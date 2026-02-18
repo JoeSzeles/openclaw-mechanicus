@@ -1,0 +1,44 @@
+# OpenClaw
+
+## Overview
+OpenClaw is a multi-channel AI gateway with extensible messaging integrations. It provides a WebSocket-based gateway server with a web-based control UI dashboard for managing AI chat sessions, channels, agents, and configuration.
+
+## Current State
+- Running on Replit with Node.js 22
+- Gateway server bound to 0.0.0.0:5000 with LAN bind mode
+- Control UI pre-built in dist/control-ui/
+- Channels are skipped (OPENCLAW_SKIP_CHANNELS=1) for basic operation
+
+## Project Architecture
+- **Language**: TypeScript (Node.js >= 22.12.0)
+- **Package Manager**: pnpm (10.23.0 specified in packageManager field)
+- **Build Tool**: tsdown (TypeScript bundler)
+- **UI**: Vite-based Lit web components in `ui/` directory, built to `dist/control-ui/`
+- **Entry Point**: `dist/entry.js` (compiled from `src/entry.ts`)
+- **Gateway CLI**: `node dist/entry.js gateway [options]`
+
+## Key Directories
+- `src/` - TypeScript source code
+- `src/gateway/` - Gateway server implementation
+- `src/cli/` - CLI command handlers
+- `src/config/` - Configuration loading
+- `ui/` - Control UI (Vite + Lit)
+- `dist/` - Built output
+- `dist/control-ui/` - Built UI assets
+
+## Environment Variables
+- `OPENCLAW_GATEWAY_PORT` - Gateway port (set to 5000)
+- `OPENCLAW_GATEWAY_TOKEN` - Auth token for gateway access
+- `OPENCLAW_SKIP_CHANNELS` - Skip channel initialization (set to 1)
+- `COREPACK_ENABLE_STRICT` - Must be 0 to avoid pnpm version conflicts
+
+## Workflow
+- **Start application**: Runs gateway server on port 5000 with LAN bind mode
+
+## Build Steps
+1. Install deps: `npx pnpm@10.23.0 install --no-frozen-lockfile`
+2. Build main project: Already pre-built in dist/
+3. Build UI: `cd ui && npx pnpm@10.23.0 run build`
+
+## User Preferences
+(none recorded yet)

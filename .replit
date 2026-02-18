@@ -1,0 +1,45 @@
+modules = ["swift-5.8", "bash", "nodejs-22"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+OPENCLAW_GATEWAY_PORT = "5000"
+OPENCLAW_GATEWAY_TOKEN = "4e38d19916ace326b63cfd867b58d2287ce9fa445c7ea4a07b6403d89e366a53"
+OPENCLAW_SKIP_CHANNELS = "1"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace && COREPACK_ENABLE_STRICT=0 node dist/entry.js gateway --bind lan --port 5000 --allow-unconfigured"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[deployment]
+deploymentTarget = "vm"
+run = ["node", "dist/entry.js", "gateway", "--bind", "lan", "--port", "5000", "--allow-unconfigured"]
