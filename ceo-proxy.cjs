@@ -3,7 +3,6 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
-const WebSocket = require("ws");
 
 const GATEWAY_PORT = 5001;
 const PROXY_PORT = 5000;
@@ -427,142 +426,31 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-const wss = new WebSocket.Server({ noServer: true });
-
-function findWorkerByNameProxy(name) {
-  const lower = name.toLowerCase();
-  for (const [id, w] of workers) {
-    if (w.name.toLowerCase() === lower) return { id, ...w };
-  }
-  return null;
-}
-
-function dispatchWorkerTask(workerId, message) {
-  const task = {
-    id: crypto.randomUUID(),
-    assignedTo: workerId,
-    type: "message",
-    message: "@CEO: " + message,
-    filePath: null,
-    status: "pending",
-    createdAt: new Date().toISOString(),
-    completedAt: null,
-    result: null,
-  };
-  const data = loadJson(TASKS_FILE, { tasks: [], results: [] });
-  data.tasks.push(task);
-  saveJson(TASKS_FILE, data);
-  console.log(`[ceo-proxy] task dispatched to worker ${workerId}: ${message.slice(0, 60)}`);
-  return task;
-}
-
-function injectCeoMessage(gwWs, sessionKey, label, message) {
-  if (!gwWs || gwWs.readyState !== WebSocket.OPEN) return;
-  const frame = JSON.stringify({
-    type: "req",
-    id: "ceo-" + crypto.randomUUID().slice(0, 8),
-    method: "chat.inject",
-    params: { sessionKey, message, label }
-  });
-  gwWs.send(frame);
-}
-
 server.on("upgrade", (req, socket, head) => {
-  wss.handleUpgrade(req, socket, head, (clientWs) => {
-    const gwUrl = `ws://127.0.0.1:${GATEWAY_PORT}${req.url}`;
-    const gwHeaders = { ...req.headers, host: `127.0.0.1:${GATEWAY_PORT}` };
-    delete gwHeaders["sec-websocket-key"];
-    delete gwHeaders["sec-websocket-version"];
-    delete gwHeaders["sec-websocket-extensions"];
-    delete gwHeaders["upgrade"];
-    delete gwHeaders["connection"];
-
-    const gwWs = new WebSocket(gwUrl, {
-      headers: gwHeaders,
-      perMessageDeflate: false,
-    });
-
-    let currentSessionKey = null;
-    let connected = false;
-
-    gwWs.on("open", () => { connected = true; });
-
-    gwWs.on("message", (data, isBinary) => {
-      if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.send(data, { binary: isBinary });
-      }
-    });
-
-    gwWs.on("close", (code, reason) => {
-      if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.close(code, reason);
-      }
-    });
-
-    gwWs.on("error", () => {
-      if (clientWs.readyState === WebSocket.OPEN) clientWs.close();
-    });
-
-    clientWs.on("message", (data, isBinary) => {
-      if (isBinary || gwWs.readyState !== WebSocket.OPEN) {
-        if (gwWs.readyState === WebSocket.OPEN) gwWs.send(data, { binary: isBinary });
-        return;
-      }
-
-      try {
-        const str = data.toString();
-        const msg = JSON.parse(str);
-
-        if (msg.method === "chat.history" && msg.params && msg.params.sessionKey) {
-          currentSessionKey = msg.params.sessionKey;
-        }
-
-        if (msg.method === "chat.send" && msg.params && msg.params.message) {
-          if (msg.params.sessionKey) currentSessionKey = msg.params.sessionKey;
-          const text = msg.params.message;
-          const atMatch = text.match(/^@(\S+)\s+([\s\S]+)/);
-
-          if (atMatch) {
-            const targetName = atMatch[1];
-            const taskText = atMatch[2];
-
-            if (targetName.toLowerCase() !== "ceo") {
-              const worker = findWorkerByNameProxy(targetName);
-              if (worker) {
-                console.log(`[ceo-proxy] @${targetName} intercepted, dispatching task`);
-                const sk = currentSessionKey || "agent:main:main";
-                injectCeoMessage(gwWs, sk, "CEO \u2192 " + worker.name, taskText);
-                const chatData = loadJson(CHAT_FILE, { messages: [] });
-                chatData.messages.push({
-                  id: crypto.randomUUID(),
-                  from: "CEO",
-                  role: "ceo",
-                  text: "[CEO -> " + worker.name + "] " + taskText,
-                  ts: new Date().toISOString(),
-                });
-                if (chatData.messages.length > 500) chatData.messages = chatData.messages.slice(-500);
-                saveJson(CHAT_FILE, chatData);
-                dispatchWorkerTask(worker.id, taskText);
-                return;
-              }
-            }
-          }
-        }
-      } catch (e) {}
-
-      if (gwWs.readyState === WebSocket.OPEN) {
-        gwWs.send(data, { binary: isBinary });
-      }
-    });
-
-    clientWs.on("close", () => {
-      if (gwWs.readyState === WebSocket.OPEN) gwWs.close();
-    });
-
-    clientWs.on("error", () => {
-      if (gwWs.readyState === WebSocket.OPEN) gwWs.close();
-    });
+  const opts = {
+    hostname: "127.0.0.1",
+    port: GATEWAY_PORT,
+    path: req.url,
+    method: req.method,
+    headers: { ...req.headers, host: "127.0.0.1:" + GATEWAY_PORT },
+  };
+  const p = http.request(opts);
+  p.on("upgrade", (pr, ps, ph) => {
+    socket.write(
+      "HTTP/1.1 101 Switching Protocols\r\n" +
+      Object.entries(pr.headers).map(([k, v]) => `${k}: ${v}`).join("\r\n") +
+      "\r\n\r\n"
+    );
+    if (ph.length > 0) socket.write(ph);
+    ps.pipe(socket);
+    socket.pipe(ps);
+    ps.on("error", () => socket.destroy());
+    socket.on("error", () => ps.destroy());
+    ps.on("close", () => socket.destroy());
+    socket.on("close", () => ps.destroy());
   });
+  p.on("error", () => socket.destroy());
+  p.end();
 });
 
 server.listen(PROXY_PORT, "0.0.0.0", () => {
