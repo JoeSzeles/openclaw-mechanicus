@@ -214,6 +214,16 @@ async function handleWorkers(req, res, p) {
     return json(res, 200, { ok: true });
   }
 
+  if (req.method === "DELETE" && p.match(/^\/api\/workers\/[^/]+$/)) {
+    if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" });
+    const wid = p.split("/")[3];
+    if (workers.has(wid)) {
+      workers.delete(wid);
+      return json(res, 200, { ok: true });
+    }
+    return json(res, 404, { error: "Worker not found" });
+  }
+
   return json(res, 404, { error: "Not found" });
 }
 
