@@ -24,4 +24,15 @@ if [ ! -f "$PERSISTENT_DIR/openclaw.json" ]; then
   cp /home/runner/workspace/openclaw.json "$PERSISTENT_DIR/openclaw.json"
 fi
 
-exec node dist/entry.js gateway --bind lan --port 5000 --allow-unconfigured
+# Export gateway port for internal use  
+export OPENCLAW_GATEWAY_PORT=5001
+
+# Start CEO proxy on port 5000 (exposed port) in background
+node ceo-proxy.cjs &
+PROXY_PID=$!
+
+# Small delay to let proxy bind
+sleep 1
+
+# Start OpenClaw gateway on internal port 5001 (foreground)
+exec node dist/entry.js gateway --bind lan --port 5001 --allow-unconfigured
