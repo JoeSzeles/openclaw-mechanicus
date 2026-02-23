@@ -11,6 +11,7 @@ const DATA_DIR = path.join(OPENCLAW_HOME, ".openclaw");
 const API_KEYS_FILE = path.join(DATA_DIR, "api-keys.json");
 const EXCHANGE_DIR = path.join(DATA_DIR, "exchange");
 const TASKS_FILE = path.join(DATA_DIR, "worker-tasks.json");
+const CHAT_FILE = path.join(DATA_DIR, "ceo-chat.json");
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
 
 fs.mkdirSync(EXCHANGE_DIR, { recursive: true });
@@ -20,6 +21,9 @@ if (!fs.existsSync(API_KEYS_FILE)) {
 }
 if (!fs.existsSync(TASKS_FILE)) {
   fs.writeFileSync(TASKS_FILE, JSON.stringify({ tasks: [], results: [] }, null, 2));
+}
+if (!fs.existsSync(CHAT_FILE)) {
+  fs.writeFileSync(CHAT_FILE, JSON.stringify({ messages: [] }, null, 2));
 }
 
 function loadJson(file, fallback) {
@@ -294,6 +298,53 @@ async function handleExchange(req, res, p) {
   return json(res, 404, { error: "Not found" });
 }
 
+async function handleChat(req, res, p) {
+  const url = new URL(req.url, "http://localhost");
+
+  if (req.method === "GET" && p === "/api/chat") {
+    const isGw = authGateway(req);
+    const apiKey = authWorker(req);
+    if (!isGw && !apiKey) return json(res, 401, { error: "Unauthorized" });
+    const data = loadJson(CHAT_FILE, { messages: [] });
+    const since = url.searchParams.get("since");
+    let msgs = data.messages || [];
+    if (since) {
+      const sinceTs = new Date(since).getTime();
+      msgs = msgs.filter((m) => new Date(m.ts).getTime() > sinceTs);
+    }
+    const limit = parseInt(url.searchParams.get("limit") || "100", 10);
+    msgs = msgs.slice(-limit);
+    return json(res, 200, { messages: msgs });
+  }
+
+  if (req.method === "POST" && p === "/api/chat") {
+    const isGw = authGateway(req);
+    const apiKey = authWorker(req);
+    if (!isGw && !apiKey) return json(res, 401, { error: "Unauthorized" });
+    const body = JSON.parse((await readBody(req)).toString() || "{}");
+    const msg = {
+      id: crypto.randomUUID(),
+      from: body.from || (isGw ? "CEO" : (apiKey ? apiKey.name : "unknown")),
+      role: isGw ? "ceo" : "worker",
+      text: body.text || body.message || "",
+      ts: new Date().toISOString(),
+    };
+    const data = loadJson(CHAT_FILE, { messages: [] });
+    data.messages.push(msg);
+    if (data.messages.length > 500) data.messages = data.messages.slice(-500);
+    saveJson(CHAT_FILE, data);
+    return json(res, 201, msg);
+  }
+
+  if (req.method === "DELETE" && p === "/api/chat") {
+    if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" });
+    saveJson(CHAT_FILE, { messages: [] });
+    return json(res, 200, { ok: true });
+  }
+
+  return json(res, 404, { error: "Not found" });
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, "http://localhost");
   const p = url.pathname;
@@ -312,6 +363,7 @@ async function handleApi(req, res) {
   if (p.startsWith("/api/workers")) { await handleWorkers(req, res, p); return true; }
   if (p.startsWith("/api/tasks")) { await handleTasks(req, res, p); return true; }
   if (p.startsWith("/api/exchange")) { await handleExchange(req, res, p); return true; }
+  if (p.startsWith("/api/chat")) { await handleChat(req, res, p); return true; }
   return false;
 }
 

@@ -61,9 +61,17 @@ The CEO (this Replit instance) can dispatch tasks to local OpenClaw worker insta
 - API key management UI (generate, copy, reveal, toggle, delete)
 - Connected workers list with status (online/stale)
 - Task dispatch form with worker selection and task types
+- CEO/Worker Bee Chat panel with real-time messaging (polls every 5s)
 - File exchange browser with upload/download
 - Task history with results
-- Connection guide with PowerShell/bash scripts
+- Tabbed connection scripts (PowerShell / Bash) with banner, chat polling, workspace folder
+
+**CEO/Worker Bee Chat** (`/api/chat`)
+- Shared chat log between CEO and all worker bees
+- Workers poll for new messages alongside tasks (displayed locally in console)
+- Chat persisted in `.openclaw/ceo-chat.json` (max 500 messages)
+- Messages sent from dashboard chat or from @worker addressing on main Control UI
+- Worker bees announce when they come online and post errors/ACKs to chat
 
 ### AI Model Providers
 Two providers are pre-configured:
@@ -148,6 +156,7 @@ The gateway auth token is automatically injected into the Control UI via `token-
 - `dist/control-ui/model-config.html` - AI Model Configuration page
 - `dist/control-ui/model-config.js` - Model config page logic (WebSocket comms, UI rendering)
 - `dist/control-ui/model-config.css` - Model config page styles
+- `dist/control-ui/worker-chat.js` - @worker addressing interception for main dashboard chat
 - `dist/control-ui/nav-inject.js` - Navigation bar injection script (adds nav to all pages)
 - `dist/control-ui/token-init.js` - Auto-generated at startup, injects auth token
 - `openclaw.json` - Seed config (copied to .openclaw/ on first run only)
@@ -178,6 +187,9 @@ The gateway auth token is automatically injected into the Control UI via `token-
 | GET | /api/exchange/download/:file | Any | Download exchange file |
 | POST | /api/exchange/upload | Worker/Gateway | Upload file to exchange |
 | DELETE | /api/exchange/:file | Gateway | Delete exchange file |
+| GET | /api/chat | Any | Get chat messages (supports ?since=&limit=) |
+| POST | /api/chat | Any | Post chat message ({from, text}) |
+| DELETE | /api/chat | Gateway | Clear all chat history |
 
 ## Environment Variables & Secrets
 | Variable | Purpose |
