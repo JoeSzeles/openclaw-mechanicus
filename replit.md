@@ -41,4 +41,20 @@ OpenClaw is a multi-channel AI gateway with extensible messaging integrations. I
 3. Build UI: `cd ui && npx pnpm@10.23.0 run build`
 
 ## User Preferences
-(none recorded yet)
+- **Workflow restart**: Always use `kill -9 1` to force-kill before restarting. Never use pkill or soft kills - they hang.
+- start.sh has `trap 'kill -9 1' TERM INT` to support clean restarts.
+
+## Custom Pages
+- `dist/control-ui/model-config.html` - AI Model Configuration page (standalone HTML+JS+CSS)
+- `dist/control-ui/model-config.js` - JS logic for model config page
+- `dist/control-ui/model-config.css` - Styles for model config page
+
+## Gateway WebSocket Protocol
+- Frame format: `{ type: "req", id: "unique-id", method: "methodName", params: {} }`
+- Response format: `{ type: "res", id: "matching-id", ok: true/false, result: {} }`
+- Connect handshake: method "connect" with params including minProtocol/maxProtocol (both 3), client info, auth, role, scopes
+- Valid client IDs: openclaw-control-ui, webchat-ui, webchat, cli, etc.
+- Valid modes: webchat, cli, ui, backend, node, probe, test
+- Scopes: operator.admin (full access), operator.read, operator.write, operator.approvals, operator.pairing
+- config.* methods require operator.admin scope
+- CSP blocks inline scripts in control-ui pages; must use external .js files
