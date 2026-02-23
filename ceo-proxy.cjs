@@ -66,33 +66,22 @@ function connectGateway() {
           for (const part of pm.content) {
             if (part.type !== "text" || !part.text) continue;
             const text = part.text;
-            const mentions = text.match(/@(\S+)/g);
-            if (!mentions) continue;
-            for (const mention of mentions) {
-              const wName = mention.slice(1);
-              if (wName.toLowerCase() === "ceo") continue;
-              let foundWorker = null;
-              let foundWid = null;
-              for (const [id, wr] of workers) {
-                if (wr.name.toLowerCase() === wName.toLowerCase()) {
-                  foundWorker = wr;
-                  foundWid = id;
-                  break;
-                }
-              }
-              if (!foundWorker) continue;
+            for (const [wid, wr] of workers) {
+              const nameEsc = wr.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+              const nameRegex = new RegExp("(?:@)?" + nameEsc, "i");
+              if (!nameRegex.test(text)) continue;
               const now = Date.now();
-              if (lastAutoDispatch[foundWorker.name] && now - lastAutoDispatch[foundWorker.name] < 30000) {
-                console.log("[ceo-proxy] Skipping auto-dispatch to", foundWorker.name, "(cooldown)");
+              if (lastAutoDispatch[wr.name] && now - lastAutoDispatch[wr.name] < 30000) {
+                console.log("[ceo-proxy] Skipping auto-dispatch to", wr.name, "(cooldown)");
                 continue;
               }
-              lastAutoDispatch[foundWorker.name] = now;
-              const bodyMatch = text.match(new RegExp("@" + wName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s+([\\s\\S]+)"));
-              const body = bodyMatch ? bodyMatch[1] : text;
-              console.log("[ceo-proxy] CEO agent mentioned worker:", foundWorker.name, "- auto-dispatching");
+              lastAutoDispatch[wr.name] = now;
+              const bodyMatch = text.match(new RegExp("(?:@)?" + nameEsc + "[\\s,.:!?]*([\\s\\S]+)", "i"));
+              const body = bodyMatch ? bodyMatch[1].trim() : text;
+              console.log("[ceo-proxy] CEO agent mentioned worker:", wr.name, "- auto-dispatching");
               const task = {
                 id: crypto.randomUUID(),
-                assignedTo: foundWid,
+                assignedTo: wid,
                 type: "message",
                 message: "@CEO: " + body,
                 filePath: null,
@@ -104,8 +93,8 @@ function connectGateway() {
               const taskData = loadJson(TASKS_FILE, { tasks: [], results: [] });
               taskData.tasks.push(task);
               saveJson(TASKS_FILE, taskData);
-              injectToGateway("CEO \u2192 " + foundWorker.name, body);
-              console.log("[ceo-proxy] Auto-dispatched task to", foundWorker.name, "taskId:", task.id);
+              injectToGateway("CEO \u2192 " + wr.name, body);
+              console.log("[ceo-proxy] Auto-dispatched task to", wr.name, "taskId:", task.id);
             }
           }
         }
