@@ -1,14 +1,76 @@
-# OpenClaw
+# OpenClaw Cloud
 
 ## Overview
-OpenClaw is a multi-channel AI gateway with extensible messaging integrations. It provides a WebSocket-based gateway server with a web-based control UI dashboard for managing AI chat sessions, channels, agents, and configuration.
+OpenClaw Cloud is the online/hosted version of [OpenClaw](https://github.com/nichochar/openclaw), a multi-channel AI gateway with extensible messaging integrations. It runs on Replit as a persistent, always-accessible web service with a browser-based Control UI dashboard for managing AI chat sessions, channels, agents, models, and configuration -- no local install required.
+
+## What Makes This the "Cloud" Version
+Unlike the standard local OpenClaw setup (which runs on your machine via CLI), OpenClaw Cloud:
+- Runs on Replit with a public URL, accessible from any browser
+- Uses Replit's persistent workspace storage so all data survives container restarts
+- Provides a web-based AI Model Configuration page for managing providers/models through the browser
+- Integrates with Replit's secrets management for secure API key storage
+- Auto-injects authentication tokens into the Control UI (no manual token entry)
 
 ## Current State
 - Running on Replit with Node.js 22
 - Gateway server bound to 0.0.0.0:5000 with LAN bind mode
-- Control UI pre-built in dist/control-ui/
-- Channels are skipped (OPENCLAW_SKIP_CHANNELS=1) for basic operation
-- Persistent storage in `/home/runner/workspace/.openclaw/` via OPENCLAW_HOME
+- Control UI served at root (/) with navigation bar
+- AI Model Config page at /model-config.html
+- Primary model: xai/grok-4-1-fast-reasoning (Grok 4.1 Fast Reasoning)
+- Web search enabled via Grok provider
+- Channels skipped (OPENCLAW_SKIP_CHANNELS=1) for lightweight operation
+
+## Features
+
+### AI Model Providers
+Two providers are pre-configured:
+
+**xai (Primary)**
+- Base URL: https://api.x.ai/v1
+- API Key: via XAI_API_KEY secret
+- Models:
+  - grok-4-1-fast-reasoning (Grok 4.1 Fast Reasoning) -- reasoning model, primary
+  - grok-4 (Grok 4)
+  - grok-2 (Grok 2)
+  - grok-2-vision-1212 (Grok 2 Vision) -- supports image input
+  - grok-2-1212 (Grok 2 1212)
+
+**openai (Secondary)**
+- Base URL: via Replit AI Integrations
+- API Key: via Replit AI Integrations
+- Models:
+  - gpt-4o (GPT-4o) -- supports text + image
+  - gpt-4o-mini (GPT-4o Mini) -- supports text + image
+
+### Web Search & Fetch Tools
+- `web_search` tool enabled using Grok as the search provider (uses XAI_API_KEY)
+- `web_fetch` tool enabled for fetching web page content
+- Supported search providers in OpenClaw: brave, perplexity, grok (SearXNG not supported)
+
+### AI Model Configuration Page (/model-config.html)
+A custom web UI for managing model settings through the browser:
+- View and switch the primary agent model
+- Add/remove model providers (with base URL, API key, API type)
+- Add/remove individual models under each provider (with name, context window, max tokens, reasoning flag, input types, cost settings)
+- Live WebSocket connection to the gateway for real-time config read/write
+- Save changes directly to the persistent config
+
+### Navigation Bar
+An injected navigation bar appears at the top of all pages:
+- **Dashboard** -- main OpenClaw Control UI
+- **AI Model Config** -- model management page
+
+### Persistent Storage
+All OpenClaw data persists across container restarts:
+- Config: `.openclaw/openclaw.json`
+- Agents: `.openclaw/agents/`
+- Bootstrap: `.openclaw/bootstrap.md`
+- Sessions, devices, cron data
+- Location: `/home/runner/workspace/.openclaw/`
+- To clear everything: delete the `.openclaw/` directory and restart
+
+### Auto-Token Injection
+The gateway auth token is automatically injected into the Control UI via `token-init.js`, generated at startup from the OPENCLAW_GATEWAY_TOKEN secret. No manual token configuration needed in the browser.
 
 ## Project Architecture
 - **Language**: TypeScript (Node.js >= 22.12.0)
@@ -23,54 +85,64 @@ OpenClaw is a multi-channel AI gateway with extensible messaging integrations. I
 - `src/gateway/` - Gateway server implementation
 - `src/cli/` - CLI command handlers
 - `src/config/` - Configuration loading
-- `ui/` - Control UI (Vite + Lit)
+- `ui/` - Control UI source (Vite + Lit)
 - `dist/` - Built output
-- `dist/control-ui/` - Built UI assets
-- `.openclaw/` - Persistent OpenClaw data (config, agents, sessions, bootstrap.md)
+- `dist/control-ui/` - Built UI assets + custom pages
+- `.openclaw/` - Persistent OpenClaw data (gitignored)
 
-## Persistent Storage
-- `OPENCLAW_HOME` is set to `/home/runner/workspace` in start.sh
-- All OpenClaw data lives in `/home/runner/workspace/.openclaw/` which persists across restarts
-- Config file: `.openclaw/openclaw.json`
-- Agent data: `.openclaw/agents/`
-- Bootstrap: `.openclaw/bootstrap.md`
-- The `.openclaw/` directory is in .gitignore to avoid committing user data
-- To clear all data: delete `.openclaw/` directory and restart
+## Custom Files (Cloud-Specific)
+- `start.sh` - Startup script with token injection, env setup, persistent storage init
+- `dist/control-ui/model-config.html` - AI Model Configuration page
+- `dist/control-ui/model-config.js` - Model config page logic (WebSocket comms, UI rendering)
+- `dist/control-ui/model-config.css` - Model config page styles
+- `dist/control-ui/nav-inject.js` - Navigation bar injection script (adds nav to all pages)
+- `dist/control-ui/token-init.js` - Auto-generated at startup, injects auth token
+- `openclaw.json` - Seed config (copied to .openclaw/ on first run only)
 
-## Environment Variables
-- `OPENCLAW_GATEWAY_PORT` - Gateway port (set to 5000)
-- `OPENCLAW_GATEWAY_TOKEN` - Auth token for gateway access
-- `OPENCLAW_SKIP_CHANNELS` - Skip channel initialization (set to 1)
-- `COREPACK_ENABLE_STRICT` - Must be 0 to avoid pnpm version conflicts
-- `OPENCLAW_HOME` - Set to /home/runner/workspace for persistent storage
+## Environment Variables & Secrets
+| Variable | Purpose |
+|----------|---------|
+| `XAI_API_KEY` | xAI/Grok API key (secret) |
+| `AI_INTEGRATIONS_OPENAI_API_KEY` | OpenAI API key via Replit integrations |
+| `AI_INTEGRATIONS_OPENAI_BASE_URL` | OpenAI base URL via Replit integrations |
+| `OPENCLAW_GATEWAY_TOKEN` | Auth token for gateway/Control UI access |
+| `OPENCLAW_GATEWAY_PORT` | Gateway port (set to 5000) |
+| `OPENCLAW_SKIP_CHANNELS` | Skip channel initialization (set to 1) |
+| `COREPACK_ENABLE_STRICT` | Must be 0 to avoid pnpm version conflicts |
+| `OPENCLAW_HOME` | Set to /home/runner/workspace for persistent storage |
 
 ## Workflow
-- **Start application**: Runs gateway server on port 5000 with LAN bind mode
+- **Start application**: Runs `start.sh` which sets up env, injects token, seeds config, launches gateway on port 5000
 
 ## Build Steps
 1. Install deps: `npx pnpm@10.23.0 install --no-frozen-lockfile`
 2. Build main project: Already pre-built in dist/
 3. Build UI: `cd ui && npx pnpm@10.23.0 run build`
 
-## User Preferences
-- **Workflow restart**: Always use `kill -9 1` to force-kill before restarting. Never use pkill or soft kills - they hang.
-- start.sh has `trap 'kill -9 1' TERM INT` to support clean restarts.
-- **Persistent storage**: User wants all OpenClaw data (bootstrap.md, agents, sessions, config) to persist across restarts and be manually clearable.
-
-## Custom Pages
-- `dist/control-ui/model-config.html` - AI Model Configuration page (standalone HTML+JS+CSS)
-- `dist/control-ui/model-config.js` - JS logic for model config page
-- `dist/control-ui/model-config.css` - Styles for model config page
-
 ## Gateway WebSocket Protocol
 - Frame format: `{ type: "req", id: "unique-id", method: "methodName", params: {} }`
-- Response format: `{ type: "res", id: "matching-id", ok: true/false, payload: {} }` (note: uses `payload` not `result`)
-- Connect handshake: method "connect" with params including minProtocol/maxProtocol (both 3), client info, auth, role, scopes
+- Response format: `{ type: "res", id: "matching-id", ok: true/false, payload: {} }` (uses `payload` not `result`)
+- Connect handshake: method "connect" with minProtocol/maxProtocol (both 3), client info, auth, role, scopes
 - Valid client IDs: openclaw-control-ui, webchat-ui, webchat, cli, etc.
 - Valid modes: webchat, cli, ui, backend, node, probe, test
 - Scopes: operator.admin (full access), operator.read, operator.write, operator.approvals, operator.pairing
 - config.get returns `{ payload: { path, exists, raw (JSON string), hash } }`
 - config.set takes `{ raw: "JSON string", baseHash: "hash" }` and returns `{ payload: { ok, path, config } }`
-- config.* methods require operator.admin scope (config.get is in READ_METHODS but admin scope bypasses all checks)
-- CSP blocks inline scripts in control-ui pages; must use external .js files
-- Origin check: allowedOrigins in openclaw.json must include the Replit proxy URL for browser WebSocket connections
+- CSP blocks inline scripts in control-ui pages; all JS must be in external .js files
+- allowedOrigins in openclaw.json must include the Replit proxy URL for browser WebSocket connections
+
+## User Preferences
+- **Workflow restart**: Always use `kill -9 1` to force-kill before restarting. Never use pkill or soft kills -- they hang.
+- start.sh has `trap 'kill -9 1' TERM INT` to support clean restarts.
+- **Persistent storage**: All OpenClaw data must persist across restarts and be manually clearable by deleting `.openclaw/`.
+- **Config seeding**: start.sh only copies seed config if `.openclaw/openclaw.json` doesn't exist, to avoid overwriting user changes.
+
+## Recent Changes (Feb 2026)
+- Added xAI/Grok as primary model provider with 5 models
+- Set grok-4-1-fast-reasoning as default primary agent model
+- Enabled Grok-powered web_search and web_fetch tools
+- Created AI Model Configuration page (model-config.html/js/css)
+- Added navigation bar injection across all Control UI pages
+- Implemented persistent storage via OPENCLAW_HOME
+- Added auto-token injection for seamless Control UI auth
+- Added allowedOrigins for Replit proxy WebSocket connections
