@@ -88,7 +88,7 @@ function connectGateway() {
               }
               lastAutoDispatch[foundWorker.name] = now;
               const nameEsc = foundWorker.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-              const bodyMatch = text.match(new RegExp("@" + nameEsc + "\\s+(.+)", "i"));
+              const bodyMatch = text.match(new RegExp("@" + nameEsc + "\\s+([\\s\\S]+)", "i"));
               const body = bodyMatch ? bodyMatch[1].trim() : text;
               console.log("[ceo-proxy] CEO agent @mentioned worker:", foundWorker.name, "- auto-dispatching");
               const task = {
