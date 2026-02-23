@@ -4,7 +4,8 @@
     "port": 5000,
     "trustedProxies": ["172.16.0.0/12", "10.0.0.0/8"],
     "controlUi": {
-      "allowInsecureAuth": true
+      "allowInsecureAuth": true,
+      "allowedOrigins": ["https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev", "http://127.0.0.1:5000", "http://localhost:5000"]
     }
   },
   "models": {
