@@ -391,6 +391,33 @@ async function handleApi(req, res) {
     return true;
   }
 
+  if (p === "/api/dispatch" && req.method === "POST") {
+    if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" }), true;
+    const body = JSON.parse((await readBody(req)).toString() || "{}");
+    const workerName = body.workerName;
+    const message = body.message || "";
+    if (!workerName) return json(res, 400, { error: "workerName required" }), true;
+    let w = null;
+    for (const [, wr] of workers) { if (wr.name.toLowerCase() === workerName.toLowerCase()) { w = wr; break; } }
+    if (!w) return json(res, 404, { error: "Worker not found: " + workerName }), true;
+    const task = {
+      id: crypto.randomUUID(),
+      assignedTo: w.id,
+      type: "message",
+      message: "@CEO: " + message,
+      filePath: null,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      completedAt: null,
+      result: null,
+    };
+    const data = loadJson(TASKS_FILE, { tasks: [], results: [] });
+    data.tasks.push(task);
+    saveJson(TASKS_FILE, data);
+    console.log("[ceo-proxy] Dispatched task to", w.name, "taskId:", task.id);
+    return json(res, 201, { ok: true, taskId: task.id, workerName: w.name }), true;
+  }
+
   if (p.startsWith("/api/keys")) { await handleApiKeys(req, res, p); return true; }
   if (p.startsWith("/api/workers")) { await handleWorkers(req, res, p); return true; }
   if (p.startsWith("/api/tasks")) { await handleTasks(req, res, p); return true; }
