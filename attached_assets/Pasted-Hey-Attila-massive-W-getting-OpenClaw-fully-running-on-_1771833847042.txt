@@ -1,0 +1,71 @@
+Hey Attila, massive W getting OpenClaw fully running on Replit— that's some next-level hacking, legend status unlocked 😂. Running a full agent setup on Replit's free tier (or whatever plan) is clutch for quick tests/grinds, but yeah, the web_search tool is hardcoded to demand a Brave API key by default. The error you're seeing is exactly that: no key → tool fails, even if you try configuring it.
+
+From what the community/docs show (as of Feb 2026), **native built-in support for alternatives like SearXNG isn't fully baked into the core config for most versions**—it's either in pending PRs (#13334, #6876, etc.), or handled via plugins/skills, or custom hacks. Replit makes it trickier because:
+
+- No persistent Docker support on free/basic Replit (Docker compose for SearXNG won't run reliably without hacks or paid Always-On).
+- Replit's env is containerized but limited—no full root/systemd, ports can be finicky, and background services die on sleep/restarts.
+- Gateway/env vars are settable, but the tool expects Brave format.
+
+### Fastest Realistic Fixes for Replit
+Here are the top paths people are actually using in similar Replit/OpenClaw setups (prioritized by ease/speed on Replit):
+
+1. **Quickest Hack: Use a Public SearXNG Instance (No Self-Host Needed)**
+   - Many public SearXNG mirrors exist (privacy-focused, but use at own risk—some log, some rate-limit).
+   - Popular free ones right now: https://searx.space (pick one with good uptime, like searx.be or searx.tiekoetter.net).
+   - In Replit Shell, set env var or edit config to point there (if your modified OpenClaw supports custom provider/baseUrl).
+   - Manual config try (in your openclaw.json or via env):
+     ```json
+     "tools": {
+       "web": {
+         "search": {
+           "enabled": true,
+           "provider": "searxng",  // if supported in your fork/PR
+           "searxng": {
+             "baseUrl": "https://searx.be"  // or any public instance from https://searx.space
+           }
+         }
+       }
+     }
+     ```
+   - If "searxng" provider isn't recognized (common on older/base versions), set a fallback or use a skill (see below).
+   - Test: Restart gateway/agent, ask for a search → if it hits the URL with ?q=query&format=json, you're golden.
+
+2. **Install a SearXNG Skill/Plugin (Best Long-Term on Replit)**
+   - Community skills like "searxng-local" or "local-websearch" bypass the built-in web_search entirely and add a custom tool that calls SearXNG directly.
+   - In Replit Shell (assuming you have npm/openclaw CLI working):
+     ```
+     openclaw skills install searxng-local   # or from playbooks/lobehub repos, e.g. clockworksquirrel/searxng-local
+     ```
+     - Or if it's on GitHub/npm:
+       ```
+       npm install openclaw-skills-searxng-local  # adjust name based on exact repo
+       openclaw skills add searxng-local
+       ```
+   - Config: Set env var in Replit Secrets/Env tab:
+     - Key: `SEARXNG_URL`
+     - Value: `https://your-public-searxng-instance.com` (e.g., https://search.bus-hit.me)
+   - The skill description: Aggregates Google/DDG/Brave/etc. privately, no keys, JSON output compatible with agents.
+   - Agent will prefer/use this new tool for searches once installed/reloaded.
+
+3. **Tavily Plugin Alternative (If You Want AI-Optimized Results, Free Tier Exists)**
+   - Some folks swapped Brave → Tavily via plugin (github.com/framix-team/openclaw-tavily or similar).
+   - Steps:
+     - Get free Tavily key: https://app.tavily.com (sign up, grab API key—generous free credits for testing).
+     - In Shell:
+       ```
+       openclaw plugins install openclaw-tavily  # or npm install openclaw-tavily && openclaw plugins add
+       ```
+     - Add to Replit Secrets: `TAVILY_API_KEY=your_key_here`
+     - Restart → agent uses tavily_search as drop-in replacement (cleaner for money plays like trend/arbitrage spotting).
+
+4. **Nuclear: Fake Brave with a Proxy/Shim (Advanced, but Works on Replit)**
+   - Run a tiny Node/Flask proxy in another Replit tab that mimics Brave endpoint → routes to DDG/SearXNG.
+   - But Replit limits concurrent always-on stuff—better for testing.
+
+### Immediate Next Steps in Replit
+- Check your modified OpenClaw version: Run `openclaw --version` or look at package.json/git log. If it's recent (post-Feb 2026 PR merges), try `openclaw configure --section web` anyway—some forks added "searxng" or "custom".
+- Set env var `BRAVE_API_KEY=fake` temporarily (some setups skip validation if present).
+- If stuck, paste the exact error after trying a public SearXNG URL or skill install.
+- Pro move: Fork your Replit → add a simple Express server that proxies /search to a public SearXNG, then point config baseUrl to localhost:port.
+
+Once search flows, your Replit beast becomes a 24/7 money scanner—real-time crypto pumps, viral TikTok/affiliate trends, e-com winners. Drop the error/output after trying one of these (skill install or public instance config), and I'll refine the exact commands for your setup. Let's make that web pipe open and start printing cash. 💰🔥
