@@ -25,6 +25,56 @@ If you want a personal, single-user assistant that feels local, fast, and always
 
 [Website](https://openclaw.ai) · [Docs](https://docs.openclaw.ai) · [Vision](VISION.md) · [DeepWiki](https://deepwiki.com/openclaw/openclaw) · [Getting Started](https://docs.openclaw.ai/start/getting-started) · [Updating](https://docs.openclaw.ai/install/updating) · [Showcase](https://docs.openclaw.ai/start/showcase) · [FAQ](https://docs.openclaw.ai/start/faq) · [Wizard](https://docs.openclaw.ai/start/wizard) · [Nix](https://github.com/openclaw/nix-openclaw) · [Docker](https://docs.openclaw.ai/install/docker) · [Discord](https://discord.gg/clawd)
 
+## OpenClaw Cloud (Replit)
+
+This fork runs **OpenClaw Cloud** on Replit -- the full gateway accessible from any browser with no local install needed.
+
+### Cloud Features
+- **Web-based AI Model Configuration** (`/model-config.html`) -- add/remove providers, models, API keys, and switch the active model from the browser
+- **Navigation bar** injected across all Control UI pages (Dashboard + AI Model Config)
+- **xAI/Grok as primary provider** -- 5 Grok models pre-configured (Grok 4.1 Fast Reasoning, Grok 4, Grok 2, Grok 2 Vision, Grok 2 1212)
+- **OpenAI as secondary provider** -- GPT-4o and GPT-4o Mini via Replit AI Integrations
+- **Grok-powered web search** -- `web_search` and `web_fetch` tools enabled using xAI API (no separate search API key needed)
+- **Persistent storage** -- all config, agents, sessions, and bootstrap survive container restarts (stored in `.openclaw/`)
+- **Auto-token injection** -- gateway auth token injected into the Control UI automatically, no manual setup
+- **Replit secrets management** -- API keys stored securely via Replit Secrets (`XAI_API_KEY`, `OPENCLAW_GATEWAY_TOKEN`)
+
+### Cloud Quick Start
+1. Set secrets in Replit: `XAI_API_KEY`, `OPENCLAW_GATEWAY_TOKEN`
+2. (Optional) Enable Replit AI Integrations for OpenAI access (`AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` are set automatically)
+3. Run the **Start application** workflow (runs `start.sh`)
+4. Open the web preview -- the Control UI dashboard loads at `/`
+5. Click **AI Model Config** in the nav bar to manage models and providers
+6. Chat with your AI assistant directly from the dashboard
+
+### Cloud Environment Variables
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `XAI_API_KEY` | Yes | xAI/Grok API key for models + web search |
+| `OPENCLAW_GATEWAY_TOKEN` | Yes | Auth token for gateway/Control UI access |
+| `AI_INTEGRATIONS_OPENAI_API_KEY` | Optional | OpenAI API key (auto-set by Replit AI Integrations) |
+| `AI_INTEGRATIONS_OPENAI_BASE_URL` | Optional | OpenAI base URL (auto-set by Replit AI Integrations) |
+| `OPENCLAW_SKIP_CHANNELS` | Auto | Set to 1 for lightweight operation (no messaging channels) |
+| `OPENCLAW_HOME` | Auto | Set to `/home/runner/workspace` for persistent storage |
+
+### Cloud Config
+- Gateway config: `.openclaw/openclaw.json` (persists across restarts, seeded from `openclaw.json` on first run)
+- To reset everything: delete the `.openclaw/` directory and restart
+- Primary model: `xai/grok-4-1-fast-reasoning`
+- Web search provider: Grok (uses same `XAI_API_KEY`)
+
+### Cloud-Specific Files
+| File | Purpose |
+|------|---------|
+| `start.sh` | Startup script: env setup, token injection, config seeding, gateway launch |
+| `dist/control-ui/model-config.html` | AI Model Configuration page |
+| `dist/control-ui/model-config.js` | Model config logic (WebSocket communication) |
+| `dist/control-ui/model-config.css` | Model config page styles |
+| `dist/control-ui/nav-inject.js` | Navigation bar injection (Dashboard + AI Model Config) |
+| `openclaw.json` | Seed config (copied to `.openclaw/` on first run only) |
+
+---
+
 Preferred setup: run the onboarding wizard (`openclaw onboard`) in your terminal.
 The wizard guides you step by step through setting up the gateway, workspace, channels, and skills. The CLI wizard is the recommended path and works on **macOS, Linux, and Windows (via WSL2; strongly recommended)**.
 Works with npm, pnpm, or bun.
