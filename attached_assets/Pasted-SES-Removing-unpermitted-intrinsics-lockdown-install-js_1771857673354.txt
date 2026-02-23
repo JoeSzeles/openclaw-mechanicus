@@ -1,0 +1,65 @@
+SES Removing unpermitted intrinsics lockdown-install.js:1:203117
+  Removing intrinsics.%MapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%MapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%DatePrototype%.toTemporalInstant lockdown-install.js:1:202962
+Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-qDgogVjJNRrT/QcFIp1US9pe5S3je6IRag1UIGRroLQ=') or a nonce. inpage.js:1:557271
+Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-bDxrlXOxcdpFTpDtXTjLLXEULB6Bl660phCz7WM4YO0=') or a nonce. preload.js:139:16
+Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-ieoeWczDHkReVBsRBqaal5AFMlBtNjMzgwKvLqi/tSU=') or a nonce. sandbox eval code:17:34
+[worker-chat] v8 loaded worker-chat.js:2:11
+[worker-chat] v8 ready - chat poller active, agent watcher active worker-chat.js:305:11
+Content-Security-Policy: The page’s settings blocked a style (style-src-elem) at https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap from being applied because it violates the following directive: “style-src 'self' 'unsafe-inline'” chat
+[worker-chat] chat.send intercepted: @DESKTOP-N1TGQ67 worker-chat.js:236:19
+[worker-chat] agent @mentioned worker: DESKTOP-N1TGQ67 worker-chat.js:215:15
+[worker-chat] dispatchToWorker: DESKTOP-N1TGQ67 7c89ccdd-7abe-4cd4-8c9f-28e0c14cd995 worker-chat.js:164:13
+[worker-chat] injectChatMessage: CEO → DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17
+[worker-chat] agent @mentioned worker: DESKTOP-N1TGQ67 worker-chat.js:215:15
+[worker-chat] dispatchToWorker: DESKTOP-N1TGQ67 7c89ccdd-7abe-4cd4-8c9f-28e0c14cd995 worker-chat.js:164:13
+[worker-chat] injectChatMessage: CEO → DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17
+[worker-chat] task created: 8d52aa74-da89-4bf6-9a0f-2c6229dd294d worker-chat.js:173:15
+[worker-chat] agent @mentioned worker: DESKTOP-N1TGQ67 worker-chat.js:215:15
+[worker-chat] dispatchToWorker: DESKTOP-N1TGQ67 7c89ccdd-7abe-4cd4-8c9f-28e0c14cd995 worker-chat.js:164:13
+[worker-chat] injectChatMessage: CEO → DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17
+[worker-chat] task created: 95aef2cf-103e-4804-bf76-d9638fe3b7a6 worker-chat.js:173:15
+[worker-chat] task created: 2f352e92-8616-4648-9801-90fe633b50be worker-chat.js:173:15
+[worker-chat] NEW worker message from DESKTOP-N1TGQ67 : Locked and loaded, Boss. What's the first kill? ?????? worker-chat.js:189:21
+[worker-chat] injectChatMessage: DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17
+[worker-chat] NEW worker message from DESKTOP-N1TGQ67 : Ready, Boss. What's the play? Deploy capital or hunt alpha? worker-chat.js:189:21
+[worker-chat] injectChatMessage: DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17
+[worker-chat] NEW worker message from DESKTOP-N1TGQ67 : Yo Boss Attila ????-Based Maximizer locked and loaded. What' worker-chat.js:189:21
+[worker-chat] injectChatMessage: DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17
+[worker-chat] chat.send intercepted: try again worker-chat.js:236:19
+[worker-chat] NEW worker message from DESKTOP-N1TGQ67 : Boss, locked and loaded ????. What's the play? Poll the CEO worker-chat.js:189:21
+[worker-chat] injectChatMessage: DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17
+[worker-chat] agent @mentioned worker: DESKTOP-N1TGQ67 worker-chat.js:215:15
+[worker-chat] dispatchToWorker: DESKTOP-N1TGQ67 7c89ccdd-7abe-4cd4-8c9f-28e0c14cd995 worker-chat.js:164:13
+[worker-chat] injectChatMessage: CEO → DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17
+[worker-chat] agent @mentioned worker: DESKTOP-N1TGQ67 worker-chat.js:215:15
+[worker-chat] dispatchToWorker: DESKTOP-N1TGQ67 7c89ccdd-7abe-4cd4-8c9f-28e0c14cd995 worker-chat.js:164:13
+[worker-chat] injectChatMessage: CEO → DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17
+[worker-chat] task created: 2d664b57-d55e-4969-9f7f-0f20187e194f worker-chat.js:173:15
+[worker-chat] task created: 24001eab-0aa1-486d-9fef-e1f7b39dc243 worker-chat.js:173:15
+[worker-chat] NEW worker message from DESKTOP-N1TGQ67 : Pup geared up, Boss Attila ????. CEO channels quiet-no fresh worker-chat.js:189:21
+[worker-chat] injectChatMessage: DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17
+[worker-chat] NEW worker message from DESKTOP-N1TGQ67 : Boss, summon locked in-gears hot, alpha primed. No fluff: 
+
+worker-chat.js:189:21
+[worker-chat] injectChatMessage: DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17
+[worker-chat] NEW worker message from DESKTOP-N1TGQ67 : Yo Boss, CEO's dropping infinite hail? ???? Locked in- what' worker-chat.js:189:21
+[worker-chat] injectChatMessage: DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17
+[worker-chat] NEW worker message from DESKTOP-N1TGQ67 : Infinite hail, Boss ????. Pup reporting for duty-what's the worker-chat.js:189:21
+[worker-chat] injectChatMessage: DESKTOP-N1TGQ67 listeners: 1 ws: true worker-chat.js:61:13
+[worker-chat] injected via addEventListener handler #0 worker-chat.js:92:17

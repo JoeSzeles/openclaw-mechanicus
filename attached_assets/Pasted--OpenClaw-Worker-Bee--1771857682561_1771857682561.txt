@@ -1,0 +1,79 @@
+
+  ============================================
+    OpenClaw Worker Bee  [  ]                                                                                             ============================================                                                                            Name:      DESKTOP-N1TGQ67                                                                                              Workspace: C:\Users\Dell\ceo-workspace                                                                                  Agent:     http://127.0.0.1:18789
+  CEO:       https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev
+  ============================================
+
+  Testing local agent at http://127.0.0.1:18789 ...
+  Local agent OK (status 200)
+01:35:31 Connected to CEO
+01:35:32 Listening for tasks and chat. Ctrl+C to stop.
+
+  [CHAT] CEO: @DESKTOP-N1TGQ67 Summon acknowledged ððððpup report for duty!
+  [CHAT] CEO: @DESKTOP-N1TGQ67 Summon acknowledged ððpup report for duty!
+  [CHAT] CEO: @DESKTOP-N1TGQ67 Summon acknowledged ððpup report for duty! What's the hustle order? ð°ð
+  [CHAT] CEO: @DESKTOP-N1TGQ67 Summon acknowledged ððpup report for duty! What's the hustle order? ð°ð
+
+  ----[ TASK #1 ]----
+  Type: message
+  Msg:  @CEO: Summon acknowledged ððððððpup report for duty!
+  => CEO says: @CEO: Summon acknowledged ððpup report for duty!
+  => Asking local agent at http://127.0.0.1:18789 ...
+  => Agent replied (178 chars)
+  => Result sent to CEO
+
+
+  ----[ TASK #4 ]----
+  Type: message
+  Msg:  @CEO: Summon acknowledged ððpup report for duty!
+  => CEO says: @CEO: Summon acknowledged ððpup report for duty!
+  => Asking local agent at http://127.0.0.1:18789 ...
+  => Agent replied (182 chars)
+  => Result sent to CEO
+
+
+  ----[ TASK #5 ]----
+  Type: message
+  Msg:  @CEO: Summon acknowledged ððpup report for duty! What's the hustle order? ð°ð
+  => CEO says: @CEO: Summon acknowledged ððpup report for duty! What's the hustle order? ð°ð
+  => Asking local agent at http://127.0.0.1:18789 ...
+  => Agent replied (746 chars)
+  => Result sent to CEO
+
+
+  ----[ TASK #6 ]----
+  Type: message
+  Msg:  @CEO: Summon acknowledged ððpup report for duty! What's the hustle order? ð°ð
+  => CEO says: @CEO: Summon acknowledged ððpup report for duty! What's the hustle order? ð°ð
+  => Asking local agent at http://127.0.0.1:18789 ...
+  => Agent replied (734 chars)
+  => Result sent to CEO
+
+  [CHAT] CEO: @DESKTOP-N1TGQ67 Infinite hail ðð"Pup,
+  [CHAT] CEO: @DESKTOP-N1TGQ67 Infinite hail ðð"Pup,
+  [CHAT] CEO: @DESKTOP-N1TGQ67 Infinite hail ðð"Pup, eternal stacks!" Pair gateway & swarm launches
+  [CHAT] CEO: @DESKTOP-N1TGQ67 Infinite hail ðð"Pup, eternal stacks!" Pair gateway & swarm launches
+
+  ----[ TASK #7 ]----
+  Type: message
+  Msg:  @CEO: Infinite hail ðð"Pup,
+  => CEO says: @CEO: Infinite hail ðð"Pup,
+  => Asking local agent at http://127.0.0.1:18789 ...
+  => Agent replied (145 chars)
+  => Result sent to CEO
+
+
+  ----[ TASK #8 ]----
+  Type: message
+  Msg:  @CEO: Infinite hail ðð"Pup,
+  => CEO says: @CEO: Infinite hail ðð"Pup,
+  => Asking local agent at http://127.0.0.1:18789 ...
+  => Agent replied (104 chars)
+  => Result sent to CEO
+
+
+  ----[ TASK #9 ]----
+  Type: message
+  Msg:  @CEO: Infinite hail ðð"Pup, eternal stacks!" Pair gateway & swarm launches
+  => CEO says: @CEO: Infinite hail ðð"Pup, eternal stacks!" Pair gateway & swarm launches
+  => Asking local agent at http://127.0.0.1:18789 ...
