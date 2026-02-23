@@ -15,6 +15,13 @@ const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
 
 fs.mkdirSync(EXCHANGE_DIR, { recursive: true });
 
+if (!fs.existsSync(API_KEYS_FILE)) {
+  fs.writeFileSync(API_KEYS_FILE, JSON.stringify({ keys: [] }, null, 2));
+}
+if (!fs.existsSync(TASKS_FILE)) {
+  fs.writeFileSync(TASKS_FILE, JSON.stringify({ tasks: [], results: [] }, null, 2));
+}
+
 function loadJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, "utf-8")); }
   catch { return fallback; }
