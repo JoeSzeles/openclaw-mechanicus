@@ -3,7 +3,7 @@ TOKEN="${OPENCLAW_GATEWAY_TOKEN}"
 TOKEN_JS="/home/runner/workspace/dist/control-ui/token-init.js"
 
 cat > "$TOKEN_JS" << JSEOF
-(function(){var K="openclaw.control.settings.v1";try{var r=localStorage.getItem(K);var s=r?JSON.parse(r):{};if(!s.token){s.token="${TOKEN}";localStorage.setItem(K,JSON.stringify(s))}}catch(e){}})();
+(function(){var K="openclaw.control.settings.v1";var T="${TOKEN}";try{var r=localStorage.getItem(K);var s=r?JSON.parse(r):{};if(s.token!==T){s.token=T;localStorage.setItem(K,JSON.stringify(s))}}catch(e){}})();
 JSEOF
 
 export OPENAI_API_KEY="${AI_INTEGRATIONS_OPENAI_API_KEY}"
