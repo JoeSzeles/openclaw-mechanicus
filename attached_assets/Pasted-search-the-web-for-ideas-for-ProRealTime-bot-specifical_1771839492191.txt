@@ -1,0 +1,129 @@
+search the web for ideas for ProRealTime  bot, specifically in the ProRealTime forum and write them in .md files with unique names, funny, and based on it's strategy.
+-search the web and twitter about current trends of gold , silver and suggest lucrative trades. entry points, and exit points.
+
+here example code but do not copy it, it is just here to show you the format:
+
+// ===================================
+// Strategy: 13thwarrior
+// Asset: SILVER
+// Timeframe: 1 minute
+// Type: Long Only
+// ===================================
+
+// PARAMETERS
+Defparam cumulateorders = false
+Defparam calculateonlastbars = 1000
+
+// CAPITAL SETTINGS
+positionSize = 1
+initialCapital = 10000
+orderFee = 7
+spreadPips = 2
+
+// RISK MANAGEMENT PARAMETERS
+stopLossPoints = 7000
+takeProfitPoints = 1000
+
+// TRAILING STOP PARAMETERS (Manual Implementation)
+// Trigger: 0.46% = 46 points per 10000 price level
+// Step: 0.018% = 1.8 points per 10000 price level
+// Adjusting for Silver typical price levels
+trailingTrigger = 100
+trailingStep = 10
+
+// INDICATOR PARAMETERS
+obvPeriod = 5
+
+// ===================================
+// HEIKIN ASHI CALCULATION
+// ===================================
+// Heikin Ashi Close
+haClose = (open + high + low + close) / 4
+
+// Heikin Ashi Open
+ONCE haOpen = open
+haOpen = (haOpen[1] + haClose[1]) / 2
+
+// Heikin Ashi High
+haHigh = max(high, max(haOpen, haClose))
+
+// Heikin Ashi Low
+haLow = min(low, min(haOpen, haClose))
+
+// ===================================
+// OBV CALCULATION
+// ===================================
+// On Balance Volume with custom period
+ONCE obvValue = 0
+
+IF close > close[1] THEN
+    obvValue = obvValue + volume
+ELSIF close < close[1] THEN
+    obvValue = obvValue - volume
+ENDIF
+
+// OBV Moving Average
+obvMA = Average[obvPeriod](obvValue)
+
+// ===================================
+// STRATEGY CONDITIONS
+// ===================================
+
+// Bullish Heikin Ashi candle
+haCandle = (haClose > haOpen)
+
+// OBV above its moving average
+obvBullish = (obvValue > obvMA)
+
+// Combined entry signal
+longCondition = haCandle AND obvBullish
+
+// ===================================
+// MANUAL TRAILING STOP LOGIC
+// ===================================
+ONCE newSL = 0
+
+// Reset trailing stop when no position
+IF NOT ONMARKET THEN
+    newSL = 0
+ENDIF
+
+// Calculate trailing stop for long positions
+IF LONGONMARKET THEN
+    // Initialize trailing stop when profit reaches trigger
+    IF newSL = 0 AND close - tradeprice(1) >= trailingTrigger THEN
+        newSL = tradeprice(1) + trailingStep
+    ENDIF
+    
+    // Move trailing stop up in steps
+    IF newSL > 0 AND close - newSL >= trailingStep THEN
+        newSL = newSL + trailingStep
+    ENDIF
+ENDIF
+
+// ===================================
+// ENTRY ORDERS
+// ===================================
+IF NOT ONMARKET THEN
+    IF longCondition THEN
+        BUY positionSize CONTRACT AT MARKET
+    ENDIF
+ENDIF
+
+// ===================================
+// EXIT ORDERS
+// ===================================
+
+// Fixed stop loss and take profit
+IF ONMARKET THEN
+    SET STOP pLOSS stopLossPoints
+    SET TARGET pPROFIT takeProfitPoints
+ENDIF
+
+// Manual trailing stop exit
+IF newSL > 0 THEN
+    SELL AT newSL STOP
+ENDIF
+
+
+
