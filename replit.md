@@ -51,10 +51,13 @@ OpenClaw is a multi-channel AI gateway with extensible messaging integrations. I
 
 ## Gateway WebSocket Protocol
 - Frame format: `{ type: "req", id: "unique-id", method: "methodName", params: {} }`
-- Response format: `{ type: "res", id: "matching-id", ok: true/false, result: {} }`
+- Response format: `{ type: "res", id: "matching-id", ok: true/false, payload: {} }` (note: uses `payload` not `result`)
 - Connect handshake: method "connect" with params including minProtocol/maxProtocol (both 3), client info, auth, role, scopes
 - Valid client IDs: openclaw-control-ui, webchat-ui, webchat, cli, etc.
 - Valid modes: webchat, cli, ui, backend, node, probe, test
 - Scopes: operator.admin (full access), operator.read, operator.write, operator.approvals, operator.pairing
-- config.* methods require operator.admin scope
+- config.get returns `{ payload: { path, exists, raw (JSON string), hash } }`
+- config.set takes `{ raw: "JSON string", baseHash: "hash" }` and returns `{ payload: { ok, path, config } }`
+- config.* methods require operator.admin scope (config.get is in READ_METHODS but admin scope bypasses all checks)
 - CSP blocks inline scripts in control-ui pages; must use external .js files
+- Origin check: allowedOrigins in openclaw.json must include the Replit proxy URL for browser WebSocket connections
