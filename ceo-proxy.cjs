@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const { WebSocket } = require("ws");
 
 const GATEWAY_PORT = 5001;
 const PROXY_PORT = 5000;
@@ -13,6 +14,73 @@ const EXCHANGE_DIR = path.join(DATA_DIR, "exchange");
 const TASKS_FILE = path.join(DATA_DIR, "worker-tasks.json");
 const CHAT_FILE = path.join(DATA_DIR, "ceo-chat.json");
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
+
+let gatewayWs = null;
+let gwReqCounter = 0;
+let gwSessionKey = null;
+
+function connectGateway() {
+  if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) return;
+  try {
+    const ws = new WebSocket(`ws://127.0.0.1:${GATEWAY_PORT}`, {
+      headers: { origin: "http://127.0.0.1:5000" },
+    });
+    ws.on("open", () => {
+      const connectFrame = {
+        type: "req", id: "gw-connect-" + Date.now(), method: "connect",
+        params: {
+          minProtocol: 3, maxProtocol: 3,
+          client: { id: "openclaw-control-ui", mode: "webchat", version: "dev", platform: "linux" },
+          auth: { token: GATEWAY_TOKEN },
+          role: "operator",
+          scopes: ["operator.admin"],
+        },
+      };
+      ws.send(JSON.stringify(connectFrame));
+      console.log("[ceo-proxy] Gateway WebSocket connected");
+    });
+    ws.on("message", (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === "res" && msg.id && msg.id.startsWith("gw-connect-")) {
+          console.log("[ceo-proxy] Gateway connect response:", JSON.stringify(msg).slice(0, 300));
+          if (msg.ok !== false && msg.payload) {
+            gwSessionKey = msg.payload.sessionKey || "agent:main:main";
+            console.log("[ceo-proxy] Gateway session:", gwSessionKey);
+          }
+        }
+      } catch {}
+    });
+    ws.on("close", () => {
+      gatewayWs = null;
+      setTimeout(connectGateway, 5000);
+    });
+    ws.on("error", () => {
+      gatewayWs = null;
+      setTimeout(connectGateway, 5000);
+    });
+    gatewayWs = ws;
+  } catch {
+    setTimeout(connectGateway, 5000);
+  }
+}
+
+function injectToGateway(label, message) {
+  if (!gatewayWs || gatewayWs.readyState !== WebSocket.OPEN) {
+    console.log("[ceo-proxy] No gateway WS for inject");
+    return;
+  }
+  const sessionKey = gwSessionKey || "agent:main:main";
+  const id = "gw-inject-" + (++gwReqCounter) + "-" + Date.now();
+  const frame = {
+    type: "req", id, method: "chat.inject",
+    params: { sessionKey, message, label },
+  };
+  gatewayWs.send(JSON.stringify(frame));
+  console.log("[ceo-proxy] Injected to gateway chat:", label, message.slice(0, 60));
+}
+
+setTimeout(connectGateway, 3000);
 
 fs.mkdirSync(EXCHANGE_DIR, { recursive: true });
 
@@ -209,6 +277,7 @@ async function handleWorkers(req, res, p) {
       if (chatData.messages.length > 500) chatData.messages = chatData.messages.slice(-500);
       saveJson(CHAT_FILE, chatData);
       console.log(`[ceo-proxy] Worker "${workerName}" result auto-posted to chat`);
+      injectToGateway(workerName, resultText);
     }
 
     return json(res, 200, { ok: true });
