@@ -33,7 +33,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd /home/runner/workspace && COREPACK_ENABLE_STRICT=0 node dist/entry.js gateway --bind lan --port 5000 --allow-unconfigured"
+args = "cd /home/runner/workspace && COREPACK_ENABLE_STRICT=0 bash start.sh"
 waitForPort = 5000
 
 [[ports]]

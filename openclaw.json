@@ -1,0 +1,16 @@
+{
+  "gateway": {
+    "bind": "lan",
+    "port": 5000,
+    "trustedProxies": ["172.16.0.0/12", "10.0.0.0/8"]
+  },
+  "models": {
+    "providers": {
+      "openai": {
+        "baseUrl": "${AI_INTEGRATIONS_OPENAI_BASE_URL}",
+        "apiKey": "${AI_INTEGRATIONS_OPENAI_API_KEY}",
+        "models": []
+      }
+    }
+  }
+}
