@@ -82,6 +82,9 @@ USER.md
 # local tooling
 .serena/
 
+# OpenClaw persistent data (user configs, agents, sessions)
+.openclaw/
+
 # Agent credentials and memory (NEVER COMMIT)
 /memory/
 .agent/*.json

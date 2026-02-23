@@ -13,7 +13,15 @@ JSEOF
 export OPENAI_API_KEY="${AI_INTEGRATIONS_OPENAI_API_KEY}"
 export OPENAI_BASE_URL="${AI_INTEGRATIONS_OPENAI_BASE_URL}"
 
-mkdir -p /home/runner/.openclaw
-cp /home/runner/workspace/openclaw.json /home/runner/.openclaw/openclaw.json
+# Use workspace as OPENCLAW_HOME so all data persists across restarts
+# Data stored in /home/runner/workspace/.openclaw/ (persistent storage)
+export OPENCLAW_HOME="/home/runner/workspace"
+
+# Seed config if not present yet
+PERSISTENT_DIR="/home/runner/workspace/.openclaw"
+mkdir -p "$PERSISTENT_DIR"
+if [ ! -f "$PERSISTENT_DIR/openclaw.json" ]; then
+  cp /home/runner/workspace/openclaw.json "$PERSISTENT_DIR/openclaw.json"
+fi
 
 exec node dist/entry.js gateway --bind lan --port 5000 --allow-unconfigured
