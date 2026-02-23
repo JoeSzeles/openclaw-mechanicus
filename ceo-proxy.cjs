@@ -483,9 +483,16 @@ server.on("upgrade", (req, socket, head) => {
     });
 
     let currentSessionKey = null;
-    let connected = false;
+    let gwReady = false;
+    const pendingMessages = [];
 
-    gwWs.on("open", () => { connected = true; });
+    gwWs.on("open", () => {
+      gwReady = true;
+      for (const pm of pendingMessages) {
+        gwWs.send(pm.data, { binary: pm.binary });
+      }
+      pendingMessages.length = 0;
+    });
 
     gwWs.on("message", (data, isBinary) => {
       if (clientWs.readyState === WebSocket.OPEN) {
@@ -495,17 +502,25 @@ server.on("upgrade", (req, socket, head) => {
 
     gwWs.on("close", (code, reason) => {
       if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.close(code, reason);
+        try { clientWs.close(code || 1000, reason || ""); } catch(e) { clientWs.terminate(); }
       }
     });
 
     gwWs.on("error", () => {
-      if (clientWs.readyState === WebSocket.OPEN) clientWs.close();
+      try { if (clientWs.readyState === WebSocket.OPEN) clientWs.close(); } catch(e) {}
     });
 
+    function sendToGateway(data, binary) {
+      if (gwReady && gwWs.readyState === WebSocket.OPEN) {
+        gwWs.send(data, { binary });
+      } else {
+        pendingMessages.push({ data, binary });
+      }
+    }
+
     clientWs.on("message", (data, isBinary) => {
-      if (isBinary || gwWs.readyState !== WebSocket.OPEN) {
-        if (gwWs.readyState === WebSocket.OPEN) gwWs.send(data, { binary: isBinary });
+      if (isBinary) {
+        sendToGateway(data, true);
         return;
       }
 
@@ -550,17 +565,15 @@ server.on("upgrade", (req, socket, head) => {
         }
       } catch (e) {}
 
-      if (gwWs.readyState === WebSocket.OPEN) {
-        gwWs.send(data, { binary: isBinary });
-      }
+      sendToGateway(data, false);
     });
 
     clientWs.on("close", () => {
-      if (gwWs.readyState === WebSocket.OPEN) gwWs.close();
+      try { if (gwWs.readyState === WebSocket.OPEN) gwWs.close(); } catch(e) {}
     });
 
     clientWs.on("error", () => {
-      if (gwWs.readyState === WebSocket.OPEN) gwWs.close();
+      try { if (gwWs.readyState === WebSocket.OPEN) gwWs.close(); } catch(e) {}
     });
   });
 });
