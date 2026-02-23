@@ -19,8 +19,11 @@ let gatewayWs = null;
 let gwReqCounter = 0;
 let gwSessionKey = null;
 
+let gwConnecting = false;
 function connectGateway() {
+  if (gwConnecting) return;
   if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) return;
+  gwConnecting = true;
   try {
     const ws = new WebSocket(`ws://127.0.0.1:${GATEWAY_PORT}`, {
       headers: { origin: "http://127.0.0.1:5000" },
@@ -53,14 +56,17 @@ function connectGateway() {
     });
     ws.on("close", () => {
       gatewayWs = null;
+      gwConnecting = false;
       setTimeout(connectGateway, 5000);
     });
     ws.on("error", () => {
       gatewayWs = null;
+      gwConnecting = false;
       setTimeout(connectGateway, 5000);
     });
     gatewayWs = ws;
   } catch {
+    gwConnecting = false;
     setTimeout(connectGateway, 5000);
   }
 }
@@ -484,6 +490,11 @@ async function handleApi(req, res) {
     const data = loadJson(TASKS_FILE, { tasks: [], results: [] });
     data.tasks.push(task);
     saveJson(TASKS_FILE, data);
+    injectToGateway("CEO \u2192 " + w.name, message);
+    const chatData = loadJson(CHAT_FILE, { messages: [] });
+    chatData.messages.push({ id: crypto.randomUUID(), from: "CEO", role: "ceo", text: "[CEO -> " + w.name + "] " + message, ts: new Date().toISOString() });
+    if (chatData.messages.length > 500) chatData.messages = chatData.messages.slice(-500);
+    saveJson(CHAT_FILE, chatData);
     console.log("[ceo-proxy] Dispatched task to", w.name, "taskId:", task.id);
     return json(res, 201, { ok: true, taskId: task.id, workerName: w.name }), true;
   }
