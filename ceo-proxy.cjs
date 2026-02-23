@@ -3,7 +3,6 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
-const WebSocket = require("ws");
 
 const GATEWAY_PORT = 5001;
 const PROXY_PORT = 5000;
@@ -368,6 +367,50 @@ async function handleChat(req, res, p) {
   return json(res, 404, { error: "Not found" });
 }
 
+async function handleDispatch(req, res) {
+  if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" });
+  const body = JSON.parse((await readBody(req)).toString() || "{}");
+  const workerName = body.workerName;
+  const message = body.message;
+  if (!workerName || !message) return json(res, 400, { error: "workerName and message required" });
+
+  let foundWorker = null;
+  const lower = workerName.toLowerCase();
+  for (const [id, w] of workers) {
+    if (w.name.toLowerCase() === lower) { foundWorker = { id, ...w }; break; }
+  }
+  if (!foundWorker) return json(res, 404, { error: "Worker not found", name: workerName });
+
+  const task = {
+    id: crypto.randomUUID(),
+    assignedTo: foundWorker.id,
+    type: "message",
+    message: "@CEO: " + message,
+    filePath: null,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+    result: null,
+  };
+  const data = loadJson(TASKS_FILE, { tasks: [], results: [] });
+  data.tasks.push(task);
+  saveJson(TASKS_FILE, data);
+
+  const chatData = loadJson(CHAT_FILE, { messages: [] });
+  chatData.messages.push({
+    id: crypto.randomUUID(),
+    from: "CEO",
+    role: "ceo",
+    text: "[CEO -> " + foundWorker.name + "] " + message,
+    ts: new Date().toISOString(),
+  });
+  if (chatData.messages.length > 500) chatData.messages = chatData.messages.slice(-500);
+  saveJson(CHAT_FILE, chatData);
+
+  console.log(`[ceo-proxy] dispatch @${foundWorker.name}: ${message.slice(0, 60)}`);
+  return json(res, 201, { ok: true, taskId: task.id, workerName: foundWorker.name, workerId: foundWorker.id });
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, "http://localhost");
   const p = url.pathname;
@@ -387,6 +430,7 @@ async function handleApi(req, res) {
   if (p.startsWith("/api/tasks")) { await handleTasks(req, res, p); return true; }
   if (p.startsWith("/api/exchange")) { await handleExchange(req, res, p); return true; }
   if (p.startsWith("/api/chat")) { await handleChat(req, res, p); return true; }
+  if (p === "/api/dispatch" && req.method === "POST") { await handleDispatch(req, res); return true; }
   return false;
 }
 
@@ -427,155 +471,31 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-const wss = new WebSocket.Server({ noServer: true });
-
-function findWorkerByNameProxy(name) {
-  const lower = name.toLowerCase();
-  for (const [id, w] of workers) {
-    if (w.name.toLowerCase() === lower) return { id, ...w };
-  }
-  return null;
-}
-
-function dispatchWorkerTask(workerId, message) {
-  const task = {
-    id: crypto.randomUUID(),
-    assignedTo: workerId,
-    type: "message",
-    message: "@CEO: " + message,
-    filePath: null,
-    status: "pending",
-    createdAt: new Date().toISOString(),
-    completedAt: null,
-    result: null,
-  };
-  const data = loadJson(TASKS_FILE, { tasks: [], results: [] });
-  data.tasks.push(task);
-  saveJson(TASKS_FILE, data);
-  console.log(`[ceo-proxy] task dispatched to worker ${workerId}: ${message.slice(0, 60)}`);
-  return task;
-}
-
-function injectCeoMessage(gwWs, sessionKey, label, message) {
-  if (!gwWs || gwWs.readyState !== WebSocket.OPEN) return;
-  const frame = JSON.stringify({
-    type: "req",
-    id: "ceo-" + crypto.randomUUID().slice(0, 8),
-    method: "chat.inject",
-    params: { sessionKey, message, label }
-  });
-  gwWs.send(frame);
-}
-
 server.on("upgrade", (req, socket, head) => {
-  wss.handleUpgrade(req, socket, head, (clientWs) => {
-    const gwUrl = `ws://127.0.0.1:${GATEWAY_PORT}${req.url}`;
-    const gwHeaders = { ...req.headers, host: `127.0.0.1:${GATEWAY_PORT}` };
-    delete gwHeaders["sec-websocket-key"];
-    delete gwHeaders["sec-websocket-version"];
-    delete gwHeaders["sec-websocket-extensions"];
-    delete gwHeaders["upgrade"];
-    delete gwHeaders["connection"];
-
-    const gwWs = new WebSocket(gwUrl, {
-      headers: gwHeaders,
-      perMessageDeflate: false,
-    });
-
-    let currentSessionKey = null;
-    let gwReady = false;
-    const pendingMessages = [];
-
-    gwWs.on("open", () => {
-      gwReady = true;
-      for (const pm of pendingMessages) {
-        gwWs.send(pm.data, { binary: pm.binary });
-      }
-      pendingMessages.length = 0;
-    });
-
-    gwWs.on("message", (data, isBinary) => {
-      if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.send(data, { binary: isBinary });
-      }
-    });
-
-    gwWs.on("close", (code, reason) => {
-      if (clientWs.readyState === WebSocket.OPEN) {
-        try { clientWs.close(code || 1000, reason || ""); } catch(e) { clientWs.terminate(); }
-      }
-    });
-
-    gwWs.on("error", () => {
-      try { if (clientWs.readyState === WebSocket.OPEN) clientWs.close(); } catch(e) {}
-    });
-
-    function sendToGateway(data, binary) {
-      if (gwReady && gwWs.readyState === WebSocket.OPEN) {
-        gwWs.send(data, { binary });
-      } else {
-        pendingMessages.push({ data, binary });
-      }
-    }
-
-    clientWs.on("message", (data, isBinary) => {
-      if (isBinary) {
-        sendToGateway(data, true);
-        return;
-      }
-
-      try {
-        const str = data.toString();
-        const msg = JSON.parse(str);
-
-        if (msg.method === "chat.history" && msg.params && msg.params.sessionKey) {
-          currentSessionKey = msg.params.sessionKey;
-        }
-
-        if (msg.method === "chat.send" && msg.params && msg.params.message) {
-          if (msg.params.sessionKey) currentSessionKey = msg.params.sessionKey;
-          const text = msg.params.message;
-          const atMatch = text.match(/^@(\S+)\s+([\s\S]+)/);
-
-          if (atMatch) {
-            const targetName = atMatch[1];
-            const taskText = atMatch[2];
-
-            if (targetName.toLowerCase() !== "ceo") {
-              const worker = findWorkerByNameProxy(targetName);
-              if (worker) {
-                console.log(`[ceo-proxy] @${targetName} intercepted, dispatching task`);
-                const sk = currentSessionKey || "agent:main:main";
-                injectCeoMessage(gwWs, sk, "CEO \u2192 " + worker.name, taskText);
-                const chatData = loadJson(CHAT_FILE, { messages: [] });
-                chatData.messages.push({
-                  id: crypto.randomUUID(),
-                  from: "CEO",
-                  role: "ceo",
-                  text: "[CEO -> " + worker.name + "] " + taskText,
-                  ts: new Date().toISOString(),
-                });
-                if (chatData.messages.length > 500) chatData.messages = chatData.messages.slice(-500);
-                saveJson(CHAT_FILE, chatData);
-                dispatchWorkerTask(worker.id, taskText);
-                return;
-              }
-            }
-          }
-        }
-      } catch (e) {}
-
-      sendToGateway(data, false);
-    });
-
-    clientWs.on("close", () => {
-      try { if (gwWs.readyState === WebSocket.OPEN) gwWs.close(); } catch(e) {}
-    });
-
-    clientWs.on("error", () => {
-      try { if (gwWs.readyState === WebSocket.OPEN) gwWs.close(); } catch(e) {}
-    });
+  const opts = {
+    hostname: "127.0.0.1",
+    port: GATEWAY_PORT,
+    path: req.url,
+    method: req.method,
+    headers: { ...req.headers, host: "127.0.0.1:" + GATEWAY_PORT },
+  };
+  const p = http.request(opts);
+  p.on("upgrade", (pr, ps, ph) => {
+    socket.write(
+      "HTTP/1.1 101 Switching Protocols\r\n" +
+      Object.entries(pr.headers).map(([k, v]) => `${k}: ${v}`).join("\r\n") +
+      "\r\n\r\n"
+    );
+    if (ph.length > 0) socket.write(ph);
+    ps.pipe(socket);
+    socket.pipe(ps);
+    ps.on("error", () => socket.destroy());
+    socket.on("error", () => ps.destroy());
+    ps.on("close", () => socket.destroy());
+    socket.on("close", () => ps.destroy());
   });
+  p.on("error", () => socket.destroy());
+  p.end();
 });
 
 server.listen(PROXY_PORT, "0.0.0.0", () => {
