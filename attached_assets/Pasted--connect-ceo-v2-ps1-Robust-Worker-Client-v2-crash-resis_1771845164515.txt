@@ -1,0 +1,150 @@
+# connect-ceo-v2.ps1 - Robust Worker Client (v2 - crash-resistant)
+# Logs everything, handles errors gracefully, safe file ops
+
+$CEO_URL   = "https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev"
+$API_KEY   = "ocw_a731572128c1257aee0825ece3a2ad4aee90057855dd494072cb14be8740775f"
+
+$HEADERS = @{
+    "Authorization" = "Bearer $API_KEY"
+    "Content-Type"  = "application/json"
+}
+
+$WORKER_NAME   = "Attila-PC-v2"
+$AGENT_ID      = "default"
+$PLATFORM      = "windows"
+$VERSION       = "1.0"
+
+$POLL_INTERVAL = 10
+$BACKOFF_SEC   = 30   # On error, wait longer before next poll
+$LOG_FILE      = "$env:USERPROFILE\Desktop\ceo-worker-v2.log"
+$MAX_FILE_MB   = 20   # Hard limit to avoid OOM on base64
+
+function Log {
+    param([string]$msg, [string]$color = "White")
+    $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Write-Host "$ts $msg" -ForegroundColor $color
+    "$ts | $msg" | Out-File -FilePath $LOG_FILE -Append -Encoding utf8
+}
+
+Log "Starting worker v2 - $WORKER_NAME" "Cyan"
+
+# Register
+Log "Registering..." "Cyan"
+$regBody = @{
+    name     = $WORKER_NAME
+    agentId  = $AGENT_ID
+    platform = $PLATFORM
+    version  = $VERSION
+} | ConvertTo-Json
+
+try {
+    Invoke-RestMethod -Uri "$CEO_URL/api/workers/register" -Method Post -Headers $HEADERS -Body $regBody | Out-Null
+    Log "Registered OK" "Green"
+} catch {
+    Log "REGISTRATION FAILED: $($_.Exception.Message)" "Red"
+    Log "Full error: $($_.Exception | Format-List -Force | Out-String)" "Red"
+    exit 1
+}
+
+Log "Polling started. Press Ctrl+C to stop." "Yellow"
+
+while ($true) {
+    $resp = $null
+    try {
+        Log "Polling CEO..." "DarkGray"
+        $resp = Invoke-RestMethod -Uri "$CEO_URL/api/workers/poll" -Method Get -Headers $HEADERS
+        Log "Poll OK - $($resp.tasks?.Count ?? 0) tasks" "Green"
+    } catch {
+        Log "POLL ERROR: $($_.Exception.Message)" "Red"
+        Log "Will backoff $BACKOFF_SEC sec..." "Yellow"
+        Start-Sleep -Seconds $BACKOFF_SEC
+        continue
+    }
+
+    if ($resp.tasks -and $resp.tasks.Count -gt 0) {
+        foreach ($task in $resp.tasks) {
+            Log "Task [$($task.type ?? 'unknown')] ID: $($task.id) | Path/Msg: $($task.filePath ?? $task.message)" "Cyan"
+
+            $result = "ERROR: Unhandled task type"
+
+            try {
+                if ($task.filePath) {
+                    $safePath = [System.IO.Path]::GetFullPath($task.filePath)
+                    Log "Resolved path: $safePath" "DarkCyan"
+                }
+
+                switch ($task.type) {
+                    "file_read" {
+                        if (!(Test-Path $safePath)) { throw "File not found: $safePath" }
+                        $result = Get-Content -Path $safePath -Raw -ErrorAction Stop
+                        Log "Read OK ($($result.Length) chars)" "Magenta"
+                    }
+
+                    "file_write" {
+                        $dir = Split-Path $safePath -Parent
+                        if ($dir -and !(Test-Path $dir)) {
+                            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+                            Log "Created dir: $dir" "DarkCyan"
+                        }
+                        Set-Content -Path $safePath -Value $task.message -NoNewline -ErrorAction Stop
+                        $result = "OK: Wrote $($task.message.Length) chars to $safePath"
+                        Log $result "Green"
+                    }
+
+                    "file_upload" {
+                        if (!(Test-Path $safePath)) { throw "File not found" }
+                        $sizeMB = (Get-Item $safePath).Length / 1MB
+                        if ($sizeMB -gt $MAX_FILE_MB) { throw "File too large ($sizeMB MB > $MAX_FILE_MB MB)" }
+
+                        Log "Reading file for upload ($sizeMB MB)..." "Yellow"
+                        $bytes = [IO.File]::ReadAllBytes($safePath)
+                        $b64 = [Convert]::ToBase64String($bytes)
+                        $fname = Split-Path $safePath -Leaf
+
+                        $upBody = @{
+                            fileName = $fname
+                            content  = $b64
+                            encoding = "base64"
+                        } | ConvertTo-Json -Compress  # Compress to reduce memory
+
+                        Log "Uploading $fname..." "Yellow"
+                        Invoke-RestMethod -Uri "$CEO_URL/api/exchange/upload" -Method Post -Headers $HEADERS -Body $upBody | Out-Null
+                        $result = "OK: Uploaded $fname ($sizeMB MB)"
+                        Log $result "Green"
+                    }
+
+                    "list_files" {
+                        $dir = if ($task.filePath) { [IO.Path]::GetFullPath($task.filePath) } else { "." }
+                        if (!(Test-Path $dir)) { throw "Dir not found: $dir" }
+                        $items = Get-ChildItem -Path $dir -ErrorAction Stop | ForEach-Object {
+                            $type = if ($_.PSIsContainer) { "dir" } else { "file" }
+                            "$type`t$($_.Length)`t$($_.Name)"
+                        }
+                        $result = if ($items) { $items -join "`n" } else { "Empty" }
+                        Log "Listed $dir ($($items.Count) items)" "Magenta"
+                    }
+
+                    default {
+                        $result = "Received: $($task.message ?? 'No message')"
+                        Log "Fallback handled" "Yellow"
+                    }
+                }
+            } catch {
+                $result = "ERROR: $($_.Exception.Message)"
+                Log "TASK ERROR: $result" "Red"
+                Log $_.Exception | Format-List -Force | Out-String | ForEach-Object { Log $_ "DarkRed" }
+            }
+
+            # Send result
+            try {
+                $resBody = @{ taskId = $task.id; result = $result } | ConvertTo-Json -Compress
+                Invoke-RestMethod -Uri "$CEO_URL/api/workers/result" -Method Post -Headers $HEADERS -Body $resBody | Out-Null
+                Log "Result sent OK" "Green"
+            } catch {
+                Log "RESULT SEND FAILED: $($_.Exception.Message)" "Red"
+            }
+        }
+    }
+
+    Start-Sleep -Seconds $POLL_INTERVAL
+}
