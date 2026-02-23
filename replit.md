@@ -66,12 +66,12 @@ The CEO (this Replit instance) can dispatch tasks to local OpenClaw worker insta
 - Task history with results
 - Tabbed connection scripts (PowerShell / Bash) with banner, chat polling, workspace folder
 
-**CEO/Worker Bee Chat** (`/api/chat`)
-- Shared chat log between CEO and all worker bees
-- Workers poll for new messages alongside tasks (displayed locally in console)
-- Chat persisted in `.openclaw/ceo-chat.json` (max 500 messages)
-- Messages sent from dashboard chat or from @worker addressing on main Control UI
-- Worker bees announce when they come online and post errors/ACKs to chat
+**@worker Chat Integration**
+- Type `@workername message` in the main Dashboard chat to send messages to worker bees
+- Worker responses are injected directly back into the Dashboard chat via `chat.inject`
+- Workers forward messages to their local OpenClaw agent (`/v1/chat/completions`) for real AI-powered answers
+- Workers with no local agent return acknowledgment with the received message
+- Chat also persisted via `/api/chat` API for worker-side polling
 
 ### AI Model Providers
 Two providers are pre-configured:
