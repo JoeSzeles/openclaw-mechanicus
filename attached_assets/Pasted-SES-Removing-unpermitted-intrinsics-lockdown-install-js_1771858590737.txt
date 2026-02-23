@@ -1,0 +1,21 @@
+SES Removing unpermitted intrinsics lockdown-install.js:1:203117
+  Removing intrinsics.%MapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%MapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%DatePrototype%.toTemporalInstant lockdown-install.js:1:202962
+Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-qDgogVjJNRrT/QcFIp1US9pe5S3je6IRag1UIGRroLQ=') or a nonce. inpage.js:1:557271
+Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-tEbIMO4FiTFqOWbC5QpVwUT58HYDxkHNDnsUzuJ7/9E=') or a nonce. preload.js:139:16
+Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-ieoeWczDHkReVBsRBqaal5AFMlBtNjMzgwKvLqi/tSU=') or a nonce. sandbox eval code:17:34
+[worker-chat] v10 loaded worker-chat.js:2:11
+[worker-chat] v10 ready - chat poller + agent watcher worker-chat.js:223:11
+Content-Security-Policy: The page’s settings blocked a style (style-src-elem) at https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap from being applied because it violates the following directive: “style-src 'self' 'unsafe-inline'” chat
+[worker-chat] agent response watcher attached to WebSocket worker-chat.js:172:13
+[worker-chat] worker reply from DESKTOP-N1TGQ67 : Worker DESKTOP-N1TGQ67 is online (workspace: C:\Users\Dell\c worker-chat.js:119:21
+[worker-chat] chat.send intercepted: tell DESKTOP-N1TGQ67 to check in worker-chat.js:191:19
+[worker-chat] agent mentioned worker: DESKTOP-N1TGQ67 dispatching worker-chat.js:166:21
+[worker-chat] dispatchToWorker: DESKTOP-N1TGQ67 source: agent worker-chat.js:96:13
+[worker-chat] task created: c53cd1da-e555-4b95-9fbf-c6e126ec7ac0 worker-chat.js:104:15
+[worker-chat] worker reply from DESKTOP-N1TGQ67 : Yo Boss Attila ????,
+
+**Status:** Locked & loaded on DESKTOP worker-chat.js:119:21
