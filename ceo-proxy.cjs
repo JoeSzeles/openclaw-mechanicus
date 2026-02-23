@@ -380,8 +380,15 @@ function proxyReq(req, res) {
     method: req.method,
     headers: { ...req.headers, host: "127.0.0.1:" + GATEWAY_PORT },
   };
+  const noCache = /\/(worker-chat|nav-inject|token-init|workers)\.(js|css|html)/.test(req.url);
   const p = http.request(opts, (pr) => {
-    res.writeHead(pr.statusCode, pr.headers);
+    const headers = { ...pr.headers };
+    if (noCache) {
+      headers["cache-control"] = "no-cache, no-store, must-revalidate";
+      headers["pragma"] = "no-cache";
+      headers["expires"] = "0";
+    }
+    res.writeHead(pr.statusCode, headers);
     pr.pipe(res);
   });
   p.on("error", (err) => {
