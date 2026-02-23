@@ -1,4 +1,9 @@
 #!/bin/bash
+
+# Force kill any existing gateway processes first
+pkill -9 -f "node dist/entry.js gateway" 2>/dev/null || true
+sleep 0.5
+
 TOKEN="${OPENCLAW_GATEWAY_TOKEN}"
 TOKEN_JS="/home/runner/workspace/dist/control-ui/token-init.js"
 
