@@ -229,7 +229,13 @@ The gateway auth token is automatically injected into the Control UI via `token-
 - **Persistent storage**: All OpenClaw data must persist across restarts and be manually clearable by deleting `.openclaw/`.
 - **Config seeding**: start.sh only copies seed config if `.openclaw/openclaw.json` doesn't exist, to avoid overwriting user changes.
 
-## Recent Changes (Feb 2026)
+## Recent Changes (Feb 23, 2026)
+- **CEO→Worker @CEO labeling**: All messages from CEO to workers are prefixed with `@CEO:` so workers clearly know who's talking. CEO's outgoing messages also appear in the main Dashboard chat.
+- **Task History Clear All**: Workers Dashboard has a "Clear All" button to wipe task history (DELETE /api/tasks endpoint)
+- **Copy Script button**: PowerShell/Bash connection script tabs have a "Copy Script" button to copy the active script to clipboard
+- **fakeChat for worker responses**: Worker responses appear in main Dashboard chat via synthetic WebSocket events (no chat.inject, no CEO agent triggering)
+
+## Earlier Changes (Feb 2026)
 - **CEO/Worker system**: Added reverse proxy architecture (ceo-proxy.cjs on port 5000, gateway on port 5001)
 - **API key management**: Generate, list, reveal, toggle, delete worker API keys
 - **Worker registration & task dispatch**: REST API for workers to register, poll tasks, submit results

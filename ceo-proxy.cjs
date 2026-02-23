@@ -226,6 +226,11 @@ async function handleTasks(req, res, p) {
     return json(res, 201, task);
   }
 
+  if (req.method === "DELETE" && p === "/api/tasks") {
+    saveJson(TASKS_FILE, { tasks: [], results: [] });
+    return json(res, 200, { ok: true });
+  }
+
   if (req.method === "DELETE" && p.match(/^\/api\/tasks\/[^/]+$/)) {
     const id = p.split("/")[3];
     const data = loadJson(TASKS_FILE, { tasks: [], results: [] });
