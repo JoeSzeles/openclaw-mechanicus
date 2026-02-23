@@ -398,11 +398,12 @@ async function handleApi(req, res) {
     const message = body.message || "";
     if (!workerName) return json(res, 400, { error: "workerName required" }), true;
     let w = null;
-    for (const [, wr] of workers) { if (wr.name.toLowerCase() === workerName.toLowerCase()) { w = wr; break; } }
+    let wid = null;
+    for (const [id, wr] of workers) { if (wr.name.toLowerCase() === workerName.toLowerCase()) { w = wr; wid = id; break; } }
     if (!w) return json(res, 404, { error: "Worker not found: " + workerName }), true;
     const task = {
       id: crypto.randomUUID(),
-      assignedTo: w.id,
+      assignedTo: wid,
       type: "message",
       message: "@CEO: " + message,
       filePath: null,
