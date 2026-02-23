@@ -194,6 +194,23 @@ async function handleWorkers(req, res, p) {
       result: body.result || "", completedAt: new Date().toISOString(),
     });
     saveJson(TASKS_FILE, data);
+
+    const workerName = workers.has(apiKey.id) ? workers.get(apiKey.id).name : apiKey.name;
+    const resultText = body.result || "";
+    if (resultText) {
+      const chatData = loadJson(CHAT_FILE, { messages: [] });
+      chatData.messages.push({
+        id: crypto.randomUUID(),
+        from: workerName,
+        role: "worker",
+        text: resultText,
+        ts: new Date().toISOString(),
+      });
+      if (chatData.messages.length > 500) chatData.messages = chatData.messages.slice(-500);
+      saveJson(CHAT_FILE, chatData);
+      console.log(`[ceo-proxy] Worker "${workerName}" result auto-posted to chat`);
+    }
+
     return json(res, 200, { ok: true });
   }
 
