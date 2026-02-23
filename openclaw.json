@@ -8,11 +8,53 @@
     }
   },
   "models": {
+    "mode": "merge",
     "providers": {
       "openai": {
         "baseUrl": "${AI_INTEGRATIONS_OPENAI_BASE_URL}",
         "apiKey": "${AI_INTEGRATIONS_OPENAI_API_KEY}",
-        "models": []
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "gpt-4o",
+            "name": "GPT-4o",
+            "reasoning": false,
+            "input": ["text", "image"],
+            "contextWindow": 128000,
+            "maxTokens": 16384
+          },
+          {
+            "id": "gpt-4o-mini",
+            "name": "GPT-4o Mini",
+            "reasoning": false,
+            "input": ["text", "image"],
+            "contextWindow": 128000,
+            "maxTokens": 16384
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openai/gpt-4o"
+      },
+      "models": {
+        "openai/gpt-4o": {
+          "alias": "GPT-4o"
+        },
+        "openai/gpt-4o-mini": {
+          "alias": "GPT-4o Mini"
+        }
+      }
+    }
+  },
+  "auth": {
+    "profiles": {
+      "openai:default": {
+        "provider": "openai",
+        "mode": "api_key"
       }
     }
   }
