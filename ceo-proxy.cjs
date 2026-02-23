@@ -42,6 +42,8 @@ function connectGateway() {
       ws.send(JSON.stringify(connectFrame));
       console.log("[ceo-proxy] Gateway WebSocket connected");
     });
+    const processedRunIds = {};
+    const lastAutoDispatch = {};
     ws.on("message", (data) => {
       try {
         const msg = JSON.parse(data.toString());
@@ -50,6 +52,61 @@ function connectGateway() {
           if (msg.ok !== false && msg.payload) {
             gwSessionKey = msg.payload.sessionKey || "agent:main:main";
             console.log("[ceo-proxy] Gateway session:", gwSessionKey);
+          }
+        }
+        if (msg.type === "event" && msg.event === "chat" && msg.payload) {
+          const pm = msg.payload.message;
+          const runId = msg.payload.runId || "";
+          if (!runId || processedRunIds[runId]) return;
+          if (runId.startsWith("inject-")) return;
+          if (!pm || pm.role !== "assistant") return;
+          if (msg.payload.state !== "final") return;
+          processedRunIds[runId] = true;
+          if (!pm.content || !pm.content.length) return;
+          for (const part of pm.content) {
+            if (part.type !== "text" || !part.text) continue;
+            const text = part.text;
+            const mentions = text.match(/@(\S+)/g);
+            if (!mentions) continue;
+            for (const mention of mentions) {
+              const wName = mention.slice(1);
+              if (wName.toLowerCase() === "ceo") continue;
+              let foundWorker = null;
+              let foundWid = null;
+              for (const [id, wr] of workers) {
+                if (wr.name.toLowerCase() === wName.toLowerCase()) {
+                  foundWorker = wr;
+                  foundWid = id;
+                  break;
+                }
+              }
+              if (!foundWorker) continue;
+              const now = Date.now();
+              if (lastAutoDispatch[foundWorker.name] && now - lastAutoDispatch[foundWorker.name] < 30000) {
+                console.log("[ceo-proxy] Skipping auto-dispatch to", foundWorker.name, "(cooldown)");
+                continue;
+              }
+              lastAutoDispatch[foundWorker.name] = now;
+              const bodyMatch = text.match(new RegExp("@" + wName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s+([\\s\\S]+)"));
+              const body = bodyMatch ? bodyMatch[1] : text;
+              console.log("[ceo-proxy] CEO agent mentioned worker:", foundWorker.name, "- auto-dispatching");
+              const task = {
+                id: crypto.randomUUID(),
+                assignedTo: foundWid,
+                type: "message",
+                message: "@CEO: " + body,
+                filePath: null,
+                status: "pending",
+                createdAt: new Date().toISOString(),
+                completedAt: null,
+                result: null,
+              };
+              const taskData = loadJson(TASKS_FILE, { tasks: [], results: [] });
+              taskData.tasks.push(task);
+              saveJson(TASKS_FILE, taskData);
+              injectToGateway("CEO \u2192 " + foundWorker.name, body);
+              console.log("[ceo-proxy] Auto-dispatched task to", foundWorker.name, "taskId:", task.id);
+            }
           }
         }
       } catch {}
