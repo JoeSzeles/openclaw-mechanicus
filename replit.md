@@ -18,14 +18,19 @@ OpenClaw Cloud operates with a "CEO Proxy + Gateway" architecture where two comp
 
 ### Key Features:
 -   **CEO/Worker Bee System**: The Replit instance acts as a CEO, dispatching tasks to local OpenClaw Worker Bee instances. Workers register via a REST API, poll for tasks, process them, and return results which are injected directly into the Control UI chat.
+    -   **Multiple Workers Per API Key**: Any number of worker bees can connect using the same API key. Each gets a unique worker ID (`w-{uuid}-{timestamp}`). Workers with the same name + API key reuse their ID on re-registration.
     -   **API Key Management**: Generate, list, toggle, and delete API keys for workers.
-    -   **Worker Registration & Polling**: Workers register with metadata, poll for tasks, and submit results.
+    -   **Worker Registration & Polling**: Workers register with metadata, receive a unique workerId, poll for tasks (with `?workerId=` param), and submit results.
     -   **Task Dispatch**: High-level `/api/dispatch` for dispatching tasks by worker name, and low-level `/api/tasks` for direct task management. Supports task types like message, file_read, file_write, file_upload.
     -   **File Exchange**: Workers and the CEO can upload/download files to a shared exchange folder.
-    -   **Workers Dashboard**: A dedicated web UI (`/workers.html`) for managing API keys, viewing connected workers, dispatching tasks, and browsing file exchange. Includes a CEO/Worker Bee Chat panel.
+    -   **Workers Dashboard**: A dedicated web UI (`/workers.html`) for managing API keys, viewing connected workers (with avatars and bee count badge), dispatching tasks, and browsing file exchange.
+    -   **@CEO Chat**: Worker bees can address `@CEO` in their messages/results to ask the CEO agent questions. Messages are injected into the gateway chat for AI processing.
+    -   **Inter-Worker @BeeName Chat**: Workers can address each other with `@WorkerName` in their chat messages. The system automatically creates task dispatches between workers.
     -   **@worker Chat Integration**: Messages in the Dashboard chat prefixed with `@workername` are automatically dispatched to the respective worker. Worker responses are injected into the chat via server-side WebSockets.
     -   **Server-Side Agent Watcher**: The CEO proxy monitors gateway WebSocket for `@WorkerName` mentions in agent responses and automatically dispatches tasks server-side.
     -   **CEO Agent Bootstrap**: Instructions for the CEO agent to use `@WorkerName` syntax for worker dispatch.
+    -   **Available Bees File**: `.openclaw/available-bees.json` is maintained with current connected bees, updated on registration/deletion and periodically. Also available via `/api/workers/available` endpoint.
+    -   **Agent Avatars**: Round circle avatars with white border and colored background with initials displayed in worker lists and chat bubbles.
 -   **AI Model Configuration Page**: A custom web UI (`/model-config.html`) allows viewing and switching the primary agent model, adding/removing model providers (with base URL, API key, API type), and managing individual models.
 -   **Persistent Storage**: All OpenClaw data, including configuration, agents, API keys, worker tasks, chat history, and file exchange, persists across container restarts in the `.openclaw/` directory.
 -   **Auto-Token Injection**: The gateway authentication token is automatically injected into the Control UI at startup, eliminating manual configuration.

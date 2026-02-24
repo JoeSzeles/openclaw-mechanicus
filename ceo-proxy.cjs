@@ -13,6 +13,7 @@ const API_KEYS_FILE = path.join(DATA_DIR, "api-keys.json");
 const EXCHANGE_DIR = path.join(DATA_DIR, "exchange");
 const TASKS_FILE = path.join(DATA_DIR, "worker-tasks.json");
 const CHAT_FILE = path.join(DATA_DIR, "ceo-chat.json");
+const BEES_FILE = path.join(DATA_DIR, "available-bees.json");
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
 
 let gatewayWs = null;
@@ -71,16 +72,10 @@ function connectGateway() {
             for (const mention of mentions) {
               const wName = mention.slice(1);
               if (wName.toLowerCase() === "ceo") continue;
-              let foundWorker = null;
-              let foundWid = null;
-              for (const [id, wr] of workers) {
-                if (wr.name.toLowerCase() === wName.toLowerCase()) {
-                  foundWorker = wr;
-                  foundWid = id;
-                  break;
-                }
-              }
-              if (!foundWorker) continue;
+              const foundMatch = findWorkerByName(wName);
+              if (!foundMatch) continue;
+              const foundWorker = foundMatch.worker;
+              const foundWid = foundMatch.id;
               const now = Date.now();
               if (lastAutoDispatch[foundWorker.name] && now - lastAutoDispatch[foundWorker.name] < 30000) {
                 console.log("[ceo-proxy] Skipping auto-dispatch to", foundWorker.name, "(cooldown)");
@@ -157,6 +152,9 @@ if (!fs.existsSync(TASKS_FILE)) {
 if (!fs.existsSync(CHAT_FILE)) {
   fs.writeFileSync(CHAT_FILE, JSON.stringify({ messages: [] }, null, 2));
 }
+if (!fs.existsSync(BEES_FILE)) {
+  fs.writeFileSync(BEES_FILE, JSON.stringify({ updatedAt: new Date().toISOString(), bees: [] }, null, 2));
+}
 
 function loadJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, "utf-8")); }
@@ -167,6 +165,68 @@ function saveJson(file, data) {
 }
 
 const workers = new Map();
+
+function updateBeesFile() {
+  const list = [];
+  for (const [id, w] of workers) {
+    list.push({
+      id,
+      name: w.name,
+      apiKeyId: w.apiKeyId,
+      platform: w.platform,
+      version: w.version,
+      status: Date.now() - w.lastSeen < 60000 ? "online" : "stale",
+      lastSeen: new Date(w.lastSeen).toISOString(),
+      connectedAt: new Date(w.connectedAt).toISOString(),
+    });
+  }
+  saveJson(BEES_FILE, { updatedAt: new Date().toISOString(), bees: list });
+}
+
+function findWorkerByName(name) {
+  const lower = name.toLowerCase();
+  for (const [id, w] of workers) {
+    if (w.name.toLowerCase() === lower) return { id, worker: w };
+  }
+  return null;
+}
+
+function routeAtMentions(text, senderName) {
+  const mentions = text.match(/@(\S+)/g);
+  if (!mentions) return;
+  for (const mention of mentions) {
+    const targetName = mention.slice(1);
+    if (targetName.toLowerCase() === "ceo") {
+      const nameEsc = "CEO";
+      const bodyMatch = text.match(/@CEO\s+([\s\S]+)/i);
+      const body = bodyMatch ? bodyMatch[1].trim() : text;
+      console.log(`[ceo-proxy] Worker "${senderName}" @CEO - injecting question to gateway`);
+      injectToGateway(senderName + " → CEO", body);
+      continue;
+    }
+    const found = findWorkerByName(targetName);
+    if (!found) continue;
+    const nameEsc2 = found.worker.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const bodyMatch2 = text.match(new RegExp("@" + nameEsc2 + "\\s+([\\s\\S]+)", "i"));
+    const body2 = bodyMatch2 ? bodyMatch2[1].trim() : text;
+    console.log(`[ceo-proxy] Worker "${senderName}" -> @${found.worker.name} - dispatching inter-bee task`);
+    const task = {
+      id: crypto.randomUUID(),
+      assignedTo: found.id,
+      type: "message",
+      message: "@" + senderName + ": " + body2,
+      filePath: null,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      completedAt: null,
+      result: null,
+    };
+    const taskData = loadJson(TASKS_FILE, { tasks: [], results: [] });
+    taskData.tasks.push(task);
+    saveJson(TASKS_FILE, taskData);
+    injectToGateway(senderName + " → " + found.worker.name, body2);
+  }
+}
 
 function authGateway(req) {
   const h = req.headers["authorization"];
@@ -278,9 +338,20 @@ async function handleWorkers(req, res, p) {
     const apiKey = authWorker(req);
     if (!apiKey) return json(res, 401, { error: "Invalid API key" });
     const body = JSON.parse((await readBody(req)).toString() || "{}");
-    const wid = apiKey.id;
+    const workerName = body.name || apiKey.name;
+    let wid = null;
+    for (const [id, w] of workers) {
+      if (w.name.toLowerCase() === workerName.toLowerCase() && w.apiKeyId === apiKey.id) {
+        wid = id;
+        break;
+      }
+    }
+    if (!wid) {
+      wid = "w-" + crypto.randomUUID().slice(0, 8) + "-" + Date.now();
+    }
     workers.set(wid, {
-      name: body.name || apiKey.name,
+      name: workerName,
+      apiKeyId: apiKey.id,
       agentId: body.agentId || "default",
       platform: body.platform || "unknown",
       version: body.version || "unknown",
@@ -290,22 +361,48 @@ async function handleWorkers(req, res, p) {
     const data = loadJson(API_KEYS_FILE, { keys: [] });
     const k = data.keys.find((x) => x.id === apiKey.id);
     if (k) { k.lastUsed = new Date().toISOString(); saveJson(API_KEYS_FILE, data); }
+    updateBeesFile();
     return json(res, 200, { workerId: wid, status: "registered" });
   }
 
   if (req.method === "POST" && p === "/api/workers/heartbeat") {
     const apiKey = authWorker(req);
     if (!apiKey) return json(res, 401, { error: "Invalid API key" });
-    if (workers.has(apiKey.id)) workers.get(apiKey.id).lastSeen = Date.now();
+    const url2 = new URL(req.url, "http://localhost");
+    const hbWorkerId = url2.searchParams.get("workerId");
+    if (hbWorkerId && workers.has(hbWorkerId)) {
+      workers.get(hbWorkerId).lastSeen = Date.now();
+    } else {
+      for (const [id, w] of workers) {
+        if (w.apiKeyId === apiKey.id) w.lastSeen = Date.now();
+      }
+    }
     return json(res, 200, { ok: true });
   }
 
   if (req.method === "GET" && p === "/api/workers/poll") {
     const apiKey = authWorker(req);
     if (!apiKey) return json(res, 401, { error: "Invalid API key" });
-    if (workers.has(apiKey.id)) workers.get(apiKey.id).lastSeen = Date.now();
+    const url2 = new URL(req.url, "http://localhost");
+    const pollWorkerId = url2.searchParams.get("workerId");
+    if (pollWorkerId && workers.has(pollWorkerId)) {
+      workers.get(pollWorkerId).lastSeen = Date.now();
+    } else {
+      for (const [id, w] of workers) {
+        if (w.apiKeyId === apiKey.id) w.lastSeen = Date.now();
+      }
+    }
     const data = loadJson(TASKS_FILE, { tasks: [], results: [] });
-    const pending = data.tasks.filter((t) => t.assignedTo === apiKey.id && t.status === "pending");
+    let pending;
+    if (pollWorkerId) {
+      pending = data.tasks.filter((t) => t.assignedTo === pollWorkerId && t.status === "pending");
+    } else {
+      const myWorkerIds = [];
+      for (const [id, w] of workers) {
+        if (w.apiKeyId === apiKey.id) myWorkerIds.push(id);
+      }
+      pending = data.tasks.filter((t) => myWorkerIds.includes(t.assignedTo) && t.status === "pending");
+    }
     return json(res, 200, { tasks: pending });
   }
 
@@ -321,13 +418,21 @@ async function handleWorkers(req, res, p) {
       task.completedAt = new Date().toISOString();
     }
     if (!data.results) data.results = [];
+    const submitterId = body.workerId || null;
     data.results.push({
-      taskId: body.taskId, workerId: apiKey.id,
+      taskId: body.taskId, workerId: submitterId || apiKey.id,
       result: body.result || "", completedAt: new Date().toISOString(),
     });
     saveJson(TASKS_FILE, data);
 
-    const workerName = workers.has(apiKey.id) ? workers.get(apiKey.id).name : apiKey.name;
+    let workerName = apiKey.name;
+    if (submitterId && workers.has(submitterId)) {
+      workerName = workers.get(submitterId).name;
+    } else {
+      for (const [id, w] of workers) {
+        if (w.apiKeyId === apiKey.id) { workerName = w.name; break; }
+      }
+    }
     const resultText = body.result || "";
     if (resultText) {
       const chatData = loadJson(CHAT_FILE, { messages: [] });
@@ -342,6 +447,8 @@ async function handleWorkers(req, res, p) {
       saveJson(CHAT_FILE, chatData);
       console.log(`[ceo-proxy] Worker "${workerName}" result auto-posted to chat`);
       injectToGateway(workerName, resultText);
+
+      routeAtMentions(resultText, workerName);
     }
 
     return json(res, 200, { ok: true });
@@ -352,9 +459,24 @@ async function handleWorkers(req, res, p) {
     const wid = p.split("/")[3];
     if (workers.has(wid)) {
       workers.delete(wid);
+      updateBeesFile();
       return json(res, 200, { ok: true });
     }
     return json(res, 404, { error: "Worker not found" });
+  }
+
+  if (req.method === "GET" && p === "/api/workers/available") {
+    const isGw = authGateway(req);
+    const apiKey = authWorker(req);
+    if (!isGw && !apiKey) return json(res, 401, { error: "Unauthorized" });
+    const list = [];
+    for (const [id, w] of workers) {
+      list.push({
+        id, name: w.name, platform: w.platform,
+        status: Date.now() - w.lastSeen < 60000 ? "online" : "stale",
+      });
+    }
+    return json(res, 200, { bees: list, count: list.length });
   }
 
   return json(res, 404, { error: "Not found" });
@@ -487,9 +609,10 @@ async function handleChat(req, res, p) {
     const apiKey = authWorker(req);
     if (!isGw && !apiKey) return json(res, 401, { error: "Unauthorized" });
     const body = JSON.parse((await readBody(req)).toString() || "{}");
+    const senderName = body.from || (isGw ? "CEO" : (apiKey ? apiKey.name : "unknown"));
     const msg = {
       id: crypto.randomUUID(),
-      from: body.from || (isGw ? "CEO" : (apiKey ? apiKey.name : "unknown")),
+      from: senderName,
       role: isGw ? "ceo" : "worker",
       text: body.text || body.message || "",
       ts: new Date().toISOString(),
@@ -498,6 +621,11 @@ async function handleChat(req, res, p) {
     data.messages.push(msg);
     if (data.messages.length > 500) data.messages = data.messages.slice(-500);
     saveJson(CHAT_FILE, data);
+
+    if (!isGw && msg.text) {
+      routeAtMentions(msg.text, senderName);
+    }
+
     return json(res, 201, msg);
   }
 
@@ -530,10 +658,10 @@ async function handleApi(req, res) {
     const workerName = body.workerName;
     const message = body.message || "";
     if (!workerName) return json(res, 400, { error: "workerName required" }), true;
-    let w = null;
-    let wid = null;
-    for (const [id, wr] of workers) { if (wr.name.toLowerCase() === workerName.toLowerCase()) { w = wr; wid = id; break; } }
-    if (!w) return json(res, 404, { error: "Worker not found: " + workerName }), true;
+    const found = findWorkerByName(workerName);
+    if (!found) return json(res, 404, { error: "Worker not found: " + workerName }), true;
+    const w = found.worker;
+    const wid = found.id;
     const task = {
       id: crypto.randomUUID(),
       assignedTo: wid,
@@ -634,7 +762,9 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
 });
 
 setInterval(() => {
+  let changed = false;
   for (const [id, w] of workers) {
-    if (Date.now() - w.lastSeen > 300000) workers.delete(id);
+    if (Date.now() - w.lastSeen > 300000) { workers.delete(id); changed = true; }
   }
+  updateBeesFile();
 }, 60000);
