@@ -806,7 +806,14 @@ async function handleApi(req, res) {
   return false;
 }
 
-function proxyReq(req, res) {
+const LOADING_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>OpenClaw Cloud</title>
+<meta http-equiv="refresh" content="3">
+<style>body{background:#1a1a2e;color:#e0e0e0;font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
+.c{text-align:center}.s{font-size:48px;animation:spin 1s linear infinite;display:inline-block}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style></head>
+<body><div class="c"><div class="s">🦞</div><h2>OpenClaw Gateway Starting...</h2><p>This page will auto-refresh in a few seconds.</p></div></body></html>`;
+
+function proxyReq(req, res, retries = 3) {
   const opts = {
     hostname: "127.0.0.1",
     port: GATEWAY_PORT,
@@ -826,9 +833,17 @@ function proxyReq(req, res) {
     pr.pipe(res);
   });
   p.on("error", (err) => {
-    if (!res.headersSent) {
-      res.writeHead(502, { "Content-Type": "text/plain" });
-      res.end("Bad Gateway - OpenClaw gateway starting...");
+    if (retries > 0 && !res.headersSent) {
+      setTimeout(() => proxyReq(req, res, retries - 1), 2000);
+    } else if (!res.headersSent) {
+      const accept = (req.headers.accept || "");
+      if (accept.includes("text/html")) {
+        res.writeHead(503, { "Content-Type": "text/html" });
+        res.end(LOADING_HTML);
+      } else {
+        res.writeHead(502, { "Content-Type": "text/plain" });
+        res.end("Bad Gateway - OpenClaw gateway starting...");
+      }
     }
   });
   req.pipe(p);
