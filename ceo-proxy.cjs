@@ -19,6 +19,7 @@ const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
 let gatewayWs = null;
 let gwReqCounter = 0;
 let gwSessionKey = null;
+const pendingAgentChats = new Map();
 
 let gwConnecting = false;
 function connectGateway() {
@@ -55,9 +56,39 @@ function connectGateway() {
             console.log("[ceo-proxy] Gateway session:", gwSessionKey);
           }
         }
+        if (msg.type === "res" && msg.id && msg.id.startsWith("agent-chat-")) {
+          const pending = pendingAgentChats.get(msg.id);
+          if (pending) {
+            if (msg.ok === false) {
+              pending.reject(new Error(msg.errorMessage || "chat.send failed"));
+              pendingAgentChats.delete(msg.id);
+            } else {
+              pending.sendAcked = true;
+              if (msg.payload && msg.payload.runId) {
+                pending.runId = msg.payload.runId;
+              }
+            }
+          }
+        }
         if (msg.type === "event" && msg.event === "chat" && msg.payload) {
           const pm = msg.payload.message;
           const runId = msg.payload.runId || "";
+
+          if (pm && pm.role === "assistant" && msg.payload.state === "final" && pm.content) {
+            let fullText = "";
+            for (const part of pm.content) {
+              if (part.type === "text" && part.text) fullText += part.text;
+            }
+            for (const [reqId, pending] of pendingAgentChats) {
+              if (!pending.sendAcked || pending.resolved) continue;
+              if (pending.runId && pending.runId !== runId) continue;
+              pending.resolved = true;
+              pending.resolve(fullText);
+              pendingAgentChats.delete(reqId);
+              break;
+            }
+          }
+
           if (!runId || processedRunIds[runId]) return;
           if (runId.startsWith("inject-")) return;
           if (!pm || pm.role !== "assistant") return;
@@ -110,11 +141,25 @@ function connectGateway() {
     ws.on("close", () => {
       gatewayWs = null;
       gwConnecting = false;
+      for (const [reqId, pending] of pendingAgentChats) {
+        if (!pending.resolved) {
+          pending.resolved = true;
+          pending.reject(new Error("Gateway disconnected"));
+        }
+      }
+      pendingAgentChats.clear();
       setTimeout(connectGateway, 5000);
     });
     ws.on("error", () => {
       gatewayWs = null;
       gwConnecting = false;
+      for (const [reqId, pending] of pendingAgentChats) {
+        if (!pending.resolved) {
+          pending.resolved = true;
+          pending.reject(new Error("Gateway connection error"));
+        }
+      }
+      pendingAgentChats.clear();
       setTimeout(connectGateway, 5000);
     });
     gatewayWs = ws;
@@ -638,6 +683,73 @@ async function handleChat(req, res, p) {
   return json(res, 404, { error: "Not found" });
 }
 
+async function handleAgentChat(req, res) {
+  if (req.method !== "POST") return json(res, 405, { error: "Method not allowed" });
+  const isGw = authGateway(req);
+  const apiKey = authWorker(req);
+  if (!isGw && !apiKey) return json(res, 401, { error: "Unauthorized" });
+
+  if (!gatewayWs || gatewayWs.readyState !== WebSocket.OPEN) {
+    return json(res, 503, { error: "Gateway not connected" });
+  }
+
+  const body = JSON.parse((await readBody(req)).toString() || "{}");
+  let message = "";
+  if (body.messages && Array.isArray(body.messages)) {
+    const last = body.messages[body.messages.length - 1];
+    message = (last && last.content) || "";
+  } else {
+    message = body.message || body.text || "";
+  }
+  if (!message) return json(res, 400, { error: "No message provided" });
+
+  const senderName = apiKey ? apiKey.name : "CEO";
+  const label = senderName !== "CEO" ? "[" + senderName + " → CEO Agent]" : "";
+
+  const sessionKey = gwSessionKey || "agent:main:main";
+  const reqId = "agent-chat-" + (++gwReqCounter) + "-" + Date.now();
+  const TIMEOUT_MS = 180000;
+
+  const responsePromise = new Promise((resolve, reject) => {
+    const entry = { resolve, reject, sendAcked: false, resolved: false };
+    pendingAgentChats.set(reqId, entry);
+    setTimeout(() => {
+      if (!entry.resolved) {
+        entry.resolved = true;
+        pendingAgentChats.delete(reqId);
+        reject(new Error("Agent response timeout"));
+      }
+    }, TIMEOUT_MS);
+  });
+
+  const fullMessage = label ? label + " " + message : message;
+  const idempotencyKey = crypto.randomUUID();
+  const frame = {
+    type: "req", id: reqId, method: "chat.send",
+    params: { sessionKey, message: fullMessage, idempotencyKey },
+  };
+  gatewayWs.send(JSON.stringify(frame));
+  console.log("[ceo-proxy] Agent chat request from", senderName, ":", message.slice(0, 80));
+
+  try {
+    const responseText = await responsePromise;
+    console.log("[ceo-proxy] Agent chat response:", responseText.slice(0, 80));
+    return json(res, 200, {
+      id: reqId,
+      object: "chat.completion",
+      choices: [{
+        index: 0,
+        message: { role: "assistant", content: responseText },
+        finish_reason: "stop",
+      }],
+      model: "ceo-agent",
+    });
+  } catch (err) {
+    console.error("[ceo-proxy] Agent chat error:", err.message);
+    return json(res, 504, { error: err.message });
+  }
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, "http://localhost");
   const p = url.pathname;
@@ -689,6 +801,7 @@ async function handleApi(req, res) {
   if (p.startsWith("/api/workers")) { await handleWorkers(req, res, p); return true; }
   if (p.startsWith("/api/tasks")) { await handleTasks(req, res, p); return true; }
   if (p.startsWith("/api/exchange")) { await handleExchange(req, res, p); return true; }
+  if (p === "/api/agent/chat" || p === "/api/agent/chat/") { await handleAgentChat(req, res); return true; }
   if (p.startsWith("/api/chat")) { await handleChat(req, res, p); return true; }
   return false;
 }
