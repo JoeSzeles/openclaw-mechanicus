@@ -35,4 +35,4 @@ PROXY_PID=$!
 sleep 1
 
 # Start OpenClaw gateway on internal port 5001 (foreground)
-exec node dist/entry.js gateway --bind lan --port 5001 --allow-unconfigured
+exec node dist/entry.js gateway --bind loopback --port 5001 --allow-unconfigured
