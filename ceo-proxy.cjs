@@ -313,9 +313,16 @@ function authGateway(req) {
 }
 
 function authWorker(req) {
+  let tok = null;
   const h = req.headers["authorization"];
-  if (!h) return null;
-  const tok = h.replace(/^Bearer\s+/i, "");
+  if (h) {
+    tok = h.replace(/^Bearer\s+/i, "");
+  }
+  if (!tok) {
+    const u = new URL(req.url, "http://localhost");
+    tok = u.searchParams.get("apiKey") || u.searchParams.get("apikey") || u.searchParams.get("key");
+  }
+  if (!tok) return null;
   const data = loadJson(API_KEYS_FILE, { keys: [] });
   return data.keys.find((k) => k.key === tok && k.active) || null;
 }
@@ -690,7 +697,10 @@ async function handleSharedspace(req, res, p) {
 
   const isGw = authGateway(req);
   const apiKey = authWorker(req);
-  if (!isGw && !apiKey) return json(res, 401, { error: "Unauthorized" });
+  if (!isGw && !apiKey) {
+    console.log("[ceo-proxy] sharedspace 401:", req.method, p, "auth:", req.headers["authorization"] ? "header-present" : "no-header");
+    return json(res, 401, { error: "Unauthorized" });
+  }
 
   if (req.method === "GET" && p === "/api/sharedspace") {
     const files = [];
