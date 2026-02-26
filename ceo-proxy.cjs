@@ -643,7 +643,9 @@ async function handleExchange(req, res, p) {
     const apiKey = authWorker(req);
     const isGw = authGateway(req);
     if (!apiKey && !isGw) return json(res, 401, { error: "Unauthorized" });
-    const body = JSON.parse((await readBody(req)).toString());
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString()); }
+    catch { return json(res, 400, { error: "Invalid JSON body" }); }
     const fn = path.normalize(body.fileName || "upload-" + Date.now() + ".txt");
     const target = path.resolve(EXCHANGE_DIR, fn);
     if (!target.startsWith(EXCHANGE_DIR)) return json(res, 403, { error: "Forbidden" });
@@ -735,10 +737,13 @@ async function handleSharedspace(req, res, p) {
     const full = path.resolve(SHAREDSPACE_DIR, fp);
     if (!isInsideDir(full, SHAREDSPACE_DIR)) return json(res, 403, { error: "Forbidden" });
     fs.mkdirSync(path.dirname(full), { recursive: true });
+    let content = body.content || "";
+    if (typeof content === "object") content = JSON.stringify(content);
     if (body.encoding === "base64") {
-      fs.writeFileSync(full, Buffer.from(body.content || "", "base64"));
+      if (typeof body.content !== "string") return json(res, 400, { error: "base64 content must be a string" });
+      fs.writeFileSync(full, Buffer.from(content, "base64"));
     } else {
-      fs.writeFileSync(full, body.content || "", "utf-8");
+      fs.writeFileSync(full, content, "utf-8");
     }
     return json(res, 201, { ok: true, path: fp, size: fs.statSync(full).size });
   }
@@ -762,10 +767,9 @@ async function handleSharedspace(req, res, p) {
     }
     const fp = path.normalize(decodeURIComponent(sub));
     const full = path.resolve(SHAREDSPACE_DIR, fp);
-    console.log("[ceo-proxy] SharedSpace DELETE sub:", sub, "fp:", fp, "full:", full, "inside:", isInsideDir(full, SHAREDSPACE_DIR));
     if (!isInsideDir(full, SHAREDSPACE_DIR)) return json(res, 403, { error: "Forbidden" });
     try { fs.unlinkSync(full); return json(res, 200, { ok: true }); }
-    catch (e) { console.log("[ceo-proxy] SharedSpace DELETE error:", e.message); return json(res, 404, { error: "File not found" }); }
+    catch { return json(res, 404, { error: "File not found" }); }
   }
 
   return json(res, 404, { error: "Not found" });
