@@ -727,7 +727,9 @@ async function handleSharedspace(req, res, p) {
   }
 
   if (req.method === "POST" && p === "/api/sharedspace/write") {
-    const body = JSON.parse((await readBody(req)).toString());
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString()); }
+    catch { return json(res, 400, { error: "Invalid JSON body" }); }
     if (!body.path) return json(res, 400, { error: "path is required" });
     const fp = path.normalize(body.path);
     const full = path.resolve(SHAREDSPACE_DIR, fp);
@@ -742,7 +744,9 @@ async function handleSharedspace(req, res, p) {
   }
 
   if (req.method === "POST" && p === "/api/sharedspace/mkdir") {
-    const body = JSON.parse((await readBody(req)).toString());
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString()); }
+    catch { return json(res, 400, { error: "Invalid JSON body" }); }
     if (!body.path) return json(res, 400, { error: "path is required" });
     const fp = path.normalize(body.path);
     const full = path.resolve(SHAREDSPACE_DIR, fp);
@@ -758,9 +762,10 @@ async function handleSharedspace(req, res, p) {
     }
     const fp = path.normalize(decodeURIComponent(sub));
     const full = path.resolve(SHAREDSPACE_DIR, fp);
+    console.log("[ceo-proxy] SharedSpace DELETE sub:", sub, "fp:", fp, "full:", full, "inside:", isInsideDir(full, SHAREDSPACE_DIR));
     if (!isInsideDir(full, SHAREDSPACE_DIR)) return json(res, 403, { error: "Forbidden" });
     try { fs.unlinkSync(full); return json(res, 200, { ok: true }); }
-    catch { return json(res, 404, { error: "File not found" }); }
+    catch (e) { console.log("[ceo-proxy] SharedSpace DELETE error:", e.message); return json(res, 404, { error: "File not found" }); }
   }
 
   return json(res, 404, { error: "Not found" });
