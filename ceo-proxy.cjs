@@ -228,6 +228,37 @@ function updateBeesFile() {
   saveJson(BEES_FILE, { updatedAt: new Date().toISOString(), bees: list });
 }
 
+const CREW_FILE = path.join(DATA_DIR, "workspace", "CREW.md");
+
+function updateCrewFile() {
+  const now = new Date();
+  const ts = now.toISOString().replace("T", " ").slice(0, 19) + " UTC";
+  let md = "# Connected Worker Bees\n\n";
+  md += `**Last Updated:** ${ts}\n\n`;
+  const bees = [];
+  for (const [id, w] of workers) {
+    const online = Date.now() - w.lastSeen < 60000;
+    const lastSeen = new Date(w.lastSeen).toISOString().replace("T", " ").slice(0, 19) + " UTC";
+    const connectedAt = new Date(w.connectedAt).toISOString().replace("T", " ").slice(0, 19) + " UTC";
+    bees.push({ name: w.name, platform: w.platform, online, lastSeen, connectedAt });
+  }
+  if (bees.length === 0) {
+    md += "No worker bees currently connected.\n";
+  } else {
+    md += `| Worker | Status | Platform | Connected Since | Last Seen |\n`;
+    md += `|--------|--------|----------|-----------------|-----------|\n`;
+    for (const b of bees) {
+      const status = b.online ? "ONLINE" : "STALE";
+      md += `| ${b.name} | ${status} | ${b.platform} | ${b.connectedAt} | ${b.lastSeen} |\n`;
+    }
+    md += `\n**Total:** ${bees.length} worker(s), ${bees.filter(b => b.online).length} online\n`;
+  }
+  try {
+    fs.mkdirSync(path.dirname(CREW_FILE), { recursive: true });
+    fs.writeFileSync(CREW_FILE, md);
+  } catch {}
+}
+
 function findWorkerByName(name) {
   const lower = name.toLowerCase();
   for (const [id, w] of workers) {
@@ -407,6 +438,7 @@ async function handleWorkers(req, res, p) {
     const k = data.keys.find((x) => x.id === apiKey.id);
     if (k) { k.lastUsed = new Date().toISOString(); saveJson(API_KEYS_FILE, data); }
     updateBeesFile();
+    updateCrewFile();
     return json(res, 200, { workerId: wid, status: "registered" });
   }
 
@@ -505,6 +537,7 @@ async function handleWorkers(req, res, p) {
     if (workers.has(wid)) {
       workers.delete(wid);
       updateBeesFile();
+      updateCrewFile();
       return json(res, 200, { ok: true });
     }
     return json(res, 404, { error: "Worker not found" });
@@ -887,6 +920,7 @@ server.on("upgrade", (req, socket, head) => {
 
 server.listen(PROXY_PORT, "0.0.0.0", () => {
   console.log(`[ceo-proxy] listening on 0.0.0.0:${PROXY_PORT}, proxying to gateway:${GATEWAY_PORT}`);
+  updateCrewFile();
 });
 
 setInterval(() => {
@@ -895,4 +929,5 @@ setInterval(() => {
     if (Date.now() - w.lastSeen > 300000) { workers.delete(id); changed = true; }
   }
   updateBeesFile();
+  updateCrewFile();
 }, 60000);

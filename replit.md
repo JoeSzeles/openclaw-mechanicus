@@ -32,6 +32,7 @@ OpenClaw Cloud operates with a "CEO Proxy + Gateway" architecture where two comp
     -   **Server-Side Agent Watcher**: The CEO proxy monitors gateway WebSocket for `@WorkerName` mentions in agent responses and automatically dispatches tasks server-side.
     -   **CEO Agent Bootstrap**: Instructions for the CEO agent to use `@WorkerName` syntax for worker dispatch.
     -   **Available Bees File**: `.openclaw/available-bees.json` is maintained with current connected bees, updated on registration/deletion and periodically. Also available via `/api/workers/available` endpoint.
+    -   **CREW.md Auto-Sync**: `.openclaw/workspace/CREW.md` is automatically updated with live worker bee status (name, online/stale, platform, connected since, last seen) on startup, worker registration, deletion, and every 60 seconds. The CEO agent reads this file when asked about crew status. BOOTSTRAP.md instructs the agent to check CREW.md.
     -   **Agent Avatars**: Round circle avatars with white border and colored background with initials displayed in worker lists and chat bubbles.
 -   **AI Model Configuration Page**: A custom web UI (`/model-config.html`) allows viewing and switching the primary agent model, adding/removing model providers (with base URL, API key, API type), and managing individual models.
 -   **Persistent Storage**: All OpenClaw data, including configuration, agents, API keys, worker tasks, chat history, and file exchange, persists across container restarts in the `.openclaw/` directory.
