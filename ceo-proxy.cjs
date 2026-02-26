@@ -671,6 +671,21 @@ function isInsideDir(fullPath, baseDir) {
 }
 
 async function handleSharedspace(req, res, p) {
+  if (req.method === "GET" && p.startsWith("/api/sharedspace/download/")) {
+    const fp = path.normalize(decodeURIComponent(p.slice("/api/sharedspace/download/".length)));
+    const full = path.resolve(SHAREDSPACE_DIR, fp);
+    if (!isInsideDir(full, SHAREDSPACE_DIR)) return json(res, 403, { error: "Forbidden" });
+    try {
+      const d = fs.readFileSync(full);
+      res.writeHead(200, {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${path.basename(fp)}"`,
+        "Access-Control-Allow-Origin": "*",
+      });
+      return res.end(d);
+    } catch { return json(res, 404, { error: "File not found" }); }
+  }
+
   const isGw = authGateway(req);
   const apiKey = authWorker(req);
   if (!isGw && !apiKey) return json(res, 401, { error: "Unauthorized" });
@@ -734,21 +749,6 @@ async function handleSharedspace(req, res, p) {
     if (!isInsideDir(full, SHAREDSPACE_DIR)) return json(res, 403, { error: "Forbidden" });
     fs.mkdirSync(full, { recursive: true });
     return json(res, 201, { ok: true, path: fp });
-  }
-
-  if (req.method === "GET" && p.startsWith("/api/sharedspace/download/")) {
-    const fp = path.normalize(decodeURIComponent(p.slice("/api/sharedspace/download/".length)));
-    const full = path.resolve(SHAREDSPACE_DIR, fp);
-    if (!isInsideDir(full, SHAREDSPACE_DIR)) return json(res, 403, { error: "Forbidden" });
-    try {
-      const d = fs.readFileSync(full);
-      res.writeHead(200, {
-        "Content-Type": "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${path.basename(fp)}"`,
-        "Access-Control-Allow-Origin": "*",
-      });
-      return res.end(d);
-    } catch { return json(res, 404, { error: "File not found" }); }
   }
 
   if (req.method === "DELETE" && p.startsWith("/api/sharedspace/")) {
