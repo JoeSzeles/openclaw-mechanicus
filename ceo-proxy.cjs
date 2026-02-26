@@ -11,6 +11,7 @@ const OPENCLAW_HOME = process.env.OPENCLAW_HOME || "/home/runner/workspace";
 const DATA_DIR = path.join(OPENCLAW_HOME, ".openclaw");
 const API_KEYS_FILE = path.join(DATA_DIR, "api-keys.json");
 const EXCHANGE_DIR = path.join(DATA_DIR, "exchange");
+const SHAREDSPACE_DIR = path.join(DATA_DIR, "sharedspace");
 const TASKS_FILE = path.join(DATA_DIR, "worker-tasks.json");
 const CHAT_FILE = path.join(DATA_DIR, "ceo-chat.json");
 const BEES_FILE = path.join(DATA_DIR, "available-bees.json");
@@ -187,6 +188,7 @@ function injectToGateway(label, message) {
 setTimeout(connectGateway, 3000);
 
 fs.mkdirSync(EXCHANGE_DIR, { recursive: true });
+fs.mkdirSync(SHAREDSPACE_DIR, { recursive: true });
 
 if (!fs.existsSync(API_KEYS_FILE)) {
   fs.writeFileSync(API_KEYS_FILE, JSON.stringify({ keys: [] }, null, 2));
@@ -663,6 +665,107 @@ async function handleExchange(req, res, p) {
   return json(res, 404, { error: "Not found" });
 }
 
+function isInsideDir(fullPath, baseDir) {
+  const rel = path.relative(baseDir, fullPath);
+  return rel && !rel.startsWith("..") && !path.isAbsolute(rel);
+}
+
+async function handleSharedspace(req, res, p) {
+  const isGw = authGateway(req);
+  const apiKey = authWorker(req);
+  if (!isGw && !apiKey) return json(res, 401, { error: "Unauthorized" });
+
+  if (req.method === "GET" && p === "/api/sharedspace") {
+    const files = [];
+    function walk(dir, prefix) {
+      try {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+          const rel = prefix ? prefix + "/" + e.name : e.name;
+          if (e.isDirectory()) walk(path.join(dir, e.name), rel);
+          else {
+            const st = fs.statSync(path.join(dir, e.name));
+            files.push({ name: rel, size: st.size, modified: st.mtime.toISOString() });
+          }
+        }
+      } catch {}
+    }
+    walk(SHAREDSPACE_DIR, "");
+    return json(res, 200, { files });
+  }
+
+  if (req.method === "GET" && p.startsWith("/api/sharedspace/read/")) {
+    const fp = path.normalize(decodeURIComponent(p.slice("/api/sharedspace/read/".length)));
+    const full = path.resolve(SHAREDSPACE_DIR, fp);
+    if (!isInsideDir(full, SHAREDSPACE_DIR)) return json(res, 403, { error: "Forbidden" });
+    try {
+      const buf = fs.readFileSync(full);
+      let isText = true;
+      for (let i = 0; i < Math.min(buf.length, 8192); i++) {
+        if (buf[i] === 0) { isText = false; break; }
+      }
+      if (isText) {
+        return json(res, 200, { path: fp, content: buf.toString("utf-8"), encoding: "utf-8" });
+      } else {
+        return json(res, 200, { path: fp, content: buf.toString("base64"), encoding: "base64" });
+      }
+    } catch { return json(res, 404, { error: "File not found" }); }
+  }
+
+  if (req.method === "POST" && p === "/api/sharedspace/write") {
+    const body = JSON.parse((await readBody(req)).toString());
+    if (!body.path) return json(res, 400, { error: "path is required" });
+    const fp = path.normalize(body.path);
+    const full = path.resolve(SHAREDSPACE_DIR, fp);
+    if (!isInsideDir(full, SHAREDSPACE_DIR)) return json(res, 403, { error: "Forbidden" });
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    if (body.encoding === "base64") {
+      fs.writeFileSync(full, Buffer.from(body.content || "", "base64"));
+    } else {
+      fs.writeFileSync(full, body.content || "", "utf-8");
+    }
+    return json(res, 201, { ok: true, path: fp, size: fs.statSync(full).size });
+  }
+
+  if (req.method === "POST" && p === "/api/sharedspace/mkdir") {
+    const body = JSON.parse((await readBody(req)).toString());
+    if (!body.path) return json(res, 400, { error: "path is required" });
+    const fp = path.normalize(body.path);
+    const full = path.resolve(SHAREDSPACE_DIR, fp);
+    if (!isInsideDir(full, SHAREDSPACE_DIR)) return json(res, 403, { error: "Forbidden" });
+    fs.mkdirSync(full, { recursive: true });
+    return json(res, 201, { ok: true, path: fp });
+  }
+
+  if (req.method === "GET" && p.startsWith("/api/sharedspace/download/")) {
+    const fp = path.normalize(decodeURIComponent(p.slice("/api/sharedspace/download/".length)));
+    const full = path.resolve(SHAREDSPACE_DIR, fp);
+    if (!isInsideDir(full, SHAREDSPACE_DIR)) return json(res, 403, { error: "Forbidden" });
+    try {
+      const d = fs.readFileSync(full);
+      res.writeHead(200, {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${path.basename(fp)}"`,
+        "Access-Control-Allow-Origin": "*",
+      });
+      return res.end(d);
+    } catch { return json(res, 404, { error: "File not found" }); }
+  }
+
+  if (req.method === "DELETE" && p.startsWith("/api/sharedspace/")) {
+    const sub = p.slice("/api/sharedspace/".length);
+    if (!sub || sub === "read" || sub === "write" || sub === "mkdir" || sub === "download") {
+      return json(res, 400, { error: "Invalid path" });
+    }
+    const fp = path.normalize(decodeURIComponent(sub));
+    const full = path.resolve(SHAREDSPACE_DIR, fp);
+    if (!isInsideDir(full, SHAREDSPACE_DIR)) return json(res, 403, { error: "Forbidden" });
+    try { fs.unlinkSync(full); return json(res, 200, { ok: true }); }
+    catch { return json(res, 404, { error: "File not found" }); }
+  }
+
+  return json(res, 404, { error: "Not found" });
+}
+
 async function handleChat(req, res, p) {
   const url = new URL(req.url, "http://localhost");
 
@@ -834,6 +937,7 @@ async function handleApi(req, res) {
   if (p.startsWith("/api/workers")) { await handleWorkers(req, res, p); return true; }
   if (p.startsWith("/api/tasks")) { await handleTasks(req, res, p); return true; }
   if (p.startsWith("/api/exchange")) { await handleExchange(req, res, p); return true; }
+  if (p.startsWith("/api/sharedspace")) { await handleSharedspace(req, res, p); return true; }
   if (p === "/api/agent/chat" || p === "/api/agent/chat/") { await handleAgentChat(req, res); return true; }
   if (p.startsWith("/api/chat")) { await handleChat(req, res, p); return true; }
   return false;
