@@ -1,0 +1,120 @@
+$CEO_URL = 'https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev'
+$API_KEY = 'ocw_a731572128c1257aee0825ece3a2ad4aee90057855dd494072cb14be8740775f'
+$headers = @{
+    'Authorization' = "Bearer $API_KEY"
+    'Content-Type' = 'application/json'
+}
+$logPath = 'sharedspace_upload_log.txt'
+$projectsPrefix = 'projects/'
+
+function Write-Log {
+    param([string]$Message, [string]$Level = 'INFO')
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    "$timestamp [$Level] $Message" | Out-File -FilePath $logPath -Append -Encoding utf8
+}
+
+function Test-Endpoint {
+    param($name, $uri, $method='GET', $body=$null)
+    Write-Log "Testing endpoint: $name ($uri)"
+    try {
+        $res = Invoke-RestMethod -Uri $uri -Method $method -Headers $headers -Body $body
+        Write-Log "$name OK: $(if ($res.files) { '$($res.files.Count) files' } else { $res | ConvertTo-Json -Compress })"
+        return $true
+    } catch {
+        Write-Log "$name FAIL: $($_.Exception.Message)" -Level 'ERROR'
+        return $false
+    }
+}
+
+function List-Remote {
+    try {
+        $res = Invoke-RestMethod "$CEO_URL/api/sharedspace" -Method GET -Headers $headers
+        $projectsCount = ($res.files | Where-Object { $_.name -like "$projectsPrefix*" }).Count
+        Write-Log "Remote: $($res.files.Count) total, $projectsCount projects/"
+        ,@($res.files, $projectsCount)
+    } catch {
+        Write-Log "List FAIL: $($_.Exception.Message)" -Level 'ERROR'
+        ,@($null, 0)
+    }
+}
+
+function Upload-File {
+    param($localPath, $remotePath)
+    try {
+        $content = Get-Content -Path $localPath -Raw -Encoding utf8
+        $bodyObj = @{ path = $remotePath; content = $content; encoding = 'utf-8' }
+        $body = $bodyObj | ConvertTo-Json -Depth 10 -Compress
+        $size = $content.Length
+        Write-Log "Upload $localPath -> $remotePath ($size bytes)"
+        $res = Invoke-RestMethod "$CEO_URL/api/sharedspace/write" -Method POST -Headers $headers -Body $body
+        Write-Log "OK: $($res | ConvertTo-Json -Compress)"
+        $true
+    } catch {
+        Write-Log "FAIL $remotePath`: $($_.Exception.Message)" -Level 'ERROR'
+        $false
+    }
+}
+
+Write-Log '=== SharedSpace Upload v3 Started ==='
+
+# Re-test endpoints
+Test-Endpoint 'LIST' "$CEO_URL/api/sharedspace"
+$body = @{path='pc-test3'} | ConvertTo-Json; Test-Endpoint 'MKDIR' "$CEO_URL/api/sharedspace/mkdir" 'POST' $body
+$body = @{path='pc-test3/test.txt'; content='Test v3'} | ConvertTo-Json; Test-Endpoint 'WRITE' "$CEO_URL/api/sharedspace/write" 'POST' $body
+Test-Endpoint 'READ' "$CEO_URL/api/sharedspace/read/pc-test3/test.txt"
+try {
+    $null = Invoke-WebRequest -Uri "$CEO_URL/api/sharedspace/download/pc-test3/test.txt" -OutFile 'temp.txt' -ErrorAction SilentlyContinue
+    $dl = Get-Content 'temp.txt' -Raw -ErrorAction SilentlyContinue
+    Write-Log "DOWNLOAD OK: '$($dl.Trim())'"
+    Remove-Item 'temp.txt' -Force -ErrorAction SilentlyContinue
+} catch { Write-Log "DOWNLOAD FAIL: $($_.Exception.Message)" -Level 'ERROR' }
+Test-Endpoint 'DEL FILE' "$CEO_URL/api/sharedspace/pc-test3/test.txt" 'DELETE'
+Test-Endpoint 'DEL DIR' "$CEO_URL/api/sharedspace/pc-test3" 'DELETE'
+
+# Single test
+Upload-File 'projects/book.md' 'projects/book.md'
+List-Remote
+$remoteFiles, $projCount = List-Remote
+if ($remoteFiles -and ($remoteFiles | Where { $_.name -eq 'projects/book.md' })) {
+    Write-Log 'Single VERIFIED'
+} else {
+    Write-Log 'Single FAIL - abort' -Level 'ERROR'
+    exit 1
+}
+
+# All files
+$localFiles = Get-ChildItem 'projects' -Recurse -File
+$expected = $localFiles.Count
+Write-Log "Uploading $expected files..."
+$success = 0; $fail = 0
+foreach ($file in $localFiles) {
+    $rel = $file.FullName.Substring((Get-Location).Path.Length + 1)
+    $remote = "projects/$rel"
+    if (Upload-File $file.FullName $remote) { $success++ } else { $fail++ }
+}
+Write-Log "Bulk: $success OK, $fail FAIL"
+
+# Verify & retry loop
+$maxLoop = 10
+for ($loop = 1; $loop -le $maxLoop; $loop++) {
+    Start-Sleep 3
+    $remoteFiles, $projCount = List-Remote
+    $missing = 0
+    foreach ($file in $localFiles) {
+        $rel = $file.FullName.Substring((Get-Location).Path.Length + 1)
+        if (-not ($remoteFiles | Where { $_.name -eq "projects/$rel" })) { 
+            $missing++
+            Upload-File $file.FullName "projects/$rel" | Out-Null
+        }
+    }
+    Write-Log "Loop ${loop}: remote projects/ $projCount / $expected (missing $missing)"
+    if ($projCount -eq $expected -and $missing -eq 0) { break }
+}
+if ($projCount -eq $expected) {
+    Write-Log "ALL $expected CONFIRMED in SharedSpace!"
+} else {
+    Write-Log "FAILED verify $projCount/$expected" -Level 'ERROR'
+}
+
+Write-Log '=== Complete ==='
+Write-Log 'Lessons: UTF8 raw content, JSON -Depth 10 -Compress for large, prefix relpath, verify by name match after recurse list, retry missing individually. PS patterns: Get-ChildItem recurse -File, ConvertTo-Json hashtable body.'
