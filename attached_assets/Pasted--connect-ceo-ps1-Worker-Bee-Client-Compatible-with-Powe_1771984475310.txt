@@ -1,0 +1,240 @@
+# connect-ceo.ps1 - Worker Bee Client
+# Compatible with PowerShell 5.1+ and PowerShell 7+
+# Save this file, replace YOUR_API_KEY_HERE, then run:
+#   powershell -ExecutionPolicy Bypass -File connect-ceo.ps1
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+$CEO_URL   = "https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev"
+$API_KEY   = "ocw_a731572128c1257aee0825ece3a2ad4aee90057855dd494072cb14be8740775f"
+$WORKER_NAME = "Laptop"
+$POLL_SEC  = 10
+
+$WORKSPACE = "C:\Users\josef\.openclaw\workspace"
+if (!(Test-Path $WORKSPACE)) { New-Item -ItemType Directory -Path $WORKSPACE -Force | Out-Null }
+
+# Local OpenClaw agent -- set this to your local gateway URL for AI-powered replies
+# Leave empty to skip local agent (will just ACK messages)
+# IMPORTANT: Your local OpenClaw must have chatCompletions enabled in openclaw.json
+$LOCAL_AGENT = "http://127.0.0.1:18789"
+$LOCAL_AGENT_TOKEN = "cac988b5f9bf3ab88d8c431d800e2c1eb1e780890ddd62ed"
+
+$HEADERS = @{
+    "Authorization" = "Bearer $API_KEY"
+    "Content-Type"  = "application/json"
+}
+
+$script:lastChatCheck = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+$script:taskCount = 0
+
+function Log($msg, $color) {
+    if (-not $color) { $color = "White" }
+    $ts = Get-Date -Format "HH:mm:ss"
+    Write-Host "$ts $msg" -ForegroundColor $color
+}
+
+function Banner {
+    Write-Host ""
+    Write-Host "  ============================================" -ForegroundColor DarkCyan
+    Write-Host "    OpenClaw Worker Bee  [  ]" -ForegroundColor Cyan
+    Write-Host "  ============================================" -ForegroundColor DarkCyan
+    Write-Host "  Name:      $WORKER_NAME" -ForegroundColor White
+    Write-Host "  Workspace: $WORKSPACE" -ForegroundColor White
+    Write-Host "  Agent:     $LOCAL_AGENT" -ForegroundColor White
+    Write-Host "  CEO:       $CEO_URL" -ForegroundColor DarkGray
+    Write-Host "  ============================================" -ForegroundColor DarkCyan
+    Write-Host ""
+}
+
+function ResolvePath($relPath) {
+    if (-not $relPath) { return $WORKSPACE }
+    if ([IO.Path]::IsPathRooted($relPath)) { return [IO.Path]::GetFullPath($relPath) }
+    return [IO.Path]::GetFullPath((Join-Path $WORKSPACE $relPath))
+}
+
+function CheckChat {
+    try {
+        $chatResp = Invoke-RestMethod -Uri "$CEO_URL/api/chat?since=$([Uri]::EscapeDataString($script:lastChatCheck))&limit=20" -Method GET -Headers $HEADERS
+        if ($chatResp.messages -and $chatResp.messages.Count -gt 0) {
+            foreach ($m in $chatResp.messages) {
+                $sender = $m.from
+                if (-not $sender) { $sender = $m.role }
+                if ($sender -eq $WORKER_NAME) { continue }
+                $chatColor = if ($m.role -eq "ceo") { "Yellow" } else { "Magenta" }
+                Write-Host "" -NoNewline
+                Write-Host "  [CHAT] " -ForegroundColor DarkGray -NoNewline
+                Write-Host "$sender" -ForegroundColor $chatColor -NoNewline
+                Write-Host ": $($m.text)" -ForegroundColor White
+            }
+            $script:lastChatCheck = $chatResp.messages[-1].ts
+        }
+    } catch {}
+}
+
+function PostChat($text) {
+    try {
+        $body = @{ from=$WORKER_NAME; text=$text } | ConvertTo-Json -Compress
+        Invoke-RestMethod -Uri "$CEO_URL/api/chat" -Method POST -Headers $HEADERS -Body $body | Out-Null
+    } catch {}
+}
+
+Banner
+
+# Test local agent connectivity
+if ($LOCAL_AGENT) {
+    Write-Host "  Testing local agent at $LOCAL_AGENT ..." -ForegroundColor DarkCyan
+    try {
+        $testResp = Invoke-WebRequest -Uri "$LOCAL_AGENT/v1/models" -Method GET -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
+        Write-Host "  Local agent OK (status $($testResp.StatusCode))" -ForegroundColor Green
+    } catch {
+        Write-Host "  WARNING: Cannot reach local agent at $LOCAL_AGENT" -ForegroundColor Red
+        Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor DarkYellow
+        Write-Host "  Make sure OpenClaw is running and chatCompletions is enabled in openclaw.json" -ForegroundColor DarkYellow
+        Write-Host "  Messages will be ACKed without AI responses until agent is available." -ForegroundColor DarkYellow
+        Write-Host ""
+    }
+}
+
+# Register
+$regBody = @{
+    name     = $WORKER_NAME
+    agentId  = "default"
+    platform = "windows"
+    version  = "1.0"
+} | ConvertTo-Json
+$script:WORKER_ID = ""
+try {
+    $regResp = Invoke-RestMethod -Uri "$CEO_URL/api/workers/register" -Method POST -Headers $HEADERS -Body $regBody
+    $script:WORKER_ID = $regResp.workerId
+    Log "Connected to CEO (ID: $($script:WORKER_ID))" "Green"
+    PostChat "Worker $WORKER_NAME is online (workspace: $WORKSPACE)"
+} catch {
+    Log "Registration failed: $($_.Exception.Message)" "Red"
+    exit 1
+}
+
+Log "Listening for tasks and chat. Ctrl+C to stop." "Yellow"
+Write-Host "" 
+
+while ($true) {
+    CheckChat
+
+    try {
+        $pollUrl = "$CEO_URL/api/workers/poll"
+        if ($script:WORKER_ID) { $pollUrl += "?workerId=$($script:WORKER_ID)" }
+        $resp = Invoke-RestMethod -Uri $pollUrl -Method GET -Headers $HEADERS
+    } catch {
+        Log "Poll error: $($_.Exception.Message)" "Red"
+        Start-Sleep -Seconds 30
+        continue
+    }
+
+    $tasks = $resp.tasks
+    if ($tasks -and $tasks.Count -gt 0) {
+        foreach ($task in $tasks) {
+            $script:taskCount++
+            $ttype = $task.type
+            if (-not $ttype) { $ttype = "unknown" }
+            Write-Host ""
+            Write-Host "  ----[ TASK #$($script:taskCount) ]----" -ForegroundColor Cyan
+            Write-Host "  Type: $ttype" -ForegroundColor White
+            if ($task.filePath) { Write-Host "  Path: $($task.filePath)" -ForegroundColor DarkGray }
+            if ($task.message -and $ttype -ne "file_write") { Write-Host "  Msg:  $($task.message)" -ForegroundColor DarkGray }
+            $result = ""
+
+            try {
+                switch ($ttype) {
+                    "file_read" {
+                        $fp = ResolvePath $task.filePath
+                        if (!(Test-Path $fp)) { throw "File not found: $fp" }
+                        $result = Get-Content -Path $fp -Raw -ErrorAction Stop
+                        Write-Host "  => Read $($result.Length) chars from $fp" -ForegroundColor Green
+                    }
+                    "file_write" {
+                        $fp = ResolvePath $task.filePath
+                        $dir = Split-Path $fp -Parent
+                        if ($dir -and !(Test-Path $dir)) {
+                            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+                        }
+                        Set-Content -Path $fp -Value $task.message -NoNewline -ErrorAction Stop
+                        $result = "OK: Wrote $($task.message.Length) chars to $fp"
+                        Write-Host "  => $result" -ForegroundColor Green
+                    }
+                    "file_upload" {
+                        $fp = ResolvePath $task.filePath
+                        if (!(Test-Path $fp)) { throw "File not found: $fp" }
+                        $sizeMB = [math]::Round((Get-Item $fp).Length / 1MB, 2)
+                        Write-Host "  => Uploading $(Split-Path $fp -Leaf) ($sizeMB MB)..." -ForegroundColor Yellow
+                        $bytes = [IO.File]::ReadAllBytes($fp)
+                        $b64 = [Convert]::ToBase64String($bytes)
+                        $fname = Split-Path $fp -Leaf
+                        $upBody = @{ fileName=$fname; content=$b64; encoding="base64" } | ConvertTo-Json -Compress
+                        Invoke-RestMethod -Uri "$CEO_URL/api/exchange/upload" -Method POST -Headers $HEADERS -Body $upBody | Out-Null
+                        $result = "OK: Uploaded $fname ($sizeMB MB)"
+                        Write-Host "  => $result" -ForegroundColor Green
+                    }
+                    "list_files" {
+                        $dir = ResolvePath $task.filePath
+                        if (!(Test-Path $dir)) { throw "Dir not found: $dir" }
+                        Write-Host "  => Listing $dir" -ForegroundColor Yellow
+                        $items = Get-ChildItem -Path $dir -ErrorAction Stop | ForEach-Object {
+                            $type = if ($_.PSIsContainer) { "dir" } else { "file" }
+                            "$type`t$($_.Length)`t$($_.Name)"
+                        }
+                        if ($items) {
+                            $result = $items -join "`n"
+                            foreach ($i in $items) { Write-Host "     $i" -ForegroundColor DarkGray }
+                        } else { $result = "(empty)"; Write-Host "     (empty)" -ForegroundColor DarkGray }
+                        Write-Host "  => Listed $($items.Count) items" -ForegroundColor Green
+                    }
+                    "message" {
+                        $tmsg = $task.message
+                        if (-not $tmsg) { $tmsg = "(no message)" }
+                        Write-Host "  => CEO says: $tmsg" -ForegroundColor Yellow
+                        $result = ""
+                        if ($LOCAL_AGENT) {
+                            try {
+                                Write-Host "  => Asking local agent at $LOCAL_AGENT ..." -ForegroundColor DarkCyan
+                                $agentHeaders = @{ "Content-Type" = "application/json" }
+                                if ($LOCAL_AGENT_TOKEN) { $agentHeaders["Authorization"] = "Bearer $LOCAL_AGENT_TOKEN" }
+                                $chatBody = @{
+                                    model = "default"
+                                    messages = @(@{ role = "user"; content = $tmsg })
+                                } | ConvertTo-Json -Depth 5
+                                $agentResp = Invoke-RestMethod -Uri "$LOCAL_AGENT/v1/chat/completions" -Method POST -Headers $agentHeaders -Body $chatBody -TimeoutSec 120
+                                if ($agentResp.choices -and $agentResp.choices.Count -gt 0) {
+                                    $result = $agentResp.choices[0].message.content
+                                    Write-Host "  => Agent replied ($($result.Length) chars)" -ForegroundColor Green
+                                } else {
+                                    $result = "Agent returned no response"
+                                }
+                            } catch {
+                                Write-Host "  => Local agent error: $($_.Exception.Message)" -ForegroundColor Red
+                                $result = "[$WORKER_NAME] Local agent error: $($_.Exception.Message). Message was: $tmsg"
+                            }
+                        } else {
+                            $result = "[$WORKER_NAME] Message received: $tmsg (no local agent configured)"
+                        }
+                    }
+                    default {
+                        $result = "Unknown task type: $ttype"
+                        Write-Host "  => $result" -ForegroundColor DarkYellow
+                    }
+                }
+            } catch {
+                $result = "ERROR: $($_.Exception.Message)"
+                Write-Host "  => $result" -ForegroundColor Red
+            }
+
+            try {
+                $resBody = @{ taskId=$task.id; result=$result; workerId=$script:WORKER_ID } | ConvertTo-Json -Compress
+                Invoke-RestMethod -Uri "$CEO_URL/api/workers/result" -Method POST -Headers $HEADERS -Body $resBody | Out-Null
+                Write-Host "  => Result sent to CEO" -ForegroundColor DarkGreen
+            } catch {
+                Write-Host "  => Failed to send result: $($_.Exception.Message)" -ForegroundColor Red
+            }
+            Write-Host ""
+        }
+    }
+    Start-Sleep -Seconds $POLL_SEC
+}
