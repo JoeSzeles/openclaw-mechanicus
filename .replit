@@ -11,6 +11,11 @@ channel = "stable-25_05"
 OPENCLAW_GATEWAY_PORT = "5000"
 OPENCLAW_GATEWAY_TOKEN = "4e38d19916ace326b63cfd867b58d2287ce9fa445c7ea4a07b6403d89e366a53"
 OPENCLAW_SKIP_CHANNELS = "1"
+IG_API_KEY = "20849c0791ed15479752204f9632c949f742ddc5"
+IG_USERNAME = "Hoerbinator2"
+IG_PASSWORD = "Riacrepe88!"
+IG_ACCOUNT_ID = "Z3MJKY"
+IG_BASE_URL = "https://demo-api.ig.com/gateway/deal"
 
 [workflows]
 runButton = "Project"

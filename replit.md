@@ -62,6 +62,10 @@ OpenClaw Cloud operates with a "CEO Proxy + Gateway" architecture where two comp
     -   Used for `web_search` tool.
 -   **OpenAI API**: Secondary AI model provider via Replit AI Integrations.
     -   Models: `gpt-4o`, `gpt-4o-mini`.
--   **Replit Secrets Management**: Securely stores API keys like `XAI_API_KEY` and `OPENCLAW_GATEWAY_TOKEN`.
+-   **IG Group Trading API**: CFD trading via REST API (demo: `demo-api.ig.com`, live: `api.ig.com`).
+    -   Skills: `ig-trading` (auth, positions, orders), `ig-market-data` (search, prices, watchlists, sentiment).
+    -   Credentials stored in env vars: `IG_API_KEY`, `IG_USERNAME`, `IG_PASSWORD`, `IG_ACCOUNT_ID`, `IG_BASE_URL`.
+    -   Reference doc: `.openclaw/workspace/IG_TRADING.md`.
+-   **Replit Secrets Management**: Securely stores API keys like `XAI_API_KEY`, `OPENCLAW_GATEWAY_TOKEN`, and IG credentials.
 -   **Replit AI Integrations**: Provides access to OpenAI API key and base URL.
 -   **`web_fetch` tool**: For fetching web page content.
