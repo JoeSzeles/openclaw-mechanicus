@@ -16,6 +16,29 @@ const TASKS_FILE = path.join(DATA_DIR, "worker-tasks.json");
 const CHAT_FILE = path.join(DATA_DIR, "ceo-chat.json");
 const BEES_FILE = path.join(DATA_DIR, "available-bees.json");
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
+const CANVAS_DIR = path.join(DATA_DIR, "canvas");
+
+const MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".txt": "text/plain; charset=utf-8",
+  ".md": "text/plain; charset=utf-8",
+  ".csv": "text/csv; charset=utf-8",
+  ".xml": "application/xml",
+  ".pdf": "application/pdf",
+  ".webp": "image/webp",
+};
 
 let gatewayWs = null;
 let gwReqCounter = 0;
@@ -1005,8 +1028,52 @@ function proxyReq(req, res, retries = 3) {
   req.pipe(p);
 }
 
+function serveCanvas(req, res) {
+  const url = new URL(req.url, "http://localhost");
+  const prefix = "/__openclaw__/canvas/";
+  if (req.method !== "GET" || !url.pathname.startsWith(prefix)) return false;
+  const relPath = decodeURIComponent(url.pathname.slice(prefix.length)) || "index.html";
+  const filePath = path.resolve(CANVAS_DIR, path.normalize(relPath));
+  if (!isInsideDir(filePath, CANVAS_DIR) && filePath !== path.resolve(CANVAS_DIR)) {
+    res.writeHead(403, { "Content-Type": "text/plain" });
+    res.end("Forbidden");
+    return true;
+  }
+  try {
+    const stat = fs.statSync(filePath);
+    if (stat.isDirectory()) {
+      const idx = path.join(filePath, "index.html");
+      if (fs.existsSync(idx)) {
+        const data = fs.readFileSync(idx);
+        const ext = ".html";
+        res.writeHead(200, {
+          "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
+          "Content-Length": data.length,
+          "Access-Control-Allow-Origin": "*",
+        });
+        res.end(data);
+        return true;
+      }
+    }
+    const data = fs.readFileSync(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    res.writeHead(200, {
+      "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
+      "Content-Length": data.length,
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(data);
+    return true;
+  } catch {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("Not found");
+    return true;
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   try {
+    if (serveCanvas(req, res)) return;
     if (!(await handleApi(req, res))) proxyReq(req, res);
   } catch (err) {
     console.error("[ceo-proxy] error:", err);

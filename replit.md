@@ -37,6 +37,7 @@ OpenClaw Cloud operates with a "CEO Proxy + Gateway" architecture where two comp
     -   **Shared Space**: A shared folder (`.openclaw/sharedspace/`) accessible by all agents via `/api/sharedspace` REST endpoints (list, read, write, delete, mkdir, download). Both worker API keys and gateway token auth accepted. Separate from the CEO's private workspace for security. Web UI file browser on the Workers Dashboard page. Worker scripts include `SharedSpace-List`, `SharedSpace-Read`, `SharedSpace-Write` helper functions.
 -   **AI Model Configuration Page**: A custom web UI (`/model-config.html`) allows viewing and switching the primary agent model, adding/removing model providers (with base URL, API key, API type), and managing individual models.
 -   **Persistent Storage**: All OpenClaw data, including configuration, agents, API keys, worker tasks, chat history, and file exchange, persists across container restarts in the `.openclaw/` directory.
+-   **Canvas Static File Serving**: The CEO proxy serves files from `.openclaw/canvas/` at `/__openclaw__/canvas/` without authentication. Skills and agents can write HTML dashboards, charts, and reports to this directory and link users directly. No separate web server or custom port needed.
 -   **Auto-Token Injection**: The gateway authentication token is automatically injected into the Control UI at startup, eliminating manual configuration.
 -   **Navigation Bar**: An injected navigation bar provides easy access to the Dashboard, AI Model Config, and Workers pages.
 
