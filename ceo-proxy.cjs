@@ -229,40 +229,24 @@ function startRegisteredBots() {
 }
 
 const BOTS_DIR = path.join(process.cwd(), "skills", "bots");
-const LEGACY_BOT_PATHS = [
-  { id: "ig-signal-monitor", cmd: "node skills/ig-signal-monitor/monitor.cjs", script: "skills/ig-signal-monitor/monitor.cjs" },
-  { id: "ig-trading-bot", cmd: "node skills/ig-trading-bot/bot.cjs", script: "skills/ig-trading-bot/bot.cjs" },
-];
 
 function autoRegisterBotScripts() {
+  if (!fs.existsSync(BOTS_DIR)) return;
   const registry = loadBotRegistry();
   let changed = false;
-
-  for (const def of LEGACY_BOT_PATHS) {
-    const scriptPath = path.join(process.cwd(), def.script);
-    if (!fs.existsSync(scriptPath)) continue;
-    if (registry.find(b => b.id === def.id)) continue;
-    registry.push({ id: def.id, cmd: def.cmd, enabled: true, addedBy: "auto", addedAt: new Date().toISOString() });
-    console.log(`[bot-mgr] Auto-registered legacy bot ${def.id}`);
-    changed = true;
-  }
-
-  if (fs.existsSync(BOTS_DIR)) {
-    try {
-      const files = fs.readdirSync(BOTS_DIR).filter(f => f.endsWith(".cjs"));
-      for (const file of files) {
-        const id = file.replace(/\.cjs$/, "");
-        if (registry.find(b => b.id === id)) continue;
-        const relPath = `skills/bots/${file}`;
-        registry.push({ id, cmd: `node ${relPath}`, enabled: true, addedBy: "auto-scan", addedAt: new Date().toISOString() });
-        console.log(`[bot-mgr] Auto-registered bot from skills/bots/: ${id}`);
-        changed = true;
-      }
-    } catch (e) {
-      console.error(`[bot-mgr] Error scanning ${BOTS_DIR}:`, e.message);
+  try {
+    const files = fs.readdirSync(BOTS_DIR).filter(f => f.endsWith(".cjs"));
+    for (const file of files) {
+      const id = file.replace(/\.cjs$/, "");
+      if (registry.find(b => b.id === id)) continue;
+      const relPath = `skills/bots/${file}`;
+      registry.push({ id, cmd: `node ${relPath}`, enabled: true, addedBy: "auto-scan", addedAt: new Date().toISOString() });
+      console.log(`[bot-mgr] Auto-registered bot: ${id}`);
+      changed = true;
     }
+  } catch (e) {
+    console.error(`[bot-mgr] Error scanning ${BOTS_DIR}:`, e.message);
   }
-
   if (changed) saveBotRegistry(registry);
 }
 

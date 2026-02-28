@@ -11,8 +11,8 @@ Automated CFD trading bot for the IG Group platform. Executes trades based on co
 ## Quick Start
 
 1. Create/edit the strategy config at `.openclaw/ig-strategy.json`
-2. Test with: `node skills/ig-trading-bot/bot.cjs --test`
-3. Run live: `node skills/ig-trading-bot/bot.cjs`
+2. Test with: `node skills/bots/ig-trading-bot.cjs --test`
+3. Run live: `node skills/bots/ig-trading-bot.cjs`
 
 ## Strategy Config
 
@@ -79,7 +79,7 @@ The bot reads its configuration from `.openclaw/ig-strategy.json`.
 Simulates one cycle without placing real trades:
 
 ```bash
-node skills/ig-trading-bot/bot.cjs --test
+node skills/bots/ig-trading-bot.cjs --test
 ```
 
 This will:
@@ -92,7 +92,7 @@ This will:
 ### Live Mode
 
 ```bash
-node skills/ig-trading-bot/bot.cjs
+node skills/bots/ig-trading-bot.cjs
 ```
 
 Runs continuously, polling prices and executing trades when conditions are met. Press Ctrl+C to stop.

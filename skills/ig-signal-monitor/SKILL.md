@@ -78,7 +78,7 @@ You can add signal overrides on individual instruments:
 ### Test Mode (one cycle, no persistent loop)
 
 ```bash
-node skills/ig-signal-monitor/monitor.cjs --test
+node skills/bots/ig-signal-monitor.cjs --test
 ```
 
 Runs a single poll cycle, prints what signals would fire, then exits. Use this to verify config and connectivity before running the full loop.
@@ -86,7 +86,7 @@ Runs a single poll cycle, prints what signals would fire, then exits. Use this t
 ### Full Loop
 
 ```bash
-node skills/ig-signal-monitor/monitor.cjs
+node skills/bots/ig-signal-monitor.cjs
 ```
 
 Runs continuously, polling at the configured interval. Writes alerts to `.openclaw/ig-alerts.json`.
