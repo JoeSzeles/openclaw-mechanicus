@@ -1251,6 +1251,13 @@ const { execSync } = require("child_process");
 
 function getRunningProcesses() {
   try {
+    const registeredPids = new Set();
+    for (const [, entry] of botProcesses) {
+      if (entry && entry.proc && !entry.proc.killed && entry.proc.pid) {
+        registeredPids.add(entry.proc.pid);
+      }
+    }
+
     const out = execSync("ps aux --sort=-start_time", { encoding: "utf-8", timeout: 5000 });
     const lines = out.trim().split("\n").slice(1);
     const procs = [];
@@ -1258,20 +1265,19 @@ function getRunningProcesses() {
       const parts = line.trim().split(/\s+/);
       if (parts.length < 11) continue;
       const pid = parseInt(parts[1]);
+      if (registeredPids.has(pid)) continue;
       const cpu = parts[2];
       const mem = parts[3];
       const startTime = parts[8];
       const cmd = parts.slice(10).join(" ");
-      if (cmd.includes("monitor.cjs") || cmd.includes("bot.cjs") ||
-          cmd.includes("ig-signal-monitor") || cmd.includes("ig-trading-bot") ||
-          (cmd.includes("node ") && cmd.includes("skills/"))) {
+      if (cmd.includes("node ") && cmd.includes("skills/")) {
         let name = "Unknown Script";
         let type = "script";
-        if (cmd.includes("monitor.cjs") || cmd.includes("ig-signal-monitor")) { name = "Signal Monitor"; type = "monitor"; }
-        else if (cmd.includes("bot.cjs") || cmd.includes("ig-trading-bot")) { name = "Trading Bot"; type = "bot"; }
+        const m = cmd.match(/skills\/bots\/([^.\s]+)/);
+        if (m) { name = m[1]; type = name.includes("monitor") ? "monitor" : "bot"; }
         else {
-          const m = cmd.match(/skills\/([^/]+)\//);
-          if (m) name = m[1];
+          const m2 = cmd.match(/skills\/([^/]+)\//);
+          if (m2) name = m2[1];
         }
         procs.push({ pid, name, type, cpu, mem, startTime, cmd });
       }
