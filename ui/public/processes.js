@@ -77,6 +77,26 @@ function botAction(id, action) {
   });
 }
 
+function toggleStartup(id, enabled) {
+  apiFetch('/api/bots/' + encodeURIComponent(id), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: enabled })
+  }).then(function(res) {
+    return res.json().then(function(data) {
+      if (res.ok) {
+        showToast(id + ': Run at startup ' + (enabled ? 'ON' : 'OFF'), 'success');
+      } else {
+        showToast('Error: ' + (data.error || 'Failed'), 'error');
+        setTimeout(refresh, 500);
+      }
+    });
+  }).catch(function(e) {
+    showToast('Error: ' + e.message, 'error');
+    setTimeout(refresh, 500);
+  });
+}
+
 function loadBots() {
   var el = document.getElementById('botList');
   apiFetch('/api/bots').then(function(res) {
@@ -87,14 +107,16 @@ function loadBots() {
       el.innerHTML = '<p class="empty">No bots registered \u2014 agents can register bots via POST /api/bots/register</p>';
       return;
     }
-    var html = '<table><tr><th>ID</th><th>Status</th><th>PID</th><th>Restarts</th><th>Command</th><th>Added By</th><th>Actions</th></tr>';
+    var html = '<table><tr><th>ID</th><th>Status</th><th>Startup</th><th>PID</th><th>Restarts</th><th>Command</th><th>Added By</th><th>Actions</th></tr>';
     for (var i = 0; i < bots.length; i++) {
       var b = bots[i];
       var statusBadge = b.running ? '<span class="badge badge-running">RUNNING</span>'
         : (b.enabled ? '<span class="badge badge-stopped">STOPPED</span>' : '<span class="badge badge-disabled">DISABLED</span>');
+      var checked = b.enabled ? ' checked' : '';
       html += '<tr>';
       html += '<td style="font-weight:600;color:#e6edf3">' + b.id + '</td>';
       html += '<td>' + statusBadge + '</td>';
+      html += '<td><label class="startup-toggle"><input type="checkbox"' + checked + ' data-startup-id="' + b.id + '"><span class="startup-label">Auto</span></label></td>';
       html += '<td style="font-family:monospace">' + (b.pid || '-') + '</td>';
       html += '<td>' + (b.restarts || 0) + '</td>';
       html += '<td><span class="cmd" title="' + (b.cmd || '').replace(/"/g, '&quot;') + '">' + (b.cmd || '') + '</span></td>';
@@ -166,11 +188,19 @@ document.getElementById('processList').addEventListener('click', function(e) {
 });
 
 document.getElementById('botList').addEventListener('click', function(e) {
+  if (e.target.matches('[data-startup-id]')) return;
   var btn = e.target.closest('[data-bot-id]');
   if (!btn) return;
   var id = btn.getAttribute('data-bot-id');
   var action = btn.getAttribute('data-action');
   if (id && action) botAction(id, action);
+});
+
+document.getElementById('botList').addEventListener('change', function(e) {
+  var cb = e.target.closest('[data-startup-id]');
+  if (!cb) return;
+  var id = cb.getAttribute('data-startup-id');
+  toggleStartup(id, cb.checked);
 });
 
 refresh();

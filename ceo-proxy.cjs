@@ -279,6 +279,16 @@ async function handleBotsApi(req, res, p) {
       return json(res, 200, { ok: true, removed: botId });
     }
 
+    if (req.method === "PATCH" && !action) {
+      const body = JSON.parse((await readBody(req)).toString() || "{}");
+      const registry = loadBotRegistry();
+      const bot = registry.find(b => b.id === botId);
+      if (!bot) return json(res, 404, { error: "Bot not found in registry" });
+      if (typeof body.enabled === "boolean") bot.enabled = body.enabled;
+      saveBotRegistry(registry);
+      return json(res, 200, { ok: true, id: botId, enabled: bot.enabled });
+    }
+
     if (req.method === "POST" && action === "start") {
       const registry = loadBotRegistry();
       const bot = registry.find(b => b.id === botId);

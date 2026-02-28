@@ -39,6 +39,12 @@ tr:hover{background:#1c2128}
 .btn-remove{background:#6e7681;border:1px solid rgba(240,246,252,.1);color:#fff;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500}
 .btn-remove:hover{background:#da3633}
 .btn-actions{display:flex;gap:6px}
+.startup-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.startup-toggle input[type="checkbox"]{appearance:none;-webkit-appearance:none;width:16px;height:16px;border:2px solid #484f58;border-radius:4px;background:#0d1117;cursor:pointer;position:relative;flex-shrink:0}
+.startup-toggle input[type="checkbox"]:checked{background:#238636;border-color:#238636}
+.startup-toggle input[type="checkbox"]:checked::after{content:'\2713';color:#fff;font-size:12px;font-weight:700;position:absolute;top:-1px;left:2px}
+.startup-toggle .startup-label{font-size:11px;color:#8b949e}
+.startup-toggle input[type="checkbox"]:checked+.startup-label{color:#3fb950}
 .empty{color:#8b949e;font-size:14px;text-align:center;padding:32px}
 .toast{position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:6px;font-size:14px;display:none;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,.4)}
 .toast.show{display:block}
