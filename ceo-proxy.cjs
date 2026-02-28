@@ -1028,6 +1028,16 @@ function proxyReq(req, res, retries = 3) {
   req.pipe(p);
 }
 
+const NAV_INJECT_TAG = '<script src="/nav-inject.js"></script>';
+
+function injectNavIntoHtml(buf) {
+  const html = buf.toString("utf-8");
+  if (html.includes("nav-inject.js")) return buf;
+  const idx = html.indexOf("</body>");
+  if (idx === -1) return Buffer.from(html + NAV_INJECT_TAG);
+  return Buffer.from(html.slice(0, idx) + NAV_INJECT_TAG + html.slice(idx));
+}
+
 function serveCanvas(req, res) {
   const url = new URL(req.url, "http://localhost");
   const prefix = "/__openclaw__/canvas/";
@@ -1044,10 +1054,10 @@ function serveCanvas(req, res) {
     if (stat.isDirectory()) {
       const idx = path.join(filePath, "index.html");
       if (fs.existsSync(idx)) {
-        const data = fs.readFileSync(idx);
-        const ext = ".html";
+        const raw = fs.readFileSync(idx);
+        const data = injectNavIntoHtml(raw);
         res.writeHead(200, {
-          "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
+          "Content-Type": "text/html; charset=utf-8",
           "Content-Length": data.length,
           "Access-Control-Allow-Origin": "*",
         });
@@ -1055,8 +1065,10 @@ function serveCanvas(req, res) {
         return true;
       }
     }
-    const data = fs.readFileSync(filePath);
+    const raw = fs.readFileSync(filePath);
     const ext = path.extname(filePath).toLowerCase();
+    const isHtml = ext === ".html" || ext === ".htm";
+    const data = isHtml ? injectNavIntoHtml(raw) : raw;
     res.writeHead(200, {
       "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
       "Content-Length": data.length,
