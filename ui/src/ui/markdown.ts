@@ -14,6 +14,7 @@ const allowedTags = [
   "br",
   "code",
   "del",
+  "div",
   "em",
   "h1",
   "h2",
@@ -21,10 +22,12 @@ const allowedTags = [
   "h4",
   "hr",
   "i",
+  "iframe",
   "li",
   "ol",
   "p",
   "pre",
+  "span",
   "strong",
   "table",
   "tbody",
@@ -36,7 +39,22 @@ const allowedTags = [
   "img",
 ];
 
-const allowedAttrs = ["class", "href", "rel", "target", "title", "start", "src", "alt"];
+const allowedAttrs = [
+  "class",
+  "href",
+  "rel",
+  "target",
+  "title",
+  "start",
+  "src",
+  "alt",
+  "style",
+  "width",
+  "height",
+  "frameborder",
+  "sandbox",
+  "loading",
+];
 const sanitizeOptions = {
   ALLOWED_TAGS: allowedTags,
   ALLOWED_ATTR: allowedAttrs,
@@ -71,6 +89,8 @@ function setCachedMarkdown(key: string, value: string) {
   }
 }
 
+const CANVAS_URL_PREFIX = "/__openclaw__/canvas/";
+
 function installHooks() {
   if (hooksInstalled) {
     return;
@@ -78,15 +98,27 @@ function installHooks() {
   hooksInstalled = true;
 
   DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-    if (!(node instanceof HTMLAnchorElement)) {
-      return;
+    if (node instanceof HTMLAnchorElement) {
+      const href = node.getAttribute("href");
+      if (!href) {
+        return;
+      }
+      node.setAttribute("rel", "noreferrer noopener");
+      node.setAttribute("target", "_blank");
     }
-    const href = node.getAttribute("href");
-    if (!href) {
-      return;
+
+    if (node instanceof HTMLIFrameElement) {
+      const src = node.getAttribute("src") || "";
+      if (!src.startsWith(CANVAS_URL_PREFIX)) {
+        node.remove();
+        return;
+      }
+      node.setAttribute("sandbox", "allow-scripts allow-same-origin");
+      node.setAttribute("loading", "lazy");
+      if (!node.classList.contains("canvas-embed")) {
+        node.classList.add("canvas-embed");
+      }
     }
-    node.setAttribute("rel", "noreferrer noopener");
-    node.setAttribute("target", "_blank");
   });
 }
 
@@ -130,7 +162,21 @@ export function toSanitizedMarkdownHtml(markdown: string): string {
 // Security is handled by DOMPurify, but rendering pasted HTML (e.g. error
 // pages) as formatted output is confusing UX (#13937).
 const htmlEscapeRenderer = new marked.Renderer();
-htmlEscapeRenderer.html = ({ text }: { text: string }) => escapeHtml(text);
+htmlEscapeRenderer.html = ({ text }: { text: string }) => {
+  const iframeMatch = text.match(/<iframe\s[^>]*src=["'](\/__openclaw__\/canvas\/[^"']+)["'][^>]*>/i);
+  if (iframeMatch) {
+    return text;
+  }
+  return escapeHtml(text);
+};
+htmlEscapeRenderer.image = ({ href, title, text }: { href: string; title: string | null; text: string }) => {
+  if (href && href.startsWith(CANVAS_URL_PREFIX)) {
+    const label = text || title || "Canvas Page";
+    return `<div class="canvas-embed-wrapper"><iframe class="canvas-embed" src="${escapeHtml(href)}" frameborder="0" loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe><div class="canvas-embed-label">${escapeHtml(label)}</div></div>`;
+  }
+  const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+  return `<img src="${escapeHtml(href)}" alt="${escapeHtml(text)}"${titleAttr} />`;
+};
 
 function escapeHtml(value: string): string {
   return value
