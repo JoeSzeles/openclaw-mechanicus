@@ -59,11 +59,13 @@ export function buildInboundUserContextPrefix(ctx: TemplateContext): string {
   const blocks: string[] = [];
   const chatType = normalizeChatType(ctx.ChatType);
   const isDirect = !chatType || chatType === "direct";
+  const senderId = safeTrim(ctx.SenderId);
+  const isControlUi = senderId === "openclaw-control-ui";
 
   const conversationInfo = {
     message_id: safeTrim(ctx.MessageSid),
     conversation_label: isDirect ? undefined : safeTrim(ctx.ConversationLabel),
-    sender: safeTrim(ctx.SenderE164) ?? safeTrim(ctx.SenderId) ?? safeTrim(ctx.SenderUsername),
+    sender: safeTrim(ctx.SenderE164) ?? senderId ?? safeTrim(ctx.SenderUsername),
     group_subject: safeTrim(ctx.GroupSubject),
     group_channel: safeTrim(ctx.GroupChannel),
     group_space: safeTrim(ctx.GroupSpace),
@@ -71,7 +73,8 @@ export function buildInboundUserContextPrefix(ctx: TemplateContext): string {
     is_forum: ctx.IsForum === true ? true : undefined,
     was_mentioned: ctx.WasMentioned === true ? true : undefined,
   };
-  if (Object.values(conversationInfo).some((v) => v !== undefined)) {
+  const skipConversationInfo = isDirect && isControlUi;
+  if (!skipConversationInfo && Object.values(conversationInfo).some((v) => v !== undefined)) {
     blocks.push(
       [
         "Conversation info (untrusted metadata):",
