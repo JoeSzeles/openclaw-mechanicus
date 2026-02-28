@@ -39,7 +39,8 @@ OpenClaw Cloud operates with a "CEO Proxy + Gateway" architecture where two comp
 -   **Persistent Storage**: All OpenClaw data, including configuration, agents, API keys, worker tasks, chat history, and file exchange, persists across container restarts in the `.openclaw/` directory.
 -   **Canvas Static File Serving**: The CEO proxy serves files from `.openclaw/canvas/` at `/__openclaw__/canvas/` without authentication. Skills and agents can write HTML dashboards, charts, and reports to this directory and link users directly. No separate web server or custom port needed. A manifest system (`.openclaw/canvas/manifest.json`) tracks all published pages for dynamic discovery on the Canvas hub (`/__openclaw__/canvas/`). Agents register new pages by adding entries to the manifest JSON array.
 -   **Auto-Token Injection**: The gateway authentication token is automatically injected into the Control UI at startup, eliminating manual configuration.
--   **Navigation Bar**: An injected navigation bar provides easy access to the Dashboard, Canvas, AI Model Config, and Workers pages.
+-   **Process Manager**: A web UI (`/processes.html`) shows all running bot scripts, monitors, and skill processes. Uses OS-level process discovery (`ps aux`) filtered to `skills/` scripts. Supports killing processes with SIGTERM/SIGKILL fallback. Auto-refreshes every 10 seconds. API: `GET /api/processes` (list), `POST /api/processes/kill` (kill by PID).
+-   **Navigation Bar**: An injected navigation bar provides easy access to the Dashboard, Canvas, AI Model Config, Workers, and Processes pages.
 
 ### Technical Implementation Details:
 -   **Language**: TypeScript (Node.js >= 22.12.0)

@@ -928,6 +928,67 @@ async function handleAgentChat(req, res) {
   }
 }
 
+const { execSync } = require("child_process");
+
+function getRunningProcesses() {
+  try {
+    const out = execSync("ps aux --sort=-start_time", { encoding: "utf-8", timeout: 5000 });
+    const lines = out.trim().split("\n").slice(1);
+    const procs = [];
+    for (const line of lines) {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 11) continue;
+      const pid = parseInt(parts[1]);
+      const cpu = parts[2];
+      const mem = parts[3];
+      const startTime = parts[8];
+      const cmd = parts.slice(10).join(" ");
+      if (cmd.includes("monitor.cjs") || cmd.includes("bot.cjs") ||
+          cmd.includes("ig-signal-monitor") || cmd.includes("ig-trading-bot") ||
+          (cmd.includes("node ") && cmd.includes("skills/"))) {
+        let name = "Unknown Script";
+        let type = "script";
+        if (cmd.includes("monitor.cjs") || cmd.includes("ig-signal-monitor")) { name = "Signal Monitor"; type = "monitor"; }
+        else if (cmd.includes("bot.cjs") || cmd.includes("ig-trading-bot")) { name = "Trading Bot"; type = "bot"; }
+        else {
+          const m = cmd.match(/skills\/([^/]+)\//);
+          if (m) name = m[1];
+        }
+        procs.push({ pid, name, type, cpu, mem, startTime, cmd });
+      }
+    }
+    return procs;
+  } catch (_) { return []; }
+}
+
+async function handleProcesses(req, res, p) {
+  if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" });
+
+  if (req.method === "GET" && p === "/api/processes") {
+    const procs = getRunningProcesses();
+    return json(res, 200, { processes: procs });
+  }
+
+  if (req.method === "POST" && p === "/api/processes/kill") {
+    const body = JSON.parse((await readBody(req)).toString() || "{}");
+    const pid = parseInt(body.pid);
+    if (!pid || isNaN(pid)) return json(res, 400, { error: "pid required" });
+    const procs = getRunningProcesses();
+    const found = procs.find(pr => pr.pid === pid);
+    if (!found) return json(res, 404, { error: "Process not found or not a managed script" });
+    try {
+      process.kill(pid, "SIGTERM");
+      setTimeout(() => { try { process.kill(pid, 0); process.kill(pid, "SIGKILL"); } catch (_) {} }, 3000);
+      console.log("[ceo-proxy] Killed process:", found.name, "pid:", pid);
+      return json(res, 200, { ok: true, killed: found.name, pid });
+    } catch (err) {
+      return json(res, 500, { error: "Failed to kill: " + err.message });
+    }
+  }
+
+  return json(res, 404, { error: "Not found" });
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, "http://localhost");
   const p = url.pathname;
@@ -975,6 +1036,7 @@ async function handleApi(req, res) {
     return json(res, 201, { ok: true, taskId: task.id, workerName: w.name }), true;
   }
 
+  if (p.startsWith("/api/processes")) { await handleProcesses(req, res, p); return true; }
   if (p.startsWith("/api/keys")) { await handleApiKeys(req, res, p); return true; }
   if (p.startsWith("/api/workers")) { await handleWorkers(req, res, p); return true; }
   if (p.startsWith("/api/tasks")) { await handleTasks(req, res, p); return true; }
@@ -1000,7 +1062,7 @@ function proxyReq(req, res, retries = 3) {
     method: req.method,
     headers: { ...req.headers, host: "127.0.0.1:" + GATEWAY_PORT },
   };
-  const noCache = /\/(worker-chat|nav-inject|token-init|workers)\.(js|css|html)/.test(req.url);
+  const noCache = /\/(worker-chat|nav-inject|token-init|workers|processes)\.(js|css|html)/.test(req.url);
   const p = http.request(opts, (pr) => {
     const headers = { ...pr.headers };
     if (noCache) {
