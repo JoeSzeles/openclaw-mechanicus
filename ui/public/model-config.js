@@ -151,9 +151,15 @@ function renderIgConfig(config) {
     var usernameEl = document.getElementById(key + '-username');
     var passwordEl = document.getElementById(key + '-password');
     var accountIdEl = document.getElementById(key + '-accountId');
-    if (apiKeyEl) apiKeyEl.placeholder = prof.hasCredentials ? prof.apiKey : 'Enter API key';
-    if (usernameEl) usernameEl.placeholder = prof.hasCredentials ? prof.username : 'Enter username';
-    if (passwordEl) passwordEl.placeholder = prof.hasCredentials ? '********' : 'Enter password';
+    if (prof.hasCredentials) {
+      if (apiKeyEl) apiKeyEl.placeholder = prof.apiKey + ' (leave empty to keep)';
+      if (usernameEl) usernameEl.placeholder = prof.username + ' (leave empty to keep)';
+      if (passwordEl) passwordEl.placeholder = '******** (leave empty to keep)';
+    } else {
+      if (apiKeyEl) apiKeyEl.placeholder = 'Enter API key';
+      if (usernameEl) usernameEl.placeholder = 'Enter username';
+      if (passwordEl) passwordEl.placeholder = 'Enter password';
+    }
     if (accountIdEl) accountIdEl.value = prof.accountId || '';
     apiKeyEl.value = '';
     usernameEl.value = '';
@@ -322,18 +328,18 @@ function saveProfile(profileName) {
   });
 }
 
-function testConnection() {
-  showToast('Testing connection...', 'success');
+function testConnection(profileName) {
+  showToast('Testing ' + profileName.toUpperCase() + ' connection...', 'success');
   apiFetch('/api/ig/config/test', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: '{}'
+    body: JSON.stringify({ profile: profileName })
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (data.ok) {
-      showToast('Connection successful! Profile: ' + data.profile + (data.lightstreamerEndpoint ? ', Streaming: ' + data.lightstreamerEndpoint : ''), 'success');
+      showToast(profileName.toUpperCase() + ' connection successful!' + (data.lightstreamerEndpoint ? ' Streaming: ' + data.lightstreamerEndpoint : ''), 'success');
       loadIgConfig();
     } else {
-      showToast('Connection failed: ' + (data.error || 'Unknown error'), 'error');
+      showToast(profileName.toUpperCase() + ' connection failed: ' + (data.error || 'Unknown error'), 'error');
     }
   }).catch(function(e) {
     showToast('Error: ' + e.message, 'error');
@@ -341,9 +347,9 @@ function testConnection() {
 }
 
 document.getElementById('btnSaveDemo').addEventListener('click', function() { saveProfile('demo'); });
-document.getElementById('btnTestDemo').addEventListener('click', function() { testConnection(); });
+document.getElementById('btnTestDemo').addEventListener('click', function() { testConnection('demo'); });
 document.getElementById('btnSaveLive').addEventListener('click', function() { saveProfile('live'); });
-document.getElementById('btnTestLive').addEventListener('click', function() { testConnection(); });
+document.getElementById('btnTestLive').addEventListener('click', function() { testConnection('live'); });
 
 loadConfig();
 loadIgConfig();

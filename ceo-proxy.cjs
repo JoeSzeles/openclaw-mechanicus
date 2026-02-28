@@ -260,10 +260,10 @@ function stopLightstreamer() {
 // Bot process manager
 const botProcesses = new Map();
 
-function igRequest(method, urlPath, headers, body) {
+function igRequest(method, urlPath, headers, body, baseUrlOverride) {
   return new Promise((resolve, reject) => {
     const profile = getActiveIgProfile();
-    const base = (profile && profile.baseUrl) || process.env.IG_BASE_URL || "";
+    const base = baseUrlOverride || (profile && profile.baseUrl) || process.env.IG_BASE_URL || "";
     const url = new URL(urlPath.startsWith("http") ? urlPath : base + urlPath);
     const mod = url.protocol === "https:" ? https : http;
     const opts = {
@@ -481,6 +481,33 @@ async function handleIgApi(req, res, p) {
     }
 
     if (req.method === "POST" && p === "/api/ig/config/test") {
+      const testBody = JSON.parse((await readBody(req)).toString() || "{}");
+      const testProfileName = testBody.profile || null;
+      if (testProfileName) {
+        const config = ensureIgConfig();
+        const prof = config.profiles[testProfileName];
+        if (!prof || !prof.apiKey || !prof.username || !prof.password || !prof.baseUrl) {
+          return json(res, 400, { error: "No credentials configured for " + testProfileName + " profile" });
+        }
+        try {
+          const testRes = await igRequest("POST", "/session", {
+            "Content-Type": "application/json; charset=UTF-8",
+            Accept: "application/json; charset=UTF-8",
+            "X-IG-API-KEY": prof.apiKey,
+            Version: "2",
+          }, JSON.stringify({ identifier: prof.username, password: prof.password }), prof.baseUrl);
+          if (testRes.status !== 200) {
+            let errDetail = testRes.body || "";
+            try { const ej = JSON.parse(errDetail); errDetail = ej.errorCode || ej.error || errDetail; } catch(_) {}
+            return json(res, 200, { ok: false, error: "IG auth failed (" + testRes.status + "): " + errDetail });
+          }
+          let lsEndpoint = null;
+          try { lsEndpoint = JSON.parse(testRes.body).lightstreamerEndpoint || null; } catch(_) {}
+          return json(res, 200, { ok: true, profile: testProfileName, lightstreamerEndpoint: lsEndpoint });
+        } catch (e) {
+          return json(res, 200, { ok: false, error: e.message });
+        }
+      }
       if (!igConfigured()) return json(res, 400, { error: "No credentials configured for active profile" });
       try {
         const session = await igAuth();
