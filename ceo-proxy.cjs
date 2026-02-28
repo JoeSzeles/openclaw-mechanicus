@@ -1034,13 +1034,21 @@ function unescapeHtmlEntities(html) {
   return html
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"');
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&amp;/g, "&");
+}
+
+function needsUnescape(html) {
+  return html.includes("&lt;html") || html.includes("&lt;!DOCTYPE") || html.includes("&lt;head")
+    || html.includes("&#39;") || html.includes("&#x27;") || html.includes("&#34;");
 }
 
 function injectNavIntoHtml(buf, filePath) {
   let html = buf.toString("utf-8");
-  if (html.includes("&lt;html") || html.includes("&lt;!DOCTYPE") || html.includes("&lt;head")) {
+  if (needsUnescape(html)) {
     console.log("[canvas] Auto-fixing HTML-escaped canvas file:", filePath);
     html = unescapeHtmlEntities(html);
     if (filePath) { try { fs.writeFileSync(filePath, html); } catch (_) {} }
@@ -1051,11 +1059,35 @@ function injectNavIntoHtml(buf, filePath) {
   return Buffer.from(html.slice(0, idx) + NAV_INJECT_TAG + html.slice(idx));
 }
 
+function buildCanvasManifest() {
+  let manifest = [];
+  const manifestPath = path.join(CANVAS_DIR, "manifest.json");
+  try { manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8")); } catch (_) {}
+  if (!Array.isArray(manifest)) manifest = [];
+  const knownFiles = new Set(manifest.map(e => e.file));
+  try {
+    const files = fs.readdirSync(CANVAS_DIR);
+    for (const f of files) {
+      if (f === "index.html" || f === "manifest.json" || !f.endsWith(".html")) continue;
+      if (knownFiles.has(f)) continue;
+      manifest.push({ name: f.replace(/\.html$/, "").replace(/[-_]/g, " "), file: f, description: "", category: "Other" });
+    }
+  } catch (_) {}
+  return manifest;
+}
+
 function serveCanvas(req, res) {
   const url = new URL(req.url, "http://localhost");
   const prefix = "/__openclaw__/canvas/";
   if (req.method !== "GET" || !url.pathname.startsWith(prefix)) return false;
   const relPath = decodeURIComponent(url.pathname.slice(prefix.length)) || "index.html";
+  if (relPath === "manifest.json") {
+    const manifest = buildCanvasManifest();
+    const data = Buffer.from(JSON.stringify(manifest));
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Content-Length": data.length, "Access-Control-Allow-Origin": "*" });
+    res.end(data);
+    return true;
+  }
   const filePath = path.resolve(CANVAS_DIR, path.normalize(relPath));
   if (!isInsideDir(filePath, CANVAS_DIR) && filePath !== path.resolve(CANVAS_DIR)) {
     res.writeHead(403, { "Content-Type": "text/plain" });
