@@ -64,7 +64,7 @@ OpenClaw Cloud operates with a "CEO Proxy + Gateway" architecture where two comp
 -   **OpenAI API**: Secondary AI model provider via Replit AI Integrations.
     -   Models: `gpt-4o`, `gpt-4o-mini`.
 -   **IG Group Trading API**: CFD trading via REST API (demo: `demo-api.ig.com`, live: `api.ig.com`).
-    -   Skills: `ig-trading` (auth, positions, orders), `ig-market-data` (search, prices, watchlists, sentiment), `ig-trade-verify` (mandatory pre-trade proof reader).
+    -   Skills: `ig-trading` (auth, positions, orders), `ig-market-data` (search, prices, watchlists, sentiment), `ig-trade-verify` (mandatory pre-trade proof reader), `ig-backtest` (strategy backtesting with charts).
     -   Bot skills: `ig-signal-monitor` (price signal monitoring), `ig-trading-bot` (automated strategy execution with built-in proof reader).
     -   **Trade Proof Reader**: Multi-layered anti-hallucination protection for margin trading. Bot-level rule-based verification (spread limits, stop-loss validation, price staleness detection, risk sizing, duplicate checks) runs before every trade. Agent-level `ig-trade-verify` skill defines a mandatory verification protocol. All verifications logged to `.openclaw/canvas/ig-verify-log.json` and displayed on the IG dashboard.
     -   Signal monitor config: `.openclaw/ig-monitor-config.json`, alerts: `.openclaw/ig-alerts.json`.

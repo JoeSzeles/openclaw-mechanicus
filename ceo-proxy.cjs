@@ -961,6 +961,44 @@ function getRunningProcesses() {
   } catch (_) { return []; }
 }
 
+async function handleCanvasApi(req, res, p) {
+  if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" });
+  const MANIFEST_PATH = path.join(CANVAS_DIR, "manifest.json");
+
+  if (req.method === "DELETE" && p.startsWith("/api/canvas/page/")) {
+    const filename = decodeURIComponent(p.slice("/api/canvas/page/".length));
+    if (!filename || filename.includes("..") || filename.includes("/")) {
+      return json(res, 400, { error: "Invalid filename" });
+    }
+    try {
+      let manifest = [];
+      if (fs.existsSync(MANIFEST_PATH)) manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
+      manifest = manifest.filter(e => e.file !== filename);
+      fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2));
+      const filePath = path.join(CANVAS_DIR, filename);
+      if (fs.existsSync(filePath) && filename !== "index.html" && filename !== "manifest.json" && filename !== "ig-dashboard.html") {
+        fs.unlinkSync(filePath);
+      }
+      console.log("[ceo-proxy] Deleted canvas page:", filename);
+      return json(res, 200, { ok: true, deleted: filename });
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
+  }
+
+  if (req.method === "GET" && p === "/api/canvas/manifest") {
+    try {
+      let manifest = [];
+      if (fs.existsSync(MANIFEST_PATH)) manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
+      return json(res, 200, { pages: manifest });
+    } catch (e) {
+      return json(res, 200, { pages: [] });
+    }
+  }
+
+  return json(res, 404, { error: "Not found" });
+}
+
 async function handleProcesses(req, res, p) {
   if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" });
 
@@ -1037,6 +1075,7 @@ async function handleApi(req, res) {
   }
 
   if (p.startsWith("/api/processes")) { await handleProcesses(req, res, p); return true; }
+  if (p.startsWith("/api/canvas")) { await handleCanvasApi(req, res, p); return true; }
   if (p.startsWith("/api/keys")) { await handleApiKeys(req, res, p); return true; }
   if (p.startsWith("/api/workers")) { await handleWorkers(req, res, p); return true; }
   if (p.startsWith("/api/tasks")) { await handleTasks(req, res, p); return true; }
