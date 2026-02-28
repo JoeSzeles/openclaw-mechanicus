@@ -28,9 +28,59 @@ Live API base URL: `https://api.ig.com/gateway/deal`
 
 > **CRITICAL**: Demo keys ONLY work on `demo-api.ig.com`. Live keys ONLY work on `api.ig.com`. Using a demo key on the live server returns `error.security.api-key-invalid`. Each account is limited to one API key.
 
-## Environment Variables
+## Credential Profiles (Demo/Live Switching)
 
-Set these in Replit Secrets:
+OpenClaw Cloud supports two credential profiles — **Demo** and **Live** — stored in `.openclaw/ig-config.json`. You can switch between them from the **Config** page without restarting.
+
+### How It Works
+
+1. On first startup, environment variables (`IG_API_KEY`, etc.) are used to seed the demo profile
+2. Both profiles are stored in `.openclaw/ig-config.json` with full credentials
+3. All IG code (proxy, bots, dashboard) reads from the **active profile** — not env vars directly
+4. Switching profiles:
+   - Clears cached IG sessions
+   - Disconnects and reconnects Lightstreamer to the correct endpoint
+   - Bots pick up the new credentials on their next cycle
+
+### Config Page
+
+Navigate to **Config > IG Trading** to:
+- Toggle between Demo and Live profiles
+- Enter/update credentials for each profile (passwords are masked in the UI)
+- Test the connection with a single click
+- View Lightstreamer streaming status
+
+### Manual Configuration
+
+The profile config file at `.openclaw/ig-config.json`:
+
+```json
+{
+  "activeProfile": "demo",
+  "profiles": {
+    "demo": {
+      "label": "Demo Account",
+      "baseUrl": "https://demo-api.ig.com/gateway/deal",
+      "apiKey": "your-demo-api-key",
+      "username": "your-username",
+      "password": "your-password",
+      "accountId": "Z3MJKY"
+    },
+    "live": {
+      "label": "Live Account",
+      "baseUrl": "https://api.ig.com/gateway/deal",
+      "apiKey": "",
+      "username": "",
+      "password": "",
+      "accountId": ""
+    }
+  }
+}
+```
+
+### Environment Variables (Legacy/Seed)
+
+Environment variables are still supported and are used to seed the initial profile if `ig-config.json` doesn't exist:
 
 | Variable | Required | Example | Description |
 |----------|----------|---------|-------------|
@@ -39,6 +89,8 @@ Set these in Replit Secrets:
 | `IG_PASSWORD` | Yes | Your IG password | Login credential |
 | `IG_ACCOUNT_ID` | Yes | `Z3MJKY` | Your IG account identifier |
 | `IG_BASE_URL` | Yes | `https://demo-api.ig.com/gateway/deal` | API endpoint (demo or live) |
+
+Once profiles are configured via the Config page, env vars are no longer read directly.
 
 ## Testing Your Connection
 
@@ -154,18 +206,25 @@ Executes trades based on configurable strategy rules with built-in risk controls
 
 ## Dashboard
 
-The IG Trading Dashboard is available at `/__openclaw__/canvas/ig-dashboard.html` and auto-refreshes every 30 seconds.
+The IG Trading Dashboard is available at `/__openclaw__/canvas/ig-dashboard.html`.
 
 ![IG Trading Dashboard](images/ig-dashboard.png)
 
 It shows:
-- **Account balance, available funds, unrealised P&L** (LIVE from API)
-- **Open positions** with entry, current price, and P&L (LIVE from API)
+- **Account balance, available funds, unrealised P&L** (LIVE from API, cached 30s)
+- **Open positions** with entry, current price, and P&L (LIVE from API, cached 30s)
+- **Streamed prices** with bid/offer/spread/state (STREAMING via Lightstreamer, updated every 5s)
 - **Price charts** with bid/offer/mid (SNAPSHOT from price history)
 - **Monitor and bot status** (ACTIVE/INACTIVE)
 - **Watched instruments** and **active strategies** (SNAPSHOT from config files)
 
-Badge system: green **LIVE** badge for sections fetched from the IG API in real-time, grey **SNAPSHOT** badge for sections loaded from local config files.
+Badge system:
+- Green **STREAMING** badge: prices delivered via Lightstreamer in real-time (5-second UI refresh)
+- Green **LIVE** badge: data fetched from IG REST API (cached 30s)
+- Grey **SNAPSHOT** badge: data loaded from local config files
+- Orange **POLLING** badge: streaming unavailable, falling back to REST
+
+The dashboard uses JavaScript-based refresh intervals instead of meta-refresh: streamed prices update every 5 seconds, full dashboard refresh every 30 seconds.
 
 ## Rate Limits
 
@@ -251,7 +310,7 @@ Both bots support configurable rate limiting via their config files:
 - **Reduce instruments** being monitored if hitting limits
 - **Use the IG Trading Dashboard** (which uses cached data) instead of making direct API calls for viewing
 - **Avoid restarting bots frequently** — each restart triggers a fresh authentication
-- **Consider Lightstreamer** for real-time price data in future implementations
+- **Enable Lightstreamer streaming** to eliminate REST polling for prices (see below)
 
 ## Trade Proof Reader
 
@@ -283,6 +342,58 @@ Features:
 - Price chart with trade entry/exit markers
 - Performance metrics: P&L, win rate, Sharpe ratio, max drawdown, profit factor
 - Results published as interactive HTML pages on the Canvas hub
+
+## Lightstreamer Streaming
+
+OpenClaw Cloud uses IG's Lightstreamer streaming API for real-time price data, eliminating the need for REST polling and dramatically reducing API quota usage.
+
+### How It Works
+
+1. On startup (5 seconds after the proxy boots), the system authenticates with IG and connects to the Lightstreamer endpoint
+2. It subscribes to L1 (Level 1) price data for all instruments configured in the signal monitor and trading bot configs
+3. Price updates arrive in real-time and are stored in memory
+4. The dashboard, bots, and any other consumer can read streamed prices from `/api/ig/stream/prices` at zero API quota cost
+5. If Lightstreamer is unavailable, everything falls back to REST polling automatically
+
+### Streaming Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/ig/stream/prices` | GET | Returns all currently streamed prices (zero quota) |
+| `/api/ig/stream/status` | GET | Returns Lightstreamer connection status |
+
+### Subscription Limits
+
+- **Maximum 40 concurrent L1 subscriptions** per Lightstreamer connection
+- Each instrument (EPIC) uses one subscription
+- The system auto-subscribes to all EPICs found in bot configs on startup
+- Exceeding the limit will cause subscription errors (the system handles this gracefully)
+
+### Lightstreamer Endpoints
+
+| Account Type | Lightstreamer Endpoint |
+|-------------|----------------------|
+| **Demo** | `https://demo-apd.marketdatasystems.com` |
+| **Live** | Returned in the IG session response (`lightstreamerEndpoint` field) |
+
+### Bot Integration
+
+Both bots automatically try streamed prices before falling back to REST:
+
+1. Bot checks `/api/ig/stream/prices` for the instrument
+2. If a valid price exists (< 60 seconds old), it uses it (zero quota)
+3. If streaming is unavailable or data is stale, it falls back to REST `/markets/{epic}`
+
+To disable streaming for a bot, set `"useStreaming": false` in its config file.
+
+### Response Caching
+
+The proxy also caches REST responses for 30 seconds on these endpoints:
+- `/api/ig/account`
+- `/api/ig/positions`
+- `/api/ig/prices`
+
+This means multiple dashboard refreshes within 30 seconds reuse cached data instead of making fresh API calls. The cache is invalidated when a trade is executed.
 
 ## Troubleshooting
 

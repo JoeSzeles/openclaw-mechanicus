@@ -21,19 +21,244 @@ const BOT_REGISTRY_FILE = path.join(DATA_DIR, "bot-registry.json");
 const https = require("https");
 
 // IG API session cache
-let igSession = { cst: null, xst: null, ts: 0 };
+let igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
 const IG_SESSION_TTL = 5 * 60 * 1000;
+
+// IG response cache
+const igResponseCache = new Map();
+const IG_CACHE_TTL = 30000;
+
+function igCacheGet(key) {
+  const entry = igResponseCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > IG_CACHE_TTL) { igResponseCache.delete(key); return null; }
+  return entry.data;
+}
+
+function igCacheSet(key, data) {
+  igResponseCache.set(key, { data, ts: Date.now() });
+}
+
+function igCacheInvalidate() {
+  igResponseCache.clear();
+}
+
+// IG credential profiles
+const IG_CONFIG_FILE = path.join(DATA_DIR, "ig-config.json");
+
+function loadIgConfig() {
+  try {
+    if (fs.existsSync(IG_CONFIG_FILE)) return JSON.parse(fs.readFileSync(IG_CONFIG_FILE, "utf8"));
+  } catch (_) {}
+  return null;
+}
+
+function saveIgConfig(config) {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(IG_CONFIG_FILE, JSON.stringify(config, null, 2));
+}
+
+function getDefaultIgConfig() {
+  return {
+    activeProfile: "demo",
+    profiles: {
+      demo: {
+        label: "Demo Account",
+        baseUrl: "https://demo-api.ig.com/gateway/deal",
+        apiKey: "",
+        username: "",
+        password: "",
+        accountId: ""
+      },
+      live: {
+        label: "Live Account",
+        baseUrl: "https://api.ig.com/gateway/deal",
+        apiKey: "",
+        username: "",
+        password: "",
+        accountId: ""
+      }
+    }
+  };
+}
+
+function ensureIgConfig() {
+  let config = loadIgConfig();
+  if (!config) {
+    config = getDefaultIgConfig();
+    if (process.env.IG_API_KEY || process.env.IG_USERNAME) {
+      const profile = (process.env.IG_BASE_URL || "").includes("demo-api") ? "demo" : "live";
+      config.activeProfile = profile;
+      config.profiles[profile].apiKey = process.env.IG_API_KEY || "";
+      config.profiles[profile].username = process.env.IG_USERNAME || "";
+      config.profiles[profile].password = process.env.IG_PASSWORD || "";
+      config.profiles[profile].accountId = process.env.IG_ACCOUNT_ID || "";
+      config.profiles[profile].baseUrl = process.env.IG_BASE_URL || config.profiles[profile].baseUrl;
+      console.log(`[ig-config] Seeded ${profile} profile from env vars`);
+    }
+    saveIgConfig(config);
+  }
+  return config;
+}
+
+function getActiveIgProfile() {
+  const config = ensureIgConfig();
+  const profile = config.profiles[config.activeProfile];
+  if (!profile) return null;
+  return { ...profile, profileName: config.activeProfile };
+}
+
+function igConfigured() {
+  const p = getActiveIgProfile();
+  return !!(p && p.apiKey && p.username && p.password && p.baseUrl);
+}
+
+// Lightstreamer streaming
+let lsClient = null;
+let lsSubscription = null;
+let lsStatus = "disconnected";
+let lsConnectedEpics = [];
+const streamedPrices = new Map();
+
+function getStreamedPrices() {
+  const result = {};
+  for (const [epic, data] of streamedPrices) {
+    result[epic] = { ...data };
+  }
+  return result;
+}
+
+function collectInstrumentEpics() {
+  const epics = new Set();
+  try {
+    const monCfg = path.join(DATA_DIR, "ig-monitor-config.json");
+    if (fs.existsSync(monCfg)) {
+      const cfg = JSON.parse(fs.readFileSync(monCfg, "utf8"));
+      if (cfg.instruments) cfg.instruments.forEach(i => { if (i.epic) epics.add(i.epic); });
+    }
+  } catch (_) {}
+  try {
+    const strCfg = path.join(DATA_DIR, "ig-strategy.json");
+    if (fs.existsSync(strCfg)) {
+      const cfg = JSON.parse(fs.readFileSync(strCfg, "utf8"));
+      if (cfg.strategies) cfg.strategies.forEach(s => { if (s.instrument) epics.add(s.instrument); });
+    }
+  } catch (_) {}
+  return [...epics].slice(0, 40);
+}
+
+async function startLightstreamer() {
+  if (!igConfigured()) { lsStatus = "not_configured"; return; }
+  try {
+    const { LightstreamerClient, Subscription } = require("lightstreamer-client-node");
+    const session = await igAuth();
+    if (!igSession.lightstreamerEndpoint) {
+      console.log("[lightstreamer] No endpoint from session, skipping");
+      lsStatus = "no_endpoint";
+      return;
+    }
+    if (lsClient) { try { lsClient.disconnect(); } catch (_) {} }
+
+    const client = new LightstreamerClient(igSession.lightstreamerEndpoint, "DEFAULT");
+    const profile = getActiveIgProfile();
+    client.connectionDetails.setUser(profile.accountId);
+    client.connectionDetails.setPassword(`CST-${session.cst}|XST-${session.xst}`);
+
+    client.addListener({
+      onStatusChange: (status) => {
+        console.log("[lightstreamer] Status:", status);
+        if (status.startsWith("CONNECTED")) lsStatus = "connected";
+        else if (status.startsWith("DISCONNECTED")) lsStatus = "disconnected";
+        else if (status.startsWith("CONNECTING") || status.startsWith("STALLED")) lsStatus = "reconnecting";
+      },
+      onServerError: (code, msg) => {
+        console.log("[lightstreamer] Server error:", code, msg);
+        lsStatus = "error";
+      }
+    });
+
+    client.connect();
+    lsClient = client;
+
+    const epics = collectInstrumentEpics();
+    if (epics.length === 0) {
+      console.log("[lightstreamer] No instruments to subscribe to");
+      lsStatus = "connected";
+      lsConnectedEpics = [];
+      return;
+    }
+
+    const items = epics.map(e => `L1:${e}`);
+    const fields = ["BID", "OFFER", "HIGH", "LOW", "MID_OPEN", "MARKET_STATE", "UPDATE_TIME"];
+    const sub = new Subscription("MERGE", items, fields);
+    sub.setRequestedSnapshot("yes");
+    sub.addListener({
+      onSubscription: () => {
+        console.log(`[lightstreamer] Subscribed to ${epics.length} instruments`);
+        lsConnectedEpics = epics;
+      },
+      onSubscriptionError: (code, msg) => {
+        console.error(`[lightstreamer] Subscription error: ${code} ${msg}`);
+        if (msg && msg.includes("Invalid account type")) {
+          console.log("[lightstreamer] This IG account type does not support streaming. Prices will use REST polling instead.");
+          lsStatus = "unsupported";
+        }
+      },
+      onItemUpdate: (info) => {
+        const epicFull = info.getItemName();
+        const epic = epicFull.startsWith("L1:") ? epicFull.slice(3) : epicFull;
+        const bid = parseFloat(info.getValue("BID")) || null;
+        const offer = parseFloat(info.getValue("OFFER")) || null;
+        const mid = (bid && offer) ? (bid + offer) / 2 : null;
+        streamedPrices.set(epic, {
+          bid, offer, mid,
+          high: parseFloat(info.getValue("HIGH")) || null,
+          low: parseFloat(info.getValue("LOW")) || null,
+          midOpen: parseFloat(info.getValue("MID_OPEN")) || null,
+          marketState: info.getValue("MARKET_STATE") || null,
+          updateTime: info.getValue("UPDATE_TIME") || null,
+          timestamp: Date.now()
+        });
+      },
+      onUnsubscription: () => {
+        console.log("[lightstreamer] Unsubscribed");
+        lsConnectedEpics = [];
+      },
+      onCommandSecondLevelSubscriptionError: (code, msg) => {
+        console.error(`[lightstreamer] 2nd level error: ${code} ${msg}`);
+      }
+    });
+    client.subscribe(sub);
+    lsSubscription = sub;
+    console.log(`[lightstreamer] Connecting to ${igSession.lightstreamerEndpoint}, subscribing to ${epics.length} instruments`);
+  } catch (e) {
+    console.error("[lightstreamer] Error starting:", e.message);
+    lsStatus = "error";
+  }
+}
+
+function stopLightstreamer() {
+  if (lsClient) {
+    try {
+      if (lsSubscription) lsClient.unsubscribe(lsSubscription);
+      lsClient.disconnect();
+    } catch (_) {}
+    lsClient = null;
+    lsSubscription = null;
+    lsStatus = "disconnected";
+    lsConnectedEpics = [];
+    streamedPrices.clear();
+    console.log("[lightstreamer] Disconnected");
+  }
+}
 
 // Bot process manager
 const botProcesses = new Map();
 
-function igConfigured() {
-  return !!(process.env.IG_API_KEY && process.env.IG_USERNAME && process.env.IG_PASSWORD && process.env.IG_BASE_URL);
-}
-
 function igRequest(method, urlPath, headers, body) {
   return new Promise((resolve, reject) => {
-    const base = process.env.IG_BASE_URL || "";
+    const profile = getActiveIgProfile();
+    const base = (profile && profile.baseUrl) || process.env.IG_BASE_URL || "";
     const url = new URL(urlPath.startsWith("http") ? urlPath : base + urlPath);
     const mod = url.protocol === "https:" ? https : http;
     const opts = {
@@ -60,23 +285,31 @@ async function igAuth() {
   if (igSession.cst && Date.now() - igSession.ts < IG_SESSION_TTL) {
     return { cst: igSession.cst, xst: igSession.xst };
   }
+  const profile = getActiveIgProfile();
+  if (!profile) throw new Error("No active IG profile configured");
   const res = await igRequest("POST", "/session", {
     "Content-Type": "application/json; charset=UTF-8",
     Accept: "application/json; charset=UTF-8",
-    "X-IG-API-KEY": process.env.IG_API_KEY,
+    "X-IG-API-KEY": profile.apiKey,
     Version: "2",
-  }, JSON.stringify({ identifier: process.env.IG_USERNAME, password: process.env.IG_PASSWORD }));
-  if (res.status !== 200) throw new Error("IG auth failed: " + res.status);
+  }, JSON.stringify({ identifier: profile.username, password: profile.password }));
+  if (res.status !== 200) throw new Error("IG auth failed: " + res.status + " " + res.body);
   const cst = res.headers["cst"] || res.headers["CST"];
   const xst = res.headers["x-security-token"] || res.headers["X-SECURITY-TOKEN"];
   if (!cst || !xst) throw new Error("IG auth missing tokens");
-  igSession = { cst, xst, ts: Date.now() };
+  let lsEndpoint = null;
+  try {
+    const body = JSON.parse(res.body);
+    lsEndpoint = body.lightstreamerEndpoint || null;
+  } catch (_) {}
+  igSession = { cst, xst, ts: Date.now(), lightstreamerEndpoint: lsEndpoint };
   return { cst, xst };
 }
 
 function igHeaders(session) {
+  const profile = getActiveIgProfile();
   return {
-    "X-IG-API-KEY": process.env.IG_API_KEY,
+    "X-IG-API-KEY": (profile && profile.apiKey) || process.env.IG_API_KEY || "",
     CST: session.cst,
     "X-SECURITY-TOKEN": session.xst,
     "Content-Type": "application/json; charset=UTF-8",
@@ -84,38 +317,130 @@ function igHeaders(session) {
   };
 }
 
+function maskSecret(val) {
+  if (!val || val.length < 4) return val ? "****" : "";
+  return val.slice(0, 2) + "****" + val.slice(-2);
+}
+
 async function handleIgApi(req, res, p) {
   if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" });
-  if (!igConfigured()) return json(res, 503, { error: "IG not configured — set IG_API_KEY, IG_USERNAME, IG_PASSWORD, IG_BASE_URL env vars" });
 
   try {
+    if (req.method === "GET" && p === "/api/ig/config") {
+      const config = ensureIgConfig();
+      const masked = JSON.parse(JSON.stringify(config));
+      for (const key of Object.keys(masked.profiles)) {
+        const pr = masked.profiles[key];
+        pr.apiKey = maskSecret(pr.apiKey);
+        pr.username = maskSecret(pr.username);
+        pr.password = maskSecret(pr.password);
+        pr.hasCredentials = !!(config.profiles[key].apiKey && config.profiles[key].username && config.profiles[key].password);
+      }
+      masked.streaming = { status: lsStatus, connectedEpics: lsConnectedEpics, priceCount: streamedPrices.size };
+      return json(res, 200, masked);
+    }
+
+    if (req.method === "POST" && p === "/api/ig/config") {
+      const body = JSON.parse((await readBody(req)).toString() || "{}");
+      const config = ensureIgConfig();
+      if (body.activeProfile && config.profiles[body.activeProfile]) {
+        const oldProfile = config.activeProfile;
+        config.activeProfile = body.activeProfile;
+        if (oldProfile !== body.activeProfile) {
+          igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
+          igCacheInvalidate();
+          stopLightstreamer();
+          console.log(`[ig-config] Switched profile: ${oldProfile} -> ${body.activeProfile}`);
+        }
+      }
+      if (body.profiles) {
+        for (const key of Object.keys(body.profiles)) {
+          if (!config.profiles[key]) continue;
+          const src = body.profiles[key];
+          if (src.apiKey !== undefined && !src.apiKey.includes("****")) config.profiles[key].apiKey = src.apiKey;
+          if (src.username !== undefined && !src.username.includes("****")) config.profiles[key].username = src.username;
+          if (src.password !== undefined && !src.password.includes("****")) config.profiles[key].password = src.password;
+          if (src.accountId !== undefined) config.profiles[key].accountId = src.accountId;
+        }
+      }
+      saveIgConfig(config);
+      if (igConfigured()) {
+        igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
+        igCacheInvalidate();
+        setTimeout(() => startLightstreamer(), 1000);
+      }
+      return json(res, 200, { ok: true, activeProfile: config.activeProfile });
+    }
+
+    if (req.method === "POST" && p === "/api/ig/config/test") {
+      if (!igConfigured()) return json(res, 400, { error: "No credentials configured for active profile" });
+      try {
+        const session = await igAuth();
+        const profile = getActiveIgProfile();
+        return json(res, 200, { ok: true, profile: profile.profileName, lightstreamerEndpoint: igSession.lightstreamerEndpoint || null });
+      } catch (e) {
+        return json(res, 200, { ok: false, error: e.message });
+      }
+    }
+
+    if (req.method === "GET" && p === "/api/ig/stream/prices") {
+      const prices = getStreamedPrices();
+      return json(res, 200, { streaming: lsStatus === "connected", prices });
+    }
+
+    if (req.method === "GET" && p === "/api/ig/stream/status") {
+      return json(res, 200, {
+        status: lsStatus,
+        connectedEpics: lsConnectedEpics,
+        priceCount: streamedPrices.size,
+        activeProfile: getActiveIgProfile()?.profileName || null,
+        lightstreamerEndpoint: igSession.lightstreamerEndpoint || null
+      });
+    }
+
+    if (!igConfigured()) return json(res, 503, { error: "IG not configured — set credentials in Config page or env vars" });
+
     if (req.method === "GET" && p === "/api/ig/positions") {
+      const cached = igCacheGet("positions");
+      if (cached) return json(res, 200, cached);
       const session = await igAuth();
       const r = await igRequest("GET", "/positions", { ...igHeaders(session), Version: "2" });
       if (r.status !== 200) return json(res, r.status, { error: "IG API error", detail: r.body });
-      return json(res, 200, JSON.parse(r.body));
+      const data = JSON.parse(r.body);
+      igCacheSet("positions", data);
+      return json(res, 200, data);
     }
 
     if (req.method === "GET" && p === "/api/ig/account") {
+      const cached = igCacheGet("account");
+      if (cached) return json(res, 200, cached);
       const session = await igAuth();
       const r = await igRequest("GET", "/accounts", igHeaders(session));
       if (r.status !== 200) return json(res, r.status, { error: "IG API error", detail: r.body });
-      return json(res, 200, JSON.parse(r.body));
+      const data = JSON.parse(r.body);
+      igCacheSet("account", data);
+      return json(res, 200, data);
     }
 
     if (req.method === "GET" && p.startsWith("/api/ig/prices")) {
       const url = new URL("http://localhost" + req.url);
       const epics = url.searchParams.get("epics");
       if (!epics) return json(res, 400, { error: "Missing ?epics= param" });
+      const epicList = epics.split(",").map(s => s.trim()).filter(Boolean);
+      const cacheKey = "prices:" + epicList.sort().join(",");
+      const cached = igCacheGet(cacheKey);
+      if (cached) return json(res, 200, cached);
       const session = await igAuth();
       const results = {};
-      for (const epic of epics.split(",").map(s => s.trim()).filter(Boolean)) {
+      for (const epic of epicList) {
         try {
           const r = await igRequest("GET", "/markets/" + epic, igHeaders(session));
           if (r.status === 200) results[epic] = JSON.parse(r.body);
         } catch (_) {}
       }
-      return json(res, 200, { prices: results });
+      const data = { prices: results };
+      igCacheSet(cacheKey, data);
+      return json(res, 200, data);
     }
 
     if (req.method === "POST" && p === "/api/ig/refresh-snapshots") {
@@ -1617,10 +1942,12 @@ server.on("upgrade", (req, socket, head) => {
 
 server.listen(PROXY_PORT, "0.0.0.0", () => {
   console.log(`[ceo-proxy] listening on 0.0.0.0:${PROXY_PORT}, proxying to gateway:${GATEWAY_PORT}`);
+  ensureIgConfig();
   updateCrewFile();
   writeConfigSnapshots();
   autoRegisterBotScripts();
   startRegisteredBots();
+  setTimeout(() => startLightstreamer(), 5000);
 });
 
 setInterval(() => {

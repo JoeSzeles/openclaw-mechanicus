@@ -25,6 +25,19 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+var tabs = document.querySelectorAll('.tab');
+var tabContents = document.querySelectorAll('.tab-content');
+for (var i = 0; i < tabs.length; i++) {
+  tabs[i].addEventListener('click', function() {
+    var target = this.getAttribute('data-tab');
+    for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove('active');
+    for (var j = 0; j < tabContents.length; j++) tabContents[j].classList.remove('active');
+    this.classList.add('active');
+    document.getElementById('tab-' + target).classList.add('active');
+    if (target === 'ig-trading') loadIgConfig();
+  });
+}
+
 function loadConfig() {
   apiFetch('/__openclaw/control-ui-config.json').then(function(r) {
     if (!r.ok) throw new Error('Config not available (status ' + r.status + ')');
@@ -89,4 +102,177 @@ function renderConfig(config) {
   document.getElementById('rawConfig').innerHTML = '<div class="card"><pre style="font-size:12px;color:#c9d1d9;white-space:pre-wrap;max-height:400px;overflow:auto">' + escHtml(raw) + '</pre></div>';
 }
 
+var currentIgConfig = null;
+
+function loadIgConfig() {
+  apiFetch('/api/ig/config').then(function(r) {
+    if (!r.ok) throw new Error('IG config not available');
+    return r.json();
+  }).then(function(config) {
+    currentIgConfig = config;
+    renderIgConfig(config);
+  }).catch(function(e) {
+    document.getElementById('streamingCard').innerHTML = '<p style="color:#8b949e">Could not load IG config: ' + escHtml(e.message) + '</p>';
+  });
+}
+
+function renderIgConfig(config) {
+  var active = config.activeProfile || 'demo';
+  var toggle = document.getElementById('profileToggle');
+  var slider = toggle.querySelector('.toggle-slider');
+  var options = toggle.querySelectorAll('.toggle-option');
+
+  slider.className = 'toggle-slider ' + active;
+  for (var i = 0; i < options.length; i++) {
+    var prof = options[i].getAttribute('data-profile');
+    if (prof === active) options[i].classList.add('active');
+    else options[i].classList.remove('active');
+  }
+
+  var statusEl = document.getElementById('profileStatus');
+  if (active === 'demo') {
+    statusEl.innerHTML = '<span class="badge badge-warn">DEMO MODE</span>';
+  } else {
+    statusEl.innerHTML = '<span class="badge badge-error">LIVE TRADING</span>';
+  }
+
+  var profiles = ['demo', 'live'];
+  for (var p = 0; p < profiles.length; p++) {
+    var key = profiles[p];
+    var prof = config.profiles[key];
+    if (!prof) continue;
+    var apiKeyEl = document.getElementById(key + '-apiKey');
+    var usernameEl = document.getElementById(key + '-username');
+    var passwordEl = document.getElementById(key + '-password');
+    var accountIdEl = document.getElementById(key + '-accountId');
+    if (apiKeyEl) apiKeyEl.placeholder = prof.hasCredentials ? prof.apiKey : 'Enter API key';
+    if (usernameEl) usernameEl.placeholder = prof.hasCredentials ? prof.username : 'Enter username';
+    if (passwordEl) passwordEl.placeholder = prof.hasCredentials ? '********' : 'Enter password';
+    if (accountIdEl) accountIdEl.value = prof.accountId || '';
+    apiKeyEl.value = '';
+    usernameEl.value = '';
+    passwordEl.value = '';
+  }
+
+  var activeCard = document.getElementById(active + 'ProfileCard');
+  var inactiveCard = document.getElementById((active === 'demo' ? 'live' : 'demo') + 'ProfileCard');
+  if (activeCard) activeCard.style.borderColor = active === 'demo' ? '#d29922' : '#da3633';
+  if (inactiveCard) inactiveCard.style.borderColor = '#30363d';
+
+  renderStreamingStatus(config.streaming);
+}
+
+function renderStreamingStatus(streaming) {
+  if (!streaming) {
+    document.getElementById('streamingCard').innerHTML = '<p class="empty">Streaming info not available</p>';
+    return;
+  }
+  var dotClass = 'grey';
+  var label = streaming.status || 'unknown';
+  if (streaming.status === 'connected') dotClass = 'green';
+  else if (streaming.status === 'reconnecting') dotClass = 'yellow';
+  else if (streaming.status === 'error') dotClass = 'red';
+
+  var html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
+  html += '<span class="status-dot ' + dotClass + '"></span>';
+  html += '<span style="font-size:14px;font-weight:500;color:#e6edf3">Lightstreamer: ' + escHtml(label.toUpperCase()) + '</span>';
+  if (streaming.status === 'connected') html += ' <span class="badge badge-primary">STREAMING</span>';
+  else html += ' <span class="badge badge-warn">POLLING</span>';
+  html += '</div>';
+
+  html += '<div class="streaming-info">';
+  html += '<div class="streaming-stat">Instruments: <strong>' + (streaming.connectedEpics ? streaming.connectedEpics.length : 0) + '</strong></div>';
+  html += '<div class="streaming-stat">Price updates: <strong>' + (streaming.priceCount || 0) + '</strong></div>';
+  html += '</div>';
+
+  if (streaming.connectedEpics && streaming.connectedEpics.length > 0) {
+    html += '<div style="margin-top:12px;font-size:12px;color:#8b949e">';
+    html += '<strong>Subscribed:</strong> ' + streaming.connectedEpics.map(function(e) { return escHtml(e); }).join(', ');
+    html += '</div>';
+  }
+
+  document.getElementById('streamingCard').innerHTML = html;
+}
+
+document.getElementById('profileToggle').addEventListener('click', function(e) {
+  var option = e.target.closest('.toggle-option');
+  if (!option) return;
+  var newProfile = option.getAttribute('data-profile');
+  if (!newProfile || (currentIgConfig && currentIgConfig.activeProfile === newProfile)) return;
+
+  if (newProfile === 'live') {
+    if (!confirm('Switch to LIVE trading? Real money will be at risk.')) return;
+  }
+
+  apiFetch('/api/ig/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activeProfile: newProfile })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.ok) {
+      showToast('Switched to ' + newProfile.toUpperCase() + ' profile', 'success');
+      loadIgConfig();
+    } else {
+      showToast('Failed to switch: ' + (data.error || 'Unknown error'), 'error');
+    }
+  }).catch(function(e) {
+    showToast('Error: ' + e.message, 'error');
+  });
+});
+
+function saveProfile(profileName) {
+  var updates = {};
+  var apiKey = document.getElementById(profileName + '-apiKey').value;
+  var username = document.getElementById(profileName + '-username').value;
+  var password = document.getElementById(profileName + '-password').value;
+  var accountId = document.getElementById(profileName + '-accountId').value;
+
+  if (apiKey) updates.apiKey = apiKey;
+  if (username) updates.username = username;
+  if (password) updates.password = password;
+  if (accountId !== undefined) updates.accountId = accountId;
+
+  if (Object.keys(updates).length === 0 && !accountId) {
+    showToast('No changes to save', 'error');
+    return;
+  }
+
+  var body = { profiles: {} };
+  body.profiles[profileName] = updates;
+
+  apiFetch('/api/ig/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.ok) {
+      showToast(profileName.toUpperCase() + ' credentials saved', 'success');
+      loadIgConfig();
+    } else {
+      showToast('Failed to save: ' + (data.error || 'Unknown error'), 'error');
+    }
+  }).catch(function(e) {
+    showToast('Error: ' + e.message, 'error');
+  });
+}
+
+function testConnection() {
+  showToast('Testing connection...', 'success');
+  apiFetch('/api/ig/config/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}'
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.ok) {
+      showToast('Connection successful! Profile: ' + data.profile + (data.lightstreamerEndpoint ? ', Streaming: ' + data.lightstreamerEndpoint : ''), 'success');
+      loadIgConfig();
+    } else {
+      showToast('Connection failed: ' + (data.error || 'Unknown error'), 'error');
+    }
+  }).catch(function(e) {
+    showToast('Error: ' + e.message, 'error');
+  });
+}
+
 loadConfig();
+loadIgConfig();

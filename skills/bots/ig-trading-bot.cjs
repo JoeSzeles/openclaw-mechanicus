@@ -11,6 +11,7 @@ const LOG_PATH = path.join(process.cwd(), ".openclaw", "ig-bot-log.json");
 const ALERTS_PATH = path.join(process.cwd(), ".openclaw", "ig-alerts.json");
 const DASHBOARD_DIR = path.join(process.cwd(), ".openclaw", "canvas");
 const DASHBOARD_PATH = path.join(DASHBOARD_DIR, "ig-bot-status.html");
+const IG_CONFIG_FILE = path.join(process.cwd(), ".openclaw", "ig-config.json");
 
 const TEST_MODE = process.argv.includes("--test");
 
@@ -129,16 +130,37 @@ function loadAlerts() {
   return [];
 }
 
+function getIgCredentials() {
+  try {
+    if (fs.existsSync(IG_CONFIG_FILE)) {
+      const igCfg = JSON.parse(fs.readFileSync(IG_CONFIG_FILE, "utf8"));
+      const profile = igCfg.profiles[igCfg.activeProfile];
+      if (profile && profile.apiKey && profile.username && profile.password && profile.baseUrl) {
+        return { baseUrl: profile.baseUrl, apiKey: profile.apiKey, username: profile.username, password: profile.password, accountId: profile.accountId, profile: igCfg.activeProfile };
+      }
+    }
+  } catch (_) {}
+  return {
+    baseUrl: process.env.IG_BASE_URL || "https://demo-api.ig.com/gateway/deal",
+    apiKey: process.env.IG_API_KEY || "",
+    username: process.env.IG_USERNAME || "",
+    password: process.env.IG_PASSWORD || "",
+    accountId: process.env.IG_ACCOUNT_ID || "",
+    profile: "env"
+  };
+}
+
 function request(method, urlPath, body, extraHeaders) {
   return new Promise((resolve, reject) => {
-    const baseUrl = process.env.IG_BASE_URL || "https://demo-api.ig.com/gateway/deal";
-    const full = baseUrl.replace(/\/+$/, "") + urlPath;
+    const creds = getIgCredentials();
+    const baseUrl = urlPath.startsWith("http") ? "" : creds.baseUrl;
+    const full = urlPath.startsWith("http") ? urlPath : baseUrl.replace(/\/+$/, "") + urlPath;
     const parsed = new URL(full);
     const isHttps = parsed.protocol === "https:";
     const headers = {
       "Content-Type": "application/json; charset=UTF-8",
       Accept: "application/json; charset=UTF-8",
-      "X-IG-API-KEY": process.env.IG_API_KEY || "",
+      "X-IG-API-KEY": creds.apiKey,
       ...(sessionTokens.cst ? { CST: sessionTokens.cst } : {}),
       ...(sessionTokens.securityToken ? { "X-SECURITY-TOKEN": sessionTokens.securityToken } : {}),
       ...(extraHeaders || {})
@@ -171,13 +193,36 @@ function request(method, urlPath, body, extraHeaders) {
   });
 }
 
+async function fetchStreamedPrice(epic) {
+  try {
+    const res = await request("GET", "http://localhost:5000/api/ig/stream/prices", null, {
+      Authorization: "Bearer " + (process.env.OPENCLAW_GATEWAY_TOKEN || ""),
+    });
+    if (res.status === 200 && res.body) {
+      if (res.body.streaming && res.body.prices && res.body.prices[epic]) {
+        const p = res.body.prices[epic];
+        if (p.bid && p.offer && (Date.now() - p.timestamp) < 60000) {
+          return {
+            snapshot: {
+              bid: p.bid, offer: p.offer, marketStatus: p.marketState || "TRADEABLE",
+              updateTime: new Date(p.timestamp).toISOString()
+            }
+          };
+        }
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
 async function authenticate() {
-  const apiKey = process.env.IG_API_KEY;
-  const username = process.env.IG_USERNAME;
-  const password = process.env.IG_PASSWORD;
+  const creds = getIgCredentials();
+  const apiKey = creds.apiKey;
+  const username = creds.username;
+  const password = creds.password;
 
   if (!apiKey || !username || !password) {
-    throw new Error("Missing IG credentials. Set IG_API_KEY, IG_USERNAME, IG_PASSWORD env vars.");
+    throw new Error("Missing IG credentials. Set them in Config page or env vars.");
   }
 
   await checkApiQuota(currentConfig);
@@ -658,8 +703,14 @@ async function runCycle(config) {
     const strategy = strategies[i];
     log("INFO", `Evaluating: ${strategy.name || strategy.instrument}`);
 
-    if (i > 0) await rateLimitedSleep(config);
-    const marketData = await fetchPrice(strategy.instrument);
+    let marketData = null;
+    if (config.useStreaming !== false) {
+      marketData = await fetchStreamedPrice(strategy.instrument);
+    }
+    if (!marketData) {
+      if (i > 0) await rateLimitedSleep(config);
+      marketData = await fetchPrice(strategy.instrument);
+    }
     if (!marketData) {
       log("WARN", `Skipping ${strategy.instrument} — could not fetch price.`);
       continue;
@@ -700,7 +751,9 @@ async function runCycle(config) {
 }
 
 async function main() {
-  console.log(`\n=== IG Trading Bot ${TEST_MODE ? "(TEST MODE)" : "(LIVE)"} ===\n`);
+  const creds = getIgCredentials();
+  console.log(`\n=== IG Trading Bot ${TEST_MODE ? "(TEST MODE)" : "(LIVE)"} ===`);
+  console.log(`Using IG profile: ${creds.profile} (${creds.baseUrl.includes("demo") ? "DEMO" : "LIVE"})\n`);
 
   const config = loadConfig();
   currentConfig = config;
@@ -718,7 +771,7 @@ async function main() {
 
   const accounts = await fetchAccounts();
   if (accounts?.accounts?.length > 0) {
-    const acct = accounts.accounts.find((a) => a.accountId === process.env.IG_ACCOUNT_ID) || accounts.accounts[0];
+    const acct = accounts.accounts.find((a) => a.accountId === creds.accountId) || accounts.accounts[0];
     accountBalance = acct.balance?.balance || acct.balance?.available || null;
     log("INFO", `Account: ${acct.accountId}, Balance: ${accountBalance}`);
   }

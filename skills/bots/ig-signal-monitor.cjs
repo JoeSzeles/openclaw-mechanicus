@@ -9,6 +9,7 @@ const path = require("path");
 const CONFIG_PATH = path.join(process.cwd(), ".openclaw", "ig-monitor-config.json");
 const ALERTS_PATH = path.join(process.cwd(), ".openclaw", "ig-alerts.json");
 const CANVAS_DIR = path.join(process.cwd(), ".openclaw", "canvas");
+const IG_CONFIG_FILE = path.join(process.cwd(), ".openclaw", "ig-config.json");
 const TEST_MODE = process.argv.includes("--test");
 
 const priceHistory = {};
@@ -122,20 +123,67 @@ function request(method, urlStr, headers, body) {
   });
 }
 
+function getIgCredentials() {
+  try {
+    if (fs.existsSync(IG_CONFIG_FILE)) {
+      const igCfg = JSON.parse(fs.readFileSync(IG_CONFIG_FILE, "utf8"));
+      const profile = igCfg.profiles[igCfg.activeProfile];
+      if (profile && profile.apiKey && profile.username && profile.password && profile.baseUrl) {
+        return { baseUrl: profile.baseUrl, apiKey: profile.apiKey, username: profile.username, password: profile.password, accountId: profile.accountId, profile: igCfg.activeProfile };
+      }
+    }
+  } catch (_) {}
+  return {
+    baseUrl: process.env.IG_BASE_URL || "",
+    apiKey: process.env.IG_API_KEY || "",
+    username: process.env.IG_USERNAME || "",
+    password: process.env.IG_PASSWORD || "",
+    accountId: process.env.IG_ACCOUNT_ID || "",
+    profile: "env"
+  };
+}
+
 function getEnv(name) {
-  const v = process.env[name];
-  if (!v) {
-    log(`Missing environment variable: ${name}`);
-    process.exit(1);
-  }
-  return v;
+  const creds = getIgCredentials();
+  const map = { IG_BASE_URL: creds.baseUrl, IG_API_KEY: creds.apiKey, IG_USERNAME: creds.username, IG_PASSWORD: creds.password, IG_ACCOUNT_ID: creds.accountId };
+  return map[name] || process.env[name] || "";
+}
+
+async function fetchStreamedPrice(epic) {
+  try {
+    const res = await request("GET", "http://localhost:5000/api/ig/stream/prices", {
+      Authorization: "Bearer " + (process.env.OPENCLAW_GATEWAY_TOKEN || ""),
+      Accept: "application/json"
+    });
+    if (res.status === 200) {
+      const data = JSON.parse(res.body);
+      if (data.streaming && data.prices && data.prices[epic]) {
+        const p = data.prices[epic];
+        if (p.bid && p.offer && (Date.now() - p.timestamp) < 60000) {
+          return {
+            snapshot: {
+              bid: p.bid, offer: p.offer, marketStatus: p.marketState || "TRADEABLE",
+              updateTime: new Date(p.timestamp).toISOString()
+            }
+          };
+        }
+      }
+    }
+  } catch (_) {}
+  return null;
 }
 
 async function authenticate(config) {
-  const baseUrl = getEnv("IG_BASE_URL");
-  const apiKey = getEnv("IG_API_KEY");
-  const username = getEnv("IG_USERNAME");
-  const password = getEnv("IG_PASSWORD");
+  const creds = getIgCredentials();
+  const baseUrl = creds.baseUrl;
+  const apiKey = creds.apiKey;
+  const username = creds.username;
+  const password = creds.password;
+
+  if (!baseUrl || !apiKey || !username || !password) {
+    log("Missing IG credentials. Set them in Config page or env vars.");
+    return false;
+  }
 
   trackApiCall();
   log("Authenticating with IG API...");
@@ -303,11 +351,21 @@ function detectSignals(instrument, config) {
 
 async function pollCycle(config) {
   const allSignals = [];
+  const useStreaming = config.useStreaming !== false;
 
   for (let i = 0; i < config.instruments.length; i++) {
     const instrument = config.instruments[i];
-    if (i > 0) await rateLimitedSleep(config);
-    const data = await fetchPrice(instrument.epic, config);
+    let data = null;
+    if (useStreaming) {
+      data = await fetchStreamedPrice(instrument.epic);
+      if (data) {
+        // no need for rate limit sleep — streaming data is free
+      }
+    }
+    if (!data) {
+      if (i > 0) await rateLimitedSleep(config);
+      data = await fetchPrice(instrument.epic, config);
+    }
     if (!data || !data.snapshot) {
       log(`No data for ${instrument.name} (${instrument.epic})`);
       continue;
@@ -364,6 +422,8 @@ async function run() {
   log(TEST_MODE ? "Starting in TEST mode (single cycle)" : "Starting signal monitor");
 
   const config = loadConfig();
+  const creds = getIgCredentials();
+  log(`Using IG profile: ${creds.profile} (${creds.baseUrl.includes("demo") ? "DEMO" : "LIVE"})`);
 
   if (!config.enabled) {
     log("Monitor is disabled in config. Set enabled=true to start.");

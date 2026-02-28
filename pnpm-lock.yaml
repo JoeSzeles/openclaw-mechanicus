@@ -121,6 +121,9 @@ importers:
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
+      lightstreamer-client-node:
+        specifier: ^9.2.2
+        version: 9.2.2
       linkedom:
         specifier: ^0.18.12
         version: 0.18.12
@@ -3309,6 +3312,7 @@ packages:
   basic-ftp@5.1.0:
     resolution: {integrity: sha512-RkaJzeJKDbaDWTIPiJwubyljaEPwpVWkm9Rt5h9Nd6h7tEXTJ3VB4qxdZBioV7JO5yLUaOKwz7vDOzlncUsegw==}
     engines: {node: '>=10.0.0'}
+    deprecated: Security vulnerability fixed in 5.2.0, please upgrade
 
   bcrypt-pbkdf@1.0.2:
     resolution: {integrity: sha512-qeFIXtP4MSoi6NLqO12WfqARWWuCKi2Rn/9hJLEmtB5yTNr9DqFWkJRCf2qShWzPeAMRnOgCrq0sg/KLv5ES9w==}
@@ -3498,6 +3502,9 @@ packages:
   cookie@0.7.2:
     resolution: {integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==}
     engines: {node: '>= 0.6'}
+
+  cookiejar@2.1.4:
+    resolution: {integrity: sha512-LDx6oHrK+PhzLKJU9j5S7/Y3jM/mUHvD/DeI1WQmJn652iPC5Y4TBzC9l+5OMOXlyTTA+SmVUPm0HQUwpD5Jqw==}
 
   core-util-is@1.0.2:
     resolution: {integrity: sha512-3lqz5YjWTYnW6dlDa5TLaTCcShfar1e40rmcJVwCBJC6mWlFuj0eCHIElmG1g5kyuJ/GD+8Wn4FFCcz4gJPfaQ==}
@@ -4209,6 +4216,10 @@ packages:
   jsonfile@6.2.0:
     resolution: {integrity: sha512-FGuPw30AdOIUTRMC2OMRtQV+jkVj2cfPqSeWXv1NEAJ1qZ5zb1X6z1mFhbfOB/iy3ssJCD+3KuZ8r8C3uVFlAg==}
 
+  jsonpatch@3.1.0:
+    resolution: {integrity: sha512-rJa0FepwDzebgYAuT389AtziWfn3EZA4N5e/B8d50IC1glqlZ7njo7iAI/ph5MYw2GGH7lCE6DGqBGQ7TVa06w==}
+    engines: {node: '>=0.4.0'}
+
   jsonwebtoken@9.0.3:
     resolution: {integrity: sha512-MT/xP0CrubFRNLNKvxJ2BYfy53Zkm++5bX9dtuPbqAeQpTVe0MQTFhao8+Cp//EmJp244xt6Drw/GVEGCUj40g==}
     engines: {node: '>=12', npm: '>=6'}
@@ -4318,6 +4329,9 @@ packages:
   lightningcss@1.30.2:
     resolution: {integrity: sha512-utfs7Pr5uJyyvDETitgsaqSyjCb2qNRAtuqUeWIAKztsOYdcACf2KtARYXg2pSvhkt+9NfoaNY7fxjl6nuMjIQ==}
     engines: {node: '>= 12.0.0'}
+
+  lightstreamer-client-node@9.2.2:
+    resolution: {integrity: sha512-8SHmv61Op6+VCpUPR3dDb9+XKn16bEz9ThSi/wqY7mPGya1RYQ4MjLha7EeHizZD8+are47HQzBlJtkWiboBnA==}
 
   limiter@1.1.5:
     resolution: {integrity: sha512-FWWMIEOxz3GwUI4Ts/IvgVy6LPvoMPgjMdQ185nN6psJyBJ4yOpzqm695/h5umdLJg2vW3GR5iG11MAkR2AzJA==}
@@ -5733,6 +5747,11 @@ packages:
         optional: true
       utf-8-validate:
         optional: true
+
+  xmlhttprequest@https://codeload.github.com/driverdan/node-XMLHttpRequest/tar.gz/97966e4ca1c9f2cc5574d8775cbdacebfec75455:
+    resolution: {tarball: https://codeload.github.com/driverdan/node-XMLHttpRequest/tar.gz/97966e4ca1c9f2cc5574d8775cbdacebfec75455}
+    version: 1.8.0
+    engines: {node: '>=0.4.0'}
 
   y18n@5.0.8:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
@@ -9129,6 +9148,8 @@ snapshots:
 
   cookie@0.7.2: {}
 
+  cookiejar@2.1.4: {}
+
   core-util-is@1.0.2: {}
 
   core-util-is@1.0.3: {}
@@ -9905,6 +9926,8 @@ snapshots:
     optionalDependencies:
       graceful-fs: 4.2.11
 
+  jsonpatch@3.1.0: {}
+
   jsonwebtoken@9.0.3:
     dependencies:
       jws: 4.0.1
@@ -10018,6 +10041,16 @@ snapshots:
       lightningcss-win32-arm64-msvc: 1.30.2
       lightningcss-win32-x64-msvc: 1.30.2
     optional: true
+
+  lightstreamer-client-node@9.2.2:
+    dependencies:
+      cookiejar: 2.1.4
+      jsonpatch: 3.1.0
+      ws: 8.19.0
+      xmlhttprequest: https://codeload.github.com/driverdan/node-XMLHttpRequest/tar.gz/97966e4ca1c9f2cc5574d8775cbdacebfec75455
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   limiter@1.1.5: {}
 
@@ -11581,6 +11614,8 @@ snapshots:
   wrappy@1.0.2: {}
 
   ws@8.19.0: {}
+
+  xmlhttprequest@https://codeload.github.com/driverdan/node-XMLHttpRequest/tar.gz/97966e4ca1c9f2cc5574d8775cbdacebfec75455: {}
 
   y18n@5.0.8: {}
 
