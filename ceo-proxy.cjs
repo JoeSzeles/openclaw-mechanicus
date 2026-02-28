@@ -267,6 +267,7 @@ function igRequest(method, urlPath, headers, body) {
       path: url.pathname + url.search,
       method,
       headers,
+      timeout: 15000,
     };
     const req = mod.request(opts, (res) => {
       const chunks = [];
@@ -275,6 +276,7 @@ function igRequest(method, urlPath, headers, body) {
         resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString() });
       });
     });
+    req.on("timeout", () => { req.destroy(); reject(new Error("IG API request timed out (15s) — server not responding")); });
     req.on("error", reject);
     if (body) req.write(typeof body === "string" ? body : JSON.stringify(body));
     req.end();
