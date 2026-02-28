@@ -1386,7 +1386,8 @@ function proxyReq(req, res, retries = 3) {
     method: req.method,
     headers: { ...req.headers, host: "127.0.0.1:" + GATEWAY_PORT },
   };
-  const noCache = /\/(worker-chat|nav-inject|token-init|workers|processes)\.(js|css|html)/.test(req.url);
+  const noCache = /\/(worker-chat|nav-inject|token-init|workers|processes|model-config)\.(js|css|html)/.test(req.url);
+  const isHtmlPage = req.url === '/' || req.url === '/index.html' || /^\/(chat|overview|channels|instances|sessions|usage|cron|agents|skills|nodes|config|debug)/i.test(req.url);
   const p = http.request(opts, (pr) => {
     const headers = { ...pr.headers };
     if (noCache) {
@@ -1394,8 +1395,29 @@ function proxyReq(req, res, retries = 3) {
       headers["pragma"] = "no-cache";
       headers["expires"] = "0";
     }
-    res.writeHead(pr.statusCode, headers);
-    pr.pipe(res);
+    const contentType = (pr.headers["content-type"] || "");
+    if (isHtmlPage && contentType.includes("text/html")) {
+      const chunks = [];
+      pr.on("data", (c) => chunks.push(c));
+      pr.on("end", () => {
+        let html = Buffer.concat(chunks).toString("utf-8");
+        if (!html.includes("nav-inject.js")) {
+          const idx = html.indexOf("</body>");
+          if (idx !== -1) {
+            html = html.slice(0, idx) + NAV_INJECT_TAG + html.slice(idx);
+          } else {
+            html += NAV_INJECT_TAG;
+          }
+        }
+        delete headers["content-length"];
+        headers["transfer-encoding"] = "chunked";
+        res.writeHead(pr.statusCode, headers);
+        res.end(html);
+      });
+    } else {
+      res.writeHead(pr.statusCode, headers);
+      pr.pipe(res);
+    }
   });
   p.on("error", (err) => {
     if (retries > 0 && !res.headersSent) {

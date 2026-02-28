@@ -6,11 +6,10 @@
   var style = document.createElement('style');
   style.textContent = '#openclaw-nav{position:fixed;top:0;left:0;right:0;z-index:9999;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:flex-end;padding:0 16px;height:36px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}#openclaw-nav .ocn-links{display:flex;align-items:center;gap:2px}#openclaw-nav a{color:#8b949e;text-decoration:none;font-size:13px;font-weight:500;padding:5px 12px;border-radius:6px;transition:color .15s,background .15s;white-space:nowrap}#openclaw-nav a:hover{color:#e6edf3;background:rgba(255,255,255,.06)}#openclaw-nav a.active{color:#58a6ff;background:rgba(88,166,255,.1)}';
   document.head.appendChild(style);
+  document.body.insertBefore(nav, document.body.firstChild);
   var app = document.querySelector('openclaw-app');
   if (app) {
-    app.parentNode.insertBefore(nav, app);
-  } else {
-    document.body.insertBefore(nav, document.body.firstChild);
+    app.style.paddingTop = '36px';
   }
   var loc = window.location.pathname;
   var links = nav.querySelectorAll('a');
