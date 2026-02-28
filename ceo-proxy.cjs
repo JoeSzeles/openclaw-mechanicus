@@ -1030,9 +1030,22 @@ function proxyReq(req, res, retries = 3) {
 
 const NAV_INJECT_TAG = '<script src="/nav-inject.js"></script>';
 
-function injectNavIntoHtml(buf) {
-  const html = buf.toString("utf-8");
-  if (html.includes("nav-inject.js")) return buf;
+function unescapeHtmlEntities(html) {
+  return html
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"');
+}
+
+function injectNavIntoHtml(buf, filePath) {
+  let html = buf.toString("utf-8");
+  if (html.includes("&lt;html") || html.includes("&lt;!DOCTYPE") || html.includes("&lt;head")) {
+    console.log("[canvas] Auto-fixing HTML-escaped canvas file:", filePath);
+    html = unescapeHtmlEntities(html);
+    if (filePath) { try { fs.writeFileSync(filePath, html); } catch (_) {} }
+  }
+  if (html.includes("nav-inject.js")) return Buffer.from(html);
   const idx = html.indexOf("</body>");
   if (idx === -1) return Buffer.from(html + NAV_INJECT_TAG);
   return Buffer.from(html.slice(0, idx) + NAV_INJECT_TAG + html.slice(idx));
@@ -1055,7 +1068,7 @@ function serveCanvas(req, res) {
       const idx = path.join(filePath, "index.html");
       if (fs.existsSync(idx)) {
         const raw = fs.readFileSync(idx);
-        const data = injectNavIntoHtml(raw);
+        const data = injectNavIntoHtml(raw, idx);
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Content-Length": data.length,
@@ -1068,7 +1081,7 @@ function serveCanvas(req, res) {
     const raw = fs.readFileSync(filePath);
     const ext = path.extname(filePath).toLowerCase();
     const isHtml = ext === ".html" || ext === ".htm";
-    const data = isHtml ? injectNavIntoHtml(raw) : raw;
+    const data = isHtml ? injectNavIntoHtml(raw, filePath) : raw;
     res.writeHead(200, {
       "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
       "Content-Length": data.length,
