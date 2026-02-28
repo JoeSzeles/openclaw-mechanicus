@@ -64,6 +64,10 @@ OpenClaw Cloud operates with a "CEO Proxy + Gateway" architecture where two comp
     -   Models: `gpt-4o`, `gpt-4o-mini`.
 -   **IG Group Trading API**: CFD trading via REST API (demo: `demo-api.ig.com`, live: `api.ig.com`).
     -   Skills: `ig-trading` (auth, positions, orders), `ig-market-data` (search, prices, watchlists, sentiment).
+    -   Bot skills: `ig-signal-monitor` (price signal monitoring), `ig-trading-bot` (automated strategy execution).
+    -   Signal monitor config: `.openclaw/ig-monitor-config.json`, alerts: `.openclaw/ig-alerts.json`.
+    -   Trading bot config: `.openclaw/ig-strategy.json`, log: `.openclaw/ig-bot-log.json`.
+    -   Dashboard: `.openclaw/canvas/ig-dashboard.html` (viewable at `/__openclaw__/canvas/ig-dashboard.html`).
     -   Credentials stored in env vars: `IG_API_KEY`, `IG_USERNAME`, `IG_PASSWORD`, `IG_ACCOUNT_ID`, `IG_BASE_URL`.
     -   Reference doc: `.openclaw/workspace/IG_TRADING.md`.
 -   **Replit Secrets Management**: Securely stores API keys like `XAI_API_KEY`, `OPENCLAW_GATEWAY_TOKEN`, and IG credentials.
