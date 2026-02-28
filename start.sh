@@ -5,10 +5,18 @@ trap 'kill -9 1' TERM INT
 
 TOKEN="${OPENCLAW_GATEWAY_TOKEN}"
 TOKEN_JS="/home/runner/workspace/dist/control-ui/token-init.js"
+CACHE_BUST=$(date +%s)
 
 cat > "$TOKEN_JS" << JSEOF
 (function(){var K="openclaw.control.settings.v1";var T="${TOKEN}";try{var r=localStorage.getItem(K);var s=r?JSON.parse(r):{};if(s.token!==T){s.token=T;localStorage.setItem(K,JSON.stringify(s))}}catch(e){}})();
 JSEOF
+
+for htmlfile in /home/runner/workspace/dist/control-ui/model-config.html /home/runner/workspace/dist/control-ui/workers.html /home/runner/workspace/dist/control-ui/processes.html; do
+  if [ -f "$htmlfile" ]; then
+    sed -i "s|/token-init\.js\"|/token-init.js?v=${CACHE_BUST}\"|g" "$htmlfile"
+    sed -i "s|/token-init\.js?v=[0-9]*\"|/token-init.js?v=${CACHE_BUST}\"|g" "$htmlfile"
+  fi
+done
 
 export OPENAI_API_KEY="${AI_INTEGRATIONS_OPENAI_API_KEY}"
 export OPENAI_BASE_URL="${AI_INTEGRATIONS_OPENAI_BASE_URL}"

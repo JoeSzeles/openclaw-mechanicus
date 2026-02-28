@@ -18,7 +18,13 @@ function apiFetch(url, opts) {
   opts = opts || {};
   opts.headers = opts.headers || {};
   if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
-  return fetch(url, opts);
+  return fetch(url, opts).then(function(r) {
+    if (r.status === 401) {
+      showToast('Authentication failed — please hard-refresh (Ctrl+Shift+R)', 'error');
+      throw new Error('Unauthorized (401) — token may be stale, hard-refresh the page');
+    }
+    return r;
+  });
 }
 
 function escHtml(s) {
@@ -222,18 +228,20 @@ document.getElementById('profileToggle').addEventListener('click', function(e) {
 
 function saveProfile(profileName) {
   var updates = {};
-  var apiKey = document.getElementById(profileName + '-apiKey').value;
-  var username = document.getElementById(profileName + '-username').value;
-  var password = document.getElementById(profileName + '-password').value;
-  var accountId = document.getElementById(profileName + '-accountId').value;
+  var apiKey = document.getElementById(profileName + '-apiKey').value.trim();
+  var username = document.getElementById(profileName + '-username').value.trim();
+  var password = document.getElementById(profileName + '-password').value.trim();
+  var accountId = document.getElementById(profileName + '-accountId').value.trim();
 
   if (apiKey) updates.apiKey = apiKey;
   if (username) updates.username = username;
   if (password) updates.password = password;
-  if (accountId !== undefined) updates.accountId = accountId;
 
-  if (Object.keys(updates).length === 0 && !accountId) {
-    showToast('No changes to save', 'error');
+  var origAccountId = currentIgConfig && currentIgConfig.profiles[profileName] ? currentIgConfig.profiles[profileName].accountId : '';
+  if (accountId && accountId !== origAccountId) updates.accountId = accountId;
+
+  if (Object.keys(updates).length === 0) {
+    showToast('No changes to save — fill in the fields you want to update', 'error');
     return;
   }
 
