@@ -142,3 +142,98 @@
   padding-left: 0;
   padding-right: 1em;
 }
+
+/* =============================================
+   CANVAS EMBEDS
+   ============================================= */
+
+.chat-text .canvas-embed-wrapper {
+  margin: 8px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.chat-text .canvas-embed {
+  width: 100%;
+  height: 420px;
+  border: none;
+  display: block;
+  background: #0d1117;
+}
+
+.chat-text .canvas-embed-label {
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.15);
+  border-top: 1px solid var(--border);
+}
+
+/* =============================================
+   ENHANCED TABLES
+   ============================================= */
+
+.chat-text :where(table) {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.chat-text :where(th) {
+  background: rgba(0, 0, 0, 0.2);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--muted);
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.chat-text :where(td) {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.chat-text :where(tr:nth-child(even)) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.chat-text :where(tr:hover) {
+  background: rgba(88, 166, 255, 0.04);
+}
+
+:root[data-theme="light"] .chat-text :where(th) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="light"] .chat-text :where(td) {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .chat-text :where(tr:nth-child(even)) {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+:root[data-theme="light"] .chat-text :where(tr:hover) {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="light"] .chat-text .canvas-embed-wrapper {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+:root[data-theme="light"] .chat-text .canvas-embed {
+  background: #f6f8fa;
+}
+
+:root[data-theme="light"] .chat-text .canvas-embed-label {
+  background: rgba(0, 0, 0, 0.04);
+}
