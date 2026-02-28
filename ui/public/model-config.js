@@ -282,5 +282,10 @@ function testConnection() {
   });
 }
 
+document.getElementById('btnSaveDemo').addEventListener('click', function() { saveProfile('demo'); });
+document.getElementById('btnTestDemo').addEventListener('click', function() { testConnection(); });
+document.getElementById('btnSaveLive').addEventListener('click', function() { saveProfile('live'); });
+document.getElementById('btnTestLive').addEventListener('click', function() { testConnection(); });
+
 loadConfig();
 loadIgConfig();
