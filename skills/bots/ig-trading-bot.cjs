@@ -363,7 +363,11 @@ async function proofReadTrade(strategy, marketData) {
 
   const updateTime = snapshot.updateTime || snapshot.updateTimeUTC;
   if (updateTime) {
-    const updateMs = new Date(updateTime).getTime();
+    let updateMs = new Date(updateTime).getTime();
+    if (isNaN(updateMs) && /^\d{2}:\d{2}:\d{2}$/.test(updateTime)) {
+      const today = new Date().toISOString().slice(0, 11);
+      updateMs = new Date(today + updateTime + "Z").getTime();
+    }
     const ageSeconds = (Date.now() - updateMs) / 1000;
     if (isNaN(ageSeconds) || ageSeconds > 120) {
       checks.push({ check: "Price staleness", pass: false, detail: `Snapshot age ${isNaN(ageSeconds) ? 'unknown' : Math.round(ageSeconds) + 's'} exceeds 120s limit — data may be stale` });
