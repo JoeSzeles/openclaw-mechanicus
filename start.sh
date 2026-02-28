@@ -13,8 +13,8 @@ JSEOF
 
 for htmlfile in /home/runner/workspace/dist/control-ui/model-config.html /home/runner/workspace/dist/control-ui/workers.html /home/runner/workspace/dist/control-ui/processes.html; do
   if [ -f "$htmlfile" ]; then
-    sed -i "s|/token-init\.js\"|/token-init.js?v=${CACHE_BUST}\"|g" "$htmlfile"
-    sed -i "s|/token-init\.js?v=[0-9]*\"|/token-init.js?v=${CACHE_BUST}\"|g" "$htmlfile"
+    sed -i "s|\.js\"|.js?v=${CACHE_BUST}\"|g" "$htmlfile"
+    sed -i "s|\.js?v=[0-9]*\"|.js?v=${CACHE_BUST}\"|g" "$htmlfile"
   fi
 done
 
