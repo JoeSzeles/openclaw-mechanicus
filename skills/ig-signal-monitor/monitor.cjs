@@ -274,6 +274,26 @@ function writeCanvasSnapshots(config) {
     fs.writeFileSync(path.join(CANVAS_DIR, "ig-monitor-config-snapshot.json"), JSON.stringify(config, null, 2));
     const alerts = loadAlerts();
     fs.writeFileSync(path.join(CANVAS_DIR, "ig-alerts-snapshot.json"), JSON.stringify(alerts, null, 2));
+    writePriceHistorySnapshot(config);
+  } catch (_) {}
+}
+
+function writePriceHistorySnapshot(config) {
+  try {
+    const snapshot = {};
+    for (const inst of (config.instruments || [])) {
+      const epic = inst.epic;
+      const history = priceHistory[epic];
+      if (!history || history.length === 0) continue;
+      const last100 = history.slice(-100);
+      snapshot[epic] = {
+        name: inst.name || epic,
+        ticks: last100
+      };
+    }
+    if (Object.keys(snapshot).length > 0) {
+      fs.writeFileSync(path.join(CANVAS_DIR, "ig-price-history.json"), JSON.stringify(snapshot));
+    }
   } catch (_) {}
 }
 
