@@ -228,6 +228,25 @@ function startRegisteredBots() {
   if (registry.length > 0) console.log(`[bot-mgr] Started ${registry.filter(b => b.enabled).length}/${registry.length} registered bots`);
 }
 
+const AUTO_REGISTER_BOTS = [
+  { id: "ig-signal-monitor", cmd: "node skills/ig-signal-monitor/monitor.cjs", script: "skills/ig-signal-monitor/monitor.cjs" },
+  { id: "ig-trading-bot", cmd: "node skills/ig-trading-bot/bot.cjs", script: "skills/ig-trading-bot/bot.cjs" },
+];
+
+function autoRegisterBotScripts() {
+  const registry = loadBotRegistry();
+  let changed = false;
+  for (const def of AUTO_REGISTER_BOTS) {
+    const scriptPath = path.join(process.cwd(), def.script);
+    if (!fs.existsSync(scriptPath)) continue;
+    if (registry.find(b => b.id === def.id)) continue;
+    registry.push({ id: def.id, cmd: def.cmd, enabled: true, addedBy: "auto", addedAt: new Date().toISOString() });
+    console.log(`[bot-mgr] Auto-registered ${def.id} (script found at ${def.script})`);
+    changed = true;
+  }
+  if (changed) saveBotRegistry(registry);
+}
+
 async function handleBotsApi(req, res, p) {
   if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" });
 
@@ -1587,6 +1606,7 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
   console.log(`[ceo-proxy] listening on 0.0.0.0:${PROXY_PORT}, proxying to gateway:${GATEWAY_PORT}`);
   updateCrewFile();
   writeConfigSnapshots();
+  autoRegisterBotScripts();
   startRegisteredBots();
 });
 
