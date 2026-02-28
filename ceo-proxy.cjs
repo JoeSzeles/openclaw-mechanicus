@@ -231,23 +231,27 @@ function startRegisteredBots() {
 const BOTS_DIR = path.join(process.cwd(), "skills", "bots");
 
 function autoRegisterBotScripts() {
-  if (!fs.existsSync(BOTS_DIR)) return;
+  if (!fs.existsSync(BOTS_DIR)) { try { fs.mkdirSync(BOTS_DIR, { recursive: true }); } catch (_) {} return; }
   const registry = loadBotRegistry();
-  let changed = false;
+  const newBots = [];
   try {
     const files = fs.readdirSync(BOTS_DIR).filter(f => f.endsWith(".cjs"));
     for (const file of files) {
       const id = file.replace(/\.cjs$/, "");
       if (registry.find(b => b.id === id)) continue;
       const relPath = `skills/bots/${file}`;
-      registry.push({ id, cmd: `node ${relPath}`, enabled: true, addedBy: "auto-scan", addedAt: new Date().toISOString() });
+      const bot = { id, cmd: `node ${relPath}`, enabled: true, addedBy: "auto-scan", addedAt: new Date().toISOString() };
+      registry.push(bot);
+      newBots.push(bot);
       console.log(`[bot-mgr] Auto-registered bot: ${id}`);
-      changed = true;
     }
   } catch (e) {
     console.error(`[bot-mgr] Error scanning ${BOTS_DIR}:`, e.message);
   }
-  if (changed) saveBotRegistry(registry);
+  if (newBots.length > 0) {
+    saveBotRegistry(registry);
+    for (const bot of newBots) spawnBot(bot);
+  }
 }
 
 async function handleBotsApi(req, res, p) {
@@ -1620,4 +1624,5 @@ setInterval(() => {
   }
   updateBeesFile();
   updateCrewFile();
-}, 60000);
+  autoRegisterBotScripts();
+}, 30000);
