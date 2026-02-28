@@ -197,6 +197,182 @@ async function fetchPrice(epic) {
   return res.body;
 }
 
+const VERIFY_LOG_PATH = path.join(DASHBOARD_DIR, "ig-verify-log.json");
+
+function loadVerifyLog() {
+  try {
+    if (fs.existsSync(VERIFY_LOG_PATH)) {
+      return JSON.parse(fs.readFileSync(VERIFY_LOG_PATH, "utf8"));
+    }
+  } catch (_) {}
+  return [];
+}
+
+function saveVerifyLog(entry) {
+  try {
+    const existing = loadVerifyLog();
+    existing.push(entry);
+    const trimmed = existing.slice(-50);
+    if (!fs.existsSync(DASHBOARD_DIR)) fs.mkdirSync(DASHBOARD_DIR, { recursive: true });
+    fs.writeFileSync(VERIFY_LOG_PATH, JSON.stringify(trimmed, null, 2));
+  } catch (_) {}
+}
+
+async function proofReadTrade(strategy, marketData) {
+  const checks = [];
+  let pass = true;
+  const timestamp = new Date().toISOString();
+
+  const snapshot = marketData?.snapshot;
+  if (!snapshot) {
+    checks.push({ check: "Market data", pass: false, detail: "No snapshot available" });
+    saveVerifyLog({ timestamp, instrument: strategy.instrument, verdict: "REJECTED", checks });
+    return { approved: false, checks, reason: "No market data available" };
+  }
+
+  const bid = snapshot.bid;
+  const offer = snapshot.offer;
+  const mid = (bid + offer) / 2;
+  const spread = offer - bid;
+  const spreadPct = mid > 0 ? (spread / mid) * 100 : 999;
+
+  if (snapshot.marketStatus !== "TRADEABLE") {
+    checks.push({ check: "Market tradeable", pass: false, detail: `Status: ${snapshot.marketStatus}` });
+    pass = false;
+  } else {
+    checks.push({ check: "Market tradeable", pass: true, detail: `Status: TRADEABLE` });
+  }
+
+  if (bid == null || offer == null || bid <= 0 || offer <= 0) {
+    checks.push({ check: "Price validity", pass: false, detail: `Bid: ${bid}, Offer: ${offer}` });
+    pass = false;
+  } else {
+    checks.push({ check: "Price validity", pass: true, detail: `Bid: ${bid}, Offer: ${offer}, Mid: ${mid.toFixed(5)}` });
+  }
+
+  const updateTime = snapshot.updateTime || snapshot.updateTimeUTC;
+  if (updateTime) {
+    const updateMs = new Date(updateTime).getTime();
+    const ageSeconds = (Date.now() - updateMs) / 1000;
+    if (isNaN(ageSeconds) || ageSeconds > 120) {
+      checks.push({ check: "Price staleness", pass: false, detail: `Snapshot age ${isNaN(ageSeconds) ? 'unknown' : Math.round(ageSeconds) + 's'} exceeds 120s limit — data may be stale` });
+      pass = false;
+    } else {
+      checks.push({ check: "Price staleness", pass: true, detail: `Snapshot age ${Math.round(ageSeconds)}s (< 120s limit)` });
+    }
+  } else {
+    checks.push({ check: "Price staleness", pass: true, detail: "No updateTime in snapshot — assuming fresh (just fetched)" });
+  }
+
+  const maxSpreadPct = mid > 100 ? 0.5 : 1.0;
+  if (spreadPct > maxSpreadPct) {
+    checks.push({ check: "Spread limit", pass: false, detail: `Spread ${spread.toFixed(5)} (${spreadPct.toFixed(3)}%) exceeds ${maxSpreadPct}% limit` });
+    pass = false;
+  } else {
+    checks.push({ check: "Spread limit", pass: true, detail: `Spread ${spread.toFixed(5)} (${spreadPct.toFixed(3)}%)` });
+  }
+
+  if (!strategy.stopDistance || strategy.stopDistance <= 0) {
+    checks.push({ check: "Stop-loss set", pass: false, detail: "No stop-loss distance configured" });
+    pass = false;
+  } else if (strategy.stopDistance <= spread) {
+    checks.push({ check: "Stop-loss vs spread", pass: false, detail: `Stop ${strategy.stopDistance} <= spread ${spread.toFixed(5)} — instant stop-out risk` });
+    pass = false;
+  } else {
+    checks.push({ check: "Stop-loss set", pass: true, detail: `${strategy.stopDistance} pts (> spread ${spread.toFixed(5)})` });
+  }
+
+  if (!strategy.limitDistance || strategy.limitDistance <= 0) {
+    checks.push({ check: "Take-profit set", pass: false, detail: "No take-profit distance configured" });
+    pass = false;
+  } else {
+    const rr = strategy.limitDistance / strategy.stopDistance;
+    if (rr < 1.0) {
+      checks.push({ check: "Risk:reward ratio", pass: false, detail: `1:${rr.toFixed(2)} — below 1:1 minimum` });
+      pass = false;
+    } else {
+      checks.push({ check: "Risk:reward ratio", pass: true, detail: `1:${rr.toFixed(2)}` });
+    }
+  }
+
+  if (!strategy.size || strategy.size <= 0) {
+    checks.push({ check: "Position size", pass: false, detail: "Size is zero or negative" });
+    pass = false;
+  } else {
+    checks.push({ check: "Position size", pass: true, detail: `${strategy.size} contracts` });
+  }
+
+  if (accountBalance && strategy.stopDistance && strategy.size) {
+    const tradeRisk = strategy.stopDistance * strategy.size;
+    const riskPct = (tradeRisk / accountBalance) * 100;
+    if (riskPct > 2) {
+      checks.push({ check: "Risk % of balance", pass: false, detail: `${riskPct.toFixed(2)}% exceeds 2% safety limit (risk: ${tradeRisk.toFixed(2)}, balance: ${accountBalance.toFixed(2)})` });
+      pass = false;
+    } else {
+      checks.push({ check: "Risk % of balance", pass: true, detail: `${riskPct.toFixed(2)}% (risk: ${tradeRisk.toFixed(2)}, balance: ${accountBalance.toFixed(2)})` });
+    }
+  } else {
+    checks.push({ check: "Risk % of balance", pass: false, detail: "Cannot calculate — missing balance, stop, or size" });
+    pass = false;
+  }
+
+  const existingOnInstrument = openPositions.filter(
+    (p) => (p.market?.epic === strategy.instrument) && (p.position?.direction === strategy.direction)
+  );
+  if (existingOnInstrument.length > 0) {
+    checks.push({ check: "No duplicate position", pass: false, detail: `Already ${existingOnInstrument.length} ${strategy.direction} position(s) on ${strategy.instrument}` });
+    pass = false;
+  } else {
+    checks.push({ check: "No duplicate position", pass: true, detail: "No existing position in same direction" });
+  }
+
+  if (strategy.direction === "BUY" && strategy.entryBelow != null) {
+    const priceDiffPct = Math.abs(mid - strategy.entryBelow) / mid * 100;
+    if (priceDiffPct > 5) {
+      checks.push({ check: "Entry price sanity", pass: false, detail: `Entry ${strategy.entryBelow} is ${priceDiffPct.toFixed(2)}% from mid ${mid.toFixed(5)} — possible stale/hallucinated value` });
+      pass = false;
+    } else {
+      checks.push({ check: "Entry price sanity", pass: true, detail: `Entry ${strategy.entryBelow} within ${priceDiffPct.toFixed(2)}% of mid ${mid.toFixed(5)}` });
+    }
+  }
+  if (strategy.direction === "SELL" && strategy.entryAbove != null) {
+    const priceDiffPct = Math.abs(mid - strategy.entryAbove) / mid * 100;
+    if (priceDiffPct > 5) {
+      checks.push({ check: "Entry price sanity", pass: false, detail: `Entry ${strategy.entryAbove} is ${priceDiffPct.toFixed(2)}% from mid ${mid.toFixed(5)} — possible stale/hallucinated value` });
+      pass = false;
+    } else {
+      checks.push({ check: "Entry price sanity", pass: true, detail: `Entry ${strategy.entryAbove} within ${priceDiffPct.toFixed(2)}% of mid ${mid.toFixed(5)}` });
+    }
+  }
+
+  const verdict = pass ? "APPROVED" : "REJECTED";
+  const entry = {
+    timestamp,
+    instrument: strategy.instrument,
+    name: strategy.name || strategy.instrument,
+    direction: strategy.direction,
+    size: strategy.size,
+    stopDistance: strategy.stopDistance,
+    limitDistance: strategy.limitDistance,
+    liveBid: bid,
+    liveOffer: offer,
+    spread: spread,
+    verdict,
+    checks
+  };
+
+  saveVerifyLog(entry);
+
+  const checkSummary = checks.map(c => `  ${c.pass ? "✅" : "❌"} ${c.check}: ${c.detail}`).join("\n");
+  log(pass ? "INFO" : "WARN", `PROOF READ ${verdict}: ${strategy.name || strategy.instrument}\n${checkSummary}`);
+
+  if (!pass) {
+    const failures = checks.filter(c => !c.pass).map(c => c.check + ": " + c.detail);
+    return { approved: false, checks, reason: failures.join("; ") };
+  }
+  return { approved: true, checks };
+}
+
 async function openPosition(strategy) {
   const body = {
     epic: strategy.instrument,
@@ -436,6 +612,13 @@ async function runCycle(config) {
     if (signal) {
       log("INFO", `Signal alert found for ${strategy.instrument}: ${signal.type || signal.signal}`);
     }
+
+    const verification = await proofReadTrade(strategy, marketData);
+    if (!verification.approved) {
+      log("WARN", `TRADE BLOCKED by proof reader: ${strategy.instrument} — ${verification.reason}`);
+      continue;
+    }
+    log("INFO", `TRADE APPROVED by proof reader: ${strategy.instrument}`);
 
     const result = await openPosition(strategy);
     if (result) {

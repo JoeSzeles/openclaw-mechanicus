@@ -64,11 +64,12 @@ OpenClaw Cloud operates with a "CEO Proxy + Gateway" architecture where two comp
 -   **OpenAI API**: Secondary AI model provider via Replit AI Integrations.
     -   Models: `gpt-4o`, `gpt-4o-mini`.
 -   **IG Group Trading API**: CFD trading via REST API (demo: `demo-api.ig.com`, live: `api.ig.com`).
-    -   Skills: `ig-trading` (auth, positions, orders), `ig-market-data` (search, prices, watchlists, sentiment).
-    -   Bot skills: `ig-signal-monitor` (price signal monitoring), `ig-trading-bot` (automated strategy execution).
+    -   Skills: `ig-trading` (auth, positions, orders), `ig-market-data` (search, prices, watchlists, sentiment), `ig-trade-verify` (mandatory pre-trade proof reader).
+    -   Bot skills: `ig-signal-monitor` (price signal monitoring), `ig-trading-bot` (automated strategy execution with built-in proof reader).
+    -   **Trade Proof Reader**: Multi-layered anti-hallucination protection for margin trading. Bot-level rule-based verification (spread limits, stop-loss validation, price staleness detection, risk sizing, duplicate checks) runs before every trade. Agent-level `ig-trade-verify` skill defines a mandatory verification protocol. All verifications logged to `.openclaw/canvas/ig-verify-log.json` and displayed on the IG dashboard.
     -   Signal monitor config: `.openclaw/ig-monitor-config.json`, alerts: `.openclaw/ig-alerts.json`.
     -   Trading bot config: `.openclaw/ig-strategy.json`, log: `.openclaw/ig-bot-log.json`.
-    -   Dashboard: `.openclaw/canvas/ig-dashboard.html` (viewable at `/__openclaw__/canvas/ig-dashboard.html`).
+    -   Dashboard: `.openclaw/canvas/ig-dashboard.html` (viewable at `/__openclaw__/canvas/ig-dashboard.html`). Includes price charts, alerts, strategies, verification audit trail.
     -   Credentials stored in env vars: `IG_API_KEY`, `IG_USERNAME`, `IG_PASSWORD`, `IG_ACCOUNT_ID`, `IG_BASE_URL`.
     -   Reference doc: `.openclaw/workspace/IG_TRADING.md`.
 -   **Replit Secrets Management**: Securely stores API keys like `XAI_API_KEY`, `OPENCLAW_GATEWAY_TOKEN`, and IG credentials.
