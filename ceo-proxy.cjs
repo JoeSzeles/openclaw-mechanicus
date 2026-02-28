@@ -20,9 +20,14 @@ const CANVAS_DIR = path.join(DATA_DIR, "canvas");
 const BOT_REGISTRY_FILE = path.join(DATA_DIR, "bot-registry.json");
 const https = require("https");
 
-// IG API session cache
+// IG API persistent session
 let igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
 const IG_SESSION_TTL = 5 * 60 * 1000;
+const IG_SESSION_REFRESH_INTERVAL = 4 * 60 * 1000;
+let igSessionStatus = "disconnected";
+let igSessionError = null;
+let igSessionLastRefresh = 0;
+let igSessionRefreshTimer = null;
 
 // IG response cache
 const igResponseCache = new Map();
@@ -287,35 +292,119 @@ async function igAuth() {
   if (igSession.cst && Date.now() - igSession.ts < IG_SESSION_TTL) {
     return { cst: igSession.cst, xst: igSession.xst };
   }
+  return igSessionLogin();
+}
+
+async function igSessionLogin() {
   const profile = getActiveIgProfile();
-  if (!profile) throw new Error("No active IG profile configured");
-  const res = await igRequest("POST", "/session", {
-    "Content-Type": "application/json; charset=UTF-8",
-    Accept: "application/json; charset=UTF-8",
-    "X-IG-API-KEY": profile.apiKey,
-    Version: "2",
-  }, JSON.stringify({ identifier: profile.username, password: profile.password }));
-  if (res.status !== 200) {
-    let errDetail = res.body || "";
-    if (errDetail.includes("<html") || errDetail.includes("<HTML")) {
-      if (res.status === 503) errDetail = "IG API servers unavailable (503) — may be an outage or IP block";
-      else if (res.status === 500) errDetail = "IG API internal server error (500)";
-      else errDetail = "IG API returned HTTP " + res.status;
-    } else {
-      try { const ej = JSON.parse(errDetail); errDetail = ej.errorCode || ej.error || errDetail; } catch(_) {}
-    }
-    throw new Error("IG auth failed: " + errDetail);
+  if (!profile) {
+    igSessionStatus = "not_configured";
+    igSessionError = "No active IG profile configured";
+    throw new Error(igSessionError);
   }
-  const cst = res.headers["cst"] || res.headers["CST"];
-  const xst = res.headers["x-security-token"] || res.headers["X-SECURITY-TOKEN"];
-  if (!cst || !xst) throw new Error("IG auth missing tokens");
-  let lsEndpoint = null;
+  igSessionStatus = "connecting";
+  igSessionError = null;
+  console.log(`[ig-session] Logging in to ${profile.profileName} profile...`);
   try {
-    const body = JSON.parse(res.body);
-    lsEndpoint = body.lightstreamerEndpoint || null;
-  } catch (_) {}
-  igSession = { cst, xst, ts: Date.now(), lightstreamerEndpoint: lsEndpoint };
-  return { cst, xst };
+    const res = await igRequest("POST", "/session", {
+      "Content-Type": "application/json; charset=UTF-8",
+      Accept: "application/json; charset=UTF-8",
+      "X-IG-API-KEY": profile.apiKey,
+      Version: "2",
+    }, JSON.stringify({ identifier: profile.username, password: profile.password }));
+    if (res.status !== 200) {
+      let errDetail = res.body || "";
+      if (errDetail.includes("<html") || errDetail.includes("<HTML")) {
+        if (res.status === 503) errDetail = "IG API servers unavailable (503) — may be an outage or IP block";
+        else if (res.status === 500) errDetail = "IG API internal server error (500)";
+        else errDetail = "IG API returned HTTP " + res.status;
+      } else {
+        try { const ej = JSON.parse(errDetail); errDetail = ej.errorCode || ej.error || errDetail; } catch(_) {}
+      }
+      throw new Error("IG auth failed: " + errDetail);
+    }
+    const cst = res.headers["cst"] || res.headers["CST"];
+    const xst = res.headers["x-security-token"] || res.headers["X-SECURITY-TOKEN"];
+    if (!cst || !xst) throw new Error("IG auth missing tokens");
+    let lsEndpoint = null;
+    try {
+      const body = JSON.parse(res.body);
+      lsEndpoint = body.lightstreamerEndpoint || null;
+    } catch (_) {}
+    igSession = { cst, xst, ts: Date.now(), lightstreamerEndpoint: lsEndpoint };
+    igSessionStatus = "connected";
+    igSessionError = null;
+    igSessionLastRefresh = Date.now();
+    console.log(`[ig-session] Connected to ${profile.profileName} profile`);
+    scheduleSessionRefresh();
+    return { cst, xst };
+  } catch (e) {
+    igSessionStatus = "error";
+    igSessionError = e.message;
+    console.log(`[ig-session] Login failed: ${e.message}`);
+    throw e;
+  }
+}
+
+function scheduleSessionRefresh() {
+  if (igSessionRefreshTimer) clearTimeout(igSessionRefreshTimer);
+  igSessionRefreshTimer = setTimeout(async () => {
+    if (!igConfigured()) return;
+    console.log("[ig-session] Proactive token refresh...");
+    try {
+      igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: igSession.lightstreamerEndpoint };
+      await igSessionLogin();
+      stopLightstreamer();
+      setTimeout(() => startLightstreamer(), 1000);
+    } catch (e) {
+      console.log("[ig-session] Refresh failed:", e.message, "— will retry in 60s");
+      scheduleSessionRetry();
+    }
+  }, IG_SESSION_REFRESH_INTERVAL);
+}
+
+function scheduleSessionRetry() {
+  if (igSessionRefreshTimer) clearTimeout(igSessionRefreshTimer);
+  igSessionRefreshTimer = setTimeout(async () => {
+    if (!igConfigured()) return;
+    console.log("[ig-session] Retrying login...");
+    try {
+      await igSessionLogin();
+      stopLightstreamer();
+      setTimeout(() => startLightstreamer(), 1000);
+    } catch (e) {
+      console.log("[ig-session] Retry failed:", e.message, "— will retry in 60s");
+      scheduleSessionRetry();
+    }
+  }, 60000);
+}
+
+async function igSessionStartup() {
+  if (!igConfigured()) {
+    igSessionStatus = "not_configured";
+    console.log("[ig-session] No credentials configured, skipping auto-login");
+    return;
+  }
+  try {
+    await igSessionLogin();
+  } catch (e) {
+    console.log("[ig-session] Startup login failed:", e.message, "— will retry in 60s");
+    scheduleSessionRetry();
+  }
+}
+
+function getIgSessionInfo() {
+  const profile = getActiveIgProfile();
+  return {
+    status: igSessionStatus,
+    error: igSessionError,
+    profile: profile ? profile.profileName : null,
+    connectedSince: igSession.ts > 0 ? new Date(igSession.ts).toISOString() : null,
+    lastRefresh: igSessionLastRefresh > 0 ? new Date(igSessionLastRefresh).toISOString() : null,
+    sessionAge: igSession.ts > 0 ? Math.round((Date.now() - igSession.ts) / 1000) : null,
+    ttlRemaining: igSession.ts > 0 ? Math.max(0, Math.round((IG_SESSION_TTL - (Date.now() - igSession.ts)) / 1000)) : null,
+    lightstreamerEndpoint: igSession.lightstreamerEndpoint || null
+  };
 }
 
 function igHeaders(session) {
@@ -349,6 +438,7 @@ async function handleIgApi(req, res, p) {
         pr.hasCredentials = !!(config.profiles[key].apiKey && config.profiles[key].username && config.profiles[key].password);
       }
       masked.streaming = { status: lsStatus, connectedEpics: lsConnectedEpics, priceCount: streamedPrices.size };
+      masked.session = getIgSessionInfo();
       return json(res, 200, masked);
     }
 
@@ -360,6 +450,9 @@ async function handleIgApi(req, res, p) {
         config.activeProfile = body.activeProfile;
         if (oldProfile !== body.activeProfile) {
           igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
+          igSessionStatus = "disconnected";
+          igSessionError = null;
+          if (igSessionRefreshTimer) { clearTimeout(igSessionRefreshTimer); igSessionRefreshTimer = null; }
           igCacheInvalidate();
           stopLightstreamer();
           console.log(`[ig-config] Switched profile: ${oldProfile} -> ${body.activeProfile}`);
@@ -379,7 +472,10 @@ async function handleIgApi(req, res, p) {
       if (igConfigured()) {
         igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
         igCacheInvalidate();
-        setTimeout(() => startLightstreamer(), 1000);
+        setTimeout(async () => {
+          try { await igSessionLogin(); } catch (_) {}
+          startLightstreamer();
+        }, 1000);
       }
       return json(res, 200, { ok: true, activeProfile: config.activeProfile });
     }
@@ -408,6 +504,24 @@ async function handleIgApi(req, res, p) {
         activeProfile: getActiveIgProfile()?.profileName || null,
         lightstreamerEndpoint: igSession.lightstreamerEndpoint || null
       });
+    }
+
+    if (req.method === "GET" && p === "/api/ig/session") {
+      return json(res, 200, getIgSessionInfo());
+    }
+
+    if (req.method === "POST" && p === "/api/ig/session/refresh") {
+      if (!igConfigured()) return json(res, 400, { error: "No credentials configured for active profile" });
+      try {
+        igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: igSession.lightstreamerEndpoint };
+        igCacheInvalidate();
+        await igSessionLogin();
+        stopLightstreamer();
+        setTimeout(() => startLightstreamer(), 1000);
+        return json(res, 200, { ok: true, ...getIgSessionInfo() });
+      } catch (e) {
+        return json(res, 200, { ok: false, error: e.message, ...getIgSessionInfo() });
+      }
     }
 
     if (!igConfigured()) return json(res, 503, { error: "IG not configured — set credentials in Config page or env vars" });
@@ -1959,7 +2073,10 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
   writeConfigSnapshots();
   autoRegisterBotScripts();
   startRegisteredBots();
-  setTimeout(() => startLightstreamer(), 5000);
+  setTimeout(async () => {
+    await igSessionStartup();
+    startLightstreamer();
+  }, 3000);
 });
 
 setInterval(() => {

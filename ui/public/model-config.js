@@ -166,6 +166,7 @@ function renderIgConfig(config) {
   if (inactiveCard) inactiveCard.style.borderColor = '#30363d';
 
   renderStreamingStatus(config.streaming);
+  renderSessionStatus(config.session);
 }
 
 function renderStreamingStatus(streaming) {
@@ -198,6 +199,63 @@ function renderStreamingStatus(streaming) {
   }
 
   document.getElementById('streamingCard').innerHTML = html;
+}
+
+function renderSessionStatus(session) {
+  var el = document.getElementById('sessionCard');
+  if (!el) return;
+  if (!session) {
+    el.innerHTML = '<p class="empty">Session info not available</p>';
+    return;
+  }
+  var dotClass = 'grey';
+  var label = session.status || 'unknown';
+  if (session.status === 'connected') dotClass = 'green';
+  else if (session.status === 'connecting') dotClass = 'yellow';
+  else if (session.status === 'error') dotClass = 'red';
+  else if (session.status === 'not_configured') dotClass = 'grey';
+
+  var html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
+  html += '<span class="status-dot ' + dotClass + '"></span>';
+  html += '<span style="font-size:14px;font-weight:500;color:#e6edf3">IG Session: ' + escHtml(label.toUpperCase()) + '</span>';
+  if (session.status === 'connected') html += ' <span class="badge badge-primary">AUTHENTICATED</span>';
+  else if (session.status === 'error') html += ' <span class="badge badge-error">FAILED</span>';
+  else if (session.status === 'not_configured') html += ' <span class="badge badge-warn">NO CREDENTIALS</span>';
+  html += '</div>';
+
+  if (session.error) {
+    html += '<div style="color:#f85149;font-size:13px;margin-bottom:12px">' + escHtml(session.error) + '</div>';
+  }
+
+  html += '<div class="streaming-info">';
+  if (session.profile) html += '<div class="streaming-stat">Profile: <strong>' + escHtml(session.profile.toUpperCase()) + '</strong></div>';
+  if (session.sessionAge != null) html += '<div class="streaming-stat">Session age: <strong>' + session.sessionAge + 's</strong></div>';
+  if (session.ttlRemaining != null) html += '<div class="streaming-stat">TTL remaining: <strong>' + session.ttlRemaining + 's</strong></div>';
+  if (session.lastRefresh) html += '<div class="streaming-stat">Last refresh: <strong>' + new Date(session.lastRefresh).toLocaleTimeString() + '</strong></div>';
+  html += '</div>';
+
+  html += '<div class="btn-row"><button class="btn btn-secondary" id="btnRefreshSession">Force Refresh Session</button></div>';
+  el.innerHTML = html;
+
+  document.getElementById('btnRefreshSession').addEventListener('click', function() {
+    this.disabled = true;
+    this.textContent = 'Refreshing...';
+    apiFetch('/api/ig/session/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.ok) {
+        showToast('Session refreshed — connected to ' + (data.profile || 'IG').toUpperCase(), 'success');
+      } else {
+        showToast('Session refresh failed: ' + (data.error || 'Unknown error'), 'error');
+      }
+      loadIgConfig();
+    }).catch(function(e) {
+      showToast('Error: ' + e.message, 'error');
+      loadIgConfig();
+    });
+  });
 }
 
 document.getElementById('profileToggle').addEventListener('click', function(e) {
