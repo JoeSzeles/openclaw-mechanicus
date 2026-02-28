@@ -15,10 +15,63 @@ const priceHistory = {};
 let cst = null;
 let xSecurityToken = null;
 let sessionActive = false;
+let rateLimitBackoffUntil = 0;
+const apiCallTimestamps = [];
 
 function log(msg) {
   const ts = new Date().toISOString();
   console.log(`[${ts}] ${msg}`);
+}
+
+function getRateLimitConfig(config) {
+  return {
+    apiDelayMs: config.apiDelayMs != null ? config.apiDelayMs : 3000,
+    maxApiCallsPerMinute: config.maxApiCallsPerMinute != null ? config.maxApiCallsPerMinute : 10,
+    rateLimitBackoffMs: config.rateLimitBackoffMs != null ? config.rateLimitBackoffMs : 300000,
+  };
+}
+
+async function rateLimitedSleep(config) {
+  const rl = getRateLimitConfig(config);
+  if (rl.apiDelayMs > 0) {
+    await new Promise((r) => setTimeout(r, rl.apiDelayMs));
+  }
+}
+
+function trackApiCall() {
+  const now = Date.now();
+  apiCallTimestamps.push(now);
+  const oneMinuteAgo = now - 60000;
+  while (apiCallTimestamps.length > 0 && apiCallTimestamps[0] < oneMinuteAgo) {
+    apiCallTimestamps.shift();
+  }
+}
+
+async function checkApiQuota(config) {
+  const now = Date.now();
+  if (rateLimitBackoffUntil > now) {
+    const waitSec = Math.ceil((rateLimitBackoffUntil - now) / 1000);
+    log(`RATE LIMIT: Backing off for ${waitSec}s more (hit IG quota)`);
+    await new Promise((r) => setTimeout(r, rateLimitBackoffUntil - now));
+  }
+  const rl = getRateLimitConfig(config);
+  if (apiCallTimestamps.length >= rl.maxApiCallsPerMinute) {
+    const waitMs = 60000 - (now - apiCallTimestamps[0]) + 1000;
+    if (waitMs > 0) {
+      log(`RATE LIMIT: ${apiCallTimestamps.length} calls in last minute, pausing ${Math.ceil(waitMs / 1000)}s`);
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+}
+
+function handleRateLimitError(status, body, config) {
+  if (status === 403 && body && body.includes("exceeded-api-key-allowance")) {
+    const rl = getRateLimitConfig(config);
+    rateLimitBackoffUntil = Date.now() + rl.rateLimitBackoffMs;
+    log(`RATE LIMIT HIT: IG API quota exceeded (403). Backing off for ${rl.rateLimitBackoffMs / 1000}s. Adjust apiDelayMs/maxApiCallsPerMinute in config for less aggressive polling.`);
+    return true;
+  }
+  return false;
 }
 
 function loadConfig() {
@@ -78,12 +131,13 @@ function getEnv(name) {
   return v;
 }
 
-async function authenticate() {
+async function authenticate(config) {
   const baseUrl = getEnv("IG_BASE_URL");
   const apiKey = getEnv("IG_API_KEY");
   const username = getEnv("IG_USERNAME");
   const password = getEnv("IG_PASSWORD");
 
+  trackApiCall();
   log("Authenticating with IG API...");
   const res = await request("POST", `${baseUrl}/session`, {
     "Content-Type": "application/json; charset=UTF-8",
@@ -93,6 +147,7 @@ async function authenticate() {
   }, JSON.stringify({ identifier: username, password }));
 
   if (res.status !== 200) {
+    if (handleRateLimitError(res.status, res.body, config || {})) return false;
     log(`Authentication failed (${res.status}): ${res.body}`);
     sessionActive = false;
     return false;
@@ -121,18 +176,24 @@ function authHeaders() {
   };
 }
 
-async function fetchPrice(epic) {
+async function fetchPrice(epic, config) {
   const baseUrl = getEnv("IG_BASE_URL");
+  await checkApiQuota(config || {});
+  trackApiCall();
   const res = await request("GET", `${baseUrl}/markets/${epic}`, authHeaders());
 
   if (res.status === 401) {
     log("Session expired, re-authenticating...");
-    const ok = await authenticate();
+    const ok = await authenticate(config);
     if (!ok) return null;
+    await rateLimitedSleep(config || {});
+    trackApiCall();
     const retry = await request("GET", `${baseUrl}/markets/${epic}`, authHeaders());
     if (retry.status !== 200) return null;
     return JSON.parse(retry.body);
   }
+
+  if (handleRateLimitError(res.status, res.body, config || {})) return null;
 
   if (res.status !== 200) {
     log(`Failed to fetch price for ${epic} (${res.status}): ${res.body}`);
@@ -243,8 +304,10 @@ function detectSignals(instrument, config) {
 async function pollCycle(config) {
   const allSignals = [];
 
-  for (const instrument of config.instruments) {
-    const data = await fetchPrice(instrument.epic);
+  for (let i = 0; i < config.instruments.length; i++) {
+    const instrument = config.instruments[i];
+    if (i > 0) await rateLimitedSleep(config);
+    const data = await fetchPrice(instrument.epic, config);
     if (!data || !data.snapshot) {
       log(`No data for ${instrument.name} (${instrument.epic})`);
       continue;
@@ -312,11 +375,14 @@ async function run() {
     process.exit(1);
   }
 
-  const ok = await authenticate();
+  const ok = await authenticate(config);
   if (!ok) {
     log("Failed to authenticate. Exiting.");
     process.exit(1);
   }
+
+  const rl = getRateLimitConfig(config);
+  log(`Rate limiting: ${rl.apiDelayMs}ms between calls, max ${rl.maxApiCallsPerMinute}/min, backoff ${rl.rateLimitBackoffMs / 1000}s on quota hit`);
 
   if (TEST_MODE) {
     log("Running single poll cycle...");

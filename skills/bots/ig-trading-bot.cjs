@@ -18,6 +18,58 @@ let sessionTokens = { cst: null, securityToken: null };
 let openPositions = [];
 let botLog = [];
 let accountBalance = null;
+let rateLimitBackoffUntil = 0;
+const apiCallTimestamps = [];
+
+function getRateLimitConfig(config) {
+  return {
+    apiDelayMs: config.apiDelayMs != null ? config.apiDelayMs : 3000,
+    maxApiCallsPerMinute: config.maxApiCallsPerMinute != null ? config.maxApiCallsPerMinute : 10,
+    rateLimitBackoffMs: config.rateLimitBackoffMs != null ? config.rateLimitBackoffMs : 300000,
+  };
+}
+
+async function rateLimitedSleep(config) {
+  const rl = getRateLimitConfig(config || {});
+  if (rl.apiDelayMs > 0) await new Promise((r) => setTimeout(r, rl.apiDelayMs));
+}
+
+function trackApiCall() {
+  const now = Date.now();
+  apiCallTimestamps.push(now);
+  const oneMinuteAgo = now - 60000;
+  while (apiCallTimestamps.length > 0 && apiCallTimestamps[0] < oneMinuteAgo) apiCallTimestamps.shift();
+}
+
+async function checkApiQuota(config) {
+  const now = Date.now();
+  if (rateLimitBackoffUntil > now) {
+    const waitSec = Math.ceil((rateLimitBackoffUntil - now) / 1000);
+    log("WARN", `RATE LIMIT: Backing off for ${waitSec}s more (hit IG quota)`);
+    await new Promise((r) => setTimeout(r, rateLimitBackoffUntil - now));
+  }
+  const rl = getRateLimitConfig(config || {});
+  if (apiCallTimestamps.length >= rl.maxApiCallsPerMinute) {
+    const waitMs = 60000 - (now - apiCallTimestamps[0]) + 1000;
+    if (waitMs > 0) {
+      log("WARN", `RATE LIMIT: ${apiCallTimestamps.length} calls in last minute, pausing ${Math.ceil(waitMs / 1000)}s`);
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+}
+
+function handleRateLimitError(status, body, config) {
+  const errStr = typeof body === "string" ? body : (body?.errorCode || JSON.stringify(body) || "");
+  if (status === 403 && errStr.includes("exceeded-api-key-allowance")) {
+    const rl = getRateLimitConfig(config || {});
+    rateLimitBackoffUntil = Date.now() + rl.rateLimitBackoffMs;
+    log("ERROR", `RATE LIMIT HIT: IG API quota exceeded (403). Backing off for ${rl.rateLimitBackoffMs / 1000}s. Adjust apiDelayMs/maxApiCallsPerMinute in config.`);
+    return true;
+  }
+  return false;
+}
+
+let currentConfig = {};
 
 function log(level, message, data) {
   const entry = { timestamp: new Date().toISOString(), level, message, ...(data ? { data } : {}) };
@@ -128,10 +180,15 @@ async function authenticate() {
     throw new Error("Missing IG credentials. Set IG_API_KEY, IG_USERNAME, IG_PASSWORD env vars.");
   }
 
+  await checkApiQuota(currentConfig);
+  trackApiCall();
   log("INFO", "Authenticating with IG API...");
   const res = await request("POST", "/session", { identifier: username, password }, { Version: "2" });
 
   if (res.status !== 200) {
+    if (handleRateLimitError(res.status, res.body, currentConfig)) {
+      throw new Error("IG API quota exceeded. Backing off.");
+    }
     const errCode = res.body?.errorCode || res.raw;
     throw new Error(`Authentication failed (${res.status}): ${errCode}`);
   }
@@ -159,11 +216,14 @@ async function refreshSession() {
 }
 
 async function fetchAccounts() {
+  await checkApiQuota(currentConfig);
+  trackApiCall();
   const res = await request("GET", "/accounts");
   if (res.status === 401) {
     await refreshSession();
     return fetchAccounts();
   }
+  if (handleRateLimitError(res.status, res.body, currentConfig)) return null;
   if (res.status !== 200) {
     log("ERROR", "Failed to fetch accounts", { status: res.status, error: res.body?.errorCode });
     return null;
@@ -172,11 +232,14 @@ async function fetchAccounts() {
 }
 
 async function fetchPositions() {
+  await checkApiQuota(currentConfig);
+  trackApiCall();
   const res = await request("GET", "/positions", null, { Version: "2" });
   if (res.status === 401) {
     await refreshSession();
     return fetchPositions();
   }
+  if (handleRateLimitError(res.status, res.body, currentConfig)) return [];
   if (res.status !== 200) {
     log("ERROR", "Failed to fetch positions", { status: res.status, error: res.body?.errorCode });
     return [];
@@ -185,11 +248,14 @@ async function fetchPositions() {
 }
 
 async function fetchPrice(epic) {
+  await checkApiQuota(currentConfig);
+  trackApiCall();
   const res = await request("GET", `/markets/${epic}`);
   if (res.status === 401) {
     await refreshSession();
     return fetchPrice(epic);
   }
+  if (handleRateLimitError(res.status, res.body, currentConfig)) return null;
   if (res.status !== 200) {
     log("ERROR", `Failed to fetch price for ${epic}`, { status: res.status, error: res.body?.errorCode });
     return null;
@@ -588,9 +654,11 @@ async function runCycle(config) {
   openPositions = await fetchPositions();
   log("INFO", `Open positions: ${openPositions.length}`);
 
-  for (const strategy of strategies) {
+  for (let i = 0; i < strategies.length; i++) {
+    const strategy = strategies[i];
     log("INFO", `Evaluating: ${strategy.name || strategy.instrument}`);
 
+    if (i > 0) await rateLimitedSleep(config);
     const marketData = await fetchPrice(strategy.instrument);
     if (!marketData) {
       log("WARN", `Skipping ${strategy.instrument} — could not fetch price.`);
@@ -635,12 +703,16 @@ async function main() {
   console.log(`\n=== IG Trading Bot ${TEST_MODE ? "(TEST MODE)" : "(LIVE)"} ===\n`);
 
   const config = loadConfig();
+  currentConfig = config;
 
   if (!config.enabled && !TEST_MODE) {
     log("INFO", 'Bot is disabled in config. Set "enabled": true in ig-strategy.json to start trading.');
     writeDashboard(config, [], null);
     return;
   }
+
+  const rl = getRateLimitConfig(config);
+  log("INFO", `Rate limiting: ${rl.apiDelayMs}ms between calls, max ${rl.maxApiCallsPerMinute}/min, backoff ${rl.rateLimitBackoffMs / 1000}s on quota hit`);
 
   await ensureSession();
 
@@ -664,6 +736,7 @@ async function main() {
   const loop = async () => {
     try {
       const freshConfig = loadConfig();
+      currentConfig = freshConfig;
       if (!freshConfig.enabled) {
         log("INFO", "Bot disabled via config. Pausing...");
         writeDashboard(freshConfig, openPositions, null);

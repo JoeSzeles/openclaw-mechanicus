@@ -27,25 +27,80 @@ If you want a personal, single-user assistant that feels local, fast, and always
 
 ## OpenClaw Cloud (Replit)
 
-This fork runs **OpenClaw Cloud** on Replit -- the full gateway accessible from any browser with no local install needed.
+This fork runs **OpenClaw Cloud** on Replit -- the full gateway accessible from any browser with no local install needed. It acts as a central **CEO** that dispatches tasks to local **Worker Bee** OpenClaw instances, with integrated CFD trading, visual dashboards, and autonomous bot management.
 
 ### Cloud Features
-- **Web-based AI Model Configuration** (`/model-config.html`) -- add/remove providers, models, API keys, and switch the active model from the browser
-- **Navigation bar** injected across all Control UI pages (Dashboard + AI Model Config)
-- **xAI/Grok as primary provider** -- 5 Grok models pre-configured (Grok 4.1 Fast Reasoning, Grok 4, Grok 2, Grok 2 Vision, Grok 2 1212)
-- **OpenAI as secondary provider** -- GPT-4o and GPT-4o Mini via Replit AI Integrations
-- **Grok-powered web search** -- `web_search` and `web_fetch` tools enabled using xAI API (no separate search API key needed)
-- **Persistent storage** -- all config, agents, sessions, and bootstrap survive container restarts (stored in `.openclaw/`)
-- **Auto-token injection** -- gateway auth token injected into the Control UI automatically, no manual setup
-- **Replit secrets management** -- API keys stored securely via Replit Secrets (`XAI_API_KEY`, `OPENCLAW_GATEWAY_TOKEN`)
+
+**CEO/Worker Bee System**
+- The Replit instance acts as a CEO, dispatching tasks to local Worker Bee instances
+- Workers register via REST API, poll for tasks, and return results injected into the chat
+- `@WorkerName` mentions in chat automatically dispatch tasks to the right worker
+- Inter-worker communication via `@BeeName` addressing
+- Shared Space (`/api/sharedspace`) for file sharing between agents
+- Workers Dashboard (`/workers.html`) for managing API keys, workers, and file exchange
+
+**IG Group CFD Trading**
+
+Full IG Group trading integration with autonomous bots, real-time dashboards, and anti-hallucination protection. See [IG Trading Setup Guide](docs/IG_TRADING_SETUP.md) for full details.
+
+![IG Trading Dashboard](docs/images/ig-dashboard.png)
+
+- 6 trading skills: `ig-trading`, `ig-market-data`, `ig-signal-monitor`, `ig-trade-verify`, `ig-backtest`
+- Signal monitor bot for price alerts (drops, spikes, breakouts, spread)
+- Trading bot with configurable strategies, risk controls, and automatic proof reader
+- Live dashboard with account balance, positions, P&L, and price charts
+- Configurable API rate limiting to avoid IG's quota walls
+- Trade proof reader: 10-point anti-hallucination verification before every trade
+
+![IG Skills](docs/images/ig-skills.png)
+
+**Strategy Backtesting**
+
+Test trading strategies against historical data before deploying live.
+
+![Backtest Results](docs/images/backtest-chart.png)
+
+- Historical price data from IG API (MINUTE, HOUR, DAY resolutions)
+- Equity curve and price chart with trade markers
+- Performance metrics: P&L, win rate, Sharpe ratio, max drawdown, profit factor
+- Results published as interactive HTML on the Canvas hub
+
+**Process Manager & Bot Registry**
+
+![Processes & Bots](docs/images/processes-bots.png)
+
+- Web UI (`/processes.html`) for managing registered bots and ad-hoc processes
+- All bot scripts live in `skills/bots/` as `.cjs` files -- auto-scanned every 30 seconds
+- Drop a `.cjs` file in `skills/bots/` and it auto-registers and starts (no API call needed)
+- Auto-restart on crash with exponential backoff (5s to 60s max)
+- "Run at startup" toggle independent from start/stop (critical for trading bots managing margin)
+
+![IG Bot Status](docs/images/ig-bot-status.png)
+
+**Canvas Visual Output Hub**
+- Agents write HTML dashboards, charts, and reports to `.openclaw/canvas/`
+- Served at `/__openclaw__/canvas/` with a manifest-based discovery system
+- Inline canvas embeds in chat: `![canvas](/__openclaw__/canvas/page.html)`
+- No separate web server needed
+
+**Chat & UI**
+- Rich media in chat: canvas iframe embeds, enhanced markdown tables
+- Navigation bar across all pages: Dashboard, Canvas, AI Model Config, Workers, Processes
+- AI Model Configuration page (`/model-config.html`) for managing providers and models
+- Auto-token injection -- no manual gateway auth setup
+
+**AI Models**
+- xAI/Grok as primary provider (Grok 4.1 Fast Reasoning, Grok 4, Grok 2, Grok 2 Vision)
+- OpenAI as secondary provider via Replit AI Integrations (GPT-4o, GPT-4o Mini)
+- Grok-powered web search (`web_search` + `web_fetch` tools)
 
 ### Cloud Quick Start
 1. Set secrets in Replit: `XAI_API_KEY`, `OPENCLAW_GATEWAY_TOKEN`
-2. (Optional) Enable Replit AI Integrations for OpenAI access (`AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL` are set automatically)
-3. Run the **Start application** workflow (runs `start.sh`)
-4. Open the web preview -- the Control UI dashboard loads at `/`
-5. Click **AI Model Config** in the nav bar to manage models and providers
-6. Chat with your AI assistant directly from the dashboard
+2. (Optional) Enable Replit AI Integrations for OpenAI access
+3. (Optional) Set IG trading secrets: `IG_API_KEY`, `IG_USERNAME`, `IG_PASSWORD`, `IG_ACCOUNT_ID`, `IG_BASE_URL`
+4. Run the **Start application** workflow (runs `start.sh`)
+5. Open the web preview -- the Control UI dashboard loads at `/`
+6. Use the navigation bar to access Dashboard, Canvas, AI Model Config, Workers, and Processes
 
 ### Cloud Environment Variables
 | Variable | Required | Purpose |
@@ -54,6 +109,11 @@ This fork runs **OpenClaw Cloud** on Replit -- the full gateway accessible from 
 | `OPENCLAW_GATEWAY_TOKEN` | Yes | Auth token for gateway/Control UI access |
 | `AI_INTEGRATIONS_OPENAI_API_KEY` | Optional | OpenAI API key (auto-set by Replit AI Integrations) |
 | `AI_INTEGRATIONS_OPENAI_BASE_URL` | Optional | OpenAI base URL (auto-set by Replit AI Integrations) |
+| `IG_API_KEY` | For trading | IG Group API key |
+| `IG_USERNAME` | For trading | IG Group username |
+| `IG_PASSWORD` | For trading | IG Group password |
+| `IG_ACCOUNT_ID` | For trading | IG Group account identifier |
+| `IG_BASE_URL` | For trading | `https://demo-api.ig.com/gateway/deal` or `https://api.ig.com/gateway/deal` |
 | `OPENCLAW_SKIP_CHANNELS` | Auto | Set to 1 for lightweight operation (no messaging channels) |
 | `OPENCLAW_HOME` | Auto | Set to `/home/runner/workspace` for persistent storage |
 
@@ -62,16 +122,17 @@ This fork runs **OpenClaw Cloud** on Replit -- the full gateway accessible from 
 - To reset everything: delete the `.openclaw/` directory and restart
 - Primary model: `xai/grok-4-1-fast-reasoning`
 - Web search provider: Grok (uses same `XAI_API_KEY`)
+- IG trading setup: [docs/IG_TRADING_SETUP.md](docs/IG_TRADING_SETUP.md)
 
 ### Cloud-Specific Files
 | File | Purpose |
 |------|---------|
 | `start.sh` | Startup script: env setup, token injection, config seeding, gateway launch |
-| `dist/control-ui/model-config.html` | AI Model Configuration page |
-| `dist/control-ui/model-config.js` | Model config logic (WebSocket communication) |
-| `dist/control-ui/model-config.css` | Model config page styles |
-| `dist/control-ui/nav-inject.js` | Navigation bar injection (Dashboard + AI Model Config) |
+| `ceo-proxy.cjs` | CEO proxy: API routes, bot manager, IG proxy, WebSocket bridge |
+| `skills/bots/*.cjs` | Bot scripts (auto-scanned and registered on startup) |
+| `ui/public/` | Custom page sources (workers, processes, model-config, nav-inject) |
 | `openclaw.json` | Seed config (copied to `.openclaw/` on first run only) |
+| `docs/IG_TRADING_SETUP.md` | IG trading setup guide with rate limit documentation |
 
 ---
 

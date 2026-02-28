@@ -65,15 +65,16 @@ OpenClaw Cloud operates with a "CEO Proxy + Gateway" architecture where two comp
     -   Used for `web_search` tool.
 -   **OpenAI API**: Secondary AI model provider via Replit AI Integrations.
     -   Models: `gpt-4o`, `gpt-4o-mini`.
--   **IG Group Trading API**: CFD trading via REST API (demo: `demo-api.ig.com`, live: `api.ig.com`).
+-   **IG Group Trading API**: CFD trading via REST API (demo: `demo-api.ig.com`, live: `api.ig.com`). Full setup guide: `docs/IG_TRADING_SETUP.md`.
     -   Skills: `ig-trading` (auth, positions, orders), `ig-market-data` (search, prices, watchlists, sentiment), `ig-trade-verify` (mandatory pre-trade proof reader), `ig-backtest` (strategy backtesting with charts).
-    -   Bot skills: `ig-signal-monitor` (price signal monitoring), `ig-trading-bot` (automated strategy execution with built-in proof reader).
+    -   Bot scripts: `skills/bots/ig-signal-monitor.cjs` (price signal monitoring), `skills/bots/ig-trading-bot.cjs` (automated strategy execution with built-in proof reader).
     -   **Trade Proof Reader**: Multi-layered anti-hallucination protection for margin trading. Bot-level rule-based verification (spread limits, stop-loss validation, price staleness detection, risk sizing, duplicate checks) runs before every trade. Agent-level `ig-trade-verify` skill defines a mandatory verification protocol. All verifications logged to `.openclaw/canvas/ig-verify-log.json` and displayed on the IG dashboard.
+    -   **API Rate Limiting**: Configurable per-bot rate limits to avoid IG's undocumented quota walls (`error.public-api.exceeded-api-key-allowance` 403). Config keys: `apiDelayMs` (default 3000ms between calls), `maxApiCallsPerMinute` (default 10), `rateLimitBackoffMs` (default 300000ms = 5min backoff on quota hit). Demo accounts need conservative settings; live accounts can use higher limits. Bots auto-detect 403 errors and enter backoff mode.
     -   Signal monitor config: `.openclaw/ig-monitor-config.json`, alerts: `.openclaw/ig-alerts.json`.
     -   Trading bot config: `.openclaw/ig-strategy.json`, log: `.openclaw/ig-bot-log.json`.
     -   Dashboard: `.openclaw/canvas/ig-dashboard.html` (viewable at `/__openclaw__/canvas/ig-dashboard.html`). Shows LIVE account/positions data via `/api/ig/*` endpoints + SNAPSHOT data from config files. Badge system: green "LIVE" for API-fetched, grey "SNAPSHOT" for file-based sections.
     -   Credentials stored in env vars: `IG_API_KEY`, `IG_USERNAME`, `IG_PASSWORD`, `IG_ACCOUNT_ID`, `IG_BASE_URL`.
-    -   Reference doc: `.openclaw/workspace/IG_TRADING.md`.
+    -   Reference docs: `.openclaw/workspace/IG_TRADING.md` (API reference), `docs/IG_TRADING_SETUP.md` (setup guide with rate limits).
 -   **Replit Secrets Management**: Securely stores API keys like `XAI_API_KEY`, `OPENCLAW_GATEWAY_TOKEN`, and IG credentials.
 -   **Replit AI Integrations**: Provides access to OpenAI API key and base URL.
 -   **`web_fetch` tool**: For fetching web page content.
