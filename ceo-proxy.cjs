@@ -293,7 +293,17 @@ async function igAuth() {
     "X-IG-API-KEY": profile.apiKey,
     Version: "2",
   }, JSON.stringify({ identifier: profile.username, password: profile.password }));
-  if (res.status !== 200) throw new Error("IG auth failed: " + res.status + " " + res.body);
+  if (res.status !== 200) {
+    let errDetail = res.body || "";
+    if (errDetail.includes("<html") || errDetail.includes("<HTML")) {
+      if (res.status === 503) errDetail = "IG API servers unavailable (503) — may be an outage or IP block";
+      else if (res.status === 500) errDetail = "IG API internal server error (500)";
+      else errDetail = "IG API returned HTTP " + res.status;
+    } else {
+      try { const ej = JSON.parse(errDetail); errDetail = ej.errorCode || ej.error || errDetail; } catch(_) {}
+    }
+    throw new Error("IG auth failed: " + errDetail);
+  }
   const cst = res.headers["cst"] || res.headers["CST"];
   const xst = res.headers["x-security-token"] || res.headers["X-SECURITY-TOKEN"];
   if (!cst || !xst) throw new Error("IG auth missing tokens");
