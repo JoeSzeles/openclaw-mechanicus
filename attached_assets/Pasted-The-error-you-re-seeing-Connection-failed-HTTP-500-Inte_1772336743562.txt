@@ -1,0 +1,45 @@
+The error you're seeing—"**Connection failed (HTTP 500): Internal Server Error**" with the server message "The server encountered an internal error or misconfiguration and was unable to complete your request. Reference #3.b8f61002.177233666"—is a **server-side issue on IG's end** during the Lightstreamer connection/handshake attempt. This isn't a client-side bug in your Rust code (e.g., bad auth, wrong endpoint), nor directly your Replit IP being blocked (though IP factors can play in indirectly).
+
+### Why this happens (based on similar reports)
+- IG's streaming (Lightstreamer) setup is notoriously flaky, especially on **live accounts**. The 500 often hits during `/lightstreamer/create_session.js` (POST) or the subsequent WebSocket upgrade to `wss://.../lightstreamer`.
+- Common triggers from dev forums (Lightstreamer, trading-ig lib docs, GitHub issues):
+  - Temporary IG platform glitches/outages affecting live streaming (demo often stays up while live fails).
+  - Session creation failing due to backend misconfig, overloaded adapters, or auth token validation hiccups on their side.
+  - The "Reference #..." is an Akamai/Cloudflare-style error ID for their edge proxy — it means the request reached IG's infrastructure but crashed internally (not a clean reject like 403/401).
+- Unlike a clean 503 (Service Unavailable, often rate-limit or maintenance), 500 points to an unexpected crash/misconfig. IG's status page (status.ig.com) sometimes lags or doesn't list streaming-specific issues, but users report these resolving after hours/days without user action.
+- Replit/cloud IPs can exacerbate it (e.g., if IG's WAF flags high-freq reconnect attempts from shared ranges as suspicious, leading to backend errors instead of clean blocks), but the core is IG-side.
+
+### What to do right now
+1. **Wait and retry periodically** — Many reports (e.g., Lightstreamer forum threads from late 2025) show these 500s self-resolve after IG fixes backend issues. Try reconnecting every 15–30 min over the next few hours. Add exponential backoff + jitter in your Tokio reconnect logic to avoid hammering them (which could worsen flagging).
+
+2. **Verify your auth flow is pulling the correct live endpoint**:
+   - After successful REST `/session` login (you get CST and X-SECURITY-TOKEN), the response JSON includes `lightstreamerEndpoint` or `lsEndpoint` (e.g., something like "push.lightstreamer.com" or "apd.marketdatasystems.com" for live; demo uses "demo-apd...").
+   - **Do not hardcode** the WS URL — always use the one returned in auth response.
+   - In Rust code snippet example (assuming you're using a Lightstreamer client lib or raw WS):
+     ```rust
+     // After POST /session success
+     let ls_endpoint = auth_response["lightstreamerEndpoint"].as_str().unwrap_or("push.lightstreamer.com");
+     // Then connect to wss://{ls_endpoint}/lightstreamer
+     ```
+   - If you're still using a demo-hardcoded URL on live creds, that alone can cause 500s (adapter set mismatch).
+
+3. **Test minimally outside Replit** (critical to isolate):
+   - Run a bare-bones test script locally (your Brisbane home IP) using the same live creds:
+     - Use Python's `lightstreamer-client-lib` or the official IG sample (labs.ig.com has JS companion app — open in browser with live login).
+     - Or curl the create_session endpoint manually after auth.
+   - If it connects locally but fails on Replit → IP/reputation issue (use residential proxy or AU VPS as before).
+   - If fails everywhere → definitely IG live-side problem.
+
+4. **Contact IG support** (include these details for faster help):
+   - Ticket via client portal or labs.ig.com/contact.
+   - Say: "Live account streaming fails with HTTP 500 Internal Server Error on Lightstreamer create_session (Reference #3.b8f61002.177233666). Demo works fine. Using CST/X-SECURITY-TOKEN from /session. Happens from multiple IPs including residential. Endpoint from auth response used correctly."
+   - Attach: timestamp, full request/response headers if logged, your account type (CFD?).
+
+5. **Short-term workaround for your bot**:
+   - Fall back to **IG REST polling** for prices temporarily: `/prices/{epic}` endpoint (e.g., CS.D.BITCOIN.CFD.IP) supports frequent calls (rate limit ~30/sec burst, but sustainable ~1/sec). Not true tick-by-tick, but with Tokio timer you can get sub-second updates and feed your EMA/threshold logic.
+   - Or hybrid: Poll IG for baseline, but cross-reference with a free public WS (Binance BTCUSDT@trade for true ticks) to detect moves, then execute only on IG.
+   - This keeps the arb alive while IG sorts streaming.
+
+If you share more from your logs (e.g., the exact Lightstreamer request URL, any CONERR codes before/after the 500, or the auth response's lsEndpoint), I can narrow it further. Also, has this started recently, or after an account change? IG sometimes throttles new live API usage.
+
+These streaming gremlins are why many arb bots stick to public exchanges or hybrid feeds — IG's great for execution, but streaming reliability is hit-or-miss. Let me know what testing shows!
