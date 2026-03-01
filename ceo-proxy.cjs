@@ -1667,12 +1667,38 @@ function resolveWebchatSessionKey() {
   } catch {}
 }
 
+function getActiveSessionKey() {
+  try {
+    const agentId = (gwSessionKey || "agent:ceo:main").split(":")[1] || "ceo";
+    const sessFile = path.join(DATA_DIR, "agents", agentId, "sessions", "sessions.json");
+    if (fs.existsSync(sessFile)) {
+      const sessData = JSON.parse(fs.readFileSync(sessFile, "utf8"));
+      const webchatKey = "agent:" + agentId + ":webchat:main";
+      const mainKey = "agent:" + agentId + ":main";
+      let best = null;
+      let bestTime = 0;
+      for (const key of [webchatKey, mainKey]) {
+        const entry = sessData[key];
+        if (entry && entry.sessionId) {
+          const t = entry.updatedAt || 0;
+          if (t > bestTime) {
+            bestTime = t;
+            best = key;
+          }
+        }
+      }
+      if (best) return best;
+    }
+  } catch {}
+  return gwWebchatSessionKey || gwSessionKey || "agent:main:main";
+}
+
 function injectToGateway(label, message) {
   if (!gatewayWs || gatewayWs.readyState !== WebSocket.OPEN) {
     console.log("[ceo-proxy] No gateway WS for inject");
     return;
   }
-  const sessionKey = gwWebchatSessionKey || gwSessionKey || "agent:main:main";
+  const sessionKey = getActiveSessionKey();
   const id = "gw-inject-" + (++gwReqCounter) + "-" + Date.now();
   const frame = {
     type: "req", id, method: "chat.inject",
