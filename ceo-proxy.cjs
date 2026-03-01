@@ -1504,8 +1504,16 @@ function connectGateway() {
         if (msg.type === "res" && msg.id && msg.id.startsWith("gw-connect-")) {
           console.log("[ceo-proxy] Gateway connect response:", JSON.stringify(msg).slice(0, 300));
           if (msg.ok !== false && msg.payload) {
-            gwSessionKey = msg.payload.sessionKey || "agent:main:main";
+            const snap = msg.payload.snapshot?.sessionDefaults;
+            gwSessionKey = (snap && snap.mainSessionKey) || msg.payload.sessionKey || "agent:main:main";
             console.log("[ceo-proxy] Gateway session:", gwSessionKey);
+          }
+        }
+        if (msg.type === "res" && msg.id && msg.id.startsWith("gw-inject-")) {
+          if (msg.ok === false) {
+            console.error("[ceo-proxy] Gateway inject FAILED:", JSON.stringify(msg).slice(0, 500));
+          } else {
+            console.log("[ceo-proxy] Gateway inject OK:", msg.id);
           }
         }
         if (msg.type === "res" && msg.id && msg.id.startsWith("agent-chat-")) {

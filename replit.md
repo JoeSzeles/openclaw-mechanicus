@@ -9,6 +9,7 @@ OpenClaw Cloud is an online, hosted version of OpenClaw, serving as a multi-chan
 - **Persistent storage**: All OpenClaw data must persist across restarts and be manually clearable by deleting `.openclaw/`.
 - **Config seeding**: `start.sh` only copies seed config if `.openclaw/openclaw.json` doesn't exist, to avoid overwriting user changes.
 - **Worker dispatch**: Only `@WorkerName` (with @ symbol) should trigger dispatch -- never plain name mentions.
+- **Gateway session key**: The CEO proxy resolves `gwSessionKey` from the gateway hello response's `snapshot.sessionDefaults.mainSessionKey` (e.g., `agent:ceo:main`), NOT from a hardcoded `agent:main:main` fallback. This ensures worker message injection (`chat.inject`) targets the correct session that the UI is viewing.
 
 ## System Architecture
 OpenClaw Cloud employs a "CEO Proxy + Gateway" architecture, where two components run within a single workflow: a CEO Proxy handling API routes and proxying other requests, and an OpenClaw Gateway serving the Control UI and managing WebSocket connections.
