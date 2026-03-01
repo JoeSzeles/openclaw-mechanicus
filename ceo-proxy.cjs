@@ -1574,7 +1574,7 @@ function connectGateway() {
                   const body = bodyMatch ? bodyMatch[1].trim() : userText;
                   console.log(`[ceo-proxy] User directly @mentioned ${target.type} ${target.name} - dispatching`);
                   dispatchToTarget(target, body, "User");
-                  injectToGateway("User → " + target.name, body);
+                  injectToGateway("User → " + target.name, body, evtSessionKey || undefined);
                 }
               }
             }
@@ -1615,7 +1615,7 @@ function connectGateway() {
               const body = bodyMatch ? bodyMatch[1].trim() : text;
               console.log(`[ceo-proxy] Agent ${senderLabel} @mentioned ${target.type} ${target.name} - dispatching`);
               dispatchToTarget(target, body, senderLabel);
-              injectToGateway(senderLabel + " → " + target.name, body);
+              injectToGateway(senderLabel + " → " + target.name, body, evtSessionKey || undefined);
             }
           }
         }
@@ -1682,12 +1682,12 @@ function getActiveSessionKey() {
   return gwWebchatSessionKey || gwSessionKey || "agent:main:main";
 }
 
-function injectToGateway(label, message) {
+function injectToGateway(label, message, targetSession) {
   if (!gatewayWs || gatewayWs.readyState !== WebSocket.OPEN) {
     console.log("[ceo-proxy] No gateway WS for inject");
     return;
   }
-  const sessionKey = getActiveSessionKey();
+  const sessionKey = targetSession || getActiveSessionKey();
   const id = "gw-inject-" + (++gwReqCounter) + "-" + Date.now();
   const frame = {
     type: "req", id, method: "chat.inject",
