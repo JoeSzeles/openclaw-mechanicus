@@ -57,4 +57,5 @@ externalPort = 3002
 [deployment]
 deploymentTarget = "vm"
 run = ["bash", "-c", "cd /home/runner/workspace && COREPACK_ENABLE_STRICT=0 bash start.sh"]
-build = ["bash", "-c", "cd /home/runner/workspace && npm install --omit=dev --prefer-offline --no-audit --no-fund 2>&1 | tail -5 && echo build-ok"]
+build = ["bash", "-c", "echo 'skipping build - start.sh handles deps'"]
+publicDir = "dist"
