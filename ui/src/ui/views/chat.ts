@@ -415,34 +415,32 @@ export function renderChat(props: ChatProps) {
                   ?disabled=${!props.connected}
                   @click=${props.onAbort}
                 >Stop</button>`
-              : html`${(props.agentsList?.agents ?? []).length > 0
+              : html`<button
+                    class="btn"
+                    ?disabled=${!props.connected || props.sending}
+                    @click=${props.onNewSession}
+                    title="Start a new chat session"
+                  >+ New</button>
+                  ${(props.agentsList?.agents ?? []).length > 1
                     ? html`<select
                         class="chat-agent-select"
                         ?disabled=${!props.connected || props.sending}
                         @change=${(e: Event) => {
                           const sel = e.target as HTMLSelectElement;
-                          const val = sel.value;
+                          const agentId = sel.value;
                           sel.value = "";
-                          if (val === "__new__") {
-                            props.onNewSession();
-                          } else if (val && props.onSelectAgent) {
-                            props.onSelectAgent(val);
+                          if (agentId && props.onSelectAgent) {
+                            props.onSelectAgent(agentId);
                           }
                         }}
                       >
-                        <option value="" disabled selected>+ New ▾</option>
-                        <option value="__new__">New chat (current agent)</option>
+                        <option value="" disabled selected>Agent ▾</option>
                         ${(props.agentsList?.agents ?? []).map((agent) => {
                           const name = agent.identity?.name || agent.name || agent.id;
-                          return html`<option value=${agent.id}>New chat with ${name}</option>`;
+                          return html`<option value=${agent.id}>${name}</option>`;
                         })}
                       </select>`
-                    : html`<button
-                        class="btn"
-                        ?disabled=${!props.connected || props.sending}
-                        @click=${props.onNewSession}
-                        title="Start a new chat session"
-                      >+ New</button>`
+                    : nothing
                   }`
             }
             <button

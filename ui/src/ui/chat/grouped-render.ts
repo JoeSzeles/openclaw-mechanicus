@@ -133,7 +133,7 @@ function detectInjectedLabel(group: MessageGroup): string | null {
   if (!Array.isArray(content)) return null;
   for (const block of content) {
     if (block.type === "text" && typeof block.text === "string") {
-      const match = block.text.match(/^\[([A-Za-z0-9_-]+(?:\s*→\s*[A-Za-z0-9_-]+)?)\]\s/);
+      const match = block.text.match(/^\[([^\]]+)\]\s*\n/);
       if (match) return match[1];
     }
   }

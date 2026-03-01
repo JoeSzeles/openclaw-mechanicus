@@ -1,7 +1,7 @@
 import { html, nothing } from "lit";
 import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 import { t } from "../i18n/index.ts";
-import { CHAT_SESSIONS_ACTIVE_MINUTES, refreshChatAvatar } from "./app-chat.ts";
+import { refreshChatAvatar } from "./app-chat.ts";
 import { renderUsageTab } from "./app-render-usage-tab.ts";
 import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers.ts";
 import type { AppViewState } from "./app-view-state.ts";
@@ -845,29 +845,7 @@ export function renderApp(state: AppViewState) {
                 canAbort: Boolean(state.chatRunId),
                 onAbort: () => void state.handleAbortChat(),
                 onQueueRemove: (id) => state.removeQueuedMessage(id),
-                onNewSession: async () => {
-                  const draft = state.chatMessage;
-                  if (state.client && state.connected) {
-                    state.chatStream = null;
-                    state.chatStreamStartedAt = null;
-                    state.chatRunId = null;
-                    state.chatQueue = [];
-                    state.chatMessages = [];
-                    state.resetToolStream();
-                    try {
-                      await state.client.request("chat.send", {
-                        sessionKey: state.sessionKey,
-                        message: "/new",
-                        deliver: false,
-                      });
-                    } catch (_) {}
-                    state.chatMessage = draft;
-                    void loadChatHistory(state);
-                    void loadSessions(state as any, {
-                      activeMinutes: CHAT_SESSIONS_ACTIVE_MINUTES,
-                    });
-                  }
-                },
+                onNewSession: () => state.handleSendChat("/new", { restoreDraft: true }),
                 showNewMessages: state.chatNewMessagesBelow && !state.chatManualRefreshInFlight,
                 onScrollToBottom: () => state.scrollToBottom(),
                 // Sidebar props for tool output viewing
@@ -881,7 +859,7 @@ export function renderApp(state: AppViewState) {
                 assistantName: state.assistantName,
                 assistantAvatar: state.assistantAvatar,
                 agentsList: state.agentsList,
-                onSelectAgent: async (agentId: string) => {
+                onSelectAgent: (agentId: string) => {
                   const defaultId = state.agentsList?.defaultId ?? "main";
                   const prefix = agentId === defaultId ? "" : `agent:${agentId}:`;
                   const next = prefix ? `${prefix}webchat:main` : "webchat:main";
@@ -892,7 +870,6 @@ export function renderApp(state: AppViewState) {
                   state.chatStreamStartedAt = null;
                   state.chatRunId = null;
                   state.chatQueue = [];
-                  state.chatMessages = [];
                   state.resetToolStream();
                   state.resetChatScroll();
                   state.applySettings({
@@ -901,20 +878,8 @@ export function renderApp(state: AppViewState) {
                     lastActiveSessionKey: next,
                   });
                   void state.loadAssistantIdentity();
+                  void loadChatHistory(state);
                   void refreshChatAvatar(state);
-                  if (state.client && state.connected) {
-                    try {
-                      await state.client.request("chat.send", {
-                        sessionKey: next,
-                        message: "/new",
-                        deliver: false,
-                      });
-                    } catch (_) {}
-                    void loadChatHistory(state);
-                    void loadSessions(state as any, {
-                      activeMinutes: CHAT_SESSIONS_ACTIVE_MINUTES,
-                    });
-                  }
                 },
               })
             : nothing
