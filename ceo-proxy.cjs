@@ -1540,6 +1540,13 @@ function connectGateway() {
           if (evtSessionKey && evtSessionKey.includes(":webchat:")) {
             gwWebchatSessionKey = evtSessionKey;
           }
+          if (evtSessionKey && pm && (pm.role === "user" || pm.role === "assistant")) {
+            const prev = lastUserSessionKey;
+            lastUserSessionKey = evtSessionKey;
+            if (prev !== evtSessionKey) {
+              console.log("[ceo-proxy] Active session tracked:", evtSessionKey, "(was:", prev, ")");
+            }
+          }
 
           if (pm && pm.role === "assistant" && msg.payload.state === "final" && pm.content) {
             let fullText = "";
@@ -1557,7 +1564,6 @@ function connectGateway() {
           }
 
           if (pm && pm.role === "user" && msg.payload.state === "final" && pm.content) {
-            if (evtSessionKey) lastUserSessionKey = evtSessionKey;
             const msgId = runId || (pm.id || "");
             if (msgId && !processedRunIds["user-" + msgId]) {
               if (msgId) processedRunIds["user-" + msgId] = true;
