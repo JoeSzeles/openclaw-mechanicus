@@ -279,10 +279,9 @@ export function renderChat(props: ChatProps) {
   const splitRatio = props.splitRatio ?? 0.6;
   const sidebarOpen = Boolean(props.sidebarOpen && props.onCloseSidebar);
   const chatItems = buildChatItems(props);
-  const showAgentPicker = !props.loading && chatItems.length === 0 && props.stream === null;
   const thread = html`
     <div
-      class="chat-thread ${showAgentPicker ? "chat-thread--empty" : ""}"
+      class="chat-thread"
       role="log"
       aria-live="polite"
       @scroll=${props.onChatScroll}
@@ -294,7 +293,6 @@ export function renderChat(props: ChatProps) {
             `
           : nothing
       }
-      ${showAgentPicker ? renderAgentPicker(props) : nothing}
       ${repeat(
         chatItems,
         (item) => item.key,
