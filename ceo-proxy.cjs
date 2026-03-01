@@ -1472,6 +1472,7 @@ let gatewayWs = null;
 let gwReqCounter = 0;
 let gwSessionKey = null;
 let gwWebchatSessionKey = null;
+let lastUserSessionKey = null;
 const pendingAgentChats = new Map();
 
 let gwConnecting = false;
@@ -1556,6 +1557,7 @@ function connectGateway() {
           }
 
           if (pm && pm.role === "user" && msg.payload.state === "final" && pm.content) {
+            if (evtSessionKey) lastUserSessionKey = evtSessionKey;
             const msgId = runId || (pm.id || "");
             if (msgId && !processedRunIds["user-" + msgId]) {
               if (msgId) processedRunIds["user-" + msgId] = true;
@@ -1668,18 +1670,8 @@ function resolveWebchatSessionKey() {
 }
 
 function getActiveSessionKey() {
-  try {
-    const agentId = (gwSessionKey || "agent:ceo:main").split(":")[1] || "ceo";
-    const sessFile = path.join(DATA_DIR, "agents", agentId, "sessions", "sessions.json");
-    if (fs.existsSync(sessFile)) {
-      const sessData = JSON.parse(fs.readFileSync(sessFile, "utf8"));
-      const webchatKey = "agent:" + agentId + ":webchat:main";
-      if (sessData[webchatKey] && sessData[webchatKey].sessionId) {
-        return webchatKey;
-      }
-    }
-  } catch {}
-  return gwWebchatSessionKey || gwSessionKey || "agent:main:main";
+  if (lastUserSessionKey) return lastUserSessionKey;
+  return gwWebchatSessionKey || gwSessionKey || "agent:ceo:main";
 }
 
 function injectToGateway(label, message, targetSession) {
