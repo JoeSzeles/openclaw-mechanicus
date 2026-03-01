@@ -175,11 +175,30 @@ function renderIgConfig(config) {
   renderSessionStatus(config.session);
 }
 
+function connectLiveStreaming() {
+  var btn = document.getElementById('liveStreamBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Connecting...'; }
+  apiFetch('/api/ig/stream/connect-live', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) { loadIgConfig(); }
+      else { alert('Failed: ' + (data.error || 'Unknown error')); loadIgConfig(); }
+    })
+    .catch(function(e) { alert('Error: ' + e.message); loadIgConfig(); });
+}
+
+function disconnectLiveStreaming() {
+  apiFetch('/api/ig/stream/disconnect-live', { method: 'POST' })
+    .then(function() { loadIgConfig(); })
+    .catch(function(e) { alert('Error: ' + e.message); loadIgConfig(); });
+}
+
 function renderStreamingStatus(streaming) {
   if (!streaming) {
     document.getElementById('streamingCard').innerHTML = '<p class="empty">Streaming info not available</p>';
     return;
   }
+  var isLive = streaming.liveStreamingActive;
   var dotClass = 'grey';
   var label = streaming.status || 'unknown';
   if (streaming.status === 'connected') dotClass = 'green';
@@ -189,13 +208,26 @@ function renderStreamingStatus(streaming) {
   var html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
   html += '<span class="status-dot ' + dotClass + '"></span>';
   html += '<span style="font-size:14px;font-weight:500;color:#e6edf3">Lightstreamer: ' + escHtml(label.toUpperCase()) + '</span>';
-  if (streaming.status === 'connected') html += ' <span class="badge badge-primary">STREAMING</span>';
-  else html += ' <span class="badge badge-warn">POLLING</span>';
+  if (streaming.status === 'connected') {
+    if (isLive) html += ' <span class="badge" style="background:#1a7f37;color:#fff;font-weight:600">LIVE STREAMING</span>';
+    else html += ' <span class="badge badge-primary">STREAMING</span>';
+  } else {
+    html += ' <span class="badge badge-warn">POLLING</span>';
+  }
   html += '</div>';
 
   html += '<div class="streaming-info">';
+  if (streaming.streamingSource) html += '<div class="streaming-stat">Source: <strong>' + escHtml(streaming.streamingSource.toUpperCase()) + '</strong></div>';
   html += '<div class="streaming-stat">Instruments: <strong>' + (streaming.connectedEpics ? streaming.connectedEpics.length : 0) + '</strong></div>';
   html += '<div class="streaming-stat">Price updates: <strong>' + (streaming.priceCount || 0) + '</strong></div>';
+  html += '</div>';
+
+  html += '<div style="margin-top:12px;display:flex;gap:8px;align-items:center">';
+  if (isLive) {
+    html += '<button id="liveStreamBtn" class="btn btn-sm" style="background:#da3633;border-color:#da3633;color:#fff">Disconnect Live Streaming</button>';
+  } else {
+    html += '<button id="liveStreamBtn" class="btn btn-sm" style="background:#1a7f37;border-color:#1a7f37;color:#fff">Connect to Live Streaming</button>';
+  }
   html += '</div>';
 
   if (streaming.connectedEpics && streaming.connectedEpics.length > 0) {
@@ -205,6 +237,14 @@ function renderStreamingStatus(streaming) {
   }
 
   document.getElementById('streamingCard').innerHTML = html;
+
+  var btn = document.getElementById('liveStreamBtn');
+  if (btn) {
+    btn.addEventListener('click', function() {
+      if (isLive) disconnectLiveStreaming();
+      else connectLiveStreaming();
+    });
+  }
 }
 
 function renderSessionStatus(session) {

@@ -26,6 +26,7 @@ OpenClaw Cloud employs a "CEO Proxy + Gateway" architecture, where two component
 -   **Auto-Token Injection**: Automatically injects the gateway authentication token into the Control UI.
 -   **Process Manager & Bot Registry**: A web UI for managing ad-hoc and registered bots, including start/stop controls and auto-restart capabilities for bots residing in `skills/bots/`.
 -   **IG API Proxy**: Full-featured proxy for IG Group Trading API covering ALL IG operations: positions (open/close/update), working orders (create/update/delete), market search, price history, watchlists, activity/transaction history, and session management. Handles authentication automatically. See `skills/ig-trading/IG-COMMANDS.md` for complete endpoint reference. Includes a multi-layered trade proof reader for risk mitigation.
+-   **Independent Live Streaming**: Lightstreamer price streaming can connect independently to the live IG account for fast price data, completely decoupled from the active trading profile. Config page has Connect/Disconnect button with green status indicator. Endpoints: `POST /api/ig/stream/connect-live`, `POST /api/ig/stream/disconnect-live`, `GET /api/ig/stream/status` (includes `liveStreamingActive` and `streamingSource` fields). Live streaming session has its own token refresh cycle.
 -   **Chat Rich Media**: Supports inline iframe embeds for canvas pages and enhanced markdown tables in the chat UI.
 -   **Navigation Bar**: Injected navigation for easy access to different sections of the platform.
 

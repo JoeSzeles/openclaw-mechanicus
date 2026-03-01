@@ -199,6 +199,12 @@ let lsStatus = "disconnected";
 let lsConnectedEpics = [];
 const streamedPrices = new Map();
 
+// Independent live streaming session (decoupled from trading profile)
+let lsLiveSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
+let lsLiveActive = false;
+let lsLiveRefreshTimer = null;
+const LS_LIVE_SESSION_REFRESH = 4 * 60 * 1000;
+
 function getStreamedPrices() {
   const result = {};
   for (const [epic, data] of streamedPrices) {
@@ -227,21 +233,34 @@ function collectInstrumentEpics() {
 }
 
 async function startLightstreamer() {
-  if (!igConfigured()) { lsStatus = "not_configured"; return; }
+  if (!lsLiveActive && !igConfigured()) { lsStatus = "not_configured"; return; }
   try {
     const { LightstreamerClient, Subscription } = require("lightstreamer-client-node");
-    const session = await igAuth();
-    if (!igSession.lightstreamerEndpoint) {
+    let session, endpoint, accountId, streamSource;
+    if (lsLiveActive && lsLiveSession.cst && lsLiveSession.lightstreamerEndpoint) {
+      session = { cst: lsLiveSession.cst, xst: lsLiveSession.xst };
+      endpoint = lsLiveSession.lightstreamerEndpoint;
+      const liveProfile = getLiveProfile();
+      accountId = liveProfile ? liveProfile.accountId : null;
+      streamSource = "live";
+    } else {
+      session = await igAuth();
+      endpoint = igSession.lightstreamerEndpoint;
+      const activeProfile = getActiveIgProfile();
+      accountId = activeProfile ? activeProfile.accountId : null;
+      streamSource = activeProfile ? activeProfile.profileName : "unknown";
+    }
+    if (!endpoint) {
       console.log("[lightstreamer] No endpoint from session, skipping");
       lsStatus = "no_endpoint";
       return;
     }
     if (lsClient) { try { lsClient.disconnect(); } catch (_) {} }
 
-    const client = new LightstreamerClient(igSession.lightstreamerEndpoint, "DEFAULT");
-    const profile = getActiveIgProfile();
-    client.connectionDetails.setUser(profile.accountId);
+    const client = new LightstreamerClient(endpoint, "DEFAULT");
+    client.connectionDetails.setUser(accountId);
     client.connectionDetails.setPassword(`CST-${session.cst}|XST-${session.xst}`);
+    console.log(`[lightstreamer] Connecting via ${streamSource} profile`);
 
     client.addListener({
       onStatusChange: (status) => {
@@ -309,7 +328,7 @@ async function startLightstreamer() {
     });
     client.subscribe(sub);
     lsSubscription = sub;
-    console.log(`[lightstreamer] Connecting to ${igSession.lightstreamerEndpoint}, subscribing to ${epics.length} instruments`);
+    console.log(`[lightstreamer] Connecting to ${endpoint} (via ${streamSource}), subscribing to ${epics.length} instruments`);
   } catch (e) {
     console.error("[lightstreamer] Error starting:", e.message);
     lsStatus = "error";
@@ -329,6 +348,84 @@ function stopLightstreamer() {
     streamedPrices.clear();
     console.log("[lightstreamer] Disconnected");
   }
+}
+
+function getLiveProfile() {
+  const config = ensureIgConfig();
+  const live = config.profiles && config.profiles.live;
+  if (!live || !live.apiKey || !live.username || !live.password || !live.baseUrl) return null;
+  return { ...live, profileName: "live" };
+}
+
+async function liveStreamingLogin() {
+  const profile = getLiveProfile();
+  if (!profile) throw new Error("No live profile credentials configured");
+  console.log("[live-streaming] Authenticating with live account for streaming...");
+  const res = await igRequest("POST", "/session", {
+    "Content-Type": "application/json; charset=UTF-8",
+    Accept: "application/json; charset=UTF-8",
+    "X-IG-API-KEY": profile.apiKey,
+    Version: "2",
+  }, JSON.stringify({ identifier: profile.username, password: profile.password }), profile.baseUrl);
+  if (res.status !== 200) {
+    let errDetail = res.body || "";
+    try { const ej = JSON.parse(errDetail); errDetail = ej.errorCode || ej.error || errDetail; } catch(_) {}
+    throw new Error("Live auth failed: " + errDetail);
+  }
+  const cst = res.headers["cst"] || res.headers["CST"];
+  const xst = res.headers["x-security-token"] || res.headers["X-SECURITY-TOKEN"];
+  if (!cst || !xst) throw new Error("Live auth missing tokens");
+  let lsEndpoint = null;
+  try { const body = JSON.parse(res.body); lsEndpoint = body.lightstreamerEndpoint || null; } catch (_) {}
+  if (!lsEndpoint) throw new Error("Live account did not return a Lightstreamer endpoint");
+  lsLiveSession = { cst, xst, ts: Date.now(), lightstreamerEndpoint: lsEndpoint };
+  console.log("[live-streaming] Authenticated successfully, endpoint:", lsEndpoint);
+  return { cst, xst, lightstreamerEndpoint: lsEndpoint };
+}
+
+function scheduleLiveStreamingRefresh() {
+  if (lsLiveRefreshTimer) clearTimeout(lsLiveRefreshTimer);
+  lsLiveRefreshTimer = setTimeout(async () => {
+    if (!lsLiveActive) return;
+    console.log("[live-streaming] Proactive token refresh...");
+    try {
+      await liveStreamingLogin();
+      stopLightstreamer();
+      setTimeout(() => startLightstreamer(), 500);
+      scheduleLiveStreamingRefresh();
+    } catch (e) {
+      console.log("[live-streaming] Refresh failed:", e.message, "— will retry in 60s");
+      if (lsLiveRefreshTimer) clearTimeout(lsLiveRefreshTimer);
+      lsLiveRefreshTimer = setTimeout(() => scheduleLiveStreamingRefresh(), 60000);
+    }
+  }, LS_LIVE_SESSION_REFRESH);
+}
+
+async function startLiveLightstreamer() {
+  const profile = getLiveProfile();
+  if (!profile) throw new Error("No live profile credentials configured");
+  if (!profile.accountId) throw new Error("Live profile missing accountId");
+  try {
+    await liveStreamingLogin();
+    lsLiveActive = true;
+    stopLightstreamer();
+    await startLightstreamer();
+    scheduleLiveStreamingRefresh();
+    return { ok: true, status: lsStatus, endpoint: lsLiveSession.lightstreamerEndpoint };
+  } catch (e) {
+    lsLiveActive = false;
+    console.error("[live-streaming] Failed:", e.message);
+    throw e;
+  }
+}
+
+function stopLiveLightstreamer() {
+  lsLiveActive = false;
+  if (lsLiveRefreshTimer) { clearTimeout(lsLiveRefreshTimer); lsLiveRefreshTimer = null; }
+  lsLiveSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
+  stopLightstreamer();
+  setTimeout(() => startLightstreamer(), 500);
+  console.log("[live-streaming] Disconnected, reverting to active profile streaming");
 }
 
 // Bot process manager
@@ -522,7 +619,7 @@ async function handleIgApi(req, res, p) {
         pr.password = maskSecret(pr.password);
         pr.hasCredentials = !!(config.profiles[key].apiKey && config.profiles[key].username && config.profiles[key].password);
       }
-      masked.streaming = { status: lsStatus, connectedEpics: lsConnectedEpics, priceCount: streamedPrices.size };
+      masked.streaming = { status: lsStatus, connectedEpics: lsConnectedEpics, priceCount: streamedPrices.size, liveStreamingActive: lsLiveActive, streamingSource: lsLiveActive ? "live" : config.activeProfile };
       masked.session = getIgSessionInfo();
       return json(res, 200, masked);
     }
@@ -659,8 +756,24 @@ async function handleIgApi(req, res, p) {
         connectedEpics: lsConnectedEpics,
         priceCount: streamedPrices.size,
         activeProfile: getActiveIgProfile()?.profileName || null,
-        lightstreamerEndpoint: igSession.lightstreamerEndpoint || null
+        lightstreamerEndpoint: lsLiveActive ? lsLiveSession.lightstreamerEndpoint : (igSession.lightstreamerEndpoint || null),
+        liveStreamingActive: lsLiveActive,
+        streamingSource: lsLiveActive ? "live" : (getActiveIgProfile()?.profileName || null)
       });
+    }
+
+    if (req.method === "POST" && p === "/api/ig/stream/connect-live") {
+      try {
+        const result = await startLiveLightstreamer();
+        return json(res, 200, result);
+      } catch (e) {
+        return json(res, 400, { ok: false, error: e.message });
+      }
+    }
+
+    if (req.method === "POST" && p === "/api/ig/stream/disconnect-live") {
+      stopLiveLightstreamer();
+      return json(res, 200, { ok: true, liveStreamingActive: false });
     }
 
     if (req.method === "GET" && p === "/api/ig/session") {
