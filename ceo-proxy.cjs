@@ -240,8 +240,7 @@ async function startLightstreamer() {
     if (lsLiveActive && lsLiveSession.cst && lsLiveSession.lightstreamerEndpoint) {
       session = { cst: lsLiveSession.cst, xst: lsLiveSession.xst };
       endpoint = lsLiveSession.lightstreamerEndpoint;
-      const liveProfile = getLiveProfile();
-      accountId = liveProfile ? liveProfile.accountId : null;
+      accountId = lsLiveSession.accountId || (getLiveProfile() ? getLiveProfile().accountId : null);
       streamSource = "live";
     } else {
       session = await igAuth();
@@ -292,19 +291,19 @@ async function startLightstreamer() {
     sub.setRequestedSnapshot("yes");
     sub.addListener({
       onSubscription: () => {
-        console.log(`[lightstreamer] Subscribed to ${epics.length} instruments`);
+        console.log(`[lightstreamer] Subscribed to ${epics.length} instruments via ${streamSource}`);
         lsConnectedEpics = epics;
       },
       onSubscriptionError: (code, msg) => {
-        console.error(`[lightstreamer] Subscription error: ${code} ${msg} | source=${streamSource} items=${JSON.stringify(items)} fields=${JSON.stringify(fields)}`);
+        console.error(`[lightstreamer] Subscription error: ${code} ${msg} | source=${streamSource} items=${JSON.stringify(items)}`);
         if (msg && msg.includes("Invalid account type")) {
-          console.log("[lightstreamer] This IG account type does not support streaming. Prices will use REST polling instead.");
-          lsStatus = "unsupported";
+          console.log("[lightstreamer] L1 market data not available for this account type. Account-level streaming may still work.");
+          if (lsStatus !== "connected") lsStatus = "unsupported";
         }
       },
       onItemUpdate: (info) => {
         const epicFull = info.getItemName();
-        const epic = epicFull.startsWith("L1:") ? epicFull.slice(3) : epicFull;
+        const epic = epicFull.includes(":") ? epicFull.split(":").slice(1).join(":") : epicFull;
         const bid = parseFloat(info.getValue("BID")) || null;
         const offer = parseFloat(info.getValue("OFFER")) || null;
         const mid = (bid && offer) ? (bid + offer) / 2 : null;
@@ -328,6 +327,32 @@ async function startLightstreamer() {
     });
     client.subscribe(sub);
     lsSubscription = sub;
+
+    if (streamSource === "live" && accountId) {
+      const acctSub = new Subscription("MERGE", [`ACCOUNT:${accountId}`], ["DEPOSIT", "PNL", "AVAILABLE_CASH", "FUNDS", "MARGIN", "EQUITY"]);
+      acctSub.setRequestedSnapshot("yes");
+      acctSub.addListener({
+        onSubscription: () => {
+          console.log(`[lightstreamer] ACCOUNT subscription OK for ${accountId}`);
+          if (lsStatus === "unsupported") lsStatus = "connected";
+        },
+        onSubscriptionError: (c2, m2) => console.error(`[lightstreamer] ACCOUNT subscription error: ${c2} ${m2}`),
+        onItemUpdate: (info2) => {
+          const acctData = {
+            deposit: parseFloat(info2.getValue("DEPOSIT")) || null,
+            pnl: parseFloat(info2.getValue("PNL")) || null,
+            availableCash: parseFloat(info2.getValue("AVAILABLE_CASH")) || null,
+            funds: parseFloat(info2.getValue("FUNDS")) || null,
+            margin: parseFloat(info2.getValue("MARGIN")) || null,
+            equity: parseFloat(info2.getValue("EQUITY")) || null,
+            timestamp: Date.now()
+          };
+          streamedPrices.set("__ACCOUNT__", acctData);
+        }
+      });
+      client.subscribe(acctSub);
+    }
+
     console.log(`[lightstreamer] Connecting to ${endpoint} (via ${streamSource}), subscribing to ${epics.length} instruments`);
   } catch (e) {
     console.error("[lightstreamer] Error starting:", e.message);
@@ -376,10 +401,11 @@ async function liveStreamingLogin() {
   const xst = res.headers["x-security-token"] || res.headers["X-SECURITY-TOKEN"];
   if (!cst || !xst) throw new Error("Live auth missing tokens");
   let lsEndpoint = null;
-  try { const body = JSON.parse(res.body); lsEndpoint = body.lightstreamerEndpoint || null; } catch (_) {}
+  let sessionBody = {};
+  try { sessionBody = JSON.parse(res.body); lsEndpoint = sessionBody.lightstreamerEndpoint || null; } catch (_) {}
   if (!lsEndpoint) throw new Error("Live account did not return a Lightstreamer endpoint");
-  lsLiveSession = { cst, xst, ts: Date.now(), lightstreamerEndpoint: lsEndpoint };
-  console.log("[live-streaming] Authenticated successfully, endpoint:", lsEndpoint);
+  lsLiveSession = { cst, xst, ts: Date.now(), lightstreamerEndpoint: lsEndpoint, accountType: sessionBody.accountType || null, accountId: sessionBody.currentAccountId || profile.accountId };
+  console.log("[live-streaming] Authenticated successfully, endpoint:", lsEndpoint, "accountType:", sessionBody.accountType, "accountId:", sessionBody.currentAccountId);
   return { cst, xst, lightstreamerEndpoint: lsEndpoint };
 }
 
