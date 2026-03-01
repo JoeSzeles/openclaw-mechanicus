@@ -858,6 +858,29 @@ export function renderApp(state: AppViewState) {
                 onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
                 assistantName: state.assistantName,
                 assistantAvatar: state.assistantAvatar,
+                agentsList: state.agentsList,
+                onSelectAgent: (agentId: string) => {
+                  const defaultId = state.agentsList?.defaultId ?? "main";
+                  const prefix = agentId === defaultId ? "" : `agent:${agentId}:`;
+                  const next = prefix ? `${prefix}webchat:main` : "webchat:main";
+                  state.sessionKey = next;
+                  state.chatMessage = "";
+                  state.chatAttachments = [];
+                  state.chatStream = null;
+                  state.chatStreamStartedAt = null;
+                  state.chatRunId = null;
+                  state.chatQueue = [];
+                  state.resetToolStream();
+                  state.resetChatScroll();
+                  state.applySettings({
+                    ...state.settings,
+                    sessionKey: next,
+                    lastActiveSessionKey: next,
+                  });
+                  void state.loadAssistantIdentity();
+                  void loadChatHistory(state);
+                  void refreshChatAvatar(state);
+                },
               })
             : nothing
         }

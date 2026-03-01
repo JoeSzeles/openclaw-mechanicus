@@ -9,7 +9,7 @@ import {
 import { normalizeMessage, normalizeRoleForGrouping } from "../chat/message-normalizer.ts";
 import { icons } from "../icons.ts";
 import { detectTextDirection } from "../text-direction.ts";
-import type { SessionsListResult } from "../types.ts";
+import type { AgentsListResult, SessionsListResult } from "../types.ts";
 import type { ChatItem, MessageGroup } from "../types/chat-types.ts";
 import type { ChatAttachment, ChatQueueItem } from "../ui-types.ts";
 import { renderMarkdownSidebar } from "./markdown-sidebar.ts";
@@ -69,6 +69,8 @@ export type ChatProps = {
   onCloseSidebar?: () => void;
   onSplitRatioChange?: (ratio: number) => void;
   onChatScroll?: (event: Event) => void;
+  agentsList?: AgentsListResult | null;
+  onSelectAgent?: (agentId: string) => void;
 };
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
@@ -186,6 +188,75 @@ function renderAttachmentPreview(props: ChatProps) {
   `;
 }
 
+const AGENT_AVATAR_COLORS = [
+  "#6366f1",
+  "#ec4899",
+  "#f59e0b",
+  "#10b981",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ef4444",
+  "#14b8a6",
+  "#f97316",
+  "#06b6d4",
+];
+
+function getAgentInitials(agent: { id: string; name?: string; identity?: { name?: string } }): string {
+  const displayName = agent.identity?.name || agent.name || agent.id;
+  const words = displayName.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return displayName.slice(0, 2).toUpperCase();
+}
+
+function getAgentDisplayName(agent: { id: string; name?: string; identity?: { name?: string } }): string {
+  return agent.identity?.name || agent.name || agent.id;
+}
+
+function renderAgentPicker(props: ChatProps) {
+  const agents = props.agentsList?.agents;
+  if (!agents || agents.length === 0 || !props.onSelectAgent) {
+    return nothing;
+  }
+
+  return html`
+    <div class="chat-agent-picker">
+      <div class="chat-agent-picker__title">Start a conversation</div>
+      <div class="chat-agent-picker__subtitle">Choose an agent to chat with</div>
+      <div class="chat-agent-picker__grid">
+        ${agents.map((agent, i) => {
+          const color = AGENT_AVATAR_COLORS[i % AGENT_AVATAR_COLORS.length];
+          const initials = getAgentInitials(agent);
+          const displayName = getAgentDisplayName(agent);
+          const hasAvatar = agent.identity?.avatarUrl || agent.identity?.avatar;
+          const avatarSrc = agent.identity?.avatarUrl || agent.identity?.avatar || "";
+          const isDataOrHttp = /^(data:|https?:\/\/)/i.test(avatarSrc);
+
+          return html`
+            <button
+              class="chat-agent-picker__agent"
+              @click=${() => props.onSelectAgent!(agent.id)}
+              title="Chat with ${displayName}"
+            >
+              <div
+                class="chat-agent-picker__avatar"
+                style="background: ${hasAvatar && isDataOrHttp ? "transparent" : color}"
+              >
+                ${hasAvatar && isDataOrHttp
+                  ? html`<img src="${avatarSrc}" alt="${displayName}" class="chat-agent-picker__avatar-img" />`
+                  : html`<span class="chat-agent-picker__initials">${initials}</span>`
+                }
+              </div>
+              <span class="chat-agent-picker__name">${displayName}</span>
+            </button>
+          `;
+        })}
+      </div>
+    </div>
+  `;
+}
+
 export function renderChat(props: ChatProps) {
   const canCompose = props.connected;
   const isBusy = props.sending || props.stream !== null;
@@ -207,9 +278,11 @@ export function renderChat(props: ChatProps) {
 
   const splitRatio = props.splitRatio ?? 0.6;
   const sidebarOpen = Boolean(props.sidebarOpen && props.onCloseSidebar);
+  const chatItems = buildChatItems(props);
+  const showAgentPicker = !props.loading && chatItems.length === 0 && props.stream === null;
   const thread = html`
     <div
-      class="chat-thread"
+      class="chat-thread ${showAgentPicker ? "chat-thread--empty" : ""}"
       role="log"
       aria-live="polite"
       @scroll=${props.onChatScroll}
@@ -221,8 +294,9 @@ export function renderChat(props: ChatProps) {
             `
           : nothing
       }
+      ${showAgentPicker ? renderAgentPicker(props) : nothing}
       ${repeat(
-        buildChatItems(props),
+        chatItems,
         (item) => item.key,
         (item) => {
           if (item.kind === "divider") {

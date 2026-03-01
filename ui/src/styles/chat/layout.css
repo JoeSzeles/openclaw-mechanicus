@@ -422,6 +422,110 @@
   border-color: rgba(16, 24, 40, 0.15);
 }
 
+/* Agent picker - shown when chat is empty */
+.chat-thread--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-agent-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 32px 16px;
+  max-width: 480px;
+  width: 100%;
+}
+
+.chat-agent-picker__title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+}
+
+.chat-agent-picker__subtitle {
+  font-size: 14px;
+  color: var(--muted);
+  text-align: center;
+  margin-top: -16px;
+}
+
+.chat-agent-picker__grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+}
+
+.chat-agent-picker__agent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background 150ms ease-out, transform 150ms ease-out;
+  min-width: 100px;
+}
+
+.chat-agent-picker__agent:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-2px);
+}
+
+:root[data-theme="light"] .chat-agent-picker__agent:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.chat-agent-picker__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 200ms ease-out, transform 200ms ease-out;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.chat-agent-picker__agent:hover .chat-agent-picker__avatar {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transform: scale(1.08);
+}
+
+.chat-agent-picker__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.chat-agent-picker__initials {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 1px;
+  user-select: none;
+}
+
+.chat-agent-picker__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: center;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 640px) {
   .chat-session {
     min-width: 140px;
@@ -438,5 +542,18 @@
 
   .chat-controls__session {
     min-width: 120px;
+  }
+
+  .chat-agent-picker__avatar {
+    width: 56px;
+    height: 56px;
+  }
+
+  .chat-agent-picker__initials {
+    font-size: 18px;
+  }
+
+  .chat-agent-picker__grid {
+    gap: 16px;
   }
 }
