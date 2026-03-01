@@ -177,7 +177,8 @@
     "undici": "^7.22.0",
     "ws": "^8.19.0",
     "yaml": "^2.8.2",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "lightstreamer-client-node": "^9.2.2"
   },
   "devDependencies": {
     "@grammyjs/types": "^3.24.0",

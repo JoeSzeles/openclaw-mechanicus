@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Config — OpenClaw Cloud</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;padding:20px;padding-top:56px}
+h1{font-size:24px;font-weight:600;color:#e6edf3;margin-bottom:8px}
+.subtitle{color:#8b949e;font-size:14px;margin-bottom:24px}
+.tabs{display:flex;gap:4px;margin-bottom:24px;border-bottom:1px solid #30363d;padding-bottom:0}
+.tab{padding:8px 16px;cursor:pointer;color:#8b949e;font-size:14px;font-weight:500;border:1px solid transparent;border-bottom:2px solid transparent;border-radius:6px 6px 0 0;transition:all .15s}
+.tab:hover{color:#e6edf3;background:rgba(255,255,255,.04)}
+.tab.active{color:#e6edf3;border-bottom:2px solid #58a6ff;background:rgba(88,166,255,.08)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.section{margin-bottom:32px}
+.section-title{font-size:18px;font-weight:600;color:#e6edf3;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-icon{font-size:20px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:16px;margin-bottom:12px}
+.card-title{font-weight:600;color:#e6edf3;font-size:14px;margin-bottom:8px}
+.card-row{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+.card-label{font-size:12px;color:#8b949e;min-width:100px}
+.card-value{font-size:14px;color:#e6edf3;font-family:monospace}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;text-transform:uppercase}
+.badge-primary{background:rgba(35,134,54,.3);color:#3fb950;border:1px solid rgba(63,185,80,.3)}
+.badge-active{background:rgba(56,139,253,.2);color:#58a6ff;border:1px solid rgba(88,166,255,.3)}
+.badge-warn{background:rgba(187,128,9,.2);color:#d29922;border:1px solid rgba(187,128,9,.3)}
+.badge-error{background:rgba(248,81,73,.15);color:#f85149;border:1px solid rgba(248,81,73,.3)}
+table{width:100%;border-collapse:collapse;background:#161b22;border:1px solid #30363d;border-radius:6px;overflow:hidden}
+th{background:#21262d;color:#8b949e;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:10px 12px;text-align:left;border-bottom:1px solid #30363d}
+td{padding:10px 12px;border-bottom:1px solid #21262d;font-size:13px;color:#c9d1d9}
+tr:last-child td{border-bottom:none}
+tr:hover{background:#1c2128}
+.empty{color:#8b949e;font-size:14px;text-align:center;padding:32px}
+.form-row{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;align-items:flex-end}
+.form-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px}
+.form-group label{font-size:12px;color:#8b949e;font-weight:500}
+.form-group input,.form-group select{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:8px 12px;border-radius:6px;font-size:14px;font-family:monospace;width:100%}
+.form-group input:focus{border-color:#58a6ff;outline:none}
+.form-group input[readonly]{color:#8b949e;cursor:not-allowed}
+.btn{padding:8px 16px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500;border:1px solid rgba(240,246,252,.1);transition:all .15s}
+.btn-primary{background:#238636;color:#fff}
+.btn-primary:hover{background:#2ea043}
+.btn-secondary{background:#30363d;color:#c9d1d9}
+.btn-secondary:hover{background:#484f58}
+.btn-danger{background:#da3633;color:#fff}
+.btn-danger:hover{background:#f85149}
+.btn-small{padding:4px 10px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.toggle-container{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.toggle-switch{position:relative;width:140px;height:36px;border-radius:18px;border:2px solid #30363d;overflow:hidden;cursor:pointer;background:#161b22;display:flex}
+.toggle-option{flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;z-index:1;transition:color .2s;color:#8b949e;text-transform:uppercase}
+.toggle-option.active{color:#fff}
+.toggle-slider{position:absolute;top:2px;height:calc(100% - 4px);width:50%;border-radius:14px;transition:left .2s ease;pointer-events:none}
+.toggle-slider.demo{left:2px;background:#d29922}
+.toggle-slider.live{left:calc(50% - 2px);background:#da3633}
+.profile-section{margin-bottom:24px}
+.profile-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.profile-badge{padding:4px 12px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.profile-badge.demo{background:rgba(210,153,34,.2);color:#d29922;border:1px solid rgba(210,153,34,.3)}
+.profile-badge.live{background:rgba(218,54,51,.2);color:#f85149;border:1px solid rgba(248,81,73,.3)}
+.profile-badge.active-badge{background:rgba(63,185,80,.2);color:#3fb950;border:1px solid rgba(63,185,80,.3)}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.status-dot.green{background:#3fb950}
+.status-dot.yellow{background:#d29922}
+.status-dot.red{background:#f85149}
+.status-dot.grey{background:#484f58}
+.streaming-info{display:flex;gap:24px;flex-wrap:wrap;margin-top:12px}
+.streaming-stat{font-size:13px;color:#8b949e}
+.streaming-stat strong{color:#e6edf3}
+.link{color:#58a6ff;text-decoration:none;font-size:13px}
+.link:hover{text-decoration:underline}
+.info-text{font-size:13px;color:#8b949e;margin-bottom:16px}
+.btn-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.toast{position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:6px;font-size:14px;display:none;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.toast.show{display:block}
+.toast.success{background:#238636;color:#fff}
+.toast.error{background:#da3633;color:#fff}
+</style>
+</head>
+<body>
+<h1>Configuration</h1>
+<p class="subtitle">Manage AI models, IG Trading accounts, and streaming settings</p>
+
+<div class="tabs">
+  <div class="tab active" data-tab="ai-models">AI Models</div>
+  <div class="tab" data-tab="ig-trading">IG Trading</div>
+</div>
+
+<div id="tab-ai-models" class="tab-content active">
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#129504;</span> Current Agent Model</div>
+    <div id="currentModel"><p class="empty">Loading...</p></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#128268;</span> Model Providers</div>
+    <p class="info-text">Providers are configured in openclaw.json. Add providers with their API base URL and key.</p>
+    <div id="providerList"><p class="empty">Loading...</p></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#128203;</span> Available Models</div>
+    <div id="modelList"><p class="empty">Loading...</p></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#9881;&#65039;</span> Raw Configuration</div>
+    <p class="info-text">Direct view of the agents section from openclaw.json</p>
+    <div id="rawConfig"><p class="empty">Loading...</p></div>
+  </div>
+</div>
+
+<div id="tab-ig-trading" class="tab-content">
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#128200;</span> Account Profile</div>
+    <div class="toggle-container">
+      <span style="font-size:13px;color:#8b949e;">Account Mode:</span>
+      <div class="toggle-switch" id="profileToggle">
+        <div class="toggle-option" data-profile="demo">Demo</div>
+        <div class="toggle-option" data-profile="live">Live</div>
+        <div class="toggle-slider demo"></div>
+      </div>
+      <span id="profileStatus" style="font-size:13px;"></span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#128273;</span> Demo Account Credentials</div>
+    <div class="card" id="demoProfileCard">
+      <div class="profile-header">
+        <div><span class="profile-badge demo">DEMO</span></div>
+        <a class="link" href="https://demo-api-capital.backend-capital.com" target="_blank" rel="noopener">Get Demo API Key &#8599;</a>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>API Key</label><input type="password" id="demo-apiKey" placeholder="Enter demo API key" autocomplete="off"></div>
+        <div class="form-group"><label>Account ID</label><input type="text" id="demo-accountId" placeholder="e.g. Z3MJKY"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Username</label><input type="password" id="demo-username" placeholder="IG username" autocomplete="off"></div>
+        <div class="form-group"><label>Password</label><input type="password" id="demo-password" placeholder="IG password" autocomplete="off"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Base URL</label><input type="text" id="demo-baseUrl" value="https://demo-api.ig.com/gateway/deal" readonly></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnSaveDemo">Save Demo Credentials</button>
+        <button class="btn btn-secondary" id="btnTestDemo">Test Connection</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#128273;</span> Live Account Credentials</div>
+    <div class="card" id="liveProfileCard">
+      <div class="profile-header">
+        <div><span class="profile-badge live">LIVE</span></div>
+        <a class="link" href="https://www.ig.com/en/myig/settings/api-keys" target="_blank" rel="noopener">Get Live API Key &#8599;</a>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>API Key</label><input type="password" id="live-apiKey" placeholder="Enter live API key" autocomplete="off"></div>
+        <div class="form-group"><label>Account ID</label><input type="text" id="live-accountId" placeholder="e.g. ABC123"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Username</label><input type="password" id="live-username" placeholder="IG username" autocomplete="off"></div>
+        <div class="form-group"><label>Password</label><input type="password" id="live-password" placeholder="IG password" autocomplete="off"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Base URL</label><input type="text" id="live-baseUrl" value="https://api.ig.com/gateway/deal" readonly></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnSaveLive">Save Live Credentials</button>
+        <button class="btn btn-secondary" id="btnTestLive">Test Connection</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#128274;</span> API Session</div>
+    <div class="card" id="sessionCard">
+      <p class="empty">Loading session status...</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#9889;</span> Streaming Status</div>
+    <div class="card" id="streamingCard">
+      <p class="empty">Loading streaming status...</p>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="/token-init.js?v=1772326809"></script>
+<script src="/model-config.js?v=1772326809"></script>
+<script src="/nav-inject.js?v=1772326809"></script>
+</body>
+</html>

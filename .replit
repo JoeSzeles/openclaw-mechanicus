@@ -54,4 +54,4 @@ externalPort = 3001
 deploymentTarget = "vm"
 run = ["bash", "-c", "cd /home/runner/workspace && COREPACK_ENABLE_STRICT=0 bash start.sh"]
 publicDir = "dist"
-build = ["bash", "-c", "cd /home/runner/workspace/ui && npx vite build"]
+build = ["bash", "-c", "echo 'skip'"]

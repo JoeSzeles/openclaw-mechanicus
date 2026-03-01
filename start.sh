@@ -3,6 +3,12 @@
 # Trap to support clean restarts
 trap 'kill -9 1' TERM INT
 
+# Ensure runtime dependencies are installed (fast if already present)
+if [ ! -d "node_modules/ws" ] || [ ! -d "node_modules/lightstreamer-client-node" ]; then
+  echo "[start] Installing runtime dependencies..."
+  npm install --omit=dev --prefer-offline --no-audit --no-fund 2>&1 | tail -5
+fi
+
 TOKEN="${OPENCLAW_GATEWAY_TOKEN}"
 TOKEN_JS="/home/runner/workspace/dist/control-ui/token-init.js"
 CACHE_BUST=$(date +%s)

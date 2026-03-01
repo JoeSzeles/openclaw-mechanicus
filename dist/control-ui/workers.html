@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worker Bees — OpenClaw Cloud</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;padding:20px;padding-top:56px}
+h1{font-size:24px;font-weight:600;color:#e6edf3;margin-bottom:8px}
+.subtitle{color:#8b949e;font-size:14px;margin-bottom:24px}
+.toolbar{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.toolbar button{background:#238636;border:1px solid rgba(240,246,252,.1);color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500}
+.toolbar button:hover{background:#2ea043}
+.count-badge{background:#30363d;border:1px solid #484f58;color:#e6edf3;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:500}
+.refresh-info{color:#8b949e;font-size:12px;margin-left:auto}
+.section{margin-bottom:32px}
+.section-title{font-size:18px;font-weight:600;color:#e6edf3;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-icon{font-size:20px}
+table{width:100%;border-collapse:collapse;background:#161b22;border:1px solid #30363d;border-radius:6px;overflow:hidden}
+th{background:#21262d;color:#8b949e;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:10px 12px;text-align:left;border-bottom:1px solid #30363d}
+td{padding:10px 12px;border-bottom:1px solid #21262d;font-size:13px;color:#c9d1d9;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover{background:#1c2128}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;text-transform:uppercase}
+.badge-online{background:rgba(35,134,54,.3);color:#3fb950;border:1px solid rgba(63,185,80,.3)}
+.badge-stale{background:rgba(187,128,9,.2);color:#d29922;border:1px solid rgba(210,153,34,.3)}
+.empty{color:#8b949e;font-size:14px;text-align:center;padding:32px}
+.toast{position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:6px;font-size:14px;display:none;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.toast.show{display:block}
+.toast.success{background:#238636;color:#fff}
+.toast.error{background:#da3633;color:#fff}
+.key-section{margin-bottom:24px}
+.key-card{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.key-name{font-weight:600;color:#e6edf3;font-size:14px}
+.key-preview{font-family:monospace;font-size:12px;color:#8b949e;margin-left:12px}
+.key-actions{display:flex;gap:6px}
+.key-actions button{padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;border:1px solid rgba(240,246,252,.1);font-weight:500}
+.btn-reveal{background:#30363d;color:#c9d1d9}
+.btn-reveal:hover{background:#484f58}
+.btn-toggle{background:#d29922;color:#fff}
+.btn-toggle:hover{background:#e3b341}
+.btn-delete{background:#da3633;color:#fff}
+.btn-delete:hover{background:#f85149}
+.btn-add{background:#238636;color:#fff}
+.btn-add:hover{background:#2ea043}
+.btn-secondary{background:#30363d;color:#c9d1d9;border:1px solid rgba(240,246,252,.1);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
+.btn-secondary:hover{background:#484f58}
+.key-input{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:8px 12px;border-radius:6px;font-size:14px;margin-right:8px;width:200px}
+.avatar{width:32px;height:32px;border-radius:50%;border:2px solid #fff;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;margin-right:8px;flex-shrink:0}
+.script-box{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px 16px;margin-bottom:8px}
+.script-label{font-size:12px;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.script-code{background:#0d1117;border:1px solid #21262d;border-radius:4px;padding:10px 12px;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;color:#e6edf3;word-break:break-all;position:relative;white-space:pre-wrap;line-height:1.5}
+.btn-copy{position:absolute;top:6px;right:6px;background:#30363d;color:#c9d1d9;border:1px solid #484f58;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer}
+.btn-copy:hover{background:#484f58}
+.dispatch-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.dispatch-row input,.dispatch-row textarea{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:8px 12px;border-radius:6px;font-size:14px;font-family:inherit}
+.dispatch-row input{width:200px}
+.dispatch-row textarea{flex:1;min-width:200px;height:40px;resize:vertical}
+.chat-box{background:#161b22;border:1px solid #30363d;border-radius:6px;overflow:hidden}
+.chat-messages{height:300px;overflow-y:auto;padding:12px}
+.chat-msg{margin-bottom:10px;display:flex;gap:8px}
+.chat-msg-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.chat-msg-body{flex:1;min-width:0}
+.chat-msg-from{font-weight:600;font-size:12px;color:#e6edf3;margin-bottom:2px}
+.chat-msg-text{font-size:13px;color:#c9d1d9;word-break:break-word;white-space:pre-wrap}
+.chat-msg-time{font-size:11px;color:#484f58;margin-top:2px}
+.chat-input-row{display:flex;border-top:1px solid #30363d}
+.chat-input-row input{flex:1;background:#0d1117;border:none;color:#c9d1d9;padding:10px 14px;font-size:14px;outline:none}
+.chat-input-row button{background:#238636;color:#fff;border:none;padding:10px 20px;font-size:14px;font-weight:500;cursor:pointer}
+.chat-input-row button:hover{background:#2ea043}
+.ss-row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center}
+.ss-row input{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;border-radius:6px;font-size:13px;flex:1;min-width:150px}
+.ss-file{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#161b22;border:1px solid #21262d;border-radius:4px;margin-bottom:4px}
+.ss-file-name{font-size:13px;color:#e6edf3;word-break:break-all}
+.ss-file-size{font-size:12px;color:#8b949e;margin-left:12px;white-space:nowrap}
+.ss-file-actions{display:flex;gap:6px;margin-left:12px}
+.ss-file-actions a,.ss-file-actions button{font-size:11px;padding:2px 8px;border-radius:3px;cursor:pointer;text-decoration:none}
+.ss-file-actions a{color:#58a6ff}
+.ss-file-actions button{background:#da3633;color:#fff;border:1px solid transparent;font-size:11px}
+</style>
+</head>
+<body>
+<h1>Worker Bees</h1>
+<p class="subtitle">Manage API keys, connected workers, shared space, and dispatch tasks</p>
+<div class="toolbar">
+<button id="refreshBtn">Refresh</button>
+<span class="count-badge"><span id="workerCount">0</span> workers</span>
+<span class="refresh-info" id="lastRefresh">Auto-refresh: 10s</span>
+</div>
+
+<div class="section">
+<div class="section-title"><span class="section-icon">🔑</span> API Keys</div>
+<div style="margin-bottom:12px">
+<input type="text" id="newKeyName" class="key-input" placeholder="Key name (e.g. Desktop)">
+<button class="btn-add" id="addKeyBtn">Generate Key</button>
+</div>
+<div id="keyList"><p class="empty">Loading...</p></div>
+</div>
+
+<div class="section" id="connectSection" style="display:none">
+<div class="section-title"><span class="section-icon">🔗</span> Connection Scripts</div>
+<p style="color:#8b949e;font-size:13px;margin-bottom:12px">Copy-paste these scripts on your worker machine to connect a Worker Bee to this CEO instance.</p>
+<div id="scriptList"></div>
+</div>
+
+<div class="section">
+<div class="section-title"><span class="section-icon">🐝</span> Connected Workers</div>
+<div id="workerList"><p class="empty">Loading...</p></div>
+</div>
+
+<div class="section">
+<div class="section-title"><span class="section-icon">📨</span> Dispatch Task</div>
+<div class="dispatch-row">
+<input type="text" id="dispatchWorker" placeholder="Worker name">
+<textarea id="dispatchMessage" placeholder="Message to send..."></textarea>
+<button class="btn-add" id="dispatchBtn">Dispatch</button>
+</div>
+<div id="dispatchResult"></div>
+</div>
+
+<div class="section">
+<div class="section-title"><span class="section-icon">💬</span> Worker Chat</div>
+<div class="chat-box">
+<div class="chat-messages" id="chatMessages"><p class="empty">Loading...</p></div>
+<div class="chat-input-row">
+<input type="text" id="chatInput" placeholder="Type a message... (use @WorkerName to dispatch)">
+<button id="chatSendBtn">Send</button>
+</div>
+</div>
+</div>
+
+<div class="section">
+<div class="section-title"><span class="section-icon">📂</span> File Exchange</div>
+<div id="exchangeList"><p class="empty">Loading...</p></div>
+</div>
+
+<div class="section">
+<div class="section-title"><span class="section-icon">🗂️</span> Shared Space</div>
+<div class="ss-row">
+<input type="text" id="ssNewFile" placeholder="Filename (e.g. notes.txt)">
+<button class="btn-secondary" id="ssWriteBtn">Write File</button>
+<button class="btn-secondary" id="ssMkdirBtn">Create Folder</button>
+</div>
+<div id="ssWriteArea" style="display:none;margin-bottom:12px">
+<textarea id="ssContent" style="width:100%;height:100px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:8px;border-radius:6px;font-family:monospace;font-size:13px;resize:vertical" placeholder="File content..."></textarea>
+<button class="btn-add" id="ssSaveBtn" style="margin-top:6px">Save</button>
+<button class="btn-secondary" id="ssCancelBtn" style="margin-top:6px;margin-left:6px">Cancel</button>
+</div>
+<div id="sharedspaceList"><p class="empty">Loading...</p></div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="/token-init.js?v=1772326809"></script>
+<script src="/workers.js?v=1772326809"></script>
+<script src="/nav-inject.js?v=1772326809"></script>
+</body>
+</html>
