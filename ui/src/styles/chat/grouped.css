@@ -116,6 +116,20 @@
   color: var(--muted);
 }
 
+.chat-avatar.injected {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.chat-group.injected .chat-sender-name {
+  color: var(--injected-color, #a78bfa);
+  font-weight: 600;
+}
+
+.chat-group.injected .chat-bubble {
+  border-left: 3px solid var(--injected-color, #a78bfa);
+}
+
 /* Image avatar support */
 img.chat-avatar {
   display: block;

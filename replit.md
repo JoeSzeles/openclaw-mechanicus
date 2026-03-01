@@ -18,7 +18,7 @@ OpenClaw Cloud employs a "CEO Proxy + Gateway" architecture, where two component
 -   **Login Authentication**: Secures access with username/password, supporting persistent sessions and selective authentication bypass for specific endpoints.
 -   **CEO/Worker Bee System**: The Replit instance acts as a CEO, coordinating tasks for local OpenClaw Worker Bee instances. This includes worker registration, API key management, task dispatch, file exchange, and a dedicated Workers Dashboard UI.
     -   **Agent Chat Bridge**: Provides an OpenAI-compatible endpoint for worker bees to access CEO's AI capabilities.
-    -   **Inter-Worker Communication**: Facilitates communication between workers and with the CEO agent through `@WorkerName` and `@CEO` mentions.
+    -   **Inter-Agent/Worker Communication**: Any agent or user can address any other agent or worker via `@Name` mentions. The proxy intercepts these from chat events, dispatches tasks to workers or injects messages into agent sessions. User @mentions dispatch directly without CEO relaying. Workers can also @mention other workers or @CEO.
     -   **Shared Space**: A common folder for file sharing among all agents, accessible via REST API and a web UI file browser.
     -   **CREW.md Auto-Sync**: Automatically updates a `CREW.md` file with live worker status for the CEO agent.
 -   **Config Page**: A unified web UI for managing AI Models and IG Trading configurations.

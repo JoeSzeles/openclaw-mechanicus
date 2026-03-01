@@ -104,6 +104,50 @@ export function renderStreamingGroup(
   `;
 }
 
+const INJECTED_COLORS = [
+  "#e879f9",
+  "#38bdf8",
+  "#34d399",
+  "#fb923c",
+  "#a78bfa",
+  "#f472b6",
+  "#2dd4bf",
+  "#fbbf24",
+  "#818cf8",
+  "#4ade80",
+];
+
+function hashToColorIndex(name: string): number {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) {
+    h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h) % INJECTED_COLORS.length;
+}
+
+function detectInjectedLabel(group: MessageGroup): string | null {
+  if (group.role !== "assistant" || !group.messages.length) return null;
+  const first = group.messages[0]?.message as Record<string, unknown>;
+  if (!first?.content) return null;
+  const content = first.content as Array<Record<string, unknown>>;
+  if (!Array.isArray(content)) return null;
+  for (const block of content) {
+    if (block.type === "text" && typeof block.text === "string") {
+      const match = block.text.match(/^\[([^\]]+)\]\s*\n/);
+      if (match) return match[1];
+    }
+  }
+  return null;
+}
+
+function renderInjectedAvatar(label: string, colorIndex: number) {
+  const color = INJECTED_COLORS[colorIndex];
+  const parts = label.split(/\s*→\s*/);
+  const displayName = parts[parts.length - 1] || label;
+  const initial = displayName.charAt(0).toUpperCase();
+  return html`<div class="chat-avatar injected" style="background: ${color}; color: #fff;">${initial}</div>`;
+}
+
 export function renderMessageGroup(
   group: MessageGroup,
   opts: {
@@ -115,25 +159,37 @@ export function renderMessageGroup(
 ) {
   const normalizedRole = normalizeRoleForGrouping(group.role);
   const assistantName = opts.assistantName ?? "Assistant";
-  const who =
-    normalizedRole === "user"
+
+  const injectedLabel = detectInjectedLabel(group);
+  const isInjected = injectedLabel !== null;
+  const colorIndex = isInjected ? hashToColorIndex(injectedLabel) : -1;
+
+  const who = isInjected
+    ? injectedLabel
+    : normalizedRole === "user"
       ? "You"
       : normalizedRole === "assistant"
         ? assistantName
         : normalizedRole;
-  const roleClass =
-    normalizedRole === "user" ? "user" : normalizedRole === "assistant" ? "assistant" : "other";
+  const roleClass = isInjected
+    ? "injected"
+    : normalizedRole === "user" ? "user" : normalizedRole === "assistant" ? "assistant" : "other";
   const timestamp = new Date(group.timestamp).toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
   });
 
+  const colorStyle = isInjected ? `--injected-color: ${INJECTED_COLORS[colorIndex]}` : "";
+
   return html`
-    <div class="chat-group ${roleClass}">
-      ${renderAvatar(group.role, {
-        name: assistantName,
-        avatar: opts.assistantAvatar ?? null,
-      })}
+    <div class="chat-group ${roleClass}" style="${colorStyle}">
+      ${isInjected
+        ? renderInjectedAvatar(injectedLabel, colorIndex)
+        : renderAvatar(group.role, {
+            name: assistantName,
+            avatar: opts.assistantAvatar ?? null,
+          })
+      }
       <div class="chat-group-messages">
         ${group.messages.map((item, index) =>
           renderGroupedMessage(

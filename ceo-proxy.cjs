@@ -1549,50 +1549,67 @@ function connectGateway() {
             }
           }
 
+          if (pm && pm.role === "user" && msg.payload.state === "final" && pm.content) {
+            const msgId = runId || (pm.id || "");
+            if (msgId && !processedRunIds["user-" + msgId]) {
+              if (msgId) processedRunIds["user-" + msgId] = true;
+              let userText = "";
+              for (const part of pm.content) {
+                if (part.type === "text" && part.text) userText += part.text;
+              }
+              const userMentions = userText.match(/@(\S+)/g);
+              if (userMentions) {
+                for (const mention of userMentions) {
+                  const targetName = mention.slice(1);
+                  const target = findTargetByName(targetName);
+                  if (!target) continue;
+                  const nameEsc = target.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                  const bodyMatch = userText.match(new RegExp("@" + nameEsc + "\\s+([\\s\\S]+)", "i"));
+                  const body = bodyMatch ? bodyMatch[1].trim() : userText;
+                  console.log(`[ceo-proxy] User directly @mentioned ${target.type} ${target.name} - dispatching`);
+                  dispatchToTarget(target, body, "User");
+                  injectToGateway("User → " + target.name, body);
+                }
+              }
+            }
+          }
+
           if (!runId || processedRunIds[runId]) return;
           if (runId.startsWith("inject-")) return;
-          if (!pm || pm.role !== "assistant") return;
+          if (!pm || !pm.content || !pm.content.length) return;
           if (msg.payload.state !== "final") return;
           processedRunIds[runId] = true;
-          if (!pm.content || !pm.content.length) return;
+
+          const sessionKey = msg.payload.sessionKey || "";
+          const skParts = sessionKey.split(":");
+          if (skParts.length < 2 || skParts[0] !== "agent") return;
+          const agentId = skParts[1];
+          const senderLabel = agentId.toUpperCase();
+
           for (const part of pm.content) {
             if (part.type !== "text" || !part.text) continue;
             const text = part.text;
             const mentions = text.match(/@(\S+)/g);
             if (!mentions) continue;
             for (const mention of mentions) {
-              const wName = mention.slice(1);
-              if (wName.toLowerCase() === "ceo") continue;
-              const foundMatch = findWorkerByName(wName);
-              if (!foundMatch) continue;
-              const foundWorker = foundMatch.worker;
-              const foundWid = foundMatch.id;
+              const targetName = mention.slice(1);
+              if (targetName.toLowerCase() === agentId.toLowerCase()) continue;
+              const target = findTargetByName(targetName);
+              if (!target) continue;
+              if (target.type === "agent" && target.agent.id.toLowerCase() === agentId.toLowerCase()) continue;
               const now = Date.now();
-              if (lastAutoDispatch[foundWorker.name] && now - lastAutoDispatch[foundWorker.name] < 30000) {
-                console.log("[ceo-proxy] Skipping auto-dispatch to", foundWorker.name, "(cooldown)");
+              const dispatchKey = senderLabel + ">" + target.name;
+              if (lastAutoDispatch[dispatchKey] && now - lastAutoDispatch[dispatchKey] < 30000) {
+                console.log("[ceo-proxy] Skipping auto-dispatch", dispatchKey, "(cooldown)");
                 continue;
               }
-              lastAutoDispatch[foundWorker.name] = now;
-              const nameEsc = foundWorker.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+              lastAutoDispatch[dispatchKey] = now;
+              const nameEsc = target.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
               const bodyMatch = text.match(new RegExp("@" + nameEsc + "\\s+([\\s\\S]+)", "i"));
               const body = bodyMatch ? bodyMatch[1].trim() : text;
-              console.log("[ceo-proxy] CEO agent @mentioned worker:", foundWorker.name, "- auto-dispatching");
-              const task = {
-                id: crypto.randomUUID(),
-                assignedTo: foundWid,
-                type: "message",
-                message: "@CEO: " + body,
-                filePath: null,
-                status: "pending",
-                createdAt: new Date().toISOString(),
-                completedAt: null,
-                result: null,
-              };
-              const taskData = loadJson(TASKS_FILE, { tasks: [], results: [] });
-              taskData.tasks.push(task);
-              saveJson(TASKS_FILE, taskData);
-              injectToGateway("CEO \u2192 " + foundWorker.name, body);
-              console.log("[ceo-proxy] Auto-dispatched task to", foundWorker.name, "taskId:", task.id);
+              console.log(`[ceo-proxy] Agent ${senderLabel} @mentioned ${target.type} ${target.name} - dispatching`);
+              dispatchToTarget(target, body, senderLabel);
+              injectToGateway(senderLabel + " → " + target.name, body);
             }
           }
         }
@@ -1728,30 +1745,34 @@ function findWorkerByName(name) {
   return null;
 }
 
-function routeAtMentions(text, senderName) {
-  const mentions = text.match(/@(\S+)/g);
-  if (!mentions) return;
-  for (const mention of mentions) {
-    const targetName = mention.slice(1);
-    if (targetName.toLowerCase() === "ceo") {
-      const nameEsc = "CEO";
-      const bodyMatch = text.match(/@CEO\s+([\s\S]+)/i);
-      const body = bodyMatch ? bodyMatch[1].trim() : text;
-      console.log(`[ceo-proxy] Worker "${senderName}" @CEO - injecting question to gateway`);
-      injectToGateway(senderName + " → CEO", body);
-      continue;
+function findAgentById(name) {
+  try {
+    const cfg = loadJson(path.join(OC_DIR, "openclaw.json"), {});
+    const list = cfg.agents?.list || [];
+    const lower = name.toLowerCase();
+    for (const a of list) {
+      if (a.id.toLowerCase() === lower) return a;
+      if (a.identity?.name?.toLowerCase() === lower) return a;
     }
-    const found = findWorkerByName(targetName);
-    if (!found) continue;
-    const nameEsc2 = found.worker.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const bodyMatch2 = text.match(new RegExp("@" + nameEsc2 + "\\s+([\\s\\S]+)", "i"));
-    const body2 = bodyMatch2 ? bodyMatch2[1].trim() : text;
-    console.log(`[ceo-proxy] Worker "${senderName}" -> @${found.worker.name} - dispatching inter-bee task`);
+  } catch {}
+  return null;
+}
+
+function findTargetByName(name) {
+  const worker = findWorkerByName(name);
+  if (worker) return { type: "worker", id: worker.id, worker: worker.worker, name: worker.worker.name };
+  const agent = findAgentById(name);
+  if (agent) return { type: "agent", agent, name: agent.identity?.name || agent.id };
+  return null;
+}
+
+function dispatchToTarget(target, body, senderName) {
+  if (target.type === "worker") {
     const task = {
       id: crypto.randomUUID(),
-      assignedTo: found.id,
+      assignedTo: target.id,
       type: "message",
-      message: "@" + senderName + ": " + body2,
+      message: "@" + senderName + ": " + body,
       filePath: null,
       status: "pending",
       createdAt: new Date().toISOString(),
@@ -1761,7 +1782,45 @@ function routeAtMentions(text, senderName) {
     const taskData = loadJson(TASKS_FILE, { tasks: [], results: [] });
     taskData.tasks.push(task);
     saveJson(TASKS_FILE, taskData);
-    injectToGateway(senderName + " → " + found.worker.name, body2);
+    console.log(`[ceo-proxy] Dispatched task to worker ${target.name} from ${senderName}, taskId: ${task.id}`);
+    return true;
+  }
+  if (target.type === "agent") {
+    const agentSession = "agent:" + target.agent.id.toLowerCase() + ":main";
+    if (!gatewayWs || gatewayWs.readyState !== WebSocket.OPEN) return false;
+    const id = "gw-inject-" + (++gwReqCounter) + "-" + Date.now();
+    const frame = {
+      type: "req", id, method: "chat.inject",
+      params: { sessionKey: agentSession, message: body, label: senderName },
+    };
+    gatewayWs.send(JSON.stringify(frame));
+    console.log(`[ceo-proxy] Injected message to agent ${target.agent.id} session from ${senderName}`);
+    return true;
+  }
+  return false;
+}
+
+function routeAtMentions(text, senderName) {
+  const mentions = text.match(/@(\S+)/g);
+  if (!mentions) return;
+  for (const mention of mentions) {
+    const targetName = mention.slice(1);
+    if (targetName.toLowerCase() === senderName.toLowerCase()) continue;
+    if (targetName.toLowerCase() === "ceo") {
+      const bodyMatch = text.match(/@CEO\s+([\s\S]+)/i);
+      const body = bodyMatch ? bodyMatch[1].trim() : text;
+      console.log(`[ceo-proxy] "${senderName}" @CEO - injecting to gateway`);
+      injectToGateway(senderName + " → CEO", body);
+      continue;
+    }
+    const target = findTargetByName(targetName);
+    if (!target) continue;
+    const nameEsc = target.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const bodyMatch = text.match(new RegExp("@" + nameEsc + "\\s+([\\s\\S]+)", "i"));
+    const body = bodyMatch ? bodyMatch[1].trim() : text;
+    console.log(`[ceo-proxy] "${senderName}" -> @${target.name} - dispatching`);
+    dispatchToTarget(target, body, senderName);
+    injectToGateway(senderName + " → " + target.name, body);
   }
 }
 
