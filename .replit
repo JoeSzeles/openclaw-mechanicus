@@ -16,6 +16,7 @@ IG_PASSWORD = "Riacrepe88!"
 IG_ACCOUNT_ID = "Z3MJKY"
 IG_BASE_URL = "https://demo-api.ig.com/gateway/deal"
 OPENCLAW_GATEWAY_TOKEN = "7e3f7e32023e0220d91f15b4bb0d8469b34f3bda3b4b1b61242802ebb2264852"
+OPENCLAW_LOGIN_USER = "Josef_Szeles"
 
 [workflows]
 runButton = "Project"
