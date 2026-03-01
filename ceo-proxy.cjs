@@ -70,7 +70,10 @@ function isLoginExempt(req) {
   if (p === "/api/login" || p === "/api/logout") return true;
   if (p === "/login.html" || p === "/login") return true;
   if (p.startsWith("/api/workers") || p.startsWith("/api/tasks") || p.startsWith("/api/heartbeat") ||
-      p.startsWith("/api/exchange") || p.startsWith("/api/sharedspace") || p.startsWith("/api/chat") || p.startsWith("/api/agent/chat")) {
+      p.startsWith("/api/exchange") || p.startsWith("/api/sharedspace") || p.startsWith("/api/chat") || p.startsWith("/api/agent/chat") ||
+      p.startsWith("/api/ig/positions") || p.startsWith("/api/ig/prices") || p.startsWith("/api/ig/account") ||
+      p.startsWith("/api/ig/confirms") || p.startsWith("/api/ig/history") || p.startsWith("/api/ig/stream") ||
+      p === "/api/ig/session" || p === "/api/ig/refresh-snapshots") {
     if (hasValidBearerToken(req)) return true;
   }
   if (p.startsWith("/__openclaw__/canvas/")) return true;
@@ -712,6 +715,141 @@ async function handleIgApi(req, res, p) {
     if (req.method === "POST" && p === "/api/ig/refresh-snapshots") {
       writeConfigSnapshots();
       return json(res, 200, { ok: true, message: "Snapshots refreshed" });
+    }
+
+    if (req.method === "POST" && p === "/api/ig/positions/open") {
+      const body = JSON.parse((await readBody(req)).toString() || "{}");
+      if (!body.epic || !body.direction || !body.size) {
+        return json(res, 400, { error: "Missing required fields: epic, direction, size" });
+      }
+      const session = await igAuth();
+      const orderBody = {
+        epic: body.epic,
+        direction: body.direction.toUpperCase(),
+        size: body.size,
+        orderType: body.orderType || "MARKET",
+        currencyCode: body.currencyCode || "USD",
+        expiry: body.expiry || "-",
+        forceOpen: body.forceOpen !== undefined ? body.forceOpen : true,
+        guaranteedStop: body.guaranteedStop || false,
+      };
+      if (body.stopDistance) orderBody.stopDistance = body.stopDistance;
+      if (body.limitDistance) orderBody.limitDistance = body.limitDistance;
+      if (body.stopLevel) orderBody.stopLevel = body.stopLevel;
+      if (body.limitLevel) orderBody.limitLevel = body.limitLevel;
+      console.log(`[ig-trade] Opening ${orderBody.direction} ${orderBody.size} ${orderBody.epic}`);
+      const r = await igRequest("POST", "/positions/otc", { ...igHeaders(session), Version: "2" }, JSON.stringify(orderBody));
+      igCacheInvalidate();
+      if (r.status !== 200) {
+        let detail = r.body;
+        try { detail = JSON.parse(r.body); } catch(_) {}
+        console.log(`[ig-trade] Open failed: HTTP ${r.status}`, detail);
+        return json(res, 200, { ok: false, error: typeof detail === "object" ? (detail.errorCode || JSON.stringify(detail)) : detail, statusCode: r.status });
+      }
+      let dealRef = null;
+      try { dealRef = JSON.parse(r.body).dealReference; } catch(_) {}
+      console.log(`[ig-trade] Order placed, dealReference: ${dealRef}`);
+      if (dealRef) {
+        await new Promise(r => setTimeout(r, 1000));
+        try {
+          const conf = await igRequest("GET", "/confirms/" + dealRef, igHeaders(session));
+          if (conf.status === 200) {
+            const cd = JSON.parse(conf.body);
+            console.log(`[ig-trade] Confirmed: ${cd.dealStatus} dealId=${cd.dealId}`);
+            return json(res, 200, { ok: true, dealReference: dealRef, confirmation: cd });
+          }
+        } catch(_) {}
+      }
+      return json(res, 200, { ok: true, dealReference: dealRef });
+    }
+
+    if (req.method === "POST" && p === "/api/ig/positions/close") {
+      const body = JSON.parse((await readBody(req)).toString() || "{}");
+      if (!body.dealId) {
+        return json(res, 400, { error: "Missing required field: dealId. Get dealIds from GET /api/ig/positions" });
+      }
+      const session = await igAuth();
+      let direction = body.direction;
+      let autoSize = null;
+      if (!direction) {
+        try {
+          const posRes = await igRequest("GET", "/positions", { ...igHeaders(session), Version: "2" });
+          if (posRes.status === 200) {
+            const allPos = JSON.parse(posRes.body).positions || [];
+            console.log(`[ig-trade] Looking for dealId=${body.dealId} among ${allPos.length} positions`);
+            const found = allPos.find(item => item.position && item.position.dealId === body.dealId);
+            if (found) {
+              direction = found.position.direction === "BUY" ? "SELL" : "BUY";
+              autoSize = found.position.size;
+              console.log(`[ig-trade] Auto-detected: direction=${direction} size=${autoSize}`);
+            } else {
+              console.log(`[ig-trade] dealId not found. Available: ${allPos.map(item => item.position?.dealId).join(", ")}`);
+            }
+          } else {
+            console.log(`[ig-trade] Positions fetch failed: HTTP ${posRes.status}`);
+          }
+        } catch(e) { console.log(`[ig-trade] Error looking up position: ${e.message}`); }
+      }
+      if (!body.size && autoSize) body.size = autoSize;
+      if (!direction) {
+        return json(res, 400, { error: "Could not determine direction. Provide direction (opposite of position) or check dealId." });
+      }
+      if (!body.size) {
+        return json(res, 400, { error: "Missing size. Provide the position size to close." });
+      }
+      const closeBody = {
+        dealId: body.dealId,
+        direction: direction.toUpperCase(),
+        size: body.size,
+        orderType: body.orderType || "MARKET",
+      };
+      console.log(`[ig-trade] Closing ${closeBody.direction} ${closeBody.size} dealId=${closeBody.dealId}`);
+      const r = await igRequest("POST", "/positions/otc", { ...igHeaders(session), "_method": "DELETE", Version: "1" }, JSON.stringify(closeBody));
+      igCacheInvalidate();
+      if (r.status !== 200) {
+        let detail = r.body;
+        try { detail = JSON.parse(r.body); } catch(_) {}
+        console.log(`[ig-trade] Close failed: HTTP ${r.status}`, detail);
+        return json(res, 200, { ok: false, error: typeof detail === "object" ? (detail.errorCode || JSON.stringify(detail)) : detail, statusCode: r.status });
+      }
+      let dealRef = null;
+      try { dealRef = JSON.parse(r.body).dealReference; } catch(_) {}
+      console.log(`[ig-trade] Close order placed, dealReference: ${dealRef}`);
+      if (dealRef) {
+        await new Promise(r => setTimeout(r, 1000));
+        try {
+          const conf = await igRequest("GET", "/confirms/" + dealRef, igHeaders(session));
+          if (conf.status === 200) {
+            const cd = JSON.parse(conf.body);
+            console.log(`[ig-trade] Close confirmed: ${cd.dealStatus} dealId=${cd.dealId}`);
+            return json(res, 200, { ok: true, dealReference: dealRef, confirmation: cd });
+          }
+        } catch(_) {}
+      }
+      return json(res, 200, { ok: true, dealReference: dealRef });
+    }
+
+    if (req.method === "GET" && p.startsWith("/api/ig/confirms/")) {
+      const dealRef = p.split("/api/ig/confirms/")[1];
+      if (!dealRef) return json(res, 400, { error: "Missing deal reference" });
+      const session = await igAuth();
+      const r = await igRequest("GET", "/confirms/" + dealRef, igHeaders(session));
+      if (r.status !== 200) return json(res, r.status, { error: "IG API error", detail: r.body });
+      return json(res, 200, JSON.parse(r.body));
+    }
+
+    if (req.method === "GET" && p === "/api/ig/history") {
+      const url = new URL("http://localhost" + req.url);
+      const type = url.searchParams.get("type") || "ALL";
+      const from = url.searchParams.get("from") || "";
+      const to = url.searchParams.get("to") || "";
+      let qs = `?type=${type}`;
+      if (from) qs += `&from=${from}`;
+      if (to) qs += `&to=${to}`;
+      const session = await igAuth();
+      const r = await igRequest("GET", "/history/transactions" + qs, { ...igHeaders(session), Version: "2" });
+      if (r.status !== 200) return json(res, r.status, { error: "IG API error", detail: r.body });
+      return json(res, 200, JSON.parse(r.body));
     }
 
     return json(res, 404, { error: "Unknown IG endpoint" });

@@ -1,179 +1,128 @@
 ---
 name: ig-trading
-description: IG Group REST Trading API — authenticate, trade CFDs, manage positions, view account. Use for "IG trade", "open position", "close position", "IG account", "IG balance".
+description: IG Group Trading API via proxy — trade CFDs, manage positions, view account. Use for "IG trade", "open position", "close position", "sell BTC", "IG account", "IG balance".
 ---
 # IG Trading API Skill
 
-Trade CFDs on the IG Group platform via REST API. Supports forex, indices, commodities, crypto.
+Trade CFDs on the IG Group platform. Supports forex, indices, commodities, crypto.
+All endpoints go through the local proxy which handles IG authentication automatically.
 
-## Connection Details
+**IMPORTANT**: Use `web_fetch` with `http://localhost:5000/api/ig/...` for ALL IG operations. The proxy manages sessions, tokens, and rate limiting. Do NOT call IG APIs directly.
 
-- **Demo API**: `https://demo-api.ig.com/gateway/deal`
-- **Live API**: `https://api.ig.com/gateway/deal` (requires separate live API key)
-- Credentials are stored in environment variables: `IG_API_KEY`, `IG_USERNAME`, `IG_PASSWORD`, `IG_ACCOUNT_ID`, `IG_BASE_URL`
+## 1. List Open Positions
 
-**CRITICAL**: Demo API keys ONLY work on `demo-api.ig.com`. Live keys ONLY work on `api.ig.com`. They are NOT interchangeable.
-
-## 1. Authentication (Login)
-
-POST `/session` (Version 2) to get session tokens. You need **two response headers** for all subsequent requests.
-
-```bash
-curl -s -D - -X POST "$IG_BASE_URL/session" \
-  -H "Content-Type: application/json; charset=UTF-8" \
-  -H "Accept: application/json; charset=UTF-8" \
-  -H "X-IG-API-KEY: $IG_API_KEY" \
-  -H "Version: 2" \
-  -d "{\"identifier\":\"$IG_USERNAME\",\"password\":\"$IG_PASSWORD\"}"
+```
+GET http://localhost:5000/api/ig/positions
+Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
 ```
 
-**From the response headers, capture:**
-- `CST: <token>` — client session token
-- `X-SECURITY-TOKEN: <token>` — account security token
+Returns `{ positions: [{ position: { dealId, direction, size, level, ... }, market: { epic, instrumentName, bid, offer, ... } }, ...] }`
 
-Both tokens are valid for 6 hours and extend up to 72 hours while active.
+## 2. Open a Position (Market Order)
 
-**All subsequent requests must include these 4 headers:**
 ```
-X-IG-API-KEY: <your key>
-CST: <from login>
-X-SECURITY-TOKEN: <from login>
-Content-Type: application/json; charset=UTF-8
-```
+POST http://localhost:5000/api/ig/positions/open
+Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
+Content-Type: application/json
 
-## 2. Account Info
-
-**Get accounts:**
-```bash
-curl -s "$IG_BASE_URL/accounts" \
-  -H "X-IG-API-KEY: $IG_API_KEY" \
-  -H "CST: $CST" \
-  -H "X-SECURITY-TOKEN: $X_ST"
+{
+  "epic": "CS.D.BITCOIN.CFD.IP",
+  "direction": "BUY",
+  "size": 0.5,
+  "currencyCode": "USD",
+  "stopDistance": 100,
+  "limitDistance": 200
+}
 ```
 
-**Get account preferences:**
-```bash
-curl -s "$IG_BASE_URL/accounts/preferences" \
-  -H "X-IG-API-KEY: $IG_API_KEY" \
-  -H "CST: $CST" \
-  -H "X-SECURITY-TOKEN: $X_ST"
+Required fields: `epic`, `direction` (BUY/SELL), `size`
+Optional: `stopDistance`, `limitDistance`, `stopLevel`, `limitLevel`, `currencyCode` (default USD), `orderType` (default MARKET), `expiry` (default "-"), `forceOpen` (default true)
+
+Returns `{ ok: true, dealReference: "...", confirmation: { dealId, dealStatus, direction, size, level, ... } }` on success.
+Returns `{ ok: false, error: "...", statusCode: N }` on failure.
+
+## 3. Close a Position
+
+```
+POST http://localhost:5000/api/ig/positions/close
+Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
+Content-Type: application/json
+
+{
+  "dealId": "DIAAAAB1234ABC"
+}
 ```
 
-## 3. List Open Positions
+Required: `dealId` (get from positions list)
+Optional: `direction` (auto-detected from position if omitted), `size` (auto-detected if omitted), `orderType` (default MARKET)
 
-```bash
-curl -s "$IG_BASE_URL/positions" \
-  -H "X-IG-API-KEY: $IG_API_KEY" \
-  -H "CST: $CST" \
-  -H "X-SECURITY-TOKEN: $X_ST" \
-  -H "Version: 2"
+The proxy automatically looks up the position to determine the correct close direction and size. Just pass the `dealId`.
+
+Returns `{ ok: true, dealReference: "...", confirmation: { dealId, dealStatus, ... } }` on success.
+
+## 4. Get Deal Confirmation
+
+```
+GET http://localhost:5000/api/ig/confirms/{dealReference}
+Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
 ```
 
-## 4. Open a Position (Market Order)
+## 5. Account Info
 
-```bash
-curl -s -X POST "$IG_BASE_URL/positions/otc" \
-  -H "X-IG-API-KEY: $IG_API_KEY" \
-  -H "CST: $CST" \
-  -H "X-SECURITY-TOKEN: $X_ST" \
-  -H "Content-Type: application/json; charset=UTF-8" \
-  -H "Version: 2" \
-  -d '{
-    "epic": "CS.D.EURUSD.CFD.IP",
-    "direction": "BUY",
-    "size": 0.5,
-    "orderType": "MARKET",
-    "currencyCode": "USD",
-    "expiry": "-",
-    "forceOpen": true,
-    "guaranteedStop": false
-  }'
+```
+GET http://localhost:5000/api/ig/account
+Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
 ```
 
-**Response** returns a `dealReference`. Use it to confirm:
-```bash
-curl -s "$IG_BASE_URL/confirms/$DEAL_REF" \
-  -H "X-IG-API-KEY: $IG_API_KEY" \
-  -H "CST: $CST" \
-  -H "X-SECURITY-TOKEN: $X_ST"
+Returns `{ accounts: [{ accountId, accountName, balance: { balance, available, deposit, profitLoss }, currency, ... }] }`
+
+## 6. Market Prices
+
 ```
-
-## 5. Close a Position
-
-```bash
-curl -s -X POST "$IG_BASE_URL/positions/otc" \
-  -H "X-IG-API-KEY: $IG_API_KEY" \
-  -H "CST: $CST" \
-  -H "X-SECURITY-TOKEN: $X_ST" \
-  -H "Content-Type: application/json; charset=UTF-8" \
-  -H "_method: DELETE" \
-  -d '{
-    "dealId": "<DEAL_ID>",
-    "direction": "SELL",
-    "size": 0.5,
-    "orderType": "MARKET"
-  }'
-```
-
-Note: IG uses `_method: DELETE` header trick for closing via POST.
-
-## 6. Working Orders
-
-**List working orders:**
-```bash
-curl -s "$IG_BASE_URL/working-orders" \
-  -H "X-IG-API-KEY: $IG_API_KEY" \
-  -H "CST: $CST" \
-  -H "X-SECURITY-TOKEN: $X_ST" \
-  -H "Version: 2"
-```
-
-**Create a limit order:**
-```bash
-curl -s -X POST "$IG_BASE_URL/working-orders/otc" \
-  -H "X-IG-API-KEY: $IG_API_KEY" \
-  -H "CST: $CST" \
-  -H "X-SECURITY-TOKEN: $X_ST" \
-  -H "Content-Type: application/json; charset=UTF-8" \
-  -H "Version: 2" \
-  -d '{
-    "epic": "CS.D.EURUSD.CFD.IP",
-    "direction": "BUY",
-    "size": 0.5,
-    "level": 1.0800,
-    "type": "LIMIT",
-    "currencyCode": "USD",
-    "expiry": "-",
-    "forceOpen": true,
-    "guaranteedStop": false,
-    "timeInForce": "GOOD_TILL_CANCELLED"
-  }'
+GET http://localhost:5000/api/ig/prices?epics=CS.D.BITCOIN.CFD.IP,CS.D.USCGC.TODAY.IP
+Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
 ```
 
 ## 7. Transaction History
 
-```bash
-curl -s "$IG_BASE_URL/history/transactions?type=ALL&from=2026-02-01T00:00:00&to=2026-02-28T00:00:00" \
-  -H "X-IG-API-KEY: $IG_API_KEY" \
-  -H "CST: $CST" \
-  -H "X-SECURITY-TOKEN: $X_ST" \
-  -H "Version: 2"
+```
+GET http://localhost:5000/api/ig/history?type=ALL&from=2026-02-01T00:00:00&to=2026-02-28T00:00:00
+Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
 ```
 
-## 8. Risk Management Rules
+## 8. Session Management
+
+```
+GET http://localhost:5000/api/ig/session          # Check session status
+POST http://localhost:5000/api/ig/session/refresh  # Force re-login
+```
+
+## Common Epics
+
+| Instrument | Epic |
+|---|---|
+| Bitcoin | CS.D.BITCOIN.CFD.IP |
+| Gold | CS.D.USCGC.TODAY.IP |
+| EUR/USD | CS.D.EURUSD.CFD.IP |
+| GBP/USD | CS.D.GBPUSD.CFD.IP |
+| FTSE 100 | IX.D.FTSE.CFD.IP |
+| Silver | CS.D.CFASILVER.CFA.IP |
+
+## Risk Management Rules
 
 - Max 1% of balance per trade
 - Position size formula: `(balance * 0.01) / (stop_distance * value_per_point)`
 - Start with 0.1–0.5 contracts
-- Always calculate breakeven: `spread_points` = minimum move needed
-- Calculate overnight funding before holding positions overnight
+- Always use stop losses
+- Check market status before trading (TRADEABLE vs EDITS_ONLY)
 
 ## Common Errors
 
-| Error Code | Meaning |
+| Error | Meaning |
 |---|---|
 | `error.security.api-key-disabled` | API key disabled — regenerate on IG platform |
 | `error.security.api-key-invalid` | Wrong server (demo key on live, or vice versa) |
 | `error.security.invalid-details` | Wrong username or password |
 | `error.public-api.exceeded-api-key-allowance` | Rate limited — wait and retry |
 | `error.position.trading-not-enabled` | Account not enabled for trading |
+| `MARKET_CLOSED` or `EDITS_ONLY` | Market is closed (e.g. weekend for non-crypto) |
