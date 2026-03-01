@@ -415,28 +415,33 @@ export function renderChat(props: ChatProps) {
                   ?disabled=${!props.connected}
                   @click=${props.onAbort}
                 >Stop</button>`
-              : html`<div class="chat-new-session-wrap">
-                  <select
-                    class="chat-new-session-select"
+              : html`<button
+                    class="btn"
                     ?disabled=${!props.connected || props.sending}
-                    @change=${(e: Event) => {
-                      const sel = e.target as HTMLSelectElement;
-                      const agentId = sel.value;
-                      sel.value = "";
-                      if (agentId && props.onSelectAgent) {
-                        props.onSelectAgent(agentId);
-                      } else {
-                        props.onNewSession();
-                      }
-                    }}
-                  >
-                    <option value="" disabled selected>New chat ▾</option>
-                    ${(props.agentsList?.agents ?? []).map((agent) => {
-                      const name = agent.identity?.name || agent.name || agent.id;
-                      return html`<option value=${agent.id}>${name}</option>`;
-                    })}
-                  </select>
-                </div>`
+                    @click=${props.onNewSession}
+                    title="Start a new chat session"
+                  >+ New</button>
+                  ${(props.agentsList?.agents ?? []).length > 1
+                    ? html`<select
+                        class="chat-agent-select"
+                        ?disabled=${!props.connected || props.sending}
+                        @change=${(e: Event) => {
+                          const sel = e.target as HTMLSelectElement;
+                          const agentId = sel.value;
+                          sel.value = "";
+                          if (agentId && props.onSelectAgent) {
+                            props.onSelectAgent(agentId);
+                          }
+                        }}
+                      >
+                        <option value="" disabled selected>Agent ▾</option>
+                        ${(props.agentsList?.agents ?? []).map((agent) => {
+                          const name = agent.identity?.name || agent.name || agent.id;
+                          return html`<option value=${agent.id}>${name}</option>`;
+                        })}
+                      </select>`
+                    : nothing
+                  }`
             }
             <button
               class="btn primary"

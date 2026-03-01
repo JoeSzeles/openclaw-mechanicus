@@ -322,6 +322,18 @@
   box-sizing: border-box;
 }
 
+.chat-compose__actions .chat-agent-select {
+  height: 40px;
+  padding: 0 8px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary, #1e1e2e);
+  color: var(--fg);
+  cursor: pointer;
+  min-width: 80px;
+}
+
 /* Chat controls - moved to content-header area, left aligned */
 .chat-controls {
   display: flex;
