@@ -58,11 +58,16 @@ function validateLoginSession(req) {
 }
 function hasValidBearerToken(req) {
   const h = req.headers["authorization"];
-  if (!h || !h.startsWith("Bearer ")) return false;
-  const tok = h.slice(7);
-  if (tok === GATEWAY_TOKEN) return true;
-  const keys = loadJson(API_KEYS_FILE, { keys: [] });
-  return keys.keys.some(k => k.active && k.key === tok);
+  if (h && h.startsWith("Bearer ")) {
+    const tok = h.slice(7);
+    if (tok === GATEWAY_TOKEN) return true;
+    const keys = loadJson(API_KEYS_FILE, { keys: [] });
+    if (keys.keys.some(k => k.active && k.key === tok)) return true;
+  }
+  const url = new URL(req.url, "http://localhost");
+  const qToken = url.searchParams.get("_token");
+  if (qToken && qToken === GATEWAY_TOKEN) return true;
+  return false;
 }
 function isLoginExempt(req) {
   const url = new URL(req.url, "http://localhost");
@@ -1866,8 +1871,11 @@ function routeAtMentions(text, senderName) {
 
 function authGateway(req) {
   const h = req.headers["authorization"];
-  if (!h) return false;
-  return h.replace(/^Bearer\s+/i, "") === GATEWAY_TOKEN;
+  if (h && h.replace(/^Bearer\s+/i, "") === GATEWAY_TOKEN) return true;
+  const url = new URL(req.url, "http://localhost");
+  const qToken = url.searchParams.get("_token");
+  if (qToken && qToken === GATEWAY_TOKEN) return true;
+  return false;
 }
 
 function authWorker(req) {

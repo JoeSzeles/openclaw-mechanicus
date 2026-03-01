@@ -1,8 +1,10 @@
 # IG Trading Commands — Quick Reference
 
-All commands use `web_fetch` to `https://$REPLIT_DEV_DOMAIN/api/ig/...` with header `Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN`.
-**IMPORTANT**: You MUST use the public URL (`https://$REPLIT_DEV_DOMAIN/...`), NOT `http://localhost:5000/...`. The `web_fetch` tool blocks localhost due to SSRF protection.
-Authentication is handled automatically by the proxy. You NEVER need to call `/session` or manage CST/XST tokens.
+All commands use `web_fetch` to `https://$REPLIT_DEV_DOMAIN/api/ig/...?_token=$OPENCLAW_GATEWAY_TOKEN`.
+**IMPORTANT**:
+- You MUST use the public URL (`https://$REPLIT_DEV_DOMAIN/...`), NOT `http://localhost:5000/...`. The `web_fetch` tool blocks localhost due to SSRF protection.
+- You MUST include `?_token=$OPENCLAW_GATEWAY_TOKEN` as a query parameter for authentication (web_fetch does NOT support custom headers).
+- Authentication with IG is handled automatically by the proxy. You NEVER need to call `/session` or manage CST/XST tokens.
 
 ---
 
