@@ -25,7 +25,7 @@ OpenClaw Cloud employs a "CEO Proxy + Gateway" architecture, where two component
 -   **Canvas Static File Serving**: Serves dynamic HTML dashboards and reports from a dedicated canvas directory, supporting a manifest system for page discovery.
 -   **Auto-Token Injection**: Automatically injects the gateway authentication token into the Control UI.
 -   **Process Manager & Bot Registry**: A web UI for managing ad-hoc and registered bots, including start/stop controls and auto-restart capabilities for bots residing in `skills/bots/`.
--   **IG API Proxy**: Provides a proxy for IG Group Trading API with persistent session management, response caching, and a comprehensive set of trading-related skills and bot scripts. Includes a multi-layered trade proof reader for risk mitigation.
+-   **IG API Proxy**: Full-featured proxy for IG Group Trading API covering ALL IG operations: positions (open/close/update), working orders (create/update/delete), market search, price history, watchlists, activity/transaction history, and session management. Handles authentication automatically. See `skills/ig-trading/IG-COMMANDS.md` for complete endpoint reference. Includes a multi-layered trade proof reader for risk mitigation.
 -   **Chat Rich Media**: Supports inline iframe embeds for canvas pages and enhanced markdown tables in the chat UI.
 -   **Navigation Bar**: Injected navigation for easy access to different sections of the platform.
 

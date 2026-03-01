@@ -1,128 +1,53 @@
 ---
 name: ig-trading
-description: IG Group Trading API via proxy — trade CFDs, manage positions, view account. Use for "IG trade", "open position", "close position", "sell BTC", "IG account", "IG balance".
+description: IG Group Trading API — trade CFDs, manage positions, working orders, market data. Use for ANY IG trading task. ALWAYS read IG-COMMANDS.md first.
 ---
 # IG Trading API Skill
 
-Trade CFDs on the IG Group platform. Supports forex, indices, commodities, crypto.
-All endpoints go through the local proxy which handles IG authentication automatically.
+Trade CFDs on the IG Group platform via the local proxy. The proxy handles all authentication automatically.
 
-**IMPORTANT**: Use `web_fetch` with `http://localhost:5000/api/ig/...` for ALL IG operations. The proxy manages sessions, tokens, and rate limiting. Do NOT call IG APIs directly.
+## FIRST: Read the Command Reference
 
-## 1. List Open Positions
+**Before doing ANYTHING with IG, read `skills/ig-trading/IG-COMMANDS.md`** — it has every endpoint, every parameter, every error code. Do NOT guess or improvise.
 
-```
-GET http://localhost:5000/api/ig/positions
-Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
-```
+## How It Works
 
-Returns `{ positions: [{ position: { dealId, direction, size, level, ... }, market: { epic, instrumentName, bid, offer, ... } }, ...] }`
+All IG operations go through `http://localhost:5000/api/ig/...` with `Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN`. The proxy manages IG sessions (CST/XST tokens), rate limiting, and caching. You NEVER authenticate to IG directly.
 
-## 2. Open a Position (Market Order)
+## Critical Rules
 
-```
-POST http://localhost:5000/api/ig/positions/open
-Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
-Content-Type: application/json
+1. **ALWAYS check the response `ok` field** — `ok: false` means the operation FAILED
+2. **For trades, ALWAYS check `confirmation.dealStatus`** — only `ACCEPTED` means success. `REJECTED` means IG refused it
+3. **NEVER tell the user a trade executed unless `dealStatus` is `ACCEPTED`**
+4. **Include `dealId` and fill `level` when confirming trades**
+5. **Check `marketStatus` before trading** — `EDITS_ONLY` means market is closed
+6. **Rate limits**: IG allows ~60 requests/minute. The proxy handles this but avoid rapid-fire calls
 
-{
-  "epic": "CS.D.BITCOIN.CFD.IP",
-  "direction": "BUY",
-  "size": 0.5,
-  "currencyCode": "USD",
-  "stopDistance": 100,
-  "limitDistance": 200
-}
-```
+## Available Endpoints Summary
 
-Required fields: `epic`, `direction` (BUY/SELL), `size`
-Optional: `stopDistance`, `limitDistance`, `stopLevel`, `limitLevel`, `currencyCode` (default USD), `orderType` (default MARKET), `expiry` (default "-"), `forceOpen` (default true)
+| Action | Method | Endpoint |
+|---|---|---|
+| List positions | GET | /api/ig/positions |
+| Open position | POST | /api/ig/positions/open |
+| Close position | POST | /api/ig/positions/close |
+| Update stop/limit | PUT | /api/ig/positions/update |
+| List working orders | GET | /api/ig/workingorders |
+| Create working order | POST | /api/ig/workingorders/create |
+| Update working order | PUT | /api/ig/workingorders/update |
+| Delete working order | DELETE | /api/ig/workingorders/delete |
+| Account balance | GET | /api/ig/account |
+| Live prices | GET | /api/ig/prices?epics=... |
+| Market details | GET | /api/ig/markets/{epic} |
+| Search markets | GET | /api/ig/markets?q=... |
+| Browse categories | GET | /api/ig/marketnavigation |
+| Price candles | GET | /api/ig/pricehistory/{epic}?resolution=HOUR&max=50 |
+| Watchlists | GET | /api/ig/watchlists |
+| Transaction history | GET | /api/ig/history?type=ALL&from=...&to=... |
+| Activity log | GET | /api/ig/activity?from=...&to=... |
+| Deal confirmation | GET | /api/ig/confirms/{dealRef} |
+| Session status | GET | /api/ig/session |
+| Force re-login | POST | /api/ig/session/refresh |
+| Stream prices | GET | /api/ig/stream/prices |
+| Stream status | GET | /api/ig/stream/status |
 
-Returns `{ ok: true, dealReference: "...", confirmation: { dealId, dealStatus, direction, size, level, ... } }` on success.
-Returns `{ ok: false, error: "...", statusCode: N }` on failure.
-
-## 3. Close a Position
-
-```
-POST http://localhost:5000/api/ig/positions/close
-Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
-Content-Type: application/json
-
-{
-  "dealId": "DIAAAAB1234ABC"
-}
-```
-
-Required: `dealId` (get from positions list)
-Optional: `direction` (auto-detected from position if omitted), `size` (auto-detected if omitted), `orderType` (default MARKET)
-
-The proxy automatically looks up the position to determine the correct close direction and size. Just pass the `dealId`.
-
-Returns `{ ok: true, dealReference: "...", confirmation: { dealId, dealStatus, ... } }` on success.
-
-## 4. Get Deal Confirmation
-
-```
-GET http://localhost:5000/api/ig/confirms/{dealReference}
-Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
-```
-
-## 5. Account Info
-
-```
-GET http://localhost:5000/api/ig/account
-Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
-```
-
-Returns `{ accounts: [{ accountId, accountName, balance: { balance, available, deposit, profitLoss }, currency, ... }] }`
-
-## 6. Market Prices
-
-```
-GET http://localhost:5000/api/ig/prices?epics=CS.D.BITCOIN.CFD.IP,CS.D.USCGC.TODAY.IP
-Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
-```
-
-## 7. Transaction History
-
-```
-GET http://localhost:5000/api/ig/history?type=ALL&from=2026-02-01T00:00:00&to=2026-02-28T00:00:00
-Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN
-```
-
-## 8. Session Management
-
-```
-GET http://localhost:5000/api/ig/session          # Check session status
-POST http://localhost:5000/api/ig/session/refresh  # Force re-login
-```
-
-## Common Epics
-
-| Instrument | Epic |
-|---|---|
-| Bitcoin | CS.D.BITCOIN.CFD.IP |
-| Gold | CS.D.USCGC.TODAY.IP |
-| EUR/USD | CS.D.EURUSD.CFD.IP |
-| GBP/USD | CS.D.GBPUSD.CFD.IP |
-| FTSE 100 | IX.D.FTSE.CFD.IP |
-| Silver | CS.D.CFASILVER.CFA.IP |
-
-## Risk Management Rules
-
-- Max 1% of balance per trade
-- Position size formula: `(balance * 0.01) / (stop_distance * value_per_point)`
-- Start with 0.1–0.5 contracts
-- Always use stop losses
-- Check market status before trading (TRADEABLE vs EDITS_ONLY)
-
-## Common Errors
-
-| Error | Meaning |
-|---|---|
-| `error.security.api-key-disabled` | API key disabled — regenerate on IG platform |
-| `error.security.api-key-invalid` | Wrong server (demo key on live, or vice versa) |
-| `error.security.invalid-details` | Wrong username or password |
-| `error.public-api.exceeded-api-key-allowance` | Rate limited — wait and retry |
-| `error.position.trading-not-enabled` | Account not enabled for trading |
-| `MARKET_CLOSED` or `EDITS_ONLY` | Market is closed (e.g. weekend for non-crypto) |
+See `skills/ig-trading/IG-COMMANDS.md` for full request/response details on every endpoint.
