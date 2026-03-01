@@ -296,7 +296,7 @@ async function startLightstreamer() {
         lsConnectedEpics = epics;
       },
       onSubscriptionError: (code, msg) => {
-        console.error(`[lightstreamer] Subscription error: ${code} ${msg}`);
+        console.error(`[lightstreamer] Subscription error: ${code} ${msg} | source=${streamSource} items=${JSON.stringify(items)} fields=${JSON.stringify(fields)}`);
         if (msg && msg.includes("Invalid account type")) {
           console.log("[lightstreamer] This IG account type does not support streaming. Prices will use REST polling instead.");
           lsStatus = "unsupported";

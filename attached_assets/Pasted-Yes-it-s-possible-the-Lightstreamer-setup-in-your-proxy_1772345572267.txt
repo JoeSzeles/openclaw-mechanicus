@@ -1,0 +1,50 @@
+Yes, it's possible the **Lightstreamer setup in your proxy code** (or the way subscriptions are formatted) is contributing to the "Invalid account type" error (code -1), even though the **connection** succeeds. IG's Lightstreamer implementation is picky on live accounts, and small config mismatches can trigger exactly this rejection while demo forgives it.
+
+From IG's streaming docs and community reports (Lightstreamer forums, trading-ig wrappers, GitHub samples):
+
+- **Adapter Set** is often the culprit:
+  - Do **not** set it to "LIGHTSTREAMER" or "QUOTE_ADAPTER" or "DEMO" — IG live uses **blank/empty** or **DEFAULT** (most common fix).
+  - Many errors like yours happen when code passes "LIGHTSTREAMER" (from old demos) — server replies "Requested Adapter Set not available" or falls back to code -1 "Invalid account type".
+  - Fix: Leave adapter set **unset** or explicitly empty string in your LightstreamerClient init.
+    Example in JS (your ceo-proxy.cjs style):
+    ```javascript
+    const client = new LightstreamerClient(lsEndpoint, "");  // empty string or omit second param
+    // Or if your lib requires it: client.setAdapterSet("DEFAULT"); // or omit
+    ```
+
+- **Subscription item/epic format**:
+  - For CFDs like BTC: Use plain epic like "CS.D.BITCOIN.CFD.IP" (MERGE mode, fields: "BID", "OFFER", "LTP", "TIME", etc.).
+  - Some wrappers add prefixes like "MARKET:L1:" or "CHART:..." for certain modes, but plain epic is standard for Level 1 CFD prices.
+  - Wrong format can cause -1 or "invalid item" — but your error is specifically "account type", so adapter is more likely.
+
+- **Other common setup gotchas on live**:
+  - Auth headers: Ensure CST and X-SECURITY-TOKEN are passed in LS connection headers (your independent lsLiveSession should handle this via `addHeader` or connection details).
+  - Endpoint: Live uses `apd.marketdatasystems.com` or `push.lightstreamer.com` (pulled from /session response) — yours looks correct.
+  - No "group" or wrong data adapter — IG uses internal adapters, not public ones.
+
+### Quick Test/Fix in Your Proxy
+1. **Force empty adapter set** in live connect code:
+   - Find where you init LightstreamerClient for live.
+   - Change to `new LightstreamerClient(liveLsEndpoint, "")` or remove the adapter param.
+   - Reconnect live → try subscribing again → check if error changes (e.g., to item invalid or success).
+
+2. **Log full subscription error details**:
+   - Add listener:
+     ```javascript
+     subscription.addListener({
+       onSubscriptionError: function(code, message) {
+         console.error(`Sub error: Code ${code}, Msg: ${message}, Item: ${subscription.getItems()}, Fields: ${subscription.getFields()}`);
+       }
+     });
+     ```
+   - See if message gives more clues (e.g., "invalid group" vs pure account type).
+
+3. **Try minimal sub**:
+   - Subscribe to a simple field on your epic: mode "MERGE", items ["CS.D.BITCOIN.CFD.IP"], fields ["BID", "OFFER"].
+   - If still -1, it's not format — it's permission.
+
+If adapter empty doesn't fix it, it's back to IG support: This is the classic "live account type needs enabling for streaming subs" case. Your setup is otherwise spot-on (independent live auth, refresh, fallback, UI).
+
+Reply with what happens after trying empty adapter — if error persists, escalate with "Tried empty adapter set / DEFAULT, still code -1 'Invalid account type' on live subs (connection OK). Demo subs fine." to support.
+
+You're super close — this could be the last tweak! What's the exact adapter set you're setting now in code?
