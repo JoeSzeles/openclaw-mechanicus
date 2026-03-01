@@ -75,7 +75,7 @@ function isLoginExempt(req) {
       p.startsWith("/api/ig/confirms") || p.startsWith("/api/ig/history") || p.startsWith("/api/ig/stream") ||
       p.startsWith("/api/ig/workingorders") || p.startsWith("/api/ig/markets") || p.startsWith("/api/ig/marketnavigation") ||
       p.startsWith("/api/ig/pricehistory") || p.startsWith("/api/ig/watchlists") || p.startsWith("/api/ig/activity") ||
-      p === "/api/ig/session" || p === "/api/ig/refresh-snapshots" ||
+      p.startsWith("/api/ig/session") || p === "/api/ig/refresh-snapshots" ||
       p.startsWith("/api/ig/config")) {
     if (hasValidBearerToken(req)) return true;
   }
