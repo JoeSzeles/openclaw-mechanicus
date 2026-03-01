@@ -1471,6 +1471,7 @@ const MIME_TYPES = {
 let gatewayWs = null;
 let gwReqCounter = 0;
 let gwSessionKey = null;
+let gwWebchatSessionKey = null;
 const pendingAgentChats = new Map();
 
 let gwConnecting = false;
@@ -1507,6 +1508,7 @@ function connectGateway() {
             const snap = msg.payload.snapshot?.sessionDefaults;
             gwSessionKey = (snap && snap.mainSessionKey) || msg.payload.sessionKey || "agent:main:main";
             console.log("[ceo-proxy] Gateway session:", gwSessionKey);
+            resolveWebchatSessionKey();
           }
         }
         if (msg.type === "res" && msg.id && msg.id.startsWith("gw-inject-")) {
@@ -1533,6 +1535,10 @@ function connectGateway() {
         if (msg.type === "event" && msg.event === "chat" && msg.payload) {
           const pm = msg.payload.message;
           const runId = msg.payload.runId || "";
+          const evtSessionKey = msg.payload.sessionKey || "";
+          if (evtSessionKey && evtSessionKey.includes(":webchat:")) {
+            gwWebchatSessionKey = evtSessionKey;
+          }
 
           if (pm && pm.role === "assistant" && msg.payload.state === "final" && pm.content) {
             let fullText = "";
@@ -1646,19 +1652,34 @@ function connectGateway() {
   }
 }
 
+function resolveWebchatSessionKey() {
+  try {
+    const agentId = (gwSessionKey || "agent:ceo:main").split(":")[1] || "ceo";
+    const sessFile = path.join(DATA_DIR, "agents", agentId, "sessions", "sessions.json");
+    if (fs.existsSync(sessFile)) {
+      const sessData = JSON.parse(fs.readFileSync(sessFile, "utf8"));
+      const webchatKey = "agent:" + agentId + ":webchat:main";
+      if (sessData[webchatKey]) {
+        gwWebchatSessionKey = webchatKey;
+        console.log("[ceo-proxy] Webchat session key:", gwWebchatSessionKey);
+      }
+    }
+  } catch {}
+}
+
 function injectToGateway(label, message) {
   if (!gatewayWs || gatewayWs.readyState !== WebSocket.OPEN) {
     console.log("[ceo-proxy] No gateway WS for inject");
     return;
   }
-  const sessionKey = gwSessionKey || "agent:main:main";
+  const sessionKey = gwWebchatSessionKey || gwSessionKey || "agent:main:main";
   const id = "gw-inject-" + (++gwReqCounter) + "-" + Date.now();
   const frame = {
     type: "req", id, method: "chat.inject",
     params: { sessionKey, message, label },
   };
   gatewayWs.send(JSON.stringify(frame));
-  console.log("[ceo-proxy] Injected to gateway chat:", label, message.slice(0, 60));
+  console.log("[ceo-proxy] Injected to gateway chat (session:" + sessionKey + "):", label, message.slice(0, 60));
 }
 
 setTimeout(connectGateway, 3000);
@@ -1747,7 +1768,7 @@ function findWorkerByName(name) {
 
 function findAgentById(name) {
   try {
-    const cfg = loadJson(path.join(OC_DIR, "openclaw.json"), {});
+    const cfg = loadJson(path.join(DATA_DIR, "openclaw.json"), {});
     const list = cfg.agents?.list || [];
     const lower = name.toLowerCase();
     for (const a of list) {
