@@ -1563,6 +1563,8 @@ function connectGateway() {
                   const targetName = mention.slice(1);
                   const target = findTargetByName(targetName);
                   if (!target) continue;
+                  const now = Date.now();
+                  lastAutoDispatch["to>" + target.name.toLowerCase()] = now;
                   const nameEsc = target.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
                   const bodyMatch = userText.match(new RegExp("@" + nameEsc + "\\s+([\\s\\S]+)", "i"));
                   const body = bodyMatch ? bodyMatch[1].trim() : userText;
@@ -1598,12 +1600,12 @@ function connectGateway() {
               if (!target) continue;
               if (target.type === "agent" && target.agent.id.toLowerCase() === agentId.toLowerCase()) continue;
               const now = Date.now();
-              const dispatchKey = senderLabel + ">" + target.name;
-              if (lastAutoDispatch[dispatchKey] && now - lastAutoDispatch[dispatchKey] < 30000) {
-                console.log("[ceo-proxy] Skipping auto-dispatch", dispatchKey, "(cooldown)");
+              const targetKey = "to>" + target.name.toLowerCase();
+              if (lastAutoDispatch[targetKey] && now - lastAutoDispatch[targetKey] < 30000) {
+                console.log("[ceo-proxy] Skipping auto-dispatch to", target.name, "(already dispatched recently)");
                 continue;
               }
-              lastAutoDispatch[dispatchKey] = now;
+              lastAutoDispatch[targetKey] = now;
               const nameEsc = target.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
               const bodyMatch = text.match(new RegExp("@" + nameEsc + "\\s+([\\s\\S]+)", "i"));
               const body = bodyMatch ? bodyMatch[1].trim() : text;

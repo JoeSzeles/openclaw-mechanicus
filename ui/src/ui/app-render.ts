@@ -878,8 +878,8 @@ export function renderApp(state: AppViewState) {
                     lastActiveSessionKey: next,
                   });
                   void state.loadAssistantIdentity();
-                  void loadChatHistory(state);
                   void refreshChatAvatar(state);
+                  state.handleSendChat("/new", { restoreDraft: true });
                 },
               })
             : nothing
