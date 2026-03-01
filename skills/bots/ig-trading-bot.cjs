@@ -21,6 +21,7 @@ let botLog = [];
 let accountBalance = null;
 let rateLimitBackoffUntil = 0;
 const apiCallTimestamps = [];
+let startupProfile = null;
 
 function getRateLimitConfig(config) {
   return {
@@ -148,6 +149,27 @@ function getIgCredentials() {
     accountId: process.env.IG_ACCOUNT_ID || "",
     profile: "env"
   };
+}
+
+function isLiveProfile(creds) {
+  return creds.profile === "live" || (!creds.baseUrl.includes("demo"));
+}
+
+function checkLiveSafety(config) {
+  const creds = getIgCredentials();
+  const isLive = isLiveProfile(creds);
+
+  if (startupProfile && creds.profile !== startupProfile) {
+    log("WARN", `PROFILE CHANGED mid-run: was "${startupProfile}", now "${creds.profile}". Stopping bot for safety. Restart the bot manually after confirming the switch.`);
+    return { safe: false, reason: "profile_changed" };
+  }
+
+  if (isLive && !config.allowLive) {
+    log("WARN", `LIVE TRADING BLOCKED: Profile is "${creds.profile}" (${creds.baseUrl}) but strategy config does not have "allowLive": true. Add "allowLive": true to ig-strategy.json to enable live trading. Bot will monitor only, no trades.`);
+    return { safe: false, reason: "live_not_allowed" };
+  }
+
+  return { safe: true, isLive };
 }
 
 function request(method, urlPath, body, extraHeaders) {
@@ -756,8 +778,12 @@ async function runCycle(config) {
 
 async function main() {
   const creds = getIgCredentials();
+  const isLive = isLiveProfile(creds);
+  startupProfile = creds.profile;
   console.log(`\n=== IG Trading Bot ${TEST_MODE ? "(TEST MODE)" : "(LIVE)"} ===`);
-  console.log(`Using IG profile: ${creds.profile} (${creds.baseUrl.includes("demo") ? "DEMO" : "LIVE"})\n`);
+  console.log(`Using IG profile: ${creds.profile} (${isLive ? "LIVE" : "DEMO"})`);
+  if (isLive) console.log(`*** LIVE ACCOUNT — real money at risk ***\n`);
+  else console.log(``);
 
   const config = loadConfig();
   currentConfig = config;
@@ -766,6 +792,17 @@ async function main() {
     log("INFO", 'Bot is disabled in config. Set "enabled": true in ig-strategy.json to start trading.');
     writeDashboard(config, [], null);
     return;
+  }
+
+  if (!TEST_MODE) {
+    const safety = checkLiveSafety(config);
+    if (!safety.safe) {
+      if (safety.reason === "live_not_allowed") {
+        log("INFO", "Bot will start in MONITOR-ONLY mode (no trades on live). Add \"allowLive\": true to ig-strategy.json and restart to enable live trading.");
+      } else {
+        return;
+      }
+    }
   }
 
   const rl = getRateLimitConfig(config);
@@ -794,6 +831,22 @@ async function main() {
     try {
       const freshConfig = loadConfig();
       currentConfig = freshConfig;
+
+      const safety = checkLiveSafety(freshConfig);
+      if (!safety.safe) {
+        if (safety.reason === "profile_changed") {
+          log("WARN", "Bot shutting down due to profile change. Restart manually after confirming.");
+          writeDashboard(freshConfig, openPositions, null);
+          process.exit(0);
+          return;
+        }
+        if (safety.reason === "live_not_allowed") {
+          writeDashboard(freshConfig, openPositions, null);
+          setTimeout(loop, interval);
+          return;
+        }
+      }
+
       if (!freshConfig.enabled) {
         log("INFO", "Bot disabled via config. Pausing...");
         writeDashboard(freshConfig, openPositions, null);
