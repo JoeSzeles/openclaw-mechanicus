@@ -1,0 +1,49 @@
+The console log from the **IG Streaming Companion** (labs.ig.com tool) clearly shows why live login fails while demo succeeds:
+
+- **Demo login works fully**: It fetches encryption key → encrypts password → POSTs to `/session` → gets CST/X-SECURITY-TOKEN → connects to Lightstreamer (`demo-apd.marketdatasystems.com`) → subscribes to ACCOUNT/MARKET/CHART → streams updates (e.g., DEPOSIT/PNL changes visible in logs).
+- **Live login fails early**: Browser tries to GET `/session/encryptionKey` and POST `/session` to `https://api.ig.com/gateway/deal` → both return **503 Service Unavailable**, triggering **CORS errors** ("Access-Control-Allow-Origin missing" and "CORS request did not succeed").
+- The root error is **"Failed to encrypt password: NetworkError: A network error occurred"** — because the encryption key fetch fails (503), password encryption aborts → no valid auth payload sent → session creation never happens.
+
+This isn't a code bug in your Rust bot or OpenClaw — it's a **browser-enforced CORS block** on live API requests from the companion's origin (labs.ig.com domain). The 503 from IG's server prevents any CORS headers (including Access-Control-Allow-Origin) from being sent back, so the browser blocks reading the (error) response.
+
+### Why this happens specifically on live (not demo)
+- **Demo endpoint** (`demo-api.ig.com`) is configured to allow CORS from labs.ig.com (the companion's origin) — preflight OPTIONS and actual requests succeed with proper headers.
+- **Live endpoint** (`api.ig.com/gateway/deal`) does **not** include CORS headers for the companion's origin on error responses (503). Many servers (including IG's) omit CORS headers on errors for security/compliance — the "happy path" works, but failures like overload, temp unavailability, or unactivated features return bare 503 without Allow-Origin.
+- From similar reports (GitHub trading-ig issues, Stack Overflow, MDN CORS docs), 503 + missing CORS is common when the backend rejects early (e.g., rate limit, IP flag, account not fully enabled for live API, or transient gateway issue). The companion relies on browser JS fetch/XMLHttpRequest, which strictly enforces CORS — curl/Postman ignore it and would show the raw 503 body.
+
+### Fixes & Workarounds
+1. **Best: Use non-browser tools for live testing** (bypasses CORS entirely):
+   - **Postman** or **curl** — Test live /session with encryption=False first (safer for debug):
+     ```
+     curl -v -X POST https://api.ig.com/gateway/deal/session \
+     -H "Content-Type: application/json; charset=UTF-8" \
+     -H "Accept: application/json; charset=UTF-8" \
+     -H "Version: 2" \
+     -H "X-IG-API-KEY: YOUR_LIVE_API_KEY" \
+     -d '{
+       "identifier": "YOUR_LIVE_USERNAME",
+       "password": "YOUR_LIVE_PASSWORD",
+       "encryptedPassword": false
+     }'
+     ```
+     - If this returns 200 + CST/X-SECURITY-TOKEN → live creds/API key are valid; problem is companion-specific (CORS + encryption flow).
+     - If 503 → live API gateway issue (transient or account-specific) — retry in 15–60 min, or contact IG.
+   - Then test balance: Use CST/X-SECURITY-TOKEN in GET /accounts headers.
+
+2. **For encryption=True** (recommended for security):
+   - First GET `/session/encryptionKey` with X-IG-API-KEY header.
+   - Encrypt password client-side (companion uses JS for this).
+   - POST /session with encrypted payload.
+   - But since companion fails at key fetch, use Postman collection or Rust code to replicate.
+
+3. **Contact IG support** (mention these details for faster resolution):
+   - "IG Streaming Companion fails live login with 503 on /session/encryptionKey and /session (CORS blocked, no Access-Control-Allow-Origin). Demo works fully (streams data). Using correct live creds/API key from My IG. Tested residential IP (Brisbane AU). Browser console shows NetworkError on password encryption. REST via curl/Postman? Can you check live API gateway/CORS config or enable live streaming/auth for my account?"
+   - Include timestamp (~March 1, 2026 03:xx PM AEST) and error snippets.
+
+4. **For your bot** (Rust/OpenClaw):
+   - Set `encryptedPassword: false` temporarily for testing (many wrappers do this initially).
+   - Use live base URL, fresh API key, handle retries on 503.
+   - If live REST works via curl but not bot → check headers/charset exactly match.
+   - For full streaming: Once /session succeeds, use returned `lightstreamerEndpoint` (not hardcoded).
+
+This is a known pain with IG's live API (stricter CORS/security than demo). Live should work once past auth — many bots run fine after support nudge or using non-encrypted login for setup. Try the curl test now and share the output (mask tokens/creds) — that'll confirm if it's account activation or transient. Hang in there!
