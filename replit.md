@@ -1,7 +1,7 @@
 # OpenClaw Cloud
 
 ## Overview
-OpenClaw Cloud is the online, hosted version of OpenClaw, a multi-channel AI gateway with extensible messaging integrations. It runs on Replit as a persistent, always-accessible web service with a browser-based Control UI dashboard. This version eliminates the need for local installation and provides a centralized platform for managing AI chat sessions, channels, agents, models, and configuration. Its primary purpose is to act as a central "CEO" dispatching tasks to local "Worker Bee" OpenClaw instances.
+OpenClaw Cloud is an online, hosted version of OpenClaw, serving as a multi-channel AI gateway with extensible messaging integrations. It runs on Replit as a persistent web service with a browser-based Control UI dashboard. This platform centralizes the management of AI chat sessions, channels, agents, models, and configuration. Its primary purpose is to act as a central "CEO" dispatching tasks to local "Worker Bee" OpenClaw instances, eliminating the need for local installations.
 
 ## User Preferences
 - **Workflow restart**: Always use `kill -9 1` to force-kill before restarting. Never use pkill or soft kills -- they hang.
@@ -11,70 +11,40 @@ OpenClaw Cloud is the online, hosted version of OpenClaw, a multi-channel AI gat
 - **Worker dispatch**: Only `@WorkerName` (with @ symbol) should trigger dispatch -- never plain name mentions.
 
 ## System Architecture
-OpenClaw Cloud operates with a "CEO Proxy + Gateway" architecture where two components run in a single workflow:
-
-1.  **CEO Proxy** (`ceo-proxy.cjs`): Runs on port 5000, handles all `/api/*` routes (for keys, workers, tasks, exchange, dispatch, chat), and proxies all other requests to the gateway. It maintains a server-side WebSocket connection to the gateway for direct chat injection and monitoring agent responses.
-2.  **OpenClaw Gateway**: Runs on port 5001, serving the standard OpenClaw Control UI and handling WebSocket connections. All WebSocket connections from the Control UI are transparently proxied from port 5000 to 5001.
+OpenClaw Cloud employs a "CEO Proxy + Gateway" architecture, where two components run within a single workflow: a CEO Proxy handling API routes and proxying other requests, and an OpenClaw Gateway serving the Control UI and managing WebSocket connections.
 
 ### Key Features:
--   **CEO/Worker Bee System**: The Replit instance acts as a CEO, dispatching tasks to local OpenClaw Worker Bee instances. Workers register via a REST API, poll for tasks, process them, and return results which are injected directly into the Control UI chat.
-    -   **Multiple Workers Per API Key**: Any number of worker bees can connect using the same API key. Each gets a unique worker ID (`w-{uuid}-{timestamp}`). Workers with the same name + API key reuse their ID on re-registration.
-    -   **API Key Management**: Generate, list, toggle, and delete API keys for workers.
-    -   **Worker Registration & Polling**: Workers register with metadata, receive a unique workerId, poll for tasks (with `?workerId=` param), and submit results.
-    -   **Task Dispatch**: High-level `/api/dispatch` for dispatching tasks by worker name, and low-level `/api/tasks` for direct task management. Supports task types like message, file_read, file_write, file_upload.
-    -   **File Exchange**: Workers and the CEO can upload/download files to a shared exchange folder.
-    -   **Workers Dashboard**: A dedicated web UI (`/workers.html`) for managing API keys, viewing connected workers (with avatars and bee count badge), dispatching tasks, and browsing file exchange.
-    -   **CEO Agent Chat Bridge** (`/api/agent/chat`): A REST endpoint that accepts OpenAI-compatible chat messages, sends them to the CEO agent via WebSocket `chat.send`, waits for the full response, and returns it in OpenAI chat completions format. Used by worker bees in "ceo" agent mode to get AI-powered responses without needing a local agent. Supports concurrent requests with runId-based correlation.
-    -   **Worker Agent Modes**: Worker scripts support two modes: `"ceo"` (default, recommended) routes messages through the CEO's `/api/agent/chat` endpoint for full AI capabilities including web search and tools; `"local"` uses the worker's own local OpenClaw `/v1/chat/completions` endpoint.
-    -   **@CEO Chat**: Worker bees can address `@CEO` in their messages/results to ask the CEO agent questions. Messages are injected into the gateway chat for AI processing.
-    -   **Inter-Worker @BeeName Chat**: Workers can address each other with `@WorkerName` in their chat messages. The system automatically creates task dispatches between workers.
-    -   **@worker Chat Integration**: Messages in the Dashboard chat prefixed with `@workername` are automatically dispatched to the respective worker. Worker responses are injected into the chat via server-side WebSockets.
-    -   **Server-Side Agent Watcher**: The CEO proxy monitors gateway WebSocket for `@WorkerName` mentions in agent responses and automatically dispatches tasks server-side.
-    -   **CEO Agent Bootstrap**: Instructions for the CEO agent to use `@WorkerName` syntax for worker dispatch.
-    -   **Available Bees File**: `.openclaw/available-bees.json` is maintained with current connected bees, updated on registration/deletion and periodically. Also available via `/api/workers/available` endpoint.
-    -   **CREW.md Auto-Sync**: `.openclaw/workspace/CREW.md` is automatically updated with live worker bee status (name, online/stale, platform, connected since, last seen) on startup, worker registration, deletion, and every 60 seconds. The CEO agent reads this file when asked about crew status. BOOTSTRAP.md instructs the agent to check CREW.md.
-    -   **Agent Avatars**: Round circle avatars with white border and colored background with initials displayed in worker lists and chat bubbles.
-    -   **Shared Space**: A shared folder (`.openclaw/sharedspace/`) accessible by all agents via `/api/sharedspace` REST endpoints (list, read, write, delete, mkdir, download). Both worker API keys and gateway token auth accepted. Separate from the CEO's private workspace for security. Web UI file browser on the Workers Dashboard page. Worker scripts include `SharedSpace-List`, `SharedSpace-Read`, `SharedSpace-Write` helper functions.
--   **Config Page**: A unified web UI (`/model-config.html`) with tabs for **AI Models** (model/provider configuration) and **IG Trading** (demo/live profile switching, credential management, Lightstreamer streaming status). Renamed from "AI Model Config" to "Config" in the navigation bar.
--   **Persistent Storage**: All OpenClaw data, including configuration, agents, API keys, worker tasks, chat history, and file exchange, persists across container restarts in the `.openclaw/` directory.
--   **Canvas Static File Serving**: The CEO proxy serves files from `.openclaw/canvas/` at `/__openclaw__/canvas/` without authentication. Canvas API: `DELETE /api/canvas/page/{filename}` removes a page from manifest + disk (protected pages: index.html, manifest.json, ig-dashboard.html). `GET /api/canvas/manifest` returns manifest entries. Skills and agents can write HTML dashboards, charts, and reports to this directory and link users directly. No separate web server or custom port needed. A manifest system (`.openclaw/canvas/manifest.json`) tracks all published pages for dynamic discovery on the Canvas hub (`/__openclaw__/canvas/`). Agents register new pages by adding entries to the manifest JSON array.
--   **Auto-Token Injection**: The gateway authentication token is automatically injected into the Control UI at startup, eliminating manual configuration.
--   **Process Manager & Bot Registry**: A web UI (`/processes.html`) shows registered bots with start/stop/remove controls, a "Run at startup" checkbox toggle, AND ad-hoc running processes. Bot registry persists in `.openclaw/bot-registry.json` — registered bots with `enabled: true` auto-restart on server restart with exponential backoff (5s→60s max). The "Startup" checkbox toggle lets you control auto-restart independently from start/stop (critical for trading bots managing margin positions). **All bot scripts live in `skills/bots/` as `.cjs` files** — the system auto-scans this folder on startup and registers any new scripts (filename minus `.cjs` = bot ID). API: `GET /api/processes` (list ad-hoc), `POST /api/processes/kill` (kill by PID), `GET /api/bots` (list registered bots), `POST /api/bots/register` (register a bot with id+cmd), `POST /api/bots/{id}/start|stop` (control), `PATCH /api/bots/{id}` (toggle enabled flag without starting/stopping), `DELETE /api/bots/{id}` (remove).
--   **IG API Proxy**: Live IG Group API endpoints in ceo-proxy.cjs with persistent session management and response caching (30s TTL). **Persistent Session**: Auto-logs in to IG at server startup, proactively refreshes tokens every 4 minutes (before 5-min TTL expiry), retries on failure every 60s. Session status tracked via `igSessionStatus` (connected/connecting/error/disconnected/not_configured). Endpoints: `GET /api/ig/account` (balance/margin), `GET /api/ig/positions` (open positions), `GET /api/ig/prices?epics=...` (current prices), `POST /api/ig/refresh-snapshots` (refresh config snapshot files for dashboard), `GET/POST /api/ig/config` (credential profile management), `POST /api/ig/config/test` (connection test), `GET /api/ig/stream/prices` (zero-quota streamed prices), `GET /api/ig/stream/status` (streaming status), `GET /api/ig/session` (session status with age, TTL, profile), `POST /api/ig/session/refresh` (force token refresh + Lightstreamer reconnect). Session status displayed on Config page (API Session card with Force Refresh button) and IG Dashboard (SESSION CONNECTED badge + Force Refresh Session button). Graceful fallback if IG credentials not configured.
--   **Chat Rich Media (Canvas Embeds)**: The chat UI supports inline iframe embeds for canvas pages. `![canvas](/__openclaw__/canvas/page.html)` renders as a sandboxed iframe. Raw `<iframe src="/__openclaw__/canvas/...">` also works. DOMPurify restricts iframe src to `/__openclaw__/canvas/` URLs only. Enhanced markdown tables with alternating row colors and hover highlighting.
--   **Navigation Bar**: An injected navigation bar provides easy access to the Dashboard, Canvas, Config, Workers, and Processes pages.
+-   **Login Authentication**: Secures access with username/password, supporting persistent sessions and selective authentication bypass for specific endpoints.
+-   **CEO/Worker Bee System**: The Replit instance acts as a CEO, coordinating tasks for local OpenClaw Worker Bee instances. This includes worker registration, API key management, task dispatch, file exchange, and a dedicated Workers Dashboard UI.
+    -   **Agent Chat Bridge**: Provides an OpenAI-compatible endpoint for worker bees to access CEO's AI capabilities.
+    -   **Inter-Worker Communication**: Facilitates communication between workers and with the CEO agent through `@WorkerName` and `@CEO` mentions.
+    -   **Shared Space**: A common folder for file sharing among all agents, accessible via REST API and a web UI file browser.
+    -   **CREW.md Auto-Sync**: Automatically updates a `CREW.md` file with live worker status for the CEO agent.
+-   **Config Page**: A unified web UI for managing AI Models and IG Trading configurations.
+-   **Persistent Storage**: All OpenClaw data is stored persistently in the `.openclaw/` directory.
+-   **Canvas Static File Serving**: Serves dynamic HTML dashboards and reports from a dedicated canvas directory, supporting a manifest system for page discovery.
+-   **Auto-Token Injection**: Automatically injects the gateway authentication token into the Control UI.
+-   **Process Manager & Bot Registry**: A web UI for managing ad-hoc and registered bots, including start/stop controls and auto-restart capabilities for bots residing in `skills/bots/`.
+-   **IG API Proxy**: Provides a proxy for IG Group Trading API with persistent session management, response caching, and a comprehensive set of trading-related skills and bot scripts. Includes a multi-layered trade proof reader for risk mitigation.
+-   **Chat Rich Media**: Supports inline iframe embeds for canvas pages and enhanced markdown tables in the chat UI.
+-   **Navigation Bar**: Injected navigation for easy access to different sections of the platform.
 
 ### Technical Implementation Details:
 -   **Language**: TypeScript (Node.js >= 22.12.0)
 -   **Package Manager**: pnpm (10.23.0)
--   **Build Tool**: tsdown (TypeScript bundler)
+-   **Build Tool**: tsdown
 -   **UI**: Vite-based Lit web components.
--   **Entry Point**: `dist/entry.js`.
--   **Gateway CLI**: `node dist/entry.js gateway [options]`.
--   **Cloud-Specific Files**: `start.sh` for setup, `ceo-proxy.cjs` for proxy logic, custom HTML/JS/CSS for Workers Dashboard and Model Config page.
 
 ### UI/UX Decisions:
--   The Control UI is accessible from any browser with a public Replit URL.
--   Custom web UIs (`workers.html`, `model-config.html`) provide dedicated interfaces for managing specific functionalities.
--   An injected navigation bar enhances user experience by providing quick access to different sections.
--   Real-time chat and status updates are provided via WebSocket connections.
+-   Browser-accessible Control UI.
+-   Custom web UIs for specific functionalities.
+-   Injected navigation bar for improved user experience.
+-   Real-time updates via WebSockets.
 
 ## External Dependencies
--   **xAI/Grok API**: Primary AI model provider.
-    -   Models: `grok-4-1-fast-reasoning` (primary), `grok-4`, `grok-2`, `grok-2-vision-1212`, `grok-2-1212`.
-    -   Used for `web_search` tool.
--   **OpenAI API**: Secondary AI model provider via Replit AI Integrations.
-    -   Models: `gpt-4o`, `gpt-4o-mini`.
--   **IG Group Trading API**: CFD trading via REST API (demo: `demo-api.ig.com`, live: `api.ig.com`). Full setup guide: `docs/IG_TRADING_SETUP.md`.
-    -   Skills: `ig-trading` (auth, positions, orders), `ig-market-data` (search, prices, watchlists, sentiment), `ig-trade-verify` (mandatory pre-trade proof reader), `ig-backtest` (strategy backtesting with charts).
-    -   Bot scripts: `skills/bots/ig-signal-monitor.cjs` (price signal monitoring), `skills/bots/ig-trading-bot.cjs` (automated strategy execution with built-in proof reader).
-    -   **Trade Proof Reader**: Multi-layered anti-hallucination protection for margin trading. Bot-level rule-based verification (spread limits, stop-loss validation, price staleness detection, risk sizing, duplicate checks) runs before every trade. Agent-level `ig-trade-verify` skill defines a mandatory verification protocol. All verifications logged to `.openclaw/canvas/ig-verify-log.json` and displayed on the IG dashboard.
-    -   **API Rate Limiting**: Configurable per-bot rate limits to avoid IG's undocumented quota walls (`error.public-api.exceeded-api-key-allowance` 403). Config keys: `apiDelayMs` (default 3000ms between calls), `maxApiCallsPerMinute` (default 10), `rateLimitBackoffMs` (default 300000ms = 5min backoff on quota hit). Demo accounts need conservative settings; live accounts can use higher limits. Bots auto-detect 403 errors and enter backoff mode.
-    -   Signal monitor config: `.openclaw/ig-monitor-config.json`, alerts: `.openclaw/ig-alerts.json`.
-    -   Trading bot config: `.openclaw/ig-strategy.json`, log: `.openclaw/ig-bot-log.json`.
-    -   Dashboard: `.openclaw/canvas/ig-dashboard.html` (viewable at `/__openclaw__/canvas/ig-dashboard.html`). Shows LIVE account/positions data via `/api/ig/*` endpoints + SNAPSHOT data from config files. Badge system: green "LIVE" for API-fetched, grey "SNAPSHOT" for file-based sections.
-    -   Credentials stored in `.openclaw/ig-config.json` with demo/live profiles. Env vars (`IG_API_KEY`, `IG_USERNAME`, `IG_PASSWORD`, `IG_ACCOUNT_ID`, `IG_BASE_URL`) used as seed on first run only.
-    -   Reference docs: `.openclaw/workspace/IG_TRADING.md` (API reference), `docs/IG_TRADING_SETUP.md` (setup guide with rate limits).
--   **Replit Secrets Management**: Securely stores API keys like `XAI_API_KEY`, `OPENCLAW_GATEWAY_TOKEN`, and IG credentials.
--   **Replit AI Integrations**: Provides access to OpenAI API key and base URL.
--   **`web_fetch` tool**: For fetching web page content.
+-   **xAI/Grok API**: Primary AI model provider (e.g., `grok-4-1-fast-reasoning`, `grok-4`, `grok-2`). Used for `web_search` tool.
+-   **OpenAI API**: Secondary AI model provider via Replit AI Integrations (e.g., `gpt-4o`, `gpt-4o-mini`).
+-   **IG Group Trading API**: For CFD trading (demo and live environments). Integrates skills for trading, market data, trade verification, and backtesting.
+-   **Replit Secrets Management**: For secure storage of API keys and credentials.
+-   **Replit AI Integrations**: Provides access to OpenAI API.
+-   **`web_fetch` tool**: For web content retrieval.

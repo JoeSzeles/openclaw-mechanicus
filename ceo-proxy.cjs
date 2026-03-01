@@ -20,6 +20,74 @@ const CANVAS_DIR = path.join(DATA_DIR, "canvas");
 const BOT_REGISTRY_FILE = path.join(DATA_DIR, "bot-registry.json");
 const https = require("https");
 
+const LOGIN_USER = process.env.OPENCLAW_LOGIN_USER || "";
+const LOGIN_PASS = process.env.OPENCLAW_LOGIN_PASSWORD || "";
+const LOGIN_SESSION_FILE = path.join(DATA_DIR, "login-sessions.json");
+const LOGIN_SESSION_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
+
+function loadLoginSessions() {
+  try { if (fs.existsSync(LOGIN_SESSION_FILE)) return JSON.parse(fs.readFileSync(LOGIN_SESSION_FILE, "utf8")); } catch (_) {}
+  return {};
+}
+function saveLoginSessions(sessions) {
+  try { fs.writeFileSync(LOGIN_SESSION_FILE, JSON.stringify(sessions)); } catch (_) {}
+}
+function createLoginSession() {
+  const token = crypto.randomBytes(32).toString("hex");
+  const sessions = loadLoginSessions();
+  const now = Date.now();
+  for (const k of Object.keys(sessions)) {
+    if (now - sessions[k].created > LOGIN_SESSION_MAX_AGE) delete sessions[k];
+  }
+  sessions[token] = { created: now, user: LOGIN_USER };
+  saveLoginSessions(sessions);
+  return token;
+}
+function validateLoginSession(req) {
+  if (!LOGIN_USER || !LOGIN_PASS) return true;
+  const cookies = (req.headers.cookie || "").split(";").map(c => c.trim());
+  for (const c of cookies) {
+    if (c.startsWith("openclaw_session=")) {
+      const tok = c.slice("openclaw_session=".length);
+      const sessions = loadLoginSessions();
+      const s = sessions[tok];
+      if (s && Date.now() - s.created < LOGIN_SESSION_MAX_AGE) return true;
+    }
+  }
+  return false;
+}
+function hasValidBearerToken(req) {
+  const h = req.headers["authorization"];
+  if (!h || !h.startsWith("Bearer ")) return false;
+  const tok = h.slice(7);
+  if (tok === GATEWAY_TOKEN) return true;
+  const keys = loadJson(API_KEYS_FILE, { keys: [] });
+  return keys.keys.some(k => k.active && k.key === tok);
+}
+function isLoginExempt(req) {
+  const url = new URL(req.url, "http://localhost");
+  const p = url.pathname;
+  if (p === "/api/login" || p === "/api/logout") return true;
+  if (p === "/login.html" || p === "/login") return true;
+  if (p.startsWith("/api/workers") || p.startsWith("/api/tasks") || p.startsWith("/api/heartbeat") ||
+      p.startsWith("/api/exchange") || p.startsWith("/api/sharedspace") || p.startsWith("/api/chat") || p.startsWith("/api/agent/chat")) {
+    if (hasValidBearerToken(req)) return true;
+  }
+  if (p.startsWith("/__openclaw__/canvas/")) return true;
+  return false;
+}
+function serveLoginPage(req, res) {
+  const loginPath = path.join(__dirname, "dist", "control-ui", "login.html");
+  try {
+    const html = fs.readFileSync(loginPath, "utf8");
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(html);
+  } catch (e) {
+    res.writeHead(500, { "Content-Type": "text/plain" });
+    res.end("Login page not found");
+  }
+}
+
 // IG API persistent session
 let igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
 const IG_SESSION_TTL = 5 * 60 * 1000;
@@ -1889,6 +1957,45 @@ async function handleApi(req, res) {
     return true;
   }
 
+  if (p === "/api/login" && req.method === "POST") {
+    const body = JSON.parse((await readBody(req)).toString() || "{}");
+    const u = (body.username || "").trim();
+    const pw = (body.password || "").trim();
+    if (!LOGIN_USER || !LOGIN_PASS) return json(res, 200, { ok: false, error: "Login not configured" }), true;
+    if (u !== LOGIN_USER || pw !== LOGIN_PASS) {
+      console.log(`[login] Failed login attempt for user: ${u}`);
+      return json(res, 200, { ok: false, error: "Invalid username or password" }), true;
+    }
+    const sessionToken = createLoginSession();
+    const maxAgeSec = Math.floor(LOGIN_SESSION_MAX_AGE / 1000);
+    const isSecure = (req.headers["x-forwarded-proto"] === "https") ? "; Secure" : "";
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "Set-Cookie": `openclaw_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}${isSecure}`
+    });
+    res.end(JSON.stringify({ ok: true }));
+    console.log(`[login] User ${u} logged in successfully`);
+    return true;
+  }
+
+  if (p === "/api/logout" && req.method === "POST") {
+    const cookies = (req.headers.cookie || "").split(";").map(c => c.trim());
+    for (const c of cookies) {
+      if (c.startsWith("openclaw_session=")) {
+        const tok = c.slice("openclaw_session=".length);
+        const sessions = loadLoginSessions();
+        delete sessions[tok];
+        saveLoginSessions(sessions);
+      }
+    }
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "Set-Cookie": "openclaw_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+    });
+    res.end(JSON.stringify({ ok: true }));
+    return true;
+  }
+
   if (p === "/api/dispatch" && req.method === "POST") {
     if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" }), true;
     const body = JSON.parse((await readBody(req)).toString() || "{}");
@@ -2103,6 +2210,14 @@ function serveCanvas(req, res) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    if (!isLoginExempt(req) && !validateLoginSession(req)) {
+      const url = new URL(req.url, "http://localhost");
+      const p = url.pathname;
+      if (p.startsWith("/api/")) {
+        return json(res, 401, { error: "Not authenticated" });
+      }
+      return serveLoginPage(req, res);
+    }
     if (serveCanvas(req, res)) return;
     if (!(await handleApi(req, res))) proxyReq(req, res);
   } catch (err) {
@@ -2112,6 +2227,11 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.on("upgrade", (req, socket, head) => {
+  if (!validateLoginSession(req)) {
+    socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+    socket.destroy();
+    return;
+  }
   const opts = {
     hostname: "127.0.0.1",
     port: GATEWAY_PORT,
