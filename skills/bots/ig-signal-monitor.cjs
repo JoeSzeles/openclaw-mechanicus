@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 "use strict";
 
-const https = require("https");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -12,68 +11,16 @@ const CANVAS_DIR = path.join(process.cwd(), ".openclaw", "canvas");
 const IG_CONFIG_FILE = path.join(process.cwd(), ".openclaw", "ig-config.json");
 const TEST_MODE = process.argv.includes("--test");
 
+const PROXY_BASE = "http://localhost:5000";
+const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
+
 const priceHistory = {};
-let cst = null;
-let xSecurityToken = null;
-let sessionActive = false;
-let rateLimitBackoffUntil = 0;
-const apiCallTimestamps = [];
 
 function log(msg) {
   const ts = new Date().toISOString();
   console.log(`[${ts}] ${msg}`);
 }
 
-function getRateLimitConfig(config) {
-  return {
-    apiDelayMs: config.apiDelayMs != null ? config.apiDelayMs : 3000,
-    maxApiCallsPerMinute: config.maxApiCallsPerMinute != null ? config.maxApiCallsPerMinute : 10,
-    rateLimitBackoffMs: config.rateLimitBackoffMs != null ? config.rateLimitBackoffMs : 300000,
-  };
-}
-
-async function rateLimitedSleep(config) {
-  const rl = getRateLimitConfig(config);
-  if (rl.apiDelayMs > 0) {
-    await new Promise((r) => setTimeout(r, rl.apiDelayMs));
-  }
-}
-
-function trackApiCall() {
-  const now = Date.now();
-  apiCallTimestamps.push(now);
-  const oneMinuteAgo = now - 60000;
-  while (apiCallTimestamps.length > 0 && apiCallTimestamps[0] < oneMinuteAgo) {
-    apiCallTimestamps.shift();
-  }
-}
-
-async function checkApiQuota(config) {
-  const now = Date.now();
-  if (rateLimitBackoffUntil > now) {
-    const waitSec = Math.ceil((rateLimitBackoffUntil - now) / 1000);
-    log(`RATE LIMIT: Backing off for ${waitSec}s more (hit IG quota)`);
-    await new Promise((r) => setTimeout(r, rateLimitBackoffUntil - now));
-  }
-  const rl = getRateLimitConfig(config);
-  if (apiCallTimestamps.length >= rl.maxApiCallsPerMinute) {
-    const waitMs = 60000 - (now - apiCallTimestamps[0]) + 1000;
-    if (waitMs > 0) {
-      log(`RATE LIMIT: ${apiCallTimestamps.length} calls in last minute, pausing ${Math.ceil(waitMs / 1000)}s`);
-      await new Promise((r) => setTimeout(r, waitMs));
-    }
-  }
-}
-
-function handleRateLimitError(status, body, config) {
-  if (status === 403 && body && body.includes("exceeded-api-key-allowance")) {
-    const rl = getRateLimitConfig(config);
-    rateLimitBackoffUntil = Date.now() + rl.rateLimitBackoffMs;
-    log(`RATE LIMIT HIT: IG API quota exceeded (403). Backing off for ${rl.rateLimitBackoffMs / 1000}s. Adjust apiDelayMs/maxApiCallsPerMinute in config for less aggressive polling.`);
-    return true;
-  }
-  return false;
-}
 
 function loadConfig() {
   if (!fs.existsSync(CONFIG_PATH)) {
@@ -98,67 +45,54 @@ function saveAlerts(alerts) {
   fs.writeFileSync(ALERTS_PATH, JSON.stringify(alerts, null, 2));
 }
 
-function request(method, urlStr, headers, body) {
+function proxyRequest(method, apiPath) {
   return new Promise((resolve, reject) => {
-    const url = new URL(urlStr);
-    const mod = url.protocol === "https:" ? https : http;
-    const opts = {
-      hostname: url.hostname,
-      port: url.port || (url.protocol === "https:" ? 443 : 80),
-      path: url.pathname + url.search,
+    const full = PROXY_BASE + apiPath;
+    const parsed = new URL(full);
+    const req = http.request({
+      hostname: parsed.hostname,
+      port: parsed.port || 80,
+      path: parsed.pathname + parsed.search,
       method,
-      headers,
-    };
-    const req = mod.request(opts, (res) => {
+      headers: {
+        "Content-Type": "application/json; charset=UTF-8",
+        Accept: "application/json; charset=UTF-8",
+        Authorization: "Bearer " + GATEWAY_TOKEN,
+      },
+    }, (res) => {
       const chunks = [];
       res.on("data", (c) => chunks.push(c));
       res.on("end", () => {
         const raw = Buffer.concat(chunks).toString();
-        resolve({ status: res.statusCode, headers: res.headers, body: raw });
+        let json = null;
+        try { json = JSON.parse(raw); } catch (_) {}
+        resolve({ status: res.statusCode, body: json, raw });
       });
     });
     req.on("error", reject);
-    if (body) req.write(typeof body === "string" ? body : JSON.stringify(body));
     req.end();
   });
 }
 
-function getIgCredentials() {
+function getIgProfile() {
   try {
     if (fs.existsSync(IG_CONFIG_FILE)) {
       const igCfg = JSON.parse(fs.readFileSync(IG_CONFIG_FILE, "utf8"));
       const profile = igCfg.profiles[igCfg.activeProfile];
-      if (profile && profile.apiKey && profile.username && profile.password && profile.baseUrl) {
-        return { baseUrl: profile.baseUrl, apiKey: profile.apiKey, username: profile.username, password: profile.password, accountId: profile.accountId, profile: igCfg.activeProfile };
+      if (profile) {
+        return { profile: igCfg.activeProfile, baseUrl: profile.baseUrl || "" };
       }
     }
   } catch (_) {}
-  return {
-    baseUrl: process.env.IG_BASE_URL || "",
-    apiKey: process.env.IG_API_KEY || "",
-    username: process.env.IG_USERNAME || "",
-    password: process.env.IG_PASSWORD || "",
-    accountId: process.env.IG_ACCOUNT_ID || "",
-    profile: "env"
-  };
-}
-
-function getEnv(name) {
-  const creds = getIgCredentials();
-  const map = { IG_BASE_URL: creds.baseUrl, IG_API_KEY: creds.apiKey, IG_USERNAME: creds.username, IG_PASSWORD: creds.password, IG_ACCOUNT_ID: creds.accountId };
-  return map[name] || process.env[name] || "";
+  return { profile: "env", baseUrl: process.env.IG_BASE_URL || "" };
 }
 
 async function fetchStreamedPrice(epic) {
   try {
-    const res = await request("GET", "http://localhost:5000/api/ig/stream/prices", {
-      Authorization: "Bearer " + (process.env.OPENCLAW_GATEWAY_TOKEN || ""),
-      Accept: "application/json"
-    });
-    if (res.status === 200) {
-      const data = JSON.parse(res.body);
-      if (data.streaming && data.prices && data.prices[epic]) {
-        const p = data.prices[epic];
+    const res = await proxyRequest("GET", "/api/ig/stream/prices");
+    if (res.status === 200 && res.body) {
+      if (res.body.streaming && res.body.prices && res.body.prices[epic]) {
+        const p = res.body.prices[epic];
         if (p.bid && p.offer && (Date.now() - p.timestamp) < 60000) {
           return {
             snapshot: {
@@ -173,82 +107,13 @@ async function fetchStreamedPrice(epic) {
   return null;
 }
 
-async function authenticate(config) {
-  const creds = getIgCredentials();
-  const baseUrl = creds.baseUrl;
-  const apiKey = creds.apiKey;
-  const username = creds.username;
-  const password = creds.password;
-
-  if (!baseUrl || !apiKey || !username || !password) {
-    log("Missing IG credentials. Set them in Config page or env vars.");
-    return false;
-  }
-
-  trackApiCall();
-  log("Authenticating with IG API...");
-  const res = await request("POST", `${baseUrl}/session`, {
-    "Content-Type": "application/json; charset=UTF-8",
-    Accept: "application/json; charset=UTF-8",
-    "X-IG-API-KEY": apiKey,
-    Version: "2",
-  }, JSON.stringify({ identifier: username, password }));
-
+async function fetchPrice(epic) {
+  const res = await proxyRequest("GET", `/api/ig/markets/${epic}`);
   if (res.status !== 200) {
-    if (handleRateLimitError(res.status, res.body, config || {})) return false;
-    log(`Authentication failed (${res.status}): ${res.body}`);
-    sessionActive = false;
-    return false;
-  }
-
-  cst = res.headers["cst"] || res.headers["CST"];
-  xSecurityToken = res.headers["x-security-token"] || res.headers["X-SECURITY-TOKEN"];
-
-  if (!cst || !xSecurityToken) {
-    log("Authentication succeeded but missing session tokens in headers");
-    sessionActive = false;
-    return false;
-  }
-
-  sessionActive = true;
-  log("Authenticated successfully");
-  return true;
-}
-
-function authHeaders() {
-  return {
-    "X-IG-API-KEY": getEnv("IG_API_KEY"),
-    CST: cst,
-    "X-SECURITY-TOKEN": xSecurityToken,
-    "Content-Type": "application/json; charset=UTF-8",
-  };
-}
-
-async function fetchPrice(epic, config) {
-  const baseUrl = getEnv("IG_BASE_URL");
-  await checkApiQuota(config || {});
-  trackApiCall();
-  const res = await request("GET", `${baseUrl}/markets/${epic}`, authHeaders());
-
-  if (res.status === 401) {
-    log("Session expired, re-authenticating...");
-    const ok = await authenticate(config);
-    if (!ok) return null;
-    await rateLimitedSleep(config || {});
-    trackApiCall();
-    const retry = await request("GET", `${baseUrl}/markets/${epic}`, authHeaders());
-    if (retry.status !== 200) return null;
-    return JSON.parse(retry.body);
-  }
-
-  if (handleRateLimitError(res.status, res.body, config || {})) return null;
-
-  if (res.status !== 200) {
-    log(`Failed to fetch price for ${epic} (${res.status}): ${res.body}`);
+    log(`Failed to fetch price for ${epic} (${res.status}): ${res.body?.error || res.raw}`);
     return null;
   }
-
-  return JSON.parse(res.body);
+  return res.body;
 }
 
 function recordTick(epic, bid, offer) {
@@ -363,8 +228,8 @@ async function pollCycle(config) {
       }
     }
     if (!data) {
-      if (i > 0) await rateLimitedSleep(config);
-      data = await fetchPrice(instrument.epic, config);
+      if (i > 0) await new Promise((r) => setTimeout(r, 1000));
+      data = await fetchPrice(instrument.epic);
     }
     if (!data || !data.snapshot) {
       log(`No data for ${instrument.name} (${instrument.epic})`);
@@ -422,8 +287,8 @@ async function run() {
   log(TEST_MODE ? "Starting in TEST mode (single cycle)" : "Starting signal monitor");
 
   const config = loadConfig();
-  const creds = getIgCredentials();
-  log(`Using IG profile: ${creds.profile} (${creds.baseUrl.includes("demo") ? "DEMO" : "LIVE"})`);
+  const info = getIgProfile();
+  log(`Using IG profile: ${info.profile} (${info.baseUrl.includes("demo") ? "DEMO" : "LIVE"}) — via proxy at ${PROXY_BASE}`);
 
   if (!config.enabled) {
     log("Monitor is disabled in config. Set enabled=true to start.");
@@ -435,14 +300,12 @@ async function run() {
     process.exit(1);
   }
 
-  const ok = await authenticate(config);
-  if (!ok) {
-    log("Failed to authenticate. Exiting.");
+  if (!GATEWAY_TOKEN) {
+    log("OPENCLAW_GATEWAY_TOKEN not set. Monitor cannot authenticate with the proxy.");
     process.exit(1);
   }
 
-  const rl = getRateLimitConfig(config);
-  log(`Rate limiting: ${rl.apiDelayMs}ms between calls, max ${rl.maxApiCallsPerMinute}/min, backoff ${rl.rateLimitBackoffMs / 1000}s on quota hit`);
+  log("Using centralized proxy session (no direct IG auth)");
 
   if (TEST_MODE) {
     log("Running single poll cycle...");

@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 "use strict";
 
-const https = require("https");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -15,61 +14,13 @@ const IG_CONFIG_FILE = path.join(process.cwd(), ".openclaw", "ig-config.json");
 
 const TEST_MODE = process.argv.includes("--test");
 
-let sessionTokens = { cst: null, securityToken: null };
+const PROXY_BASE = "http://localhost:5000";
+const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
+
 let openPositions = [];
 let botLog = [];
 let accountBalance = null;
-let rateLimitBackoffUntil = 0;
-const apiCallTimestamps = [];
 let startupProfile = null;
-
-function getRateLimitConfig(config) {
-  return {
-    apiDelayMs: config.apiDelayMs != null ? config.apiDelayMs : 3000,
-    maxApiCallsPerMinute: config.maxApiCallsPerMinute != null ? config.maxApiCallsPerMinute : 10,
-    rateLimitBackoffMs: config.rateLimitBackoffMs != null ? config.rateLimitBackoffMs : 300000,
-  };
-}
-
-async function rateLimitedSleep(config) {
-  const rl = getRateLimitConfig(config || {});
-  if (rl.apiDelayMs > 0) await new Promise((r) => setTimeout(r, rl.apiDelayMs));
-}
-
-function trackApiCall() {
-  const now = Date.now();
-  apiCallTimestamps.push(now);
-  const oneMinuteAgo = now - 60000;
-  while (apiCallTimestamps.length > 0 && apiCallTimestamps[0] < oneMinuteAgo) apiCallTimestamps.shift();
-}
-
-async function checkApiQuota(config) {
-  const now = Date.now();
-  if (rateLimitBackoffUntil > now) {
-    const waitSec = Math.ceil((rateLimitBackoffUntil - now) / 1000);
-    log("WARN", `RATE LIMIT: Backing off for ${waitSec}s more (hit IG quota)`);
-    await new Promise((r) => setTimeout(r, rateLimitBackoffUntil - now));
-  }
-  const rl = getRateLimitConfig(config || {});
-  if (apiCallTimestamps.length >= rl.maxApiCallsPerMinute) {
-    const waitMs = 60000 - (now - apiCallTimestamps[0]) + 1000;
-    if (waitMs > 0) {
-      log("WARN", `RATE LIMIT: ${apiCallTimestamps.length} calls in last minute, pausing ${Math.ceil(waitMs / 1000)}s`);
-      await new Promise((r) => setTimeout(r, waitMs));
-    }
-  }
-}
-
-function handleRateLimitError(status, body, config) {
-  const errStr = typeof body === "string" ? body : (body?.errorCode || JSON.stringify(body) || "");
-  if (status === 403 && errStr.includes("exceeded-api-key-allowance")) {
-    const rl = getRateLimitConfig(config || {});
-    rateLimitBackoffUntil = Date.now() + rl.rateLimitBackoffMs;
-    log("ERROR", `RATE LIMIT HIT: IG API quota exceeded (403). Backing off for ${rl.rateLimitBackoffMs / 1000}s. Adjust apiDelayMs/maxApiCallsPerMinute in config.`);
-    return true;
-  }
-  return false;
-}
 
 let currentConfig = {};
 
@@ -131,82 +82,66 @@ function loadAlerts() {
   return [];
 }
 
-function getIgCredentials() {
+function getIgProfile() {
   try {
     if (fs.existsSync(IG_CONFIG_FILE)) {
       const igCfg = JSON.parse(fs.readFileSync(IG_CONFIG_FILE, "utf8"));
       const profile = igCfg.profiles[igCfg.activeProfile];
-      if (profile && profile.apiKey && profile.username && profile.password && profile.baseUrl) {
-        return { baseUrl: profile.baseUrl, apiKey: profile.apiKey, username: profile.username, password: profile.password, accountId: profile.accountId, profile: igCfg.activeProfile };
+      if (profile) {
+        return { profile: igCfg.activeProfile, baseUrl: profile.baseUrl || "" };
       }
     }
   } catch (_) {}
-  return {
-    baseUrl: process.env.IG_BASE_URL || "https://demo-api.ig.com/gateway/deal",
-    apiKey: process.env.IG_API_KEY || "",
-    username: process.env.IG_USERNAME || "",
-    password: process.env.IG_PASSWORD || "",
-    accountId: process.env.IG_ACCOUNT_ID || "",
-    profile: "env"
-  };
+  return { profile: "env", baseUrl: process.env.IG_BASE_URL || "" };
 }
 
-function isLiveProfile(creds) {
-  return creds.profile === "live" || (!creds.baseUrl.includes("demo"));
+function isLiveProfile(info) {
+  return info.profile === "live" || (!info.baseUrl.includes("demo"));
 }
 
 function checkLiveSafety(config) {
-  const creds = getIgCredentials();
-  const isLive = isLiveProfile(creds);
+  const info = getIgProfile();
+  const isLive = isLiveProfile(info);
 
-  if (startupProfile && creds.profile !== startupProfile) {
-    log("WARN", `PROFILE CHANGED mid-run: was "${startupProfile}", now "${creds.profile}". Stopping bot for safety. Restart the bot manually after confirming the switch.`);
+  if (startupProfile && info.profile !== startupProfile) {
+    log("WARN", `PROFILE CHANGED mid-run: was "${startupProfile}", now "${info.profile}". Stopping bot for safety. Restart the bot manually after confirming the switch.`);
     return { safe: false, reason: "profile_changed" };
   }
 
   if (isLive && !config.allowLive) {
-    log("WARN", `LIVE TRADING BLOCKED: Profile is "${creds.profile}" (${creds.baseUrl}) but strategy config does not have "allowLive": true. Add "allowLive": true to ig-strategy.json to enable live trading. Bot will monitor only, no trades.`);
+    log("WARN", `LIVE TRADING BLOCKED: Profile is "${info.profile}" (${info.baseUrl}) but strategy config does not have "allowLive": true. Add "allowLive": true to ig-strategy.json to enable live trading. Bot will monitor only, no trades.`);
     return { safe: false, reason: "live_not_allowed" };
   }
 
   return { safe: true, isLive };
 }
 
-function request(method, urlPath, body, extraHeaders) {
+function proxyRequest(method, apiPath, body) {
   return new Promise((resolve, reject) => {
-    const creds = getIgCredentials();
-    const baseUrl = urlPath.startsWith("http") ? "" : creds.baseUrl;
-    const full = urlPath.startsWith("http") ? urlPath : baseUrl.replace(/\/+$/, "") + urlPath;
+    const full = PROXY_BASE + apiPath;
     const parsed = new URL(full);
-    const isHttps = parsed.protocol === "https:";
     const headers = {
       "Content-Type": "application/json; charset=UTF-8",
       Accept: "application/json; charset=UTF-8",
-      "X-IG-API-KEY": creds.apiKey,
-      ...(sessionTokens.cst ? { CST: sessionTokens.cst } : {}),
-      ...(sessionTokens.securityToken ? { "X-SECURITY-TOKEN": sessionTokens.securityToken } : {}),
-      ...(extraHeaders || {})
+      Authorization: "Bearer " + GATEWAY_TOKEN,
     };
 
     const payload = body ? JSON.stringify(body) : null;
     if (payload) headers["Content-Length"] = Buffer.byteLength(payload);
 
-    const opts = {
+    const req = http.request({
       hostname: parsed.hostname,
-      port: parsed.port || (isHttps ? 443 : 80),
+      port: parsed.port || 80,
       path: parsed.pathname + parsed.search,
       method,
       headers
-    };
-
-    const mod = isHttps ? https : http;
-    const req = mod.request(opts, (res) => {
+    }, (res) => {
       let data = "";
       res.on("data", (c) => (data += c));
       res.on("end", () => {
         let json = null;
         try { json = JSON.parse(data); } catch (_) {}
-        resolve({ status: res.statusCode, headers: res.headers, body: json, raw: data });
+        resolve({ status: res.statusCode, body: json, raw: data });
       });
     });
     req.on("error", reject);
@@ -217,9 +152,7 @@ function request(method, urlPath, body, extraHeaders) {
 
 async function fetchStreamedPrice(epic) {
   try {
-    const res = await request("GET", "http://localhost:5000/api/ig/stream/prices", null, {
-      Authorization: "Bearer " + (process.env.OPENCLAW_GATEWAY_TOKEN || ""),
-    });
+    const res = await proxyRequest("GET", "/api/ig/stream/prices");
     if (res.status === 200 && res.body) {
       if (res.body.streaming && res.body.prices && res.body.prices[epic]) {
         const p = res.body.prices[epic];
@@ -237,94 +170,28 @@ async function fetchStreamedPrice(epic) {
   return null;
 }
 
-async function authenticate() {
-  const creds = getIgCredentials();
-  const apiKey = creds.apiKey;
-  const username = creds.username;
-  const password = creds.password;
-
-  if (!apiKey || !username || !password) {
-    throw new Error("Missing IG credentials. Set them in Config page or env vars.");
-  }
-
-  await checkApiQuota(currentConfig);
-  trackApiCall();
-  log("INFO", "Authenticating with IG API...");
-  const res = await request("POST", "/session", { identifier: username, password }, { Version: "2" });
-
-  if (res.status !== 200) {
-    if (handleRateLimitError(res.status, res.body, currentConfig)) {
-      throw new Error("IG API quota exceeded. Backing off.");
-    }
-    const errCode = res.body?.errorCode || res.raw;
-    throw new Error(`Authentication failed (${res.status}): ${errCode}`);
-  }
-
-  sessionTokens.cst = res.headers["cst"] || res.headers["CST"];
-  sessionTokens.securityToken = res.headers["x-security-token"] || res.headers["X-SECURITY-TOKEN"];
-
-  if (!sessionTokens.cst || !sessionTokens.securityToken) {
-    throw new Error("Authentication succeeded but session tokens missing from response headers.");
-  }
-
-  log("INFO", "Authenticated successfully.");
-  return res.body;
-}
-
-async function ensureSession() {
-  if (!sessionTokens.cst) {
-    await authenticate();
-  }
-}
-
-async function refreshSession() {
-  sessionTokens = { cst: null, securityToken: null };
-  await authenticate();
-}
-
 async function fetchAccounts() {
-  await checkApiQuota(currentConfig);
-  trackApiCall();
-  const res = await request("GET", "/accounts");
-  if (res.status === 401) {
-    await refreshSession();
-    return fetchAccounts();
-  }
-  if (handleRateLimitError(res.status, res.body, currentConfig)) return null;
+  const res = await proxyRequest("GET", "/api/ig/account");
   if (res.status !== 200) {
-    log("ERROR", "Failed to fetch accounts", { status: res.status, error: res.body?.errorCode });
+    log("ERROR", "Failed to fetch accounts", { status: res.status, error: res.body?.error });
     return null;
   }
   return res.body;
 }
 
 async function fetchPositions() {
-  await checkApiQuota(currentConfig);
-  trackApiCall();
-  const res = await request("GET", "/positions", null, { Version: "2" });
-  if (res.status === 401) {
-    await refreshSession();
-    return fetchPositions();
-  }
-  if (handleRateLimitError(res.status, res.body, currentConfig)) return [];
+  const res = await proxyRequest("GET", "/api/ig/positions");
   if (res.status !== 200) {
-    log("ERROR", "Failed to fetch positions", { status: res.status, error: res.body?.errorCode });
+    log("ERROR", "Failed to fetch positions", { status: res.status, error: res.body?.error });
     return [];
   }
   return res.body?.positions || [];
 }
 
 async function fetchPrice(epic) {
-  await checkApiQuota(currentConfig);
-  trackApiCall();
-  const res = await request("GET", `/markets/${epic}`);
-  if (res.status === 401) {
-    await refreshSession();
-    return fetchPrice(epic);
-  }
-  if (handleRateLimitError(res.status, res.body, currentConfig)) return null;
+  const res = await proxyRequest("GET", `/api/ig/markets/${epic}`);
   if (res.status !== 200) {
-    log("ERROR", `Failed to fetch price for ${epic}`, { status: res.status, error: res.body?.errorCode });
+    log("ERROR", `Failed to fetch price for ${epic}`, { status: res.status, error: res.body?.error });
     return null;
   }
   return res.body;
@@ -531,32 +398,25 @@ async function openPosition(strategy) {
     return { dealReference: "TEST-" + Date.now(), testMode: true };
   }
 
-  const res = await request("POST", "/positions/otc", body, { Version: "2" });
-  if (res.status === 401) {
-    await refreshSession();
-    return openPosition(strategy);
-  }
-  if (res.status !== 200) {
-    log("ERROR", `Failed to open position for ${strategy.instrument}`, { status: res.status, error: res.body?.errorCode });
+  const res = await proxyRequest("POST", "/api/ig/positions/open", body);
+  if (res.status !== 200 || !res.body?.ok) {
+    log("ERROR", `Failed to open position for ${strategy.instrument}`, { status: res.status, error: res.body?.error || res.body?.errorCode });
     return null;
   }
 
-  const dealRef = res.body?.dealReference;
-  if (dealRef) {
+  const dealRef = res.body.dealReference;
+  const confirmation = res.body.confirmation;
+  if (confirmation) {
+    log("TRADE", `Deal confirmed: ${confirmation.dealStatus}`, {
+      dealId: confirmation.dealId,
+      status: confirmation.dealStatus,
+      reason: confirmation.reason,
+      level: confirmation.level
+    });
+  } else {
     log("INFO", `Order placed, dealReference: ${dealRef}`);
-    await new Promise((r) => setTimeout(r, 1000));
-    const confirm = await request("GET", `/confirms/${dealRef}`);
-    if (confirm.body) {
-      log("TRADE", `Deal confirmed: ${confirm.body.dealStatus}`, {
-        dealId: confirm.body.dealId,
-        status: confirm.body.dealStatus,
-        reason: confirm.body.reason,
-        level: confirm.body.level
-      });
-    }
-    return confirm.body || res.body;
   }
-  return res.body;
+  return confirmation || res.body;
 }
 
 function evaluateStrategy(strategy, marketData) {
@@ -734,7 +594,7 @@ async function runCycle(config) {
       marketData = await fetchStreamedPrice(strategy.instrument);
     }
     if (!marketData) {
-      if (i > 0) await rateLimitedSleep(config);
+      if (i > 0) await new Promise((r) => setTimeout(r, 1000));
       marketData = await fetchPrice(strategy.instrument);
     }
     if (!marketData) {
@@ -777,11 +637,11 @@ async function runCycle(config) {
 }
 
 async function main() {
-  const creds = getIgCredentials();
-  const isLive = isLiveProfile(creds);
-  startupProfile = creds.profile;
+  const info = getIgProfile();
+  const isLive = isLiveProfile(info);
+  startupProfile = info.profile;
   console.log(`\n=== IG Trading Bot ${TEST_MODE ? "(TEST MODE)" : "(LIVE)"} ===`);
-  console.log(`Using IG profile: ${creds.profile} (${isLive ? "LIVE" : "DEMO"})`);
+  console.log(`Using IG profile: ${info.profile} (${isLive ? "LIVE" : "DEMO"}) — via proxy at ${PROXY_BASE}`);
   if (isLive) console.log(`*** LIVE ACCOUNT — real money at risk ***\n`);
   else console.log(``);
 
@@ -805,14 +665,23 @@ async function main() {
     }
   }
 
-  const rl = getRateLimitConfig(config);
-  log("INFO", `Rate limiting: ${rl.apiDelayMs}ms between calls, max ${rl.maxApiCallsPerMinute}/min, backoff ${rl.rateLimitBackoffMs / 1000}s on quota hit`);
+  log("INFO", "Using centralized proxy session (no direct IG auth)");
 
-  await ensureSession();
+  if (!GATEWAY_TOKEN) {
+    log("ERROR", "OPENCLAW_GATEWAY_TOKEN not set. Bot cannot authenticate with the proxy.");
+    process.exit(1);
+  }
 
   const accounts = await fetchAccounts();
   if (accounts?.accounts?.length > 0) {
-    const acct = accounts.accounts.find((a) => a.accountId === creds.accountId) || accounts.accounts[0];
+    const igCfg = getIgProfile();
+    let accountId = null;
+    try {
+      const cfgFile = JSON.parse(fs.readFileSync(IG_CONFIG_FILE, "utf8"));
+      const profile = cfgFile.profiles[cfgFile.activeProfile];
+      if (profile) accountId = profile.accountId;
+    } catch (_) {}
+    const acct = (accountId && accounts.accounts.find((a) => a.accountId === accountId)) || accounts.accounts[0];
     accountBalance = acct.balance?.balance || acct.balance?.available || null;
     log("INFO", `Account: ${acct.accountId}, Balance: ${accountBalance}`);
   }

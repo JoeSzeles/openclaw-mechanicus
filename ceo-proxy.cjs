@@ -1175,10 +1175,16 @@ async function handleIgApi(req, res, p) {
     if (req.method === "GET" && p.startsWith("/api/ig/markets/")) {
       const epic = p.replace("/api/ig/markets/", "");
       if (!epic) return json(res, 400, { error: "Missing epic" });
+      const cacheKey = "market:" + epic;
+      const cached = igCacheGet(cacheKey);
+      if (cached) return json(res, 200, cached);
       const session = await igAuth();
       const r = await igRequest("GET", "/markets/" + epic, igHeaders(session));
       if (r.status !== 200) return json(res, r.status, { error: "IG API error", detail: r.body });
-      return igJsonResponse(res, 200, r.body);
+      const data = safeParseIgBody(r.body);
+      if (data._parseError) return json(res, 502, { error: "IG returned non-JSON", detail: data._raw });
+      igCacheSet(cacheKey, data);
+      return json(res, 200, data);
     }
 
     if (req.method === "GET" && p === "/api/ig/markets") {

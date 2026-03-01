@@ -12,7 +12,7 @@ Trade CFDs on the IG Group platform via the local proxy. The proxy handles all a
 
 ## How It Works
 
-All IG operations go through `http://localhost:5000/api/ig/...` with `Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN`. The proxy manages IG sessions (CST/XST tokens), rate limiting, and caching. You NEVER authenticate to IG directly.
+All IG operations go through `https://$REPLIT_DEV_DOMAIN/api/ig/...` with `Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN`. **IMPORTANT**: You MUST use the public URL (`https://$REPLIT_DEV_DOMAIN/...`), NOT `http://localhost:5000/...` — the `web_fetch` tool blocks localhost due to SSRF protection. The proxy manages IG sessions (CST/XST tokens), rate limiting, and caching. You NEVER authenticate to IG directly.
 
 ## Critical Rules
 
