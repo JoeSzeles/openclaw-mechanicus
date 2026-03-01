@@ -480,13 +480,35 @@ export function renderChat(props: ChatProps) {
             ></textarea>
           </label>
           <div class="chat-compose__actions">
-            <button
-              class="btn"
-              ?disabled=${!props.connected || (!canAbort && props.sending)}
-              @click=${canAbort ? props.onAbort : props.onNewSession}
-            >
-              ${canAbort ? "Stop" : "New session"}
-            </button>
+            ${canAbort
+              ? html`<button
+                  class="btn"
+                  ?disabled=${!props.connected}
+                  @click=${props.onAbort}
+                >Stop</button>`
+              : html`<div class="chat-new-session-wrap">
+                  <select
+                    class="chat-new-session-select"
+                    ?disabled=${!props.connected || props.sending}
+                    @change=${(e: Event) => {
+                      const sel = e.target as HTMLSelectElement;
+                      const agentId = sel.value;
+                      sel.value = "";
+                      if (agentId && props.onSelectAgent) {
+                        props.onSelectAgent(agentId);
+                      } else {
+                        props.onNewSession();
+                      }
+                    }}
+                  >
+                    <option value="" disabled selected>New chat ▾</option>
+                    ${(props.agentsList?.agents ?? []).map((agent) => {
+                      const name = agent.identity?.name || agent.name || agent.id;
+                      return html`<option value=${agent.id}>${name}</option>`;
+                    })}
+                  </select>
+                </div>`
+            }
             <button
               class="btn primary"
               ?disabled=${!props.connected}
