@@ -1674,20 +1674,9 @@ function getActiveSessionKey() {
     if (fs.existsSync(sessFile)) {
       const sessData = JSON.parse(fs.readFileSync(sessFile, "utf8"));
       const webchatKey = "agent:" + agentId + ":webchat:main";
-      const mainKey = "agent:" + agentId + ":main";
-      let best = null;
-      let bestTime = 0;
-      for (const key of [webchatKey, mainKey]) {
-        const entry = sessData[key];
-        if (entry && entry.sessionId) {
-          const t = entry.updatedAt || 0;
-          if (t > bestTime) {
-            bestTime = t;
-            best = key;
-          }
-        }
+      if (sessData[webchatKey] && sessData[webchatKey].sessionId) {
+        return webchatKey;
       }
-      if (best) return best;
     }
   } catch {}
   return gwWebchatSessionKey || gwSessionKey || "agent:main:main";
