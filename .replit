@@ -53,5 +53,4 @@ externalPort = 3001
 [deployment]
 deploymentTarget = "vm"
 run = ["bash", "-c", "cd /home/runner/workspace && COREPACK_ENABLE_STRICT=0 bash start.sh"]
-publicDir = "dist"
-build = ["bash", "-c", "echo 'skip'"]
+build = ["bash", "-c", "echo pre-built"]
