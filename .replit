@@ -50,6 +50,10 @@ externalPort = 80
 localPort = 5001
 externalPort = 3001
 
+[[ports]]
+localPort = 5012
+externalPort = 3002
+
 [deployment]
 deploymentTarget = "vm"
 run = ["bash", "-c", "cd /home/runner/workspace && COREPACK_ENABLE_STRICT=0 bash start.sh"]

@@ -741,7 +741,7 @@ async function handleIgApi(req, res, p) {
       const orderBody = {
         epic: body.epic,
         direction: body.direction.toUpperCase(),
-        size: body.size,
+        size: String(body.size),
         orderType: body.orderType || "MARKET",
         currencyCode: body.currencyCode || "USD",
         expiry: body.expiry || "-",
@@ -786,7 +786,8 @@ async function handleIgApi(req, res, p) {
       const session = await igAuth();
       let direction = body.direction;
       let autoSize = null;
-      if (!direction) {
+      let autoExpiry = null;
+      if (!direction || !body.size) {
         try {
           const posRes = await igRequest("GET", "/positions", { ...igHeaders(session), Version: "2" });
           if (posRes.status === 200) {
@@ -794,9 +795,10 @@ async function handleIgApi(req, res, p) {
             console.log(`[ig-trade] Looking for dealId=${body.dealId} among ${allPos.length} positions`);
             const found = allPos.find(item => item.position && item.position.dealId === body.dealId);
             if (found) {
-              direction = found.position.direction === "BUY" ? "SELL" : "BUY";
+              if (!direction) direction = found.position.direction === "BUY" ? "SELL" : "BUY";
               autoSize = found.position.size;
-              console.log(`[ig-trade] Auto-detected: direction=${direction} size=${autoSize}`);
+              autoExpiry = found.market?.expiry || "-";
+              console.log(`[ig-trade] Auto-detected: direction=${direction} size=${autoSize} expiry=${autoExpiry}`);
             } else {
               console.log(`[ig-trade] dealId not found. Available: ${allPos.map(item => item.position?.dealId).join(", ")}`);
             }
@@ -815,8 +817,9 @@ async function handleIgApi(req, res, p) {
       const closeBody = {
         dealId: body.dealId,
         direction: direction.toUpperCase(),
-        size: body.size,
+        size: String(body.size),
         orderType: body.orderType || "MARKET",
+        expiry: body.expiry || autoExpiry || "-",
       };
       console.log(`[ig-trade] Closing ${closeBody.direction} ${closeBody.size} dealId=${closeBody.dealId}`);
       const r = await igRequest("POST", "/positions/otc", { ...igHeaders(session), "_method": "DELETE", Version: "1" }, JSON.stringify(closeBody));
