@@ -329,19 +329,51 @@ function saveProfile(profileName) {
 }
 
 function testConnection(profileName) {
-  showToast('Testing ' + profileName.toUpperCase() + ' connection...', 'success');
+  var btn = document.getElementById('btnTest' + profileName.charAt(0).toUpperCase() + profileName.slice(1));
+  if (btn) { btn.disabled = true; btn.textContent = 'Testing...'; }
+  var resultId = profileName + '-test-result';
+  var existing = document.getElementById(resultId);
+  if (existing) existing.remove();
+
   apiFetch('/api/ig/config/test', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ profile: profileName })
   }).then(function(r) { return r.json(); }).then(function(data) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Test Connection'; }
+    var card = document.getElementById(profileName + 'ProfileCard');
+    var resultDiv = document.createElement('div');
+    resultDiv.id = resultId;
+    resultDiv.style.cssText = 'margin-top:12px;padding:12px;border-radius:6px;font-size:13px;';
+
     if (data.ok) {
-      showToast(profileName.toUpperCase() + ' connection successful!' + (data.lightstreamerEndpoint ? ' Streaming: ' + data.lightstreamerEndpoint : ''), 'success');
-      loadIgConfig();
+      resultDiv.style.background = 'rgba(35,134,54,.15)';
+      resultDiv.style.border = '1px solid rgba(63,185,80,.3)';
+      resultDiv.style.color = '#3fb950';
+      var html = '<strong>Connection successful</strong>';
+      if (data.account) {
+        var a = data.account;
+        var cur = a.currency || '';
+        html += '<div style="margin-top:8px;color:#c9d1d9;display:grid;grid-template-columns:1fr 1fr;gap:4px 16px">';
+        html += '<span style="color:#8b949e">Account:</span><span style="font-family:monospace">' + escHtml(a.accountId || '') + (a.accountName ? ' (' + escHtml(a.accountName) + ')' : '') + '</span>';
+        html += '<span style="color:#8b949e">Balance:</span><span style="font-family:monospace;color:#e6edf3;font-weight:600">' + cur + ' ' + (a.balance != null ? a.balance.toLocaleString() : '?') + '</span>';
+        html += '<span style="color:#8b949e">Available:</span><span style="font-family:monospace">' + cur + ' ' + (a.available != null ? a.available.toLocaleString() : '?') + '</span>';
+        html += '<span style="color:#8b949e">P&L:</span><span style="font-family:monospace;color:' + (a.profitLoss != null ? (a.profitLoss >= 0 ? '#3fb950' : '#f85149') : '#8b949e') + '">' + cur + ' ' + (a.profitLoss != null ? (a.profitLoss >= 0 ? '+' : '') + a.profitLoss.toLocaleString() : '?') + '</span>';
+        html += '<span style="color:#8b949e">Margin used:</span><span style="font-family:monospace">' + cur + ' ' + (a.deposit != null ? a.deposit.toLocaleString() : '?') + '</span>';
+        html += '</div>';
+      }
+      resultDiv.innerHTML = html;
+      showToast(profileName.toUpperCase() + ' connected — balance loaded', 'success');
     } else {
-      showToast(profileName.toUpperCase() + ' connection failed: ' + (data.error || 'Unknown error'), 'error');
+      resultDiv.style.background = 'rgba(248,81,73,.1)';
+      resultDiv.style.border = '1px solid rgba(248,81,73,.3)';
+      resultDiv.style.color = '#f85149';
+      resultDiv.innerHTML = '<strong>Connection failed:</strong> ' + escHtml(data.error || 'Unknown error');
+      showToast(profileName.toUpperCase() + ' connection failed', 'error');
     }
+    if (card) card.appendChild(resultDiv);
   }).catch(function(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Test Connection'; }
     showToast('Error: ' + e.message, 'error');
   });
 }

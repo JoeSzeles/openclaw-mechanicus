@@ -502,8 +502,38 @@ async function handleIgApi(req, res, p) {
             return json(res, 200, { ok: false, error: "IG auth failed (" + testRes.status + "): " + errDetail });
           }
           let lsEndpoint = null;
-          try { lsEndpoint = JSON.parse(testRes.body).lightstreamerEndpoint || null; } catch(_) {}
-          return json(res, 200, { ok: true, profile: testProfileName, lightstreamerEndpoint: lsEndpoint });
+          let sessionBody = {};
+          try { sessionBody = JSON.parse(testRes.body); lsEndpoint = sessionBody.lightstreamerEndpoint || null; } catch(_) {}
+          const testCst = testRes.headers["cst"] || "";
+          const testXst = testRes.headers["x-security-token"] || "";
+          let accountInfo = null;
+          try {
+            const acctRes = await igRequest("GET", "/accounts", {
+              "Content-Type": "application/json; charset=UTF-8",
+              Accept: "application/json; charset=UTF-8",
+              "X-IG-API-KEY": prof.apiKey,
+              CST: testCst,
+              "X-SECURITY-TOKEN": testXst,
+              Version: "1",
+            }, null, prof.baseUrl);
+            if (acctRes.status === 200) {
+              const acctData = JSON.parse(acctRes.body);
+              const accounts = acctData.accounts || [];
+              const acct = accounts.find(a => a.accountId === prof.accountId) || accounts[0];
+              if (acct && acct.balance) {
+                accountInfo = {
+                  accountId: acct.accountId,
+                  accountName: acct.accountName,
+                  balance: acct.balance.balance,
+                  deposit: acct.balance.deposit,
+                  profitLoss: acct.balance.profitLoss,
+                  available: acct.balance.available,
+                  currency: acct.currency
+                };
+              }
+            }
+          } catch (_) {}
+          return json(res, 200, { ok: true, profile: testProfileName, lightstreamerEndpoint: lsEndpoint, account: accountInfo });
         } catch (e) {
           return json(res, 200, { ok: false, error: e.message });
         }
