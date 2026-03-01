@@ -365,11 +365,32 @@ function testConnection(profileName) {
       resultDiv.innerHTML = html;
       showToast(profileName.toUpperCase() + ' connected — balance loaded', 'success');
     } else {
-      resultDiv.style.background = 'rgba(248,81,73,.1)';
-      resultDiv.style.border = '1px solid rgba(248,81,73,.3)';
-      resultDiv.style.color = '#f85149';
-      resultDiv.innerHTML = '<strong>Connection failed:</strong> ' + escHtml(data.error || 'Unknown error');
-      showToast(profileName.toUpperCase() + ' connection failed', 'error');
+      var et = data.errorType || 'unknown';
+      if (et === 'server_unavailable') {
+        resultDiv.style.background = 'rgba(210,153,34,.1)';
+        resultDiv.style.border = '1px solid rgba(210,153,34,.3)';
+        resultDiv.style.color = '#d29922';
+        resultDiv.innerHTML = '<strong>Server unavailable (HTTP ' + (data.statusCode || '?') + ')</strong><div style="margin-top:6px;color:#c9d1d9;font-size:13px">' + escHtml(data.error) + '</div><div style="margin-top:6px;color:#8b949e;font-size:12px">This is NOT a credentials error. IG is likely blocking this server\'s cloud IP. Your credentials may be fine — try from a local machine to confirm.</div>';
+        showToast(profileName.toUpperCase() + ': server blocked (not a creds issue)', 'error');
+      } else if (et === 'bad_credentials' || et === 'auth_rejected') {
+        resultDiv.style.background = 'rgba(248,81,73,.1)';
+        resultDiv.style.border = '1px solid rgba(248,81,73,.3)';
+        resultDiv.style.color = '#f85149';
+        resultDiv.innerHTML = '<strong>Authentication failed (HTTP ' + (data.statusCode || '?') + ')</strong><div style="margin-top:6px;color:#c9d1d9;font-size:13px">' + escHtml(data.error) + '</div><div style="margin-top:6px;color:#8b949e;font-size:12px">Check your API key, username, and password for the ' + profileName + ' profile.</div>';
+        showToast(profileName.toUpperCase() + ': bad credentials', 'error');
+      } else if (et === 'rate_limited') {
+        resultDiv.style.background = 'rgba(210,153,34,.1)';
+        resultDiv.style.border = '1px solid rgba(210,153,34,.3)';
+        resultDiv.style.color = '#d29922';
+        resultDiv.innerHTML = '<strong>Rate limited</strong><div style="margin-top:6px;color:#c9d1d9;font-size:13px">' + escHtml(data.error) + '</div>';
+        showToast(profileName.toUpperCase() + ': rate limited, wait and retry', 'error');
+      } else {
+        resultDiv.style.background = 'rgba(248,81,73,.1)';
+        resultDiv.style.border = '1px solid rgba(248,81,73,.3)';
+        resultDiv.style.color = '#f85149';
+        resultDiv.innerHTML = '<strong>Connection failed' + (data.statusCode ? ' (HTTP ' + data.statusCode + ')' : '') + ':</strong> ' + escHtml(data.error || 'Unknown error');
+        showToast(profileName.toUpperCase() + ' connection failed', 'error');
+      }
     }
     if (card) card.appendChild(resultDiv);
   }).catch(function(e) {

@@ -498,8 +498,23 @@ async function handleIgApi(req, res, p) {
           }, JSON.stringify({ identifier: prof.username, password: prof.password }), prof.baseUrl);
           if (testRes.status !== 200) {
             let errDetail = testRes.body || "";
-            try { const ej = JSON.parse(errDetail); errDetail = ej.errorCode || ej.error || errDetail; } catch(_) {}
-            return json(res, 200, { ok: false, error: "IG auth failed (" + testRes.status + "): " + errDetail });
+            let errorType = "unknown";
+            try { const ej = JSON.parse(errDetail); errDetail = ej.errorCode || ej.error || errDetail; } catch(_) {
+              errDetail = errDetail.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim().slice(0, 200);
+            }
+            if (testRes.status === 503 || testRes.status === 502) {
+              errorType = "server_unavailable";
+              errDetail = "IG servers returned " + testRes.status + " — this usually means IG is blocking connections from this server's IP range (cloud/datacenter IPs). Your credentials may be correct. Try testing from a residential IP or VPN.";
+            } else if (testRes.status === 401 || testRes.status === 403) {
+              errorType = "auth_rejected";
+              if (errDetail.includes("exceeded-api-key-allowance")) {
+                errDetail = "API rate limit exceeded — wait a few minutes and try again";
+                errorType = "rate_limited";
+              }
+            } else if (testRes.status === 400) {
+              errorType = "bad_credentials";
+            }
+            return json(res, 200, { ok: false, error: errDetail, errorType, statusCode: testRes.status });
           }
           let lsEndpoint = null;
           let sessionBody = {};
