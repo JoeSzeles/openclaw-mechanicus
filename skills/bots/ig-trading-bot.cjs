@@ -5,9 +5,10 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const STRATEGY_PATH = path.join(process.cwd(), ".openclaw", "ig-strategy.json");
-const LOG_PATH = path.join(process.cwd(), ".openclaw", "ig-bot-log.json");
-const ALERTS_PATH = path.join(process.cwd(), ".openclaw", "ig-alerts.json");
+const DATA_DIR = path.join(process.cwd(), ".openclaw");
+const STRATEGY_PATH = path.join(DATA_DIR, "ig-strategy.json");
+const LOG_PATH = path.join(DATA_DIR, "ig-bot-log.json");
+const ALERTS_PATH = path.join(DATA_DIR, "ig-alerts.json");
 const DASHBOARD_DIR = path.join(process.cwd(), ".openclaw", "canvas");
 const DASHBOARD_PATH = path.join(DASHBOARD_DIR, "ig-bot-status.html");
 const IG_CONFIG_FILE = path.join(process.cwd(), ".openclaw", "ig-config.json");
@@ -468,19 +469,22 @@ function checkRiskLimits(strategy, config, positions) {
     return { allowed: false, reason: `Max open positions reached (${positions.length}/${config.maxOpenPositions || 3})` };
   }
 
-  const alreadyOpen = positions.some(
+  const sameInstrument = positions.filter(
     (p) => p.market?.epic === strategy.instrument || p.market?.instrumentName === strategy.instrument
   );
-  if (alreadyOpen) {
+  const sameDirDupes = sameInstrument.filter(
+    (p) => p.position?.direction === strategy.direction
+  );
+  if (sameDirDupes.length > 0) {
     let allowDupes = false;
     try {
       const prCfg = JSON.parse(fs.readFileSync(path.join(DATA_DIR, "ig-proofread-config.json"), "utf8"));
       allowDupes = prCfg.allowDuplicatePositions === true;
     } catch (_) {}
     if (!allowDupes) {
-      return { allowed: false, reason: `Already have an open position on ${strategy.instrument}` };
+      return { allowed: false, reason: `Already have ${sameDirDupes.length} ${strategy.direction} position(s) on ${strategy.instrument} (set Allow Duplicates = Yes to override)` };
     }
-    log("WARN", `Duplicate position on ${strategy.instrument} — allowed by proofread config`);
+    log("WARN", `Duplicate ${strategy.direction} position on ${strategy.instrument} — allowed by proofread config`);
   }
 
   if (accountBalance && strategy.stopDistance && strategy.size) {
@@ -621,18 +625,24 @@ async function detachStrategy(strategyIndex) {
 }
 
 async function runCycle(config) {
+  let proofCfgSummary = "disabled";
+  try {
+    const pc = JSON.parse(fs.readFileSync(path.join(DATA_DIR, "ig-proofread-config.json"), "utf8"));
+    proofCfgSummary = pc.enabled ? `ON (dupes:${pc.allowDuplicatePositions ? 'yes' : 'no'}, maxRisk:${pc.maxRiskPct}%)` : "OFF";
+  } catch (_) {}
+
   const allStrategies = config.strategies || [];
   const enabledWithIndex = allStrategies
     .map((s, idx) => ({ strategy: s, originalIndex: idx }))
     .filter((e) => e.strategy.enabled);
 
   if (enabledWithIndex.length === 0) {
-    log("INFO", "No enabled strategies.");
+    log("INFO", `No enabled strategies. ProofReader: ${proofCfgSummary}`);
     return;
   }
 
   openPositions = await fetchPositions();
-  log("INFO", `Open positions: ${openPositions.length}`);
+  log("INFO", `Open positions: ${openPositions.length}. ProofReader: ${proofCfgSummary}`);
 
   const openDealIds = new Set(openPositions.map((p) => p.position?.dealId).filter(Boolean));
 
@@ -683,12 +693,22 @@ async function runCycle(config) {
       log("INFO", `Signal alert found for ${strategy.instrument}: ${signal.type || signal.signal}`);
     }
 
-    const verification = await proofReadTrade(strategy, marketData);
-    if (!verification.approved) {
-      log("WARN", `TRADE BLOCKED by proof reader: ${strategy.instrument} — ${verification.reason}`);
-      continue;
+    let prEnabled = true;
+    try {
+      const prc = JSON.parse(fs.readFileSync(path.join(DATA_DIR, "ig-proofread-config.json"), "utf8"));
+      prEnabled = prc.enabled !== false;
+    } catch (_) {}
+
+    if (prEnabled) {
+      const verification = await proofReadTrade(strategy, marketData);
+      if (!verification.approved) {
+        log("WARN", `TRADE BLOCKED by proof reader: ${strategy.instrument} — ${verification.reason}`);
+        continue;
+      }
+      log("INFO", `TRADE APPROVED by proof reader: ${strategy.instrument}`);
+    } else {
+      log("INFO", `Proof reader OFF — skipping checks for ${strategy.instrument}`);
     }
-    log("INFO", `TRADE APPROVED by proof reader: ${strategy.instrument}`);
 
     const result = await openPosition(strategy);
     if (result) {
