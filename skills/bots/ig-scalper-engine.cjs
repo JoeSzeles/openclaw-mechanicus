@@ -427,8 +427,9 @@ function start() {
   if (running) return;
   loadConfig();
   if (!config.enabled) {
-    log("INFO", "Scalper is disabled in config");
-    return;
+    config.enabled = true;
+    saveConfig();
+    log("INFO", "Scalper auto-enabled via start()");
   }
   loadTradeLog();
   running = true;
@@ -465,6 +466,7 @@ function stop() {
   if (balanceCheckInterval) { clearInterval(balanceCheckInterval); balanceCheckInterval = null; }
   tickBuffers = {};
   cooldowns = {};
+  if (config) { config.enabled = false; saveConfig(); }
   log("INFO", "Scalper STOPPED");
 }
 

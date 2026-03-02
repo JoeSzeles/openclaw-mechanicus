@@ -1599,6 +1599,12 @@ async function handleIgApi(req, res, p) {
       let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
       const result = scalperEngine.addStrategy(body);
       if (result.error) return json(res, 400, result);
+      if (body.instrument && lsClient) {
+        const currentEpics = new Set(lsConnectedEpics || []);
+        if (!currentEpics.has(body.instrument)) {
+          setTimeout(() => startLightstreamer(), 500);
+        }
+      }
       return json(res, 200, result);
     }
     const scalperStratMatch = p.match(/^\/api\/ig\/scalper\/strategies\/(\d+)$/);
