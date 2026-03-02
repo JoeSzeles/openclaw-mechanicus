@@ -665,8 +665,10 @@ async function runCycle(config) {
     log("INFO", `Evaluating: ${strategy.name || strategy.instrument}`);
 
     let marketData = null;
+    let priceSource = "REST";
     if (config.useStreaming !== false) {
       marketData = await fetchStreamedPrice(strategy.instrument);
+      if (marketData) priceSource = "STREAM";
     }
     if (!marketData) {
       if (originalIndex > 0) await new Promise((r) => setTimeout(r, 1000));
@@ -678,7 +680,7 @@ async function runCycle(config) {
     }
 
     const eval_ = evaluateStrategy(strategy, marketData);
-    log("INFO", `${strategy.instrument}: ${eval_.reason}`);
+    log("INFO", `${strategy.instrument} [${priceSource}]: ${eval_.reason}`);
 
     if (!eval_.trigger) continue;
 

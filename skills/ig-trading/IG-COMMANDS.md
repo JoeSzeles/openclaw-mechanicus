@@ -175,15 +175,26 @@ GET /api/ig/session
 POST /api/ig/session/refresh
 ```
 
-### Get Streamed Prices
+### Get Streamed Prices (Fastest Price Source)
 ```
 GET /api/ig/stream/prices
 ```
+Returns: `{ streaming: true/false, prices: { "CS.D.CFAGOLD.CFA.IP": { bid, offer, mid, marketState, timestamp }, ... } }`
+These are real-time Lightstreamer prices — much faster than REST polling. Use when speed matters.
 
-### Stream Status
+### Stream Status (With Performance Metrics)
 ```
 GET /api/ig/stream/status
 ```
+Returns: `{ status, connectedEpics, streamingSource, liveStreamingActive, metrics: { updatesPerSec, avgIntervalMs, minIntervalMs, maxIntervalMs, totalUpdates, uptimeMs }, instruments: { [epic]: { bid, offer, mid, marketState, ageMs, updates } } }`
+Use this to check streaming health, speed, and per-instrument update frequency.
+
+### Connect/Disconnect Live Streaming
+```
+POST /api/ig/stream/connect-live
+POST /api/ig/stream/disconnect-live
+```
+Live streaming connects independently to the live IG account for fast price data, decoupled from the active trading profile.
 
 ### Deal Confirmation
 ```

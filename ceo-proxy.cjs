@@ -204,6 +204,11 @@ let lsSubscription = null;
 let lsStatus = "disconnected";
 let lsConnectedEpics = [];
 const streamedPrices = new Map();
+let lsConnectedAt = null;
+let lsUpdateCount = 0;
+let lsUpdateCounts = {};
+let lsLastUpdateTs = 0;
+let lsUpdateIntervals = [];
 
 // Independent live streaming session (decoupled from trading profile)
 let lsLiveSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
@@ -270,8 +275,8 @@ async function startLightstreamer() {
     client.addListener({
       onStatusChange: (status) => {
         console.log("[lightstreamer] Status:", status);
-        if (status.startsWith("CONNECTED")) lsStatus = "connected";
-        else if (status.startsWith("DISCONNECTED")) lsStatus = "disconnected";
+        if (status.startsWith("CONNECTED")) { lsStatus = "connected"; if (!lsConnectedAt) lsConnectedAt = Date.now(); }
+        else if (status.startsWith("DISCONNECTED")) { lsStatus = "disconnected"; lsConnectedAt = null; }
         else if (status.startsWith("CONNECTING") || status.startsWith("STALLED")) lsStatus = "reconnecting";
       },
       onServerError: (code, msg) => {
@@ -313,6 +318,7 @@ async function startLightstreamer() {
         const bid = parseFloat(info.getValue("BID")) || null;
         const offer = parseFloat(info.getValue("OFFER")) || null;
         const mid = (bid && offer) ? (bid + offer) / 2 : null;
+        const now = Date.now();
         streamedPrices.set(epic, {
           bid, offer, mid,
           high: parseFloat(info.getValue("HIGH")) || null,
@@ -320,8 +326,15 @@ async function startLightstreamer() {
           midOpen: parseFloat(info.getValue("MID_OPEN")) || null,
           marketState: info.getValue("MARKET_STATE") || null,
           updateTime: info.getValue("UPDATE_TIME") || null,
-          timestamp: Date.now()
+          timestamp: now
         });
+        lsUpdateCount++;
+        lsUpdateCounts[epic] = (lsUpdateCounts[epic] || 0) + 1;
+        if (lsLastUpdateTs > 0) {
+          lsUpdateIntervals.push(now - lsLastUpdateTs);
+          if (lsUpdateIntervals.length > 200) lsUpdateIntervals = lsUpdateIntervals.slice(-100);
+        }
+        lsLastUpdateTs = now;
       },
       onUnsubscription: () => {
         console.log("[lightstreamer] Unsubscribed");
@@ -377,6 +390,11 @@ function stopLightstreamer() {
     lsStatus = "disconnected";
     lsConnectedEpics = [];
     streamedPrices.clear();
+    lsConnectedAt = null;
+    lsUpdateCount = 0;
+    lsUpdateCounts = {};
+    lsLastUpdateTs = 0;
+    lsUpdateIntervals = [];
     console.log("[lightstreamer] Disconnected");
   }
 }
@@ -783,6 +801,15 @@ async function handleIgApi(req, res, p) {
     }
 
     if (req.method === "GET" && p === "/api/ig/stream/status") {
+      const avgInterval = lsUpdateIntervals.length > 0 ? Math.round(lsUpdateIntervals.reduce((a, b) => a + b, 0) / lsUpdateIntervals.length) : null;
+      const minInterval = lsUpdateIntervals.length > 0 ? Math.min(...lsUpdateIntervals) : null;
+      const maxInterval = lsUpdateIntervals.length > 0 ? Math.max(...lsUpdateIntervals) : null;
+      const uptimeMs = lsConnectedAt ? Date.now() - lsConnectedAt : null;
+      const updatesPerSec = uptimeMs && uptimeMs > 5000 ? Math.round((lsUpdateCount / (uptimeMs / 1000)) * 100) / 100 : null;
+      const epicStats = {};
+      for (const [epic, data] of streamedPrices) {
+        epicStats[epic] = { bid: data.bid, offer: data.offer, mid: data.mid, marketState: data.marketState, updateTime: data.updateTime, lastUpdate: data.timestamp, ageMs: Date.now() - data.timestamp, updates: lsUpdateCounts[epic] || 0 };
+      }
       return json(res, 200, {
         status: lsStatus,
         connectedEpics: lsConnectedEpics,
@@ -790,7 +817,18 @@ async function handleIgApi(req, res, p) {
         activeProfile: getActiveIgProfile()?.profileName || null,
         lightstreamerEndpoint: lsLiveActive ? lsLiveSession.lightstreamerEndpoint : (igSession.lightstreamerEndpoint || null),
         liveStreamingActive: lsLiveActive,
-        streamingSource: lsLiveActive ? "live" : (getActiveIgProfile()?.profileName || null)
+        streamingSource: lsLiveActive ? "live" : (getActiveIgProfile()?.profileName || null),
+        metrics: {
+          connectedAt: lsConnectedAt,
+          uptimeMs,
+          totalUpdates: lsUpdateCount,
+          updatesPerSec,
+          avgIntervalMs: avgInterval,
+          minIntervalMs: minInterval,
+          maxIntervalMs: maxInterval,
+          recentSamples: lsUpdateIntervals.length
+        },
+        instruments: epicStats
       });
     }
 
