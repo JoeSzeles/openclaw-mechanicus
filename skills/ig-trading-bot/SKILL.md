@@ -6,48 +6,39 @@ description: IG CFD Trading Bot — automated strategy execution, position manag
 
 Automated CFD trading bot for the IG Group platform. Executes trades based on configurable strategy rules, manages positions, and enforces risk limits.
 
-**Prerequisite:** You must have `IG_API_KEY`, `IG_USERNAME`, `IG_PASSWORD`, `IG_ACCOUNT_ID`, and `IG_BASE_URL` environment variables set. See the `ig-trading` skill for authentication details.
+The bot runs via the proxy at `http://localhost:5000` (internal). All IG auth is handled by the proxy.
 
-## Quick Start
+## Bot Management (via API)
 
-1. Create/edit the strategy config at `.openclaw/ig-strategy.json`
-2. Test with: `node skills/bots/ig-trading-bot.cjs --test`
-3. Run live: `node skills/bots/ig-trading-bot.cjs`
+**IMPORTANT: Use the API to manage the bot. NEVER delete or modify the bot file directly.**
 
-## Strategy Config
+| Action | Method | Endpoint |
+|---|---|---|
+| List all bots | GET | /api/bots |
+| Start trading bot | POST | /api/bots/ig-trading-bot/start |
+| Stop trading bot | POST | /api/bots/ig-trading-bot/stop |
+| Start signal monitor | POST | /api/bots/ig-signal-monitor/start |
+| Stop signal monitor | POST | /api/bots/ig-signal-monitor/stop |
 
-The bot reads its configuration from `.openclaw/ig-strategy.json`.
+Bot file: `skills/bots/ig-trading-bot.cjs` — **DO NOT DELETE, OVERWRITE, OR RECREATE THIS FILE.**
 
-```json
-{
-  "strategies": [
-    {
-      "instrument": "CS.D.EURUSD.CFD.IP",
-      "name": "EUR/USD Long Dip Buy",
-      "direction": "BUY",
-      "entryBelow": 1.0800,
-      "stopDistance": 15,
-      "limitDistance": 30,
-      "size": 0.5,
-      "enabled": true
-    },
-    {
-      "instrument": "IX.D.FTSE.CFD.IP",
-      "name": "FTSE Short at Resistance",
-      "direction": "SELL",
-      "entryAbove": 8200,
-      "stopDistance": 20,
-      "limitDistance": 40,
-      "size": 0.5,
-      "enabled": false
-    }
-  ],
-  "maxOpenPositions": 3,
-  "maxRiskPercent": 1,
-  "checkIntervalSeconds": 15,
-  "enabled": false
-}
-```
+If the user says "stop the bot", "kill the bot", "nuke the bot" — they mean `POST /api/bots/ig-trading-bot/stop`. NEVER delete the file.
+
+## Strategy Management (via API)
+
+Strategies are managed through the API, NOT by editing `ig-strategy.json` directly.
+
+| Action | Method | Endpoint |
+|---|---|---|
+| List strategies | GET | /api/ig/strategies |
+| Create strategy | POST | /api/ig/strategies |
+| Update strategy | PUT | /api/ig/strategies/{index} |
+| Delete strategy | DELETE | /api/ig/strategies/{index} |
+| Toggle on/off | POST | /api/ig/strategies/{index}/toggle |
+| Attach to deal | POST | /api/ig/strategies/{index}/attach |
+| Detach from deal | POST | /api/ig/strategies/{index}/detach |
+| Pause/resume | POST | /api/ig/strategies/{index}/pause |
+| Master bot on/off | POST | /api/ig/strategies/global |
 
 ### Strategy Fields
 
@@ -56,73 +47,43 @@ The bot reads its configuration from `.openclaw/ig-strategy.json`.
 | `instrument` | string | IG EPIC code for the instrument |
 | `name` | string | Human-readable label |
 | `direction` | string | `BUY` or `SELL` |
-| `entryBelow` | number | Trigger a BUY when mid-price drops below this level |
-| `entryAbove` | number | Trigger a SELL when mid-price rises above this level |
+| `entryBelow` | number | Trigger a BUY when mid-price drops to or below this level |
+| `entryAbove` | number | Trigger a SELL when mid-price rises to or above this level |
 | `stopDistance` | number | Stop-loss distance in points |
 | `limitDistance` | number | Take-profit distance in points |
 | `size` | number | Position size in contracts |
 | `enabled` | boolean | Whether this strategy is active |
 
-### Global Settings
+### Strategy Templates
 
-| Field | Type | Description |
+| Action | Method | Endpoint |
 |---|---|---|
-| `maxOpenPositions` | number | Maximum concurrent open positions (default 3) |
-| `maxRiskPercent` | number | Max % of account balance risked per trade (default 1) |
-| `checkIntervalSeconds` | number | How often to poll prices (default 15) |
-| `enabled` | boolean | Master switch — bot won't trade if false |
+| List templates | GET | /api/ig/strategy-templates |
+| Save template | POST | /api/ig/strategy-templates |
+| Delete template | DELETE | /api/ig/strategy-templates/{filename} |
 
-## Running
+## Proof Reader Config
 
-### Test Mode
+| Action | Method | Endpoint |
+|---|---|---|
+| Get config | GET | /api/ig/proofread |
+| Update config | PUT | /api/ig/proofread |
 
-Simulates one cycle without placing real trades:
+The proof reader validates bot trades before execution. Controls: max staleness, spread limits, min risk:reward, max risk %, allow duplicate positions, require stop/limit.
 
-```bash
-node skills/bots/ig-trading-bot.cjs --test
-```
+## Bot Behavior
 
-This will:
-- Authenticate with IG
-- Fetch current prices for all configured instruments
-- Evaluate strategy rules against live prices
-- Report what trades it **would** execute
-- No orders are placed
+- Reads strategies from `.openclaw/ig-strategy.json` every 60s (hot-reload)
+- Reads proof reader config from `.openclaw/ig-proofread-config.json` every cycle
+- Checks signal alerts from `.openclaw/ig-alerts.json` for additional confirmation
+- Skips strategies with a `dealId` attached (already has a position)
+- Only opens same-direction duplicate if `allowDuplicatePositions` is true
+- Logs to `.openclaw/ig-bot-log.json`
 
-### Live Mode
+## Reading Bot Status
 
-```bash
-node skills/bots/ig-trading-bot.cjs
-```
-
-Runs continuously, polling prices and executing trades when conditions are met. Press Ctrl+C to stop.
-
-## Output Files
-
-| File | Description |
-|---|---|
-| `.openclaw/ig-bot-log.json` | Full log of all actions, trades, and errors |
-| `.openclaw/canvas/ig-bot-status.html` | Live status dashboard (auto-refreshes) |
-
-## Signal Integration
-
-The bot also checks `.openclaw/ig-alerts.json` (written by the `ig-signal-monitor` skill) for signal alerts. If a signal alert matches a configured strategy instrument, the bot treats it as additional confirmation.
-
-## Risk Controls
-
-- Enforces `maxOpenPositions` limit
-- Enforces `maxRiskPercent` per trade against account balance
-- Won't re-enter a position on an instrument that already has an open position
-- All trades use stop-loss and take-profit (stopDistance / limitDistance)
-- Master `enabled` flag must be `true` for any trades to execute
-
-## Common EPICs
-
-| Market | EPIC |
-|---|---|
-| EUR/USD | `CS.D.EURUSD.CFD.IP` |
-| GBP/USD | `CS.D.GBPUSD.CFD.IP` |
-| FTSE 100 | `IX.D.FTSE.CFD.IP` |
-| S&P 500 | `IX.D.SPTRD.IFE.IP` |
-| Spot Gold | `CS.D.USCGC.TODAY.IP` |
-| Bitcoin | `CS.D.BITCOIN.CFD.IP` |
+To check what the bot is doing:
+1. `GET /api/bots` — check if running, PID, uptime
+2. Read `.openclaw/ig-bot-log.json` — recent trade log
+3. `GET /api/ig/strategies` — current strategies and which are linked to deals
+4. `GET /api/ig/positions` — current open positions

@@ -4,7 +4,9 @@ description: Backtest IG trading strategies using historical price data. Use for
 ---
 # IG Backtest Skill
 
-Backtest trading strategies against historical IG price data. Fetches OHLC candles from the IG API, runs strategy logic, and outputs results to the Canvas dashboard.
+Backtest trading strategies against historical IG price data. Fetches OHLC candles from the IG API via the proxy, runs strategy logic, and outputs results to the Canvas dashboard.
+
+**All IG data is fetched through the proxy** — the backtest script uses `http://localhost:5000/api/ig/...` internally. No direct IG API access needed.
 
 ## Usage
 

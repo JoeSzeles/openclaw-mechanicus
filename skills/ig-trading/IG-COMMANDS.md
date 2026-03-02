@@ -28,7 +28,9 @@ POST /api/ig/positions/open
 }
 ```
 Required: `epic`, `direction` (BUY/SELL), `size`
-Optional: `stopDistance`, `limitDistance`, `stopLevel`, `limitLevel`, `currencyCode` (default AUD), `orderType` (default MARKET), `expiry` (default "-"), `forceOpen` (default true), `guaranteedStop` (default false)
+Optional: `stopDistance`, `limitDistance`, `stopLevel`, `limitLevel`, `currencyCode`, `orderType` (default MARKET), `expiry` (default "-"), `forceOpen` (default true), `guaranteedStop` (default false)
+
+**CURRENCY WARNING**: `currencyCode` is NOT always AUD. You MUST fetch `GET /api/ig/markets/{epic}` first and read `instrument.currencies[0].name` to get the correct currency. Using the wrong currency will cause the trade to be REJECTED.
 Returns: `{ ok: true/false, dealReference, confirmation: { dealId, dealStatus, level, size, direction, profit, ... } }`
 **IMPORTANT**: Always check `ok` field AND `confirmation.dealStatus`. Only `ACCEPTED` means the trade went through.
 
@@ -190,23 +192,136 @@ GET /api/ig/confirms/{dealReference}
 
 ---
 
+## BOT MANAGEMENT
+
+**IMPORTANT: Manage bots via API. NEVER delete bot files.**
+
+### List Bots
+```
+GET /api/bots
+```
+Returns: `{ bots: [{ name, running, pid, uptime, ... }] }`
+
+### Start/Stop Bot
+```
+POST /api/bots/{name}/start
+POST /api/bots/{name}/stop
+```
+Bot names: `ig-trading-bot`, `ig-signal-monitor`, `binance-receiver`
+
+---
+
+## STRATEGY MANAGEMENT
+
+### List Strategies
+```
+GET /api/ig/strategies
+```
+Returns: `{ enabled: true/false, strategies: [...] }`
+
+### Create Strategy
+```
+POST /api/ig/strategies
+{ "instrument": "CS.D.CFAGOLD.CFA.IP", "name": "Gold Dip Buy", "direction": "BUY", "entryBelow": 5300, "stopDistance": 50, "limitDistance": 100, "size": 0.5, "enabled": true }
+```
+
+### Update Strategy
+```
+PUT /api/ig/strategies/{index}
+{ "name": "New Name", "entryBelow": 5250, "stopDistance": 60 }
+```
+
+### Delete Strategy
+```
+DELETE /api/ig/strategies/{index}
+```
+
+### Toggle Strategy On/Off
+```
+POST /api/ig/strategies/{index}/toggle
+```
+
+### Attach Strategy to Deal
+```
+POST /api/ig/strategies/{index}/attach
+{ "dealId": "DIAAAAB1234ABC" }
+```
+
+### Detach Strategy from Deal
+```
+POST /api/ig/strategies/{index}/detach
+```
+
+### Pause/Resume Strategy
+```
+POST /api/ig/strategies/{index}/pause
+```
+
+### Master Bot Enable/Disable
+```
+POST /api/ig/strategies/global
+{ "enabled": true }
+```
+
+---
+
+## STRATEGY TEMPLATES
+
+### List Templates
+```
+GET /api/ig/strategy-templates
+```
+
+### Save Template
+```
+POST /api/ig/strategy-templates
+{ "filename": "gold-dip-buy", "strategy": { ... } }
+```
+
+### Delete Template
+```
+DELETE /api/ig/strategy-templates/{filename}
+```
+
+---
+
+## PROOF READER CONFIG
+
+### Get Config
+```
+GET /api/ig/proofread
+```
+
+### Update Config
+```
+PUT /api/ig/proofread
+{ "enabled": true, "maxRiskPct": 2, "allowDuplicatePositions": false, ... }
+```
+
+Fields: `enabled`, `maxStalenessSeconds`, `spreadLimitPctHigh`, `spreadLimitPctLow`, `spreadThresholdMid`, `minRiskReward`, `maxRiskPct`, `maxEntryDeviationPct`, `allowDuplicatePositions`, `requireStopLoss`, `requireTakeProfit`
+
+---
+
 ## COMMON EPICS
 
-| Instrument | Epic |
-|---|---|
-| Bitcoin ($1) | CS.D.BITCOIN.CFD.IP |
-| Gold (US, $10) | CS.D.USCGC.TODAY.IP |
-| Gold (AUD, $1) | CS.D.CFAGOLD.CFA.IP |
-| Silver (AUD, $1) | CS.D.CFASILVER.CFA.IP |
-| EUR/USD | CS.D.EURUSD.CFD.IP |
-| GBP/USD | CS.D.GBPUSD.CFD.IP |
-| AUD/USD | CS.D.AUDUSD.CFD.IP |
-| USD/JPY | CS.D.USDJPY.CFD.IP |
-| FTSE 100 | IX.D.FTSE.CFD.IP |
-| DAX 40 | IX.D.DAX.CFD.IP |
-| S&P 500 | IX.D.SPTRD.CFD.IP |
-| Nasdaq 100 | IX.D.NASDAQ.CFD.IP |
-| Crude Oil | CC.D.CL.UME.IP |
+| Instrument | Epic | Currency |
+|---|---|---|
+| Bitcoin ($1) | CS.D.BITCOIN.CFD.IP | USD |
+| Gold (US, $10) | CS.D.USCGC.TODAY.IP | USD |
+| Gold (AUD, $1) | CS.D.CFAGOLD.CFA.IP | AUD |
+| Gold Futures (US, $10) | CS.D.CFDGOLD.CFDGC.IP | USD |
+| Silver (AUD, $1) | CS.D.CFASILVER.CFA.IP | AUD |
+| EUR/USD | CS.D.EURUSD.CFD.IP | USD |
+| GBP/USD | CS.D.GBPUSD.CFD.IP | USD |
+| AUD/USD | CS.D.AUDUSD.CFD.IP | USD |
+| USD/JPY | CS.D.USDJPY.CFD.IP | JPY |
+| FTSE 100 | IX.D.FTSE.CFD.IP | GBP |
+| DAX 40 | IX.D.DAX.CFD.IP | EUR |
+| S&P 500 | IX.D.SPTRD.CFD.IP | USD |
+| Nasdaq 100 | IX.D.NASDAQ.CFD.IP | USD |
+| Crude Oil | CC.D.CL.UME.IP | USD |
+
+**WARNING**: Currencies listed above are for reference only. ALWAYS verify by fetching `GET /api/ig/markets/{epic}` and reading `instrument.currencies[0].name` before placing a trade.
 
 ---
 
@@ -235,3 +350,26 @@ Every mutating endpoint returns `{ ok: true/false, ... }`.
 3. If `ok: false`, report the exact `error` message
 4. NEVER say "trade executed" unless `dealStatus` is "ACCEPTED"
 5. Include the `dealId` and `level` (fill price) when confirming a trade
+
+**WHEN A TRADE IS REJECTED — DO NOT GIVE UP:**
+1. Read the rejection `reason` from the response
+2. Diagnose the issue (wrong currency? size too small? market closed? stop too tight?)
+3. Fix the parameters
+4. Retry immediately — do NOT ask the user what to do unless the fix is ambiguous
+5. Common fix: wrong `currencyCode` → re-fetch market details → read `instrument.currencies[0].name` → retry
+
+---
+
+## FILE PROTECTION
+
+**NEVER delete, overwrite, or recreate these files:**
+- `skills/bots/ig-trading-bot.cjs`
+- `skills/bots/ig-signal-monitor.cjs`
+- `skills/bots/binance-receiver.cjs`
+- `.openclaw/ig-strategy.json` (use API instead)
+- `.openclaw/ig-proofread-config.json` (use API instead)
+- `.openclaw/ig-monitor-config.json`
+- `.openclaw/canvas/ig-dashboard.html`
+- `ceo-proxy.cjs`
+
+Use APIs to manage strategies, bots, and config. Use `POST /api/bots/{name}/stop` to stop bots, not file deletion.

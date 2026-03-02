@@ -40,3 +40,5 @@ const sizeMatch = lines.find(l => l.includes('PositionSize'))
 - [ig-trading-bot/SKILL.md](../../ig-trading-bot/SKILL.md) — Target bot
 
 **Constraints:** BTC/ETH only (crypto 24/7). Verify tradeable first.
+
+**FILE PROTECTION:** When deploying strategies, use the API (`POST /api/ig/strategies`) — NEVER directly edit `.openclaw/ig-strategy.json`. NEVER delete bot files. Use `POST /api/bots/ig-trading-bot/stop` to stop the bot, not file deletion.
