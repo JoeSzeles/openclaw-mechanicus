@@ -223,6 +223,11 @@ async function proofReadTrade(strategy, marketData) {
   let pass = true;
   const timestamp = new Date().toISOString();
 
+  let proofCfg = {};
+  try {
+    proofCfg = JSON.parse(fs.readFileSync(path.join(DATA_DIR, "ig-proofread-config.json"), "utf8"));
+  } catch (_) {}
+
   const snapshot = marketData?.snapshot;
   if (!snapshot) {
     checks.push({ check: "Market data", pass: false, detail: "No snapshot available" });
@@ -324,8 +329,12 @@ async function proofReadTrade(strategy, marketData) {
     (p) => (p.market?.epic === strategy.instrument) && (p.position?.direction === strategy.direction)
   );
   if (existingOnInstrument.length > 0) {
-    checks.push({ check: "No duplicate position", pass: false, detail: `Already ${existingOnInstrument.length} ${strategy.direction} position(s) on ${strategy.instrument}` });
-    pass = false;
+    if (proofCfg.allowDuplicatePositions) {
+      checks.push({ check: "No duplicate position", pass: true, detail: `${existingOnInstrument.length} existing — duplicates allowed by config` });
+    } else {
+      checks.push({ check: "No duplicate position", pass: false, detail: `Already ${existingOnInstrument.length} ${strategy.direction} position(s) on ${strategy.instrument}` });
+      pass = false;
+    }
   } else {
     checks.push({ check: "No duplicate position", pass: true, detail: "No existing position in same direction" });
   }
@@ -463,7 +472,15 @@ function checkRiskLimits(strategy, config, positions) {
     (p) => p.market?.epic === strategy.instrument || p.market?.instrumentName === strategy.instrument
   );
   if (alreadyOpen) {
-    return { allowed: false, reason: `Already have an open position on ${strategy.instrument}` };
+    let allowDupes = false;
+    try {
+      const prCfg = JSON.parse(fs.readFileSync(path.join(DATA_DIR, "ig-proofread-config.json"), "utf8"));
+      allowDupes = prCfg.allowDuplicatePositions === true;
+    } catch (_) {}
+    if (!allowDupes) {
+      return { allowed: false, reason: `Already have an open position on ${strategy.instrument}` };
+    }
+    log("WARN", `Duplicate position on ${strategy.instrument} — allowed by proofread config`);
   }
 
   if (accountBalance && strategy.stopDistance && strategy.size) {
