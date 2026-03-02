@@ -123,16 +123,39 @@ function calcEMA(prices, period) {
   return ema;
 }
 
+function downsampleTicks(ticks, numBars) {
+  if (ticks.length <= numBars) return ticks.map(t => t.mid);
+  const barSize = Math.floor(ticks.length / numBars);
+  const bars = [];
+  for (let i = 0; i < numBars; i++) {
+    const start = i * barSize;
+    const end = i === numBars - 1 ? ticks.length : (i + 1) * barSize;
+    let sum = 0;
+    for (let j = start; j < end; j++) sum += ticks[j].mid;
+    bars.push(sum / (end - start));
+  }
+  return bars;
+}
+
 function calcRSI(prices, period) {
   if (prices.length < period + 1) return null;
-  const recent = prices.slice(-(period + 1));
-  let gains = 0, losses = 0;
-  for (let i = 1; i < recent.length; i++) {
-    const diff = recent[i] - recent[i - 1];
-    if (diff > 0) gains += diff; else losses -= diff;
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = prices[i] - prices[i - 1];
+    if (diff > 0) avgGain += diff; else avgLoss -= diff;
   }
-  const avgGain = gains / period;
-  const avgLoss = losses / period;
+  avgGain /= period;
+  avgLoss /= period;
+  for (let i = period + 1; i < prices.length; i++) {
+    const diff = prices[i] - prices[i - 1];
+    if (diff > 0) {
+      avgGain = (avgGain * (period - 1) + diff) / period;
+      avgLoss = (avgLoss * (period - 1)) / period;
+    } else {
+      avgGain = (avgGain * (period - 1)) / period;
+      avgLoss = (avgLoss * (period - 1) - diff) / period;
+    }
+  }
   if (avgLoss === 0) return 100;
   const rs = avgGain / avgLoss;
   return 100 - (100 / (1 + rs));
@@ -163,11 +186,13 @@ function calcMACD(prices, fast, slow, signalPeriod) {
 
 function evaluateIndicators(ticks, direction) {
   const ind = config.indicators || {};
+  const rsiPeriod = (ind.rsi && ind.rsi.period) || 14;
+  const barPrices = downsampleTicks(ticks, Math.max(rsiPeriod * 3, 40));
   const prices = ticks.map(t => t.mid);
   const results = { passed: true, details: [] };
 
   if (ind.rsi && ind.rsi.enabled) {
-    const rsi = calcRSI(prices, ind.rsi.period || 14);
+    const rsi = calcRSI(barPrices, rsiPeriod);
     if (rsi !== null) {
       const ob = ind.rsi.overbought || 70;
       const os = ind.rsi.oversold || 30;
@@ -187,8 +212,8 @@ function evaluateIndicators(ticks, direction) {
   }
 
   if (ind.ema && ind.ema.enabled) {
-    const shortEma = calcEMA(prices, ind.ema.shortPeriod || 9);
-    const longEma = calcEMA(prices, ind.ema.longPeriod || 21);
+    const shortEma = calcEMA(barPrices, ind.ema.shortPeriod || 9);
+    const longEma = calcEMA(barPrices, ind.ema.longPeriod || 21);
     if (shortEma !== null && longEma !== null) {
       const emaBullish = shortEma > longEma;
       if (direction === "BUY" && !emaBullish) {
@@ -207,7 +232,7 @@ function evaluateIndicators(ticks, direction) {
   }
 
   if (ind.macd && ind.macd.enabled) {
-    const macd = calcMACD(prices, ind.macd.fast || 12, ind.macd.slow || 26, ind.macd.signal || 9);
+    const macd = calcMACD(barPrices, ind.macd.fast || 12, ind.macd.slow || 26, ind.macd.signal || 9);
     if (macd !== null) {
       if (direction === "BUY" && macd.histogram < 0) {
         results.passed = false;
@@ -239,12 +264,18 @@ function processTick(epic, tickData) {
     spread: tickData.offer - tickData.bid,
     ts: tickData.timestamp || Date.now()
   });
-  const indMax = Math.max(
-    (config.indicators?.macd?.slow || 26) + (config.indicators?.macd?.signal || 9) + 5,
-    (config.indicators?.ema?.longPeriod || 21) + 5,
-    (config.indicators?.rsi?.period || 14) + 5
+  const hasInd = config.indicators && (
+    (config.indicators.rsi && config.indicators.rsi.enabled) ||
+    (config.indicators.ema && config.indicators.ema.enabled) ||
+    (config.indicators.macd && config.indicators.macd.enabled)
   );
-  const maxTicks = Math.max(config.tickWindow || 15, indMax, 50);
+  const indMax = hasInd ? Math.max(
+    (config.indicators?.macd?.slow || 26) + (config.indicators?.macd?.signal || 9) + 10,
+    (config.indicators?.ema?.longPeriod || 21) * 3,
+    (config.indicators?.rsi?.period || 14) * 4,
+    80
+  ) : 50;
+  const maxTicks = Math.max(config.tickWindow || 15, indMax);
   if (buf.length > maxTicks) buf.splice(0, buf.length - maxTicks);
 
   const matchingStrategies = (config.strategies || []).filter(s =>
@@ -868,8 +899,14 @@ function resetStats() {
   scalperPositions = [];
   tradeLog = [];
   saveTradeLog();
-  if (config) config._drawdownTripped = false;
-  log("INFO", "Stats reset");
+  if (config) {
+    config._drawdownTripped = false;
+    for (const s of (config.strategies || [])) {
+      if (s.dealId) delete s.dealId;
+    }
+    saveConfig();
+  }
+  log("INFO", "Stats reset (all strategy dealIds cleared)");
   return { ok: true };
 }
 
