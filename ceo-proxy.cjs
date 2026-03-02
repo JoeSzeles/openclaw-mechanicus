@@ -81,7 +81,7 @@ function isLoginExempt(req) {
       p.startsWith("/api/ig/workingorders") || p.startsWith("/api/ig/markets") || p.startsWith("/api/ig/marketnavigation") ||
       p.startsWith("/api/ig/pricehistory") || p.startsWith("/api/ig/watchlists") || p.startsWith("/api/ig/activity") ||
       p.startsWith("/api/ig/session") || p === "/api/ig/refresh-snapshots" ||
-      p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/proofread")) {
+      p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/proofread") || p.startsWith("/api/ig/watchedlist")) {
     if (hasValidBearerToken(req)) return true;
   }
   if (p.startsWith("/__openclaw__/canvas/")) return true;
@@ -1339,7 +1339,45 @@ async function handleIgApi(req, res, p) {
       return json(res, 200, { ok: true, removed: removed });
     }
 
-    return json(res, 404, { error: "Unknown IG endpoint. Available: GET positions, POST positions/open, POST positions/close, PUT positions/update, GET workingorders, POST workingorders/create, PUT workingorders/update, DELETE workingorders/delete, GET account, GET prices, GET markets, GET markets/{epic}, GET marketnavigation, GET pricehistory/{epic}, GET watchlists, GET history, GET activity, GET confirms/{ref}, GET session, POST session/refresh, GET stream/prices, GET stream/status, GET strategies, PUT strategies/:i, DELETE strategies/:i, POST strategies/:i/toggle, POST strategies/global" });
+    if (req.method === "GET" && p === "/api/ig/watchedlist") {
+      const cfgPath = path.join(DATA_DIR, "ig-monitor-config.json");
+      const defaults = { instruments: [], signals: { dropPercent: 0.5, spikePercent: 0.5, windowSeconds: 30 }, intervalSeconds: 15, enabled: true };
+      if (!fs.existsSync(cfgPath)) return json(res, 200, defaults);
+      try { return json(res, 200, { ...defaults, ...JSON.parse(fs.readFileSync(cfgPath, "utf8")) }); } catch(_) { return json(res, 200, defaults); }
+    }
+
+    if (req.method === "POST" && p === "/api/ig/watchedlist") {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      if (!body.epic || typeof body.epic !== "string") return json(res, 400, { error: "Missing epic" });
+      const cfgPath = path.join(DATA_DIR, "ig-monitor-config.json");
+      const defaults = { instruments: [], signals: { dropPercent: 0.5, spikePercent: 0.5, windowSeconds: 30 }, intervalSeconds: 15, enabled: true };
+      let cfg;
+      try { cfg = fs.existsSync(cfgPath) ? { ...defaults, ...JSON.parse(fs.readFileSync(cfgPath, "utf8")) } : { ...defaults }; } catch(_) { cfg = { ...defaults }; }
+      if (!Array.isArray(cfg.instruments)) cfg.instruments = [];
+      if (cfg.instruments.some(i => i.epic === body.epic)) return json(res, 409, { error: "Instrument already in watchlist" });
+      const inst = { epic: body.epic, name: body.name || body.epic };
+      cfg.instruments.push(inst);
+      fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+      writeConfigSnapshots();
+      return json(res, 200, { ok: true, instrument: inst, instruments: cfg.instruments });
+    }
+
+    if (req.method === "DELETE" && p.startsWith("/api/ig/watchedlist/")) {
+      const idx = parseInt(p.replace("/api/ig/watchedlist/", ""), 10);
+      const cfgPath = path.join(DATA_DIR, "ig-monitor-config.json");
+      if (!fs.existsSync(cfgPath)) return json(res, 404, { error: "No watchlist config" });
+      const defaults = { instruments: [], signals: { dropPercent: 0.5, spikePercent: 0.5, windowSeconds: 30 }, intervalSeconds: 15, enabled: true };
+      let cfg;
+      try { cfg = { ...defaults, ...JSON.parse(fs.readFileSync(cfgPath, "utf8")) }; } catch(_) { return json(res, 500, { error: "Corrupt watchlist config" }); }
+      if (!Array.isArray(cfg.instruments)) cfg.instruments = [];
+      if (isNaN(idx) || idx < 0 || idx >= cfg.instruments.length) return json(res, 404, { error: "Index out of range" });
+      const removed = cfg.instruments.splice(idx, 1)[0];
+      fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+      writeConfigSnapshots();
+      return json(res, 200, { ok: true, removed, instruments: cfg.instruments });
+    }
+
+    return json(res, 404, { error: "Unknown IG endpoint. Available: GET positions, POST positions/open, POST positions/close, PUT positions/update, GET workingorders, POST workingorders/create, PUT workingorders/update, DELETE workingorders/delete, GET account, GET prices, GET markets, GET markets/{epic}, GET marketnavigation, GET pricehistory/{epic}, GET watchlists, GET history, GET activity, GET confirms/{ref}, GET session, POST session/refresh, GET stream/prices, GET stream/status, GET strategies, PUT strategies/:i, DELETE strategies/:i, POST strategies/:i/toggle, POST strategies/global, GET/POST/DELETE watchedlist" });
   } catch (e) {
     return json(res, 500, { error: e.message });
   }
