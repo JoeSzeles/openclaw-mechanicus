@@ -555,12 +555,14 @@ async function startLiveLightstreamer() {
     if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
     await liveStreamingLogin();
     lsLiveActive = true;
+    persistLiveStreamingPref(true);
     stopLightstreamer();
     await startLightstreamer();
     scheduleLiveStreamingRefresh();
     return { ok: true, status: lsStatus, endpoint: lsLiveSession.lightstreamerEndpoint };
   } catch (e) {
     lsLiveActive = false;
+    persistLiveStreamingPref(false);
     console.error("[live-streaming] Failed:", e.message);
     throw e;
   }
@@ -568,6 +570,7 @@ async function startLiveLightstreamer() {
 
 function stopLiveLightstreamer() {
   lsLiveActive = false;
+  persistLiveStreamingPref(false);
   lsReconnectAttempts = 0;
   lsReconnectInFlight = false;
   if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
@@ -576,6 +579,21 @@ function stopLiveLightstreamer() {
   stopLightstreamer();
   setTimeout(() => startLightstreamer(), 500);
   console.log("[live-streaming] Disconnected, reverting to active profile streaming");
+}
+
+function persistLiveStreamingPref(active) {
+  try {
+    const config = ensureIgConfig();
+    config.liveStreamingAutoConnect = !!active;
+    saveIgConfig(config);
+  } catch (_) {}
+}
+
+function shouldAutoConnectLiveStreaming() {
+  try {
+    const config = ensureIgConfig();
+    return !!config.liveStreamingAutoConnect;
+  } catch (_) { return false; }
 }
 
 // Bot process manager
@@ -675,8 +693,12 @@ function scheduleSessionRefresh() {
     try {
       igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: igSession.lightstreamerEndpoint };
       await igSessionLogin();
-      stopLightstreamer();
-      setTimeout(() => startLightstreamer(), 1000);
+      if (lsLiveActive) {
+        console.log("[ig-session] Live streaming active, skipping Lightstreamer restart (live has its own refresh)");
+      } else {
+        stopLightstreamer();
+        setTimeout(() => startLightstreamer(), 1000);
+      }
     } catch (e) {
       console.log("[ig-session] Refresh failed:", e.message, "— will retry in 60s");
       scheduleSessionRetry();
@@ -691,8 +713,10 @@ function scheduleSessionRetry() {
     console.log("[ig-session] Retrying login...");
     try {
       await igSessionLogin();
-      stopLightstreamer();
-      setTimeout(() => startLightstreamer(), 1000);
+      if (!lsLiveActive) {
+        stopLightstreamer();
+        setTimeout(() => startLightstreamer(), 1000);
+      }
     } catch (e) {
       console.log("[ig-session] Retry failed:", e.message, "— will retry in 60s");
       scheduleSessionRetry();
@@ -3392,7 +3416,17 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
   startRegisteredBots();
   setTimeout(async () => {
     await igSessionStartup();
-    startLightstreamer();
+    if (shouldAutoConnectLiveStreaming()) {
+      console.log("[startup] Auto-connecting to live streaming (was active before restart)");
+      try {
+        await startLiveLightstreamer();
+      } catch (e) {
+        console.log("[startup] Live streaming auto-connect failed:", e.message, "— falling back to active profile");
+        startLightstreamer();
+      }
+    } else {
+      startLightstreamer();
+    }
   }, 3000);
 });
 
