@@ -201,6 +201,81 @@ tr:hover { background: rgba(88,166,255,0.04); }
     </div>
   </div>
 
+  <div class="section" id="streamingSection" style="margin-bottom:16px;display:none">
+    <h2 style="font-size:14px;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleStreamPanel()">
+      Streaming Status <span id="streamToggleIcon" style="font-size:10px;color:#8b949e">&#9660;</span>
+    </h2>
+    <div id="streamPanel">
+      <div class="grid-3" style="margin-bottom:10px">
+        <div class="card" style="padding:10px">
+          <div class="stat"><div class="value" id="streamUps" style="font-size:18px">--</div><div class="label">Updates/sec</div></div>
+        </div>
+        <div class="card" style="padding:10px">
+          <div class="stat"><div class="value" id="streamAvg" style="font-size:18px">--</div><div class="label">Avg Interval</div></div>
+        </div>
+        <div class="card" style="padding:10px">
+          <div class="stat"><div class="value" id="streamUptime" style="font-size:18px">--</div><div class="label">Uptime</div></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#8b949e;margin-bottom:6px">
+        <span id="streamSource"></span> | <span id="streamEndpoint"></span> | Total: <span id="streamTotal">0</span> updates | Range: <span id="streamRange">--</span>
+      </div>
+      <table id="streamInstruments" style="font-size:12px"><tr><th>Instrument</th><th>Bid</th><th>Offer</th><th>Mid</th><th>Status</th><th>Age</th><th>Updates</th></tr></table>
+    </div>
+  </div>
+
+  <div class="section" id="scalperSection" style="margin-bottom:16px;display:none">
+    <h2 style="font-size:14px;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleScalperPanel()">
+      Scalper <span id="scalperBadge" class="badge badge-off" style="font-size:10px">STOPPED</span>
+      <span id="scalperToggleIcon" style="font-size:10px;color:#8b949e">&#9660;</span>
+    </h2>
+    <div id="scalperPanel">
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btn-sm" id="scalperStartBtn" onclick="scalperStart()">Start</button>
+        <button class="btn-sm btn-danger" id="scalperStopBtn" onclick="scalperStop()">Stop</button>
+        <button class="btn-sm" onclick="scalperReset()">Reset Stats</button>
+        <button class="btn-sm btn-edit" onclick="showScalperAddModal()">+ Add Strategy</button>
+      </div>
+      <div class="grid-3" style="margin-bottom:10px">
+        <div class="card" style="padding:10px">
+          <div class="stat"><div class="value" id="scalperPnl" style="font-size:18px">--</div><div class="label">Realized P&L</div></div>
+        </div>
+        <div class="card" style="padding:10px">
+          <div class="stat"><div class="value" id="scalperTrades" style="font-size:18px">--</div><div class="label">Trades (W/L)</div></div>
+        </div>
+        <div class="card" style="padding:10px">
+          <div class="stat"><div class="value" id="scalperWinRate" style="font-size:18px">--</div><div class="label">Win Rate</div></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#8b949e;margin-bottom:6px">
+        Budget: $<span id="scalperBudget">--</span> |
+        Max DD: $<span id="scalperMaxDD">--</span> |
+        Max Margin: <span id="scalperMaxMargin">--</span>% |
+        Break-Even: <span id="scalperBE">--</span>x |
+        Cooldown: <span id="scalperCooldown">--</span>s |
+        Ticks: <span id="scalperTicks">--</span> |
+        Min Mom: <span id="scalperMinMom">--</span>%
+        <button class="btn-sm" style="margin-left:8px;font-size:10px" onclick="editScalperSettings()">Edit</button>
+      </div>
+      <div id="scalperSettingsEdit" style="display:none;margin-bottom:10px;padding:8px;background:#161b22;border:1px solid #30363d;border-radius:6px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:11px">
+          <div><label style="color:#8b949e">Budget ($)</label><input class="edit-input" id="seditBudget" type="number" step="100"></div>
+          <div><label style="color:#8b949e">Max Drawdown ($)</label><input class="edit-input" id="seditMaxDD" type="number" step="10"></div>
+          <div><label style="color:#8b949e">Max Margin %</label><input class="edit-input" id="seditMaxMargin" type="number" step="1"></div>
+          <div><label style="color:#8b949e">Break-Even Buffer</label><input class="edit-input" id="seditBE" type="number" step="0.1"></div>
+          <div><label style="color:#8b949e">Cooldown (ms)</label><input class="edit-input" id="seditCooldown" type="number" step="1000"></div>
+          <div><label style="color:#8b949e">Tick Window</label><input class="edit-input" id="seditTicks" type="number" step="1"></div>
+          <div><label style="color:#8b949e">Min Momentum %</label><input class="edit-input" id="seditMinMom" type="number" step="0.01"></div>
+          <div><label style="color:#8b949e">Max Open Pos</label><input class="edit-input" id="seditMaxPos" type="number" step="1"></div>
+        </div>
+        <div style="margin-top:6px"><button class="btn-sm btn-save" onclick="saveScalperSettings()">Save</button> <button class="btn-sm btn-cancel" onclick="cancelScalperSettings()">Cancel</button></div>
+      </div>
+      <table id="scalperStrategies" style="font-size:12px"><tr><th>Name</th><th>Instrument</th><th>Direction</th><th>Size</th><th>Stop</th><th>Limit</th><th>Min Mom%</th><th>Status</th><th>Actions</th></tr></table>
+      <h3 style="font-size:12px;color:#8b949e;margin:10px 0 4px 0">Recent Trades</h3>
+      <table id="scalperTradeLog" style="font-size:11px"><tr><th>Time</th><th>Type</th><th>Instrument</th><th>Dir</th><th>Entry</th><th>Exit</th><th>P&L</th></tr></table>
+    </div>
+  </div>
+
   <div class="watchlist-tabs" id="watchlistTabs">
     <button class="wl-tab-add" id="btnAddInstrument" title="Search & add instrument">+</button>
   </div>
@@ -747,10 +822,13 @@ async function placeDeal() {
     var stratSel = document.getElementById('dealStrategy');
     if (stratSel && stratSel.value !== '' && conf.dealId) {
       var stratIdx = parseInt(stratSel.value, 10);
-      apiPost('/api/ig/strategies/' + stratIdx + '/attach', { dealId: conf.dealId }).then(function(r) {
-        if (r && r.ok) showToast('Strategy attached to deal', true);
-        loadStrategy();
-      });
+      var strat = cachedStrategies[stratIdx];
+      if (strat && !strat.dealId) {
+        apiPost('/api/ig/strategies/' + stratIdx + '/attach', { dealId: conf.dealId }).then(function(r) {
+          if (r && r.ok) showToast('Strategy attached to deal', true);
+          loadStrategy();
+        });
+      }
       stratSel.value = '';
     }
     setTimeout(function() { loadPositions(); loadAccount(); }, 1500);
@@ -1081,9 +1159,9 @@ function updateDealStrategySelector() {
   for (var i = 0; i < cachedStrategies.length; i++) {
     var s = cachedStrategies[i];
     if (selectedEpic && s.instrument !== selectedEpic) continue;
-    if (s.dealId) continue;
     var label = (s.name || s.instrument).substring(0, 30);
     label += ' (' + s.direction + ' ' + s.size + ')';
+    if (s.dealId) label += ' [linked]';
     html += '<option value="' + i + '">' + label + '</option>';
   }
   sel.innerHTML = html;
@@ -1799,6 +1877,252 @@ async function loadSessionStatus() {
   }
 }
 
+var streamPanelOpen = true;
+function toggleStreamPanel() {
+  streamPanelOpen = !streamPanelOpen;
+  document.getElementById('streamPanel').style.display = streamPanelOpen ? '' : 'none';
+  document.getElementById('streamToggleIcon').innerHTML = streamPanelOpen ? '&#9660;' : '&#9654;';
+}
+
+function fmtDuration(ms) {
+  if (ms == null) return '--';
+  var s = Math.floor(ms / 1000);
+  if (s < 60) return s + 's';
+  var m = Math.floor(s / 60); s = s % 60;
+  if (m < 60) return m + 'm ' + s + 's';
+  var h = Math.floor(m / 60); m = m % 60;
+  return h + 'h ' + m + 'm';
+}
+
+function fmtAge(ms) {
+  if (ms == null) return '--';
+  if (ms < 1000) return ms + 'ms';
+  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+  return Math.floor(ms / 60000) + 'm';
+}
+
+var knownEpicNames = {};
+function epicShortName(epic) {
+  if (knownEpicNames[epic]) return knownEpicNames[epic];
+  for (var i = 0; i < watchedInstruments.length; i++) {
+    if (watchedInstruments[i].epic === epic) { knownEpicNames[epic] = watchedInstruments[i].name; return watchedInstruments[i].name; }
+  }
+  return epic.replace(/^CS\.D\.|^IX\.D\.|^CC\.D\./, '').replace(/\.CFD\.IP|\.CFA\.IP|\.TODAY\.IP|\.UME\.IP|\.CFDGC\.IP/g, '');
+}
+
+async function loadStreamingStatus() {
+  var section = document.getElementById('streamingSection');
+  var data = await apiFetch('/api/ig/stream/status');
+  if (!data || data.status === 'disconnected' || data.status === 'not_configured') {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  var m = data.metrics || {};
+  document.getElementById('streamUps').textContent = m.updatesPerSec != null ? m.updatesPerSec.toFixed(1) : '--';
+  document.getElementById('streamAvg').textContent = m.avgIntervalMs != null ? m.avgIntervalMs + 'ms' : '--';
+  document.getElementById('streamUptime').textContent = fmtDuration(m.uptimeMs);
+  document.getElementById('streamSource').textContent = 'Source: ' + (data.streamingSource || 'unknown') + (data.liveStreamingActive ? ' (LIVE)' : '');
+  var ep = data.lightstreamerEndpoint || '';
+  document.getElementById('streamEndpoint').textContent = ep ? ep.replace(/https?:\/\//, '').split('/')[0] : '--';
+  document.getElementById('streamTotal').textContent = m.totalUpdates != null ? m.totalUpdates.toLocaleString() : '0';
+  document.getElementById('streamRange').textContent = (m.minIntervalMs != null ? m.minIntervalMs + 'ms' : '--') + ' - ' + (m.maxIntervalMs != null ? m.maxIntervalMs + 'ms' : '--');
+
+  var instruments = data.instruments || {};
+  var epics = Object.keys(instruments);
+  if (epics.length === 0) {
+    document.getElementById('streamInstruments').innerHTML = '<tr><td colspan="7" style="color:#8b949e">No instruments streaming</td></tr>';
+    return;
+  }
+  epics.sort(function(a, b) { return (instruments[b].updates || 0) - (instruments[a].updates || 0); });
+  var html = '<tr><th>Instrument</th><th>Bid</th><th>Offer</th><th>Mid</th><th>Status</th><th>Age</th><th>Updates</th></tr>';
+  for (var i = 0; i < epics.length; i++) {
+    var ep2 = epics[i];
+    var d = instruments[ep2];
+    var stateClass = d.marketState === 'TRADEABLE' ? 'badge-on' : 'badge-off';
+    var ageColor = d.ageMs < 5000 ? '#2dd654' : d.ageMs < 30000 ? '#f0e68c' : '#f85149';
+    html += '<tr>';
+    html += '<td style="font-weight:600">' + epicShortName(ep2) + '</td>';
+    html += '<td>' + fmtNum(d.bid, 5) + '</td>';
+    html += '<td>' + fmtNum(d.offer, 5) + '</td>';
+    html += '<td>' + fmtNum(d.mid, 5) + '</td>';
+    html += '<td><span class="badge ' + stateClass + '" style="font-size:9px;padding:1px 5px">' + (d.marketState || '?') + '</span></td>';
+    html += '<td style="color:' + ageColor + '">' + fmtAge(d.ageMs) + '</td>';
+    html += '<td>' + (d.updates || 0) + '</td>';
+    html += '</tr>';
+  }
+  document.getElementById('streamInstruments').innerHTML = html;
+}
+
+var scalperPanelOpen = true;
+function toggleScalperPanel() {
+  scalperPanelOpen = !scalperPanelOpen;
+  document.getElementById('scalperPanel').style.display = scalperPanelOpen ? '' : 'none';
+  document.getElementById('scalperToggleIcon').innerHTML = scalperPanelOpen ? '&#9660;' : '&#9654;';
+}
+
+async function loadScalperStatus() {
+  var section = document.getElementById('scalperSection');
+  var data = await apiFetch('/api/ig/scalper/status');
+  if (!data) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  var badge = document.getElementById('scalperBadge');
+  if (data.running) {
+    badge.className = 'badge badge-on';
+    badge.textContent = 'RUNNING (' + data.openPositions + ' open)';
+  } else if (data.drawdownTripped) {
+    badge.className = 'badge badge-alert';
+    badge.textContent = 'DRAWDOWN LIMIT';
+  } else {
+    badge.className = 'badge badge-off';
+    badge.textContent = data.enabled ? 'ENABLED' : 'STOPPED';
+  }
+
+  var pnlEl = document.getElementById('scalperPnl');
+  pnlEl.textContent = (data.realizedPnl >= 0 ? '+' : '') + fmtNum(data.realizedPnl);
+  pnlEl.className = 'value ' + (data.realizedPnl >= 0 ? 'pos' : 'neg');
+  document.getElementById('scalperTrades').textContent = data.tradeCount + ' (' + data.winCount + 'W/' + data.lossCount + 'L)';
+  document.getElementById('scalperWinRate').textContent = data.winRate + '%';
+  document.getElementById('scalperBudget').textContent = fmtNum(data.budget);
+  document.getElementById('scalperMaxDD').textContent = fmtNum(data.maxDrawdown);
+  document.getElementById('scalperMaxMargin').textContent = data.maxMarginPct;
+  document.getElementById('scalperBE').textContent = data.breakEvenBuffer;
+  document.getElementById('scalperCooldown').textContent = (data.cooldownMs / 1000).toFixed(0);
+  document.getElementById('scalperTicks').textContent = data.tickWindow;
+  document.getElementById('scalperMinMom').textContent = data.minMomentumPct;
+
+  var strategies = data.strategies || [];
+  var html = '<tr><th>Name</th><th>Instrument</th><th>Dir</th><th>Size</th><th>Stop</th><th>Limit</th><th>Min Mom%</th><th>Status</th><th>Linked</th><th>Actions</th></tr>';
+  if (strategies.length === 0) {
+    html += '<tr><td colspan="10" class="empty">No scalper strategies</td></tr>';
+  }
+  for (var i = 0; i < strategies.length; i++) {
+    var s = strategies[i];
+    var toggleClass = s.enabled ? 'btn-sm btn-toggle' : 'btn-sm btn-toggle off';
+    html += '<tr>';
+    html += '<td style="font-weight:600">' + (s.name || s.instrument) + '</td>';
+    html += '<td style="font-size:11px;color:#8b949e">' + s.instrument + '</td>';
+    html += '<td><span class="badge ' + (s.direction === 'BUY' ? 'badge-on' : s.direction === 'SELL' ? 'badge-alert' : 'badge-spike') + '">' + s.direction + '</span></td>';
+    html += '<td>' + (s.size || '-') + '</td>';
+    html += '<td>' + (s.stopDistance || 'auto') + '</td>';
+    html += '<td>' + (s.limitDistance || 'auto') + '</td>';
+    html += '<td>' + (s.minMomentumPct || '-') + '</td>';
+    html += '<td><button class="' + toggleClass + '" onclick="scalperToggle(' + i + ')">' + (s.enabled ? 'ON' : 'OFF') + '</button></td>';
+    html += '<td>' + (s.dealId ? '<span style="font-size:10px;color:#8b949e">' + s.dealId.substring(0, 10) + '...</span>' : '-') + '</td>';
+    html += '<td><button class="btn-sm btn-danger" onclick="scalperDeleteStrat(' + i + ')">Del</button></td>';
+    html += '</tr>';
+  }
+  document.getElementById('scalperStrategies').innerHTML = html;
+
+  var trades = data.recentTrades || [];
+  var thtml = '<tr><th>Time</th><th>Type</th><th>Instrument</th><th>Dir</th><th>Entry</th><th>Exit</th><th>P&L</th></tr>';
+  if (trades.length === 0) {
+    thtml += '<tr><td colspan="7" class="empty">No trades yet</td></tr>';
+  }
+  for (var j = 0; j < trades.length; j++) {
+    var t = trades[j];
+    var timeStr = t.timestamp ? new Date(t.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '-';
+    thtml += '<tr>';
+    thtml += '<td style="font-size:10px">' + timeStr + '</td>';
+    thtml += '<td><span class="badge ' + (t.type === 'open' ? 'badge-spike' : 'badge-snap') + '">' + t.type.toUpperCase() + '</span></td>';
+    thtml += '<td>' + epicShortName(t.epic) + '</td>';
+    thtml += '<td><span class="badge ' + (t.direction === 'BUY' ? 'badge-on' : 'badge-alert') + '">' + (t.direction || '-') + '</span></td>';
+    thtml += '<td>' + fmtNum(t.entry, 2) + '</td>';
+    thtml += '<td>' + (t.exit ? fmtNum(t.exit, 2) : '-') + '</td>';
+    thtml += '<td class="' + (t.pnl != null ? (t.pnl >= 0 ? 'pos' : 'neg') : '') + '">' + (t.pnl != null ? (t.pnl >= 0 ? '+' : '') + fmtNum(t.pnl) : '-') + '</td>';
+    thtml += '</tr>';
+  }
+  document.getElementById('scalperTradeLog').innerHTML = thtml;
+}
+
+async function scalperStart() {
+  var r = await apiPost('/api/ig/scalper/start', {});
+  if (r && r.ok) showToast('Scalper started', true);
+  else showToast('Failed to start scalper', false);
+  loadScalperStatus();
+}
+
+async function scalperStop() {
+  var r = await apiPost('/api/ig/scalper/stop', {});
+  if (r && r.ok) showToast('Scalper stopped', true);
+  else showToast('Failed to stop scalper', false);
+  loadScalperStatus();
+}
+
+async function scalperReset() {
+  if (!confirm('Reset all scalper stats and trade history?')) return;
+  var r = await apiPost('/api/ig/scalper/reset', {});
+  if (r && r.ok) showToast('Stats reset', true);
+  loadScalperStatus();
+}
+
+async function scalperToggle(idx) {
+  var r = await apiPost('/api/ig/scalper/strategies/' + idx + '/toggle', {});
+  if (r && r.ok) showToast('Strategy ' + (r.enabled ? 'enabled' : 'disabled'), true);
+  loadScalperStatus();
+}
+
+async function scalperDeleteStrat(idx) {
+  if (!confirm('Delete this scalper strategy?')) return;
+  var opts = { method: 'DELETE', headers: { 'Accept': 'application/json' } };
+  if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+  var res = await fetch('/api/ig/scalper/strategies/' + idx, opts);
+  var data = await res.json();
+  if (data.ok) showToast('Strategy deleted', true);
+  else showToast('Failed', false);
+  loadScalperStatus();
+}
+
+function editScalperSettings() {
+  document.getElementById('scalperSettingsEdit').style.display = '';
+  document.getElementById('seditBudget').value = document.getElementById('scalperBudget').textContent;
+  document.getElementById('seditMaxDD').value = document.getElementById('scalperMaxDD').textContent;
+  document.getElementById('seditMaxMargin').value = document.getElementById('scalperMaxMargin').textContent;
+  document.getElementById('seditBE').value = document.getElementById('scalperBE').textContent;
+  document.getElementById('seditCooldown').value = parseFloat(document.getElementById('scalperCooldown').textContent) * 1000;
+  document.getElementById('seditTicks').value = document.getElementById('scalperTicks').textContent;
+  document.getElementById('seditMinMom').value = document.getElementById('scalperMinMom').textContent;
+  apiFetch('/api/ig/scalper/status').then(function(d) { if (d) document.getElementById('seditMaxPos').value = d.maxOpenPositions || 2; });
+}
+function cancelScalperSettings() {
+  document.getElementById('scalperSettingsEdit').style.display = 'none';
+}
+async function saveScalperSettings() {
+  var body = {
+    budget: parseFloat(document.getElementById('seditBudget').value),
+    maxDrawdown: parseFloat(document.getElementById('seditMaxDD').value),
+    maxMarginPct: parseFloat(document.getElementById('seditMaxMargin').value),
+    breakEvenBuffer: parseFloat(document.getElementById('seditBE').value),
+    cooldownMs: parseFloat(document.getElementById('seditCooldown').value),
+    tickWindow: parseInt(document.getElementById('seditTicks').value, 10),
+    minMomentumPct: parseFloat(document.getElementById('seditMinMom').value),
+    maxOpenPositions: parseInt(document.getElementById('seditMaxPos').value, 10)
+  };
+  var r = await apiPut('/api/ig/scalper', body);
+  if (r && r.ok) {
+    showToast('Scalper settings saved', true);
+    document.getElementById('scalperSettingsEdit').style.display = 'none';
+  } else {
+    showToast('Failed to save settings', false);
+  }
+  loadScalperStatus();
+}
+
+function showScalperAddModal() {
+  var json = prompt('Enter scalper strategy JSON:\n\n{\n  "instrument": "CS.D.CFAGOLD.CFA.IP",\n  "name": "Gold Scalp",\n  "direction": "BOTH",\n  "size": 0.5,\n  "stopDistance": 50,\n  "limitDistance": 80,\n  "minMomentumPct": 0.03\n}');
+  if (!json) return;
+  try {
+    var body = JSON.parse(json);
+    apiPost('/api/ig/scalper/strategies', body).then(function(r) {
+      if (r && r.ok) { showToast('Scalper strategy added', true); loadScalperStatus(); }
+      else showToast(r && r.error ? r.error : 'Failed', false);
+    });
+  } catch (e) {
+    showToast('Invalid JSON: ' + e.message, false);
+  }
+}
+
 document.getElementById('btnRefreshSession').addEventListener('click', function() {
   var btn = this;
   btn.textContent = 'Refreshing...';
@@ -1950,12 +2274,12 @@ document.getElementById('processesPanel').addEventListener('change', async funct
 async function refresh() {
   document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
   await loadStrategy();
-  await Promise.all([loadAccount(), loadPositions(), updateLivePrices(), loadWatchlist(), loadProofread(), loadAlerts(), loadVerifyLog(), loadBotLog(), loadSessionStatus(), loadProcessesPanel()]);
+  await Promise.all([loadAccount(), loadPositions(), updateLivePrices(), loadWatchlist(), loadProofread(), loadAlerts(), loadVerifyLog(), loadBotLog(), loadSessionStatus(), loadStreamingStatus(), loadScalperStatus(), loadProcessesPanel()]);
 }
 
 renderTimeframeTabs(currentTimeframe);
 refresh();
-setInterval(function() { updateLivePrices(); }, 5000);
+setInterval(function() { updateLivePrices(); loadScalperStatus(); }, 5000);
 setInterval(function() {
   if (selectedEpic) loadMarketData(selectedEpic);
 }, 10000);

@@ -1,0 +1,32 @@
+Here's my analysis and suggestions for the ultra-fast scalping bot:
+
+What you have today:
+
+Lightstreamer pushing ~9 updates/sec across 7 instruments (roughly 1-2 updates/sec per instrument)
+The existing trading bot polls every 15-60 seconds — far too slow for scalping
+Signal monitor detects trends, reversals, breakouts every 15 seconds
+IG API accepts market orders with ~1-2 second round-trip
+Key architectural decisions:
+
+Event-driven, not polling. The current bot runs in a loop. The scalper should react to each Lightstreamer tick directly — when the price changes, evaluate immediately. This means the scalper should live inside the proxy process (ceo-proxy.cjs) where it has direct access to the onItemUpdate callback, or receive events via a local WebSocket/event emitter. Living inside the proxy is fastest (zero network latency to get prices).
+
+Strategy attachment model. Each scalper strategy would target one instrument with: direction preference (long-only, short-only, or both), entry trigger logic based on momentum/reversal signals, and tight stop/limit distances. Strategies stored in a separate config file (ig-scalper-config.json) to keep them independent from the existing bot.
+
+Risk controls (your requirements):
+
+Budget: Max capital allocation (e.g., "only use $5,000 of my $106k balance")
+Max margin: Limit total margin used by the scalper
+Max drawdown: If cumulative loss exceeds X, auto-stop (e.g., -$200 = kill switch)
+Break-even minimum: Only enter if expected move covers spread + buffer (e.g., spread is 8 pts, need at least 12 pts expected move)
+No proof reader — speed is priority, built-in risk limits are enough
+P&L tracking: Real-time running tally of scalper profit/loss
+Signal integration. The scalper would read ig-alerts.json and also compute its own micro-signals from the streaming tick data: short-term momentum (last 5-10 ticks), micro-reversals, spread widening detection. Higher timeframe bias (from signal monitor's trend_up/trend_down) determines the preferred direction.
+
+Practical speed limits to be aware of:
+
+IG API rate limit: ~60 requests/min, so max ~1 trade/second
+Trade execution: ~1-2 seconds for order confirmation
+Lightstreamer updates: ~1-2/sec per instrument (IG demo; live may differ)
+Realistic minimum trade duration: 5-10 seconds between open and close
+This means the scalper is more of a "fast swing" tool than true HFT — which is fine, it's much faster than the current 60-second bot
+Dashboard integration. A dedicated scalper section in the IG Dashboard showing: active scalper strategies, real-time P&L, trade count, win rate, drawdown gauge, and start/stop controls.

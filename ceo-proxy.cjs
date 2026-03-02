@@ -19,6 +19,7 @@ const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
 const CANVAS_DIR = path.join(DATA_DIR, "canvas");
 const BOT_REGISTRY_FILE = path.join(DATA_DIR, "bot-registry.json");
 const https = require("https");
+const scalperEngine = require("./skills/bots/ig-scalper-engine.cjs");
 
 const LOGIN_USER = process.env.OPENCLAW_LOGIN_USER || "";
 const LOGIN_PASS = process.env.OPENCLAW_LOGIN_PASSWORD || "";
@@ -81,7 +82,7 @@ function isLoginExempt(req) {
       p.startsWith("/api/ig/workingorders") || p.startsWith("/api/ig/markets") || p.startsWith("/api/ig/marketnavigation") ||
       p.startsWith("/api/ig/pricehistory") || p.startsWith("/api/ig/watchlists") || p.startsWith("/api/ig/activity") ||
       p.startsWith("/api/ig/session") || p === "/api/ig/refresh-snapshots" ||
-      p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/strategy-templates") || p.startsWith("/api/ig/proofread") || p.startsWith("/api/ig/watchedlist") ||
+      p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/strategy-templates") || p.startsWith("/api/ig/proofread") || p.startsWith("/api/ig/watchedlist") || p.startsWith("/api/ig/scalper") ||
       p.startsWith("/api/bots") || p.startsWith("/api/processes")) {
     if (hasValidBearerToken(req)) return true;
   }
@@ -240,6 +241,13 @@ function collectInstrumentEpics() {
       if (cfg.strategies) cfg.strategies.forEach(s => { if (s.instrument) epics.add(s.instrument); });
     }
   } catch (_) {}
+  try {
+    const scalpCfg = path.join(DATA_DIR, "ig-scalper-config.json");
+    if (fs.existsSync(scalpCfg)) {
+      const cfg = JSON.parse(fs.readFileSync(scalpCfg, "utf8"));
+      if (cfg.strategies) cfg.strategies.forEach(s => { if (s.instrument) epics.add(s.instrument); });
+    }
+  } catch (_) {}
   return [...epics].slice(0, 40);
 }
 
@@ -275,7 +283,7 @@ async function startLightstreamer() {
     client.addListener({
       onStatusChange: (status) => {
         console.log("[lightstreamer] Status:", status);
-        if (status.startsWith("CONNECTED")) { lsStatus = "connected"; if (!lsConnectedAt) lsConnectedAt = Date.now(); }
+        if (status.startsWith("CONNECTED")) { lsStatus = "connected"; if (!lsConnectedAt) lsConnectedAt = Date.now(); try { const sc = scalperEngine.getConfig(); if (sc && sc.enabled) { scalperEngine.start(); } } catch(_) {} }
         else if (status.startsWith("DISCONNECTED")) { lsStatus = "disconnected"; lsConnectedAt = null; }
         else if (status.startsWith("CONNECTING") || status.startsWith("STALLED")) lsStatus = "reconnecting";
       },
@@ -335,6 +343,7 @@ async function startLightstreamer() {
           if (lsUpdateIntervals.length > 200) lsUpdateIntervals = lsUpdateIntervals.slice(-100);
         }
         lsLastUpdateTs = now;
+        try { scalperEngine.processTick(epic, { bid, offer, mid, spread: (offer && bid) ? offer - bid : 0, timestamp: now }); } catch (_) {}
       },
       onUnsubscription: () => {
         console.log("[lightstreamer] Unsubscribed");
@@ -1560,7 +1569,58 @@ async function handleIgApi(req, res, p) {
       return json(res, 200, { ok: true, removed, instruments: cfg.instruments });
     }
 
-    return json(res, 404, { error: "Unknown IG endpoint. Available: GET positions, POST positions/open, POST positions/close, PUT positions/update, GET workingorders, POST workingorders/create, PUT workingorders/update, DELETE workingorders/delete, GET account, GET prices, GET markets, GET markets/{epic}, GET marketnavigation, GET pricehistory/{epic}, GET watchlists, GET history, GET activity, GET confirms/{ref}, GET session, POST session/refresh, GET stream/prices, GET stream/status, GET/POST strategies, PUT strategies/:i, DELETE strategies/:i, POST strategies/:i/toggle, POST strategies/:i/attach, POST strategies/:i/detach, POST strategies/:i/pause, POST strategies/global, GET/POST/DELETE watchedlist" });
+    if (req.method === "GET" && p === "/api/ig/scalper") {
+      return json(res, 200, scalperEngine.getConfig());
+    }
+    if (req.method === "PUT" && p === "/api/ig/scalper") {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      const cfg = scalperEngine.updateConfig(body);
+      return json(res, 200, { ok: true, ...cfg });
+    }
+    if (req.method === "GET" && p === "/api/ig/scalper/status") {
+      return json(res, 200, scalperEngine.getStatus());
+    }
+    if (req.method === "POST" && p === "/api/ig/scalper/start") {
+      scalperEngine.start();
+      return json(res, 200, { ok: true, running: true });
+    }
+    if (req.method === "POST" && p === "/api/ig/scalper/stop") {
+      scalperEngine.stop();
+      return json(res, 200, { ok: true, running: false });
+    }
+    if (req.method === "POST" && p === "/api/ig/scalper/reset") {
+      return json(res, 200, scalperEngine.resetStats());
+    }
+    if (req.method === "GET" && p === "/api/ig/scalper/strategies") {
+      const cfg = scalperEngine.getConfig();
+      return json(res, 200, { strategies: cfg.strategies || [] });
+    }
+    if (req.method === "POST" && p === "/api/ig/scalper/strategies") {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      const result = scalperEngine.addStrategy(body);
+      if (result.error) return json(res, 400, result);
+      return json(res, 200, result);
+    }
+    const scalperStratMatch = p.match(/^\/api\/ig\/scalper\/strategies\/(\d+)$/);
+    const scalperToggleMatch = p.match(/^\/api\/ig\/scalper\/strategies\/(\d+)\/toggle$/);
+    if (req.method === "POST" && scalperToggleMatch) {
+      const result = scalperEngine.toggleStrategy(parseInt(scalperToggleMatch[1], 10));
+      if (result.error) return json(res, 400, result);
+      return json(res, 200, result);
+    }
+    if (req.method === "PUT" && scalperStratMatch) {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      const result = scalperEngine.updateStrategy(parseInt(scalperStratMatch[1], 10), body);
+      if (result.error) return json(res, 400, result);
+      return json(res, 200, result);
+    }
+    if (req.method === "DELETE" && scalperStratMatch) {
+      const result = scalperEngine.deleteStrategy(parseInt(scalperStratMatch[1], 10));
+      if (result.error) return json(res, 400, result);
+      return json(res, 200, result);
+    }
+
+    return json(res, 404, { error: "Unknown IG endpoint. Available: GET positions, POST positions/open, POST positions/close, PUT positions/update, GET workingorders, POST workingorders/create, PUT workingorders/update, DELETE workingorders/delete, GET account, GET prices, GET markets, GET markets/{epic}, GET marketnavigation, GET pricehistory/{epic}, GET watchlists, GET history, GET activity, GET confirms/{ref}, GET session, POST session/refresh, GET stream/prices, GET stream/status, GET/POST strategies, PUT strategies/:i, DELETE strategies/:i, POST strategies/:i/toggle, POST strategies/:i/attach, POST strategies/:i/detach, POST strategies/:i/pause, POST strategies/global, GET/POST/DELETE watchedlist, GET/PUT scalper, GET scalper/status, POST scalper/start, POST scalper/stop, POST scalper/reset, GET/POST scalper/strategies, PUT/DELETE scalper/strategies/:i, POST scalper/strategies/:i/toggle" });
   } catch (e) {
     return json(res, 500, { error: e.message });
   }
@@ -1672,7 +1732,8 @@ function autoRegisterBotScripts() {
   const registry = loadBotRegistry();
   const newBots = [];
   try {
-    const files = fs.readdirSync(BOTS_DIR).filter(f => f.endsWith(".cjs"));
+    const SKIP_BOTS = new Set(["ig-scalper-engine"]);
+    const files = fs.readdirSync(BOTS_DIR).filter(f => f.endsWith(".cjs") && !SKIP_BOTS.has(f.replace(/\.cjs$/, "")));
     for (const file of files) {
       const id = file.replace(/\.cjs$/, "");
       if (registry.find(b => b.id === id)) continue;
