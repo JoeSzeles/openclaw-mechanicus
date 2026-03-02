@@ -21,6 +21,12 @@ const DEFAULT_CONFIG = {
   maxSize: 10,
   profitTarget: 0,
   trailingStop: 0,
+  warmupMs: 60000,
+  indicators: {
+    rsi: { enabled: false, period: 14, overbought: 70, oversold: 30 },
+    ema: { enabled: false, shortPeriod: 9, longPeriod: 21 },
+    macd: { enabled: false, fast: 12, slow: 26, signal: 9 }
+  },
   strategies: []
 };
 
@@ -107,6 +113,120 @@ function getHigherTimeframeBias(epic) {
   } catch (_) { return null; }
 }
 
+function calcEMA(prices, period) {
+  if (prices.length < period) return null;
+  const k = 2 / (period + 1);
+  let ema = prices.slice(0, period).reduce((s, v) => s + v, 0) / period;
+  for (let i = period; i < prices.length; i++) {
+    ema = prices[i] * k + ema * (1 - k);
+  }
+  return ema;
+}
+
+function calcRSI(prices, period) {
+  if (prices.length < period + 1) return null;
+  const recent = prices.slice(-(period + 1));
+  let gains = 0, losses = 0;
+  for (let i = 1; i < recent.length; i++) {
+    const diff = recent[i] - recent[i - 1];
+    if (diff > 0) gains += diff; else losses -= diff;
+  }
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
+}
+
+function calcMACD(prices, fast, slow, signalPeriod) {
+  if (prices.length < slow + signalPeriod) return null;
+  const k = 2 / (fast + 1);
+  const ks = 2 / (slow + 1);
+  let fEma = prices.slice(0, fast).reduce((s, v) => s + v, 0) / fast;
+  let sEma = prices.slice(0, slow).reduce((s, v) => s + v, 0) / slow;
+  const macdSeries = [];
+  for (let i = slow; i < prices.length; i++) {
+    if (i >= fast) fEma = prices[i] * k + fEma * (1 - k);
+    sEma = prices[i] * ks + sEma * (1 - ks);
+    macdSeries.push(fEma - sEma);
+  }
+  if (macdSeries.length < signalPeriod) return null;
+  const sigK = 2 / (signalPeriod + 1);
+  let sig = macdSeries.slice(0, signalPeriod).reduce((s, v) => s + v, 0) / signalPeriod;
+  for (let i = signalPeriod; i < macdSeries.length; i++) {
+    sig = macdSeries[i] * sigK + sig * (1 - sigK);
+  }
+  const macdLine = macdSeries[macdSeries.length - 1];
+  const histogram = macdLine - sig;
+  return { macdLine, signalLine: sig, histogram };
+}
+
+function evaluateIndicators(ticks, direction) {
+  const ind = config.indicators || {};
+  const prices = ticks.map(t => t.mid);
+  const results = { passed: true, details: [] };
+
+  if (ind.rsi && ind.rsi.enabled) {
+    const rsi = calcRSI(prices, ind.rsi.period || 14);
+    if (rsi !== null) {
+      const ob = ind.rsi.overbought || 70;
+      const os = ind.rsi.oversold || 30;
+      if (direction === "BUY" && rsi > ob) {
+        results.passed = false;
+        results.details.push(`RSI=${rsi.toFixed(1)} overbought(>${ob}), blocking BUY`);
+      } else if (direction === "SELL" && rsi < os) {
+        results.passed = false;
+        results.details.push(`RSI=${rsi.toFixed(1)} oversold(<${os}), blocking SELL`);
+      } else {
+        results.details.push(`RSI=${rsi.toFixed(1)} OK`);
+      }
+    } else {
+      results.passed = false;
+      results.details.push("RSI=insufficient data, blocking");
+    }
+  }
+
+  if (ind.ema && ind.ema.enabled) {
+    const shortEma = calcEMA(prices, ind.ema.shortPeriod || 9);
+    const longEma = calcEMA(prices, ind.ema.longPeriod || 21);
+    if (shortEma !== null && longEma !== null) {
+      const emaBullish = shortEma > longEma;
+      if (direction === "BUY" && !emaBullish) {
+        results.passed = false;
+        results.details.push(`EMA short(${shortEma.toFixed(2)})<long(${longEma.toFixed(2)}), blocking BUY`);
+      } else if (direction === "SELL" && emaBullish) {
+        results.passed = false;
+        results.details.push(`EMA short(${shortEma.toFixed(2)})>long(${longEma.toFixed(2)}), blocking SELL`);
+      } else {
+        results.details.push(`EMA ${emaBullish ? "bullish" : "bearish"} OK`);
+      }
+    } else {
+      results.passed = false;
+      results.details.push("EMA=insufficient data, blocking");
+    }
+  }
+
+  if (ind.macd && ind.macd.enabled) {
+    const macd = calcMACD(prices, ind.macd.fast || 12, ind.macd.slow || 26, ind.macd.signal || 9);
+    if (macd !== null) {
+      if (direction === "BUY" && macd.histogram < 0) {
+        results.passed = false;
+        results.details.push(`MACD histogram=${macd.histogram.toFixed(4)}<0, blocking BUY`);
+      } else if (direction === "SELL" && macd.histogram > 0) {
+        results.passed = false;
+        results.details.push(`MACD histogram=${macd.histogram.toFixed(4)}>0, blocking SELL`);
+      } else {
+        results.details.push(`MACD hist=${macd.histogram.toFixed(4)} OK`);
+      }
+    } else {
+      results.passed = false;
+      results.details.push("MACD=insufficient data, blocking");
+    }
+  }
+
+  return results;
+}
+
 function processTick(epic, tickData) {
   if (!running || !config || !config.enabled) return;
 
@@ -119,7 +239,12 @@ function processTick(epic, tickData) {
     spread: tickData.offer - tickData.bid,
     ts: tickData.timestamp || Date.now()
   });
-  const maxTicks = Math.max(config.tickWindow || 15, 25);
+  const indMax = Math.max(
+    (config.indicators?.macd?.slow || 26) + (config.indicators?.macd?.signal || 9) + 5,
+    (config.indicators?.ema?.longPeriod || 21) + 5,
+    (config.indicators?.rsi?.period || 14) + 5
+  );
+  const maxTicks = Math.max(config.tickWindow || 15, indMax, 50);
   if (buf.length > maxTicks) buf.splice(0, buf.length - maxTicks);
 
   const matchingStrategies = (config.strategies || []).filter(s =>
@@ -133,6 +258,9 @@ function processTick(epic, tickData) {
 
 async function evaluateEntry(strat, epic, ticks) {
   if (ticks.length < 5) return;
+
+  const warmup = config.warmupMs || 60000;
+  if (startedAt && (Date.now() - startedAt) < warmup) return;
 
   const stratIdx = config.strategies.indexOf(strat);
   const cooldownKey = `${epic}_${stratIdx}`;
@@ -182,6 +310,20 @@ async function evaluateEntry(strat, epic, ticks) {
   }
 
   if (!direction) return;
+
+  const hasIndicators = config.indicators && (
+    (config.indicators.rsi && config.indicators.rsi.enabled) ||
+    (config.indicators.ema && config.indicators.ema.enabled) ||
+    (config.indicators.macd && config.indicators.macd.enabled)
+  );
+  if (hasIndicators) {
+    const indResult = evaluateIndicators(ticks, direction);
+    if (!indResult.passed) {
+      log("IND", `${epic} ${direction} blocked: ${indResult.details.join(", ")}`);
+      return;
+    }
+    log("IND", `${epic} ${direction} confirmed: ${indResult.details.join(", ")}`);
+  }
 
   const spread = latest.spread;
   const stopDist = strat.stopDistance || (spread * 3);
@@ -560,7 +702,12 @@ function start() {
   positionCheckInterval = setInterval(checkPositions, 5000);
   balanceCheckInterval = setInterval(fetchBalance, 30000);
 
-  log("INFO", `Scalper STARTED | ${config.strategies.filter(s => s.enabled).length} strategies | budget=$${config.budget} maxDD=$${config.maxDrawdown}`);
+  const warmupSec = Math.round((config.warmupMs || 60000) / 1000);
+  const indList = [];
+  if (config.indicators?.rsi?.enabled) indList.push("RSI");
+  if (config.indicators?.ema?.enabled) indList.push("EMA");
+  if (config.indicators?.macd?.enabled) indList.push("MACD");
+  log("INFO", `Scalper STARTED | ${config.strategies.filter(s => s.enabled).length} strategies | budget=$${config.budget} maxDD=$${config.maxDrawdown} | warmup=${warmupSec}s | indicators=${indList.length ? indList.join(",") : "none"}`);
 }
 
 function stop() {
@@ -597,6 +744,9 @@ function getStatus() {
     maxSize: config ? config.maxSize : 10,
     profitTarget: config ? config.profitTarget : 0,
     trailingStop: config ? config.trailingStop : 0,
+    warmupMs: config ? config.warmupMs : 60000,
+    warmupRemaining: (running && startedAt) ? Math.max(0, (config?.warmupMs || 60000) - (Date.now() - startedAt)) : 0,
+    indicators: config ? config.indicators : DEFAULT_CONFIG.indicators,
     realizedPnl: Math.round(realizedPnl * 100) / 100,
     unrealizedPnl,
     tradeCount,
@@ -632,6 +782,28 @@ function updateConfig(updates) {
   if (updates.maxSize !== undefined) { const v = Number(updates.maxSize); if (Number.isFinite(v) && v >= 0.1 && v <= 1000) config.maxSize = v; }
   if (updates.profitTarget !== undefined) { const v = Number(updates.profitTarget); if (Number.isFinite(v) && v >= 0) config.profitTarget = v; }
   if (updates.trailingStop !== undefined) { const v = Number(updates.trailingStop); if (Number.isFinite(v) && v >= 0) config.trailingStop = v; }
+  if (updates.warmupMs !== undefined) { const v = Number(updates.warmupMs); if (Number.isFinite(v) && v >= 0 && v <= 600000) config.warmupMs = v; }
+  if (updates.indicators !== undefined && typeof updates.indicators === "object") {
+    if (!config.indicators) config.indicators = JSON.parse(JSON.stringify(DEFAULT_CONFIG.indicators));
+    const ui = updates.indicators;
+    if (ui.rsi && typeof ui.rsi === "object") {
+      if (ui.rsi.enabled !== undefined) config.indicators.rsi.enabled = !!ui.rsi.enabled;
+      if (ui.rsi.period !== undefined) { const v = Number(ui.rsi.period); if (Number.isFinite(v) && v >= 2 && v <= 50) config.indicators.rsi.period = Math.floor(v); }
+      if (ui.rsi.overbought !== undefined) { const v = Number(ui.rsi.overbought); if (Number.isFinite(v) && v > 50 && v <= 100) config.indicators.rsi.overbought = v; }
+      if (ui.rsi.oversold !== undefined) { const v = Number(ui.rsi.oversold); if (Number.isFinite(v) && v >= 0 && v < 50) config.indicators.rsi.oversold = v; }
+    }
+    if (ui.ema && typeof ui.ema === "object") {
+      if (ui.ema.enabled !== undefined) config.indicators.ema.enabled = !!ui.ema.enabled;
+      if (ui.ema.shortPeriod !== undefined) { const v = Number(ui.ema.shortPeriod); if (Number.isFinite(v) && v >= 2 && v <= 50) config.indicators.ema.shortPeriod = Math.floor(v); }
+      if (ui.ema.longPeriod !== undefined) { const v = Number(ui.ema.longPeriod); if (Number.isFinite(v) && v >= 5 && v <= 200) config.indicators.ema.longPeriod = Math.floor(v); }
+    }
+    if (ui.macd && typeof ui.macd === "object") {
+      if (ui.macd.enabled !== undefined) config.indicators.macd.enabled = !!ui.macd.enabled;
+      if (ui.macd.fast !== undefined) { const v = Number(ui.macd.fast); if (Number.isFinite(v) && v >= 2 && v <= 50) config.indicators.macd.fast = Math.floor(v); }
+      if (ui.macd.slow !== undefined) { const v = Number(ui.macd.slow); if (Number.isFinite(v) && v >= 5 && v <= 200) config.indicators.macd.slow = Math.floor(v); }
+      if (ui.macd.signal !== undefined) { const v = Number(ui.macd.signal); if (Number.isFinite(v) && v >= 2 && v <= 50) config.indicators.macd.signal = Math.floor(v); }
+    }
+  }
   if (updates.enabled !== undefined) config.enabled = !!updates.enabled;
   saveConfig();
   return config;
