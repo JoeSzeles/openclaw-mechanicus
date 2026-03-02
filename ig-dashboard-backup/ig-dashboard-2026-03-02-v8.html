@@ -747,10 +747,13 @@ async function placeDeal() {
     var stratSel = document.getElementById('dealStrategy');
     if (stratSel && stratSel.value !== '' && conf.dealId) {
       var stratIdx = parseInt(stratSel.value, 10);
-      apiPost('/api/ig/strategies/' + stratIdx + '/attach', { dealId: conf.dealId }).then(function(r) {
-        if (r && r.ok) showToast('Strategy attached to deal', true);
-        loadStrategy();
-      });
+      var strat = cachedStrategies[stratIdx];
+      if (strat && !strat.dealId) {
+        apiPost('/api/ig/strategies/' + stratIdx + '/attach', { dealId: conf.dealId }).then(function(r) {
+          if (r && r.ok) showToast('Strategy attached to deal', true);
+          loadStrategy();
+        });
+      }
       stratSel.value = '';
     }
     setTimeout(function() { loadPositions(); loadAccount(); }, 1500);
@@ -1081,9 +1084,9 @@ function updateDealStrategySelector() {
   for (var i = 0; i < cachedStrategies.length; i++) {
     var s = cachedStrategies[i];
     if (selectedEpic && s.instrument !== selectedEpic) continue;
-    if (s.dealId) continue;
     var label = (s.name || s.instrument).substring(0, 30);
     label += ' (' + s.direction + ' ' + s.size + ')';
+    if (s.dealId) label += ' [linked]';
     html += '<option value="' + i + '">' + label + '</option>';
   }
   sel.innerHTML = html;
