@@ -3202,6 +3202,9 @@ function serveCanvas(req, res) {
           "Content-Type": "text/html; charset=utf-8",
           "Content-Length": data.length,
           "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
         });
         res.end(data);
         return true;
@@ -3211,11 +3214,17 @@ function serveCanvas(req, res) {
     const ext = path.extname(filePath).toLowerCase();
     const isHtml = ext === ".html" || ext === ".htm";
     const data = isHtml ? injectNavIntoHtml(raw, filePath) : raw;
-    res.writeHead(200, {
+    const headers = {
       "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
       "Content-Length": data.length,
       "Access-Control-Allow-Origin": "*",
-    });
+    };
+    if (isHtml) {
+      headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+      headers["Pragma"] = "no-cache";
+      headers["Expires"] = "0";
+    }
+    res.writeHead(200, headers);
     res.end(data);
     return true;
   } catch {
