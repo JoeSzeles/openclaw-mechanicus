@@ -1,0 +1,1964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>IG Trading Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 20px; padding-top: 64px; }
+.container { max-width: 1400px; margin: 0 auto; }
+.header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+h1 { color: #58a6ff; font-size: 24px; }
+.back { color: #8b949e; text-decoration: none; font-size: 13px; }
+.back:hover { color: #58a6ff; }
+.subtitle { color: #8b949e; font-size: 13px; margin-bottom: 20px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+@media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr; } }
+@media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+.card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+.card h2 { color: #8b949e; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; border-bottom: 1px solid #21262d; padding-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.card.full { grid-column: 1 / -1; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #21262d; }
+th { color: #8b949e; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+tr:hover { background: rgba(88,166,255,0.04); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.badge-on { background: #1b4332; color: #2dc653; }
+.badge-off { background: #3d1f00; color: #f0883e; }
+.badge-alert { background: #3d1a1a; color: #f85149; }
+.badge-spike { background: #1c2541; color: #79c0ff; }
+.badge-spread { background: #2d1b4e; color: #bc8cff; }
+.badge-live { background: #1b4332; color: #2dc653; font-size: 10px; }
+.badge-snap { background: #21262d; color: #8b949e; font-size: 10px; }
+.empty { color: #484f58; font-style: italic; padding: 12px; text-align: center; }
+.stat { text-align: center; padding: 8px; }
+.stat .value { font-size: 24px; font-weight: 700; color: #58a6ff; }
+.stat .label { font-size: 12px; color: #8b949e; margin-top: 4px; }
+.error { color: #f85149; }
+.pos { color: #2dc653; }
+.neg { color: #f85149; }
+.btn-refresh { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 4px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.btn-refresh:hover { border-color: #58a6ff; }
+.actions-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.btn-sm { padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; border: 1px solid #30363d; background: #21262d; color: #c9d1d9; white-space: nowrap; }
+.btn-sm:hover { border-color: #58a6ff; }
+.btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-toggle { background: #1b4332; color: #2dc653; border-color: #2dc653; }
+.btn-toggle.off { background: #3d1f00; color: #f0883e; border-color: #f0883e; }
+.btn-danger { background: #3d1a1a; color: #f85149; border-color: #f85149; }
+.btn-danger:hover { background: #5a1a1a; }
+.btn-edit { background: #1c2541; color: #79c0ff; border-color: #79c0ff; }
+.btn-save { background: #1b4332; color: #2dc653; border-color: #2dc653; }
+.btn-cancel { background: #21262d; color: #8b949e; }
+.btn-bot { padding: 4px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid; }
+.btn-bot-stop { background: #3d1a1a; color: #f85149; border-color: #f85149; }
+.btn-bot-stop:hover { background: #5a1a1a; }
+.btn-bot-start { background: #1b4332; color: #2dc653; border-color: #2dc653; }
+.btn-bot-start:hover { background: #2a5a42; }
+.proc-badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.3px; }
+.proc-running { background:rgba(35,134,54,.3); color:#3fb950; border:1px solid rgba(63,185,80,.3); }
+.proc-stopped { background:rgba(187,128,9,.2); color:#d29922; border:1px solid rgba(210,153,34,.3); }
+.proc-disabled { background:rgba(139,148,158,.2); color:#8b949e; border:1px solid rgba(139,148,158,.3); }
+.proc-cmd { font-family:'SFMono-Regular',Consolas,monospace; font-size:11px; color:#8b949e; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; }
+.proc-actions { display:flex; gap:4px; align-items:center; }
+.proc-btn { padding:3px 10px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer; border:1px solid; }
+.proc-btn-start { background:#1b4332; color:#2dc653; border-color:#2dc653; }
+.proc-btn-stop { background:#3d1a1a; color:#f85149; border-color:#f85149; }
+.proc-btn-kill { background:#da3633; color:#fff; border-color:#da3633; }
+.proc-btn-remove { background:#21262d; color:#8b949e; border-color:#484f58; }
+.proc-btn-remove:hover { background:#3d1a1a; color:#f85149; border-color:#f85149; }
+.startup-check { appearance:none; -webkit-appearance:none; width:14px; height:14px; border:2px solid #484f58; border-radius:3px; background:#0d1117; cursor:pointer; position:relative; vertical-align:middle; }
+.startup-check:checked { background:#238636; border-color:#238636; }
+.startup-check:checked::after { content:'\2713'; color:#fff; font-size:10px; font-weight:700; position:absolute; top:-2px; left:1px; }
+.btn-master { padding: 4px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; border: 2px solid; }
+.btn-master.on { background: #1b4332; color: #2dc653; border-color: #2dc653; }
+.btn-master.off { background: #3d1a1a; color: #f85149; border-color: #f85149; }
+.edit-input { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 3px 6px; border-radius: 4px; font-size: 12px; width: 70px; }
+.edit-input:focus { border-color: #58a6ff; outline: none; }
+.strategy-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 9999; animation: fadeIn 0.3s; }
+.toast-ok { background: #1b4332; color: #2dc653; border: 1px solid #2dc653; }
+.toast-err { background: #3d1a1a; color: #f85149; border: 1px solid #f85149; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.watchlist-tabs { display: flex; gap: 0; background: #161b22; border: 1px solid #30363d; border-radius: 8px 8px 0 0; overflow-x: auto; white-space: nowrap; }
+.wl-tab { padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: #8b949e; border-bottom: 2px solid transparent; transition: all 0.2s; display: flex; align-items: center; gap: 6px; position: relative; }
+.wl-tab:hover { color: #c9d1d9; background: rgba(88,166,255,0.05); }
+.wl-tab.active { color: #58a6ff; border-bottom-color: #58a6ff; background: rgba(88,166,255,0.08); }
+.wl-tab .wl-close { font-size: 10px; color: #484f58; margin-left: 4px; padding: 2px 4px; border-radius: 3px; }
+.wl-tab .wl-close:hover { color: #f85149; background: rgba(248,81,73,0.15); }
+.wl-tab .wl-status { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.wl-tab .wl-status.open { background: #2dc653; }
+.wl-tab .wl-status.closed { background: #f85149; }
+.wl-tab-add { padding: 8px 12px; font-size: 14px; cursor: pointer; border: none; background: transparent; color: #484f58; font-weight: 700; }
+.wl-tab-add:hover { color: #58a6ff; }
+
+.instrument-header { display: flex; align-items: center; gap: 16px; padding: 12px 16px; background: #161b22; border: 1px solid #30363d; border-top: none; }
+.inst-price { font-size: 22px; font-weight: 700; }
+.inst-change { font-size: 14px; font-weight: 600; }
+.inst-details { font-size: 12px; color: #8b949e; }
+
+.search-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 10000; justify-content: center; align-items: flex-start; padding-top: 80px; }
+.search-overlay.visible { display: flex; }
+.search-box { background: #161b22; border: 1px solid #30363d; border-radius: 12px; width: 550px; max-width: 90vw; max-height: 70vh; overflow: hidden; display: flex; flex-direction: column; }
+.search-input { background: #0d1117; border: none; border-bottom: 1px solid #30363d; color: #c9d1d9; font-size: 16px; padding: 14px 16px; outline: none; width: 100%; }
+.search-input::placeholder { color: #484f58; }
+.search-results { overflow-y: auto; max-height: 50vh; padding: 8px; }
+.search-result { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
+.search-result:hover { background: rgba(88,166,255,0.08); }
+.search-result .sr-name { font-weight: 600; font-size: 14px; }
+.search-result .sr-epic { font-size: 11px; color: #8b949e; }
+.search-result .sr-status { font-size: 11px; }
+.search-result .sr-add { padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid #2dc653; background: #1b4332; color: #2dc653; }
+.search-result .sr-add:hover { background: #2a5a42; }
+.search-result .sr-add:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.chart-area { background: #161b22; border: 1px solid #30363d; border-top: none; padding: 16px; border-radius: 0 0 8px 8px; }
+.chart-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.tf-tabs { display: flex; gap: 4px; }
+.tf-tab { padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid #30363d; background: transparent; color: #8b949e; transition: all 0.2s; }
+.tf-tab.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+.tf-tab:hover:not(.active) { border-color: #58a6ff; color: #c9d1d9; }
+.chart-container { position: relative; height: 350px; }
+.chart-hint { font-size: 11px; color: #484f58; }
+
+.deal-panel { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+.deal-tabs { display: flex; gap: 0; margin-bottom: 12px; border-bottom: 2px solid #21262d; }
+.deal-tab { padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: #8b949e; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+.deal-tab.active { color: #c9d1d9; border-bottom-color: #da3633; }
+.deal-tab:hover:not(.active) { color: #c9d1d9; }
+.deal-prices { display: flex; gap: 4px; margin-bottom: 12px; }
+.deal-btn { flex: 1; padding: 10px 8px; border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer; border: 2px solid; text-align: center; transition: all 0.15s; }
+.deal-btn.sell { background: rgba(248,81,73,0.1); border-color: #f85149; color: #f85149; }
+.deal-btn.sell:hover, .deal-btn.sell.selected { background: rgba(248,81,73,0.25); }
+.deal-btn.buy { background: rgba(45,198,83,0.1); border-color: #2dc653; color: #2dc653; }
+.deal-btn.buy:hover, .deal-btn.buy.selected { background: rgba(45,198,83,0.25); }
+.deal-btn .deal-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; }
+.deal-btn .deal-price { font-size: 20px; display: block; margin-top: 2px; }
+.deal-btn .deal-arrow { font-size: 12px; }
+.deal-spread { text-align: center; font-size: 12px; color: #8b949e; margin-bottom: 12px; }
+.deal-field { margin-bottom: 10px; }
+.deal-field label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+.deal-field-row { display: flex; gap: 8px; align-items: center; }
+.deal-input { flex: 1; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px 10px; border-radius: 6px; font-size: 14px; }
+.deal-input:focus { border-color: #58a6ff; outline: none; }
+.deal-input-suffix { font-size: 12px; color: #8b949e; white-space: nowrap; }
+.deal-select { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 8px 10px; border-radius: 6px; font-size: 13px; }
+.deal-select:focus { border-color: #58a6ff; outline: none; }
+.deal-submit { width: 100%; padding: 10px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; margin-top: 12px; transition: all 0.15s; }
+.deal-submit.buy-mode { background: #2dc653; color: #fff; }
+.deal-submit.sell-mode { background: #f85149; color: #fff; }
+.deal-submit:hover { opacity: 0.9; }
+.deal-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.deal-options { display: flex; gap: 16px; margin-bottom: 10px; font-size: 12px; }
+.deal-options label { display: flex; align-items: center; gap: 4px; cursor: pointer; color: #8b949e; }
+.deal-options input[type=radio] { accent-color: #58a6ff; }
+.market-info { margin-top: 12px; border-top: 1px solid #21262d; padding-top: 10px; }
+.market-info-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
+.market-info-row .mi-label { color: #8b949e; }
+.market-info-row .mi-value { color: #c9d1d9; font-weight: 600; }
+
+.main-layout { display: grid; grid-template-columns: 1fr 320px; gap: 16px; margin-bottom: 20px; }
+@media (max-width: 900px) { .main-layout { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>IG Trading Dashboard</h1>
+    <a href="/__openclaw__/canvas/" class="back">Canvas</a>
+  </div>
+  <p class="subtitle"><span id="sessionBadge"></span> <span id="streamBadge"></span> <span id="lastUpdate">Loading...</span></p>
+
+  <div class="actions-bar">
+    <button class="btn-refresh" id="btnRefreshSnap">Refresh Snapshots</button>
+    <button class="btn-refresh" id="btnRefreshSession">Force Refresh Session</button>
+  </div>
+
+  <div class="grid-3" id="accountRow">
+    <div class="card">
+      <div class="stat">
+        <div class="value" id="balance">--</div>
+        <div class="label">Balance</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="stat">
+        <div class="value" id="available">--</div>
+        <div class="label">Available</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="stat">
+        <div class="value" id="pnl">--</div>
+        <div class="label">Unrealised P&L</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="watchlist-tabs" id="watchlistTabs">
+    <button class="wl-tab-add" id="btnAddInstrument" title="Search & add instrument">+</button>
+  </div>
+  <div id="instrumentHeader" class="instrument-header" style="display:none"></div>
+
+  <div class="main-layout">
+    <div>
+      <div class="chart-area" id="chartArea">
+        <div class="chart-controls">
+          <div class="tf-tabs" id="timeframeTabs"></div>
+          <div class="chart-hint">Scroll to zoom, drag to pan, double-click to reset</div>
+        </div>
+        <div class="chart-container">
+          <canvas id="priceChart"></canvas>
+        </div>
+        <p class="empty" id="chartEmpty">Select an instrument to view chart</p>
+      </div>
+    </div>
+    <div>
+      <div class="deal-panel" id="dealPanel" style="display:none">
+        <div class="deal-tabs">
+          <button class="deal-tab active" data-deal="deal" onclick="switchDealTab('deal')">Deal</button>
+          <button class="deal-tab" data-deal="order" onclick="switchDealTab('order')">Order</button>
+          <button class="deal-tab" data-deal="info" onclick="switchDealTab('info')">Info</button>
+        </div>
+
+        <div id="dealTabContent">
+          <div class="deal-prices" id="dealPrices"></div>
+          <div class="deal-spread" id="dealSpread"></div>
+
+          <div class="deal-field">
+            <label>Size (AUD)</label>
+            <div class="deal-field-row">
+              <input class="deal-input" id="dealSize" type="number" step="0.01" min="0.01" value="0.5">
+              <span class="deal-input-suffix" id="dealSizeInfo">contracts</span>
+            </div>
+          </div>
+
+          <div class="deal-field" id="dealPriceLevelField" style="display:none">
+            <label>Price level</label>
+            <input class="deal-input" id="dealPriceLevel" type="number" step="any">
+          </div>
+
+          <div class="deal-field" id="dealExpiryField" style="display:none">
+            <label>Expiry</label>
+            <select class="deal-select deal-input" id="dealExpiry">
+              <option value="GTC">Good till cancelled</option>
+              <option value="DFB">DFB</option>
+            </select>
+          </div>
+
+          <div class="deal-field">
+            <label>Stop</label>
+            <div class="deal-field-row">
+              <input class="deal-input" id="dealStop" type="number" step="any" placeholder="">
+              <span class="deal-input-suffix" id="dealStopSuffix">pts away</span>
+            </div>
+          </div>
+
+          <div class="deal-field">
+            <label>Limit</label>
+            <div class="deal-field-row">
+              <input class="deal-input" id="dealLimit" type="number" step="any" placeholder="">
+              <span class="deal-input-suffix">pts away</span>
+            </div>
+          </div>
+
+          <div class="deal-options">
+            <label><input type="radio" name="dealNetOff" value="false" checked> Net off</label>
+            <label><input type="radio" name="dealNetOff" value="true"> Force open</label>
+          </div>
+
+          <div class="deal-field" id="dealStrategyField">
+            <label>Strategy</label>
+            <select class="deal-select deal-input" id="dealStrategy" onchange="onDealStrategyChange()">
+              <option value="">— None —</option>
+            </select>
+          </div>
+
+          <button class="deal-submit buy-mode" id="dealSubmit" onclick="placeDeal()">Place deal</button>
+        </div>
+
+        <div id="orderTabContent" style="display:none">
+          <div class="deal-prices" id="orderPrices"></div>
+          <div class="deal-spread" id="orderSpread"></div>
+
+          <div class="deal-field">
+            <label>Size (AUD)</label>
+            <div class="deal-field-row">
+              <input class="deal-input" id="orderSize" type="number" step="0.01" min="0.01" value="0.5">
+              <span class="deal-input-suffix">contracts</span>
+            </div>
+          </div>
+
+          <div class="deal-field">
+            <label>Price level</label>
+            <input class="deal-input" id="orderPriceLevel" type="number" step="any">
+          </div>
+
+          <div class="deal-field">
+            <label>Expiry</label>
+            <select class="deal-select deal-input" id="orderExpiry">
+              <option value="GTC">Good till cancelled</option>
+              <option value="DFB">DFB</option>
+            </select>
+          </div>
+
+          <div class="deal-field">
+            <label>Stop</label>
+            <div class="deal-field-row">
+              <input class="deal-input" id="orderStop" type="number" step="any">
+              <span class="deal-input-suffix">pts away</span>
+            </div>
+          </div>
+
+          <div class="deal-field">
+            <label>Limit</label>
+            <div class="deal-field-row">
+              <input class="deal-input" id="orderLimit" type="number" step="any">
+              <span class="deal-input-suffix">pts away</span>
+            </div>
+          </div>
+
+          <div class="deal-options">
+            <label><input type="radio" name="orderNetOff" value="false" checked> Net off</label>
+            <label><input type="radio" name="orderNetOff" value="true"> Force open</label>
+          </div>
+
+          <button class="deal-submit buy-mode" id="orderSubmit" onclick="placeOrder()">Place order</button>
+        </div>
+
+        <div id="infoTabContent" style="display:none">
+          <div id="marketInfoContent"><p class="empty">No instrument selected</p></div>
+        </div>
+
+        <div class="market-info" id="dealMarketInfo"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card full">
+      <h2>Open Positions <span class="badge badge-live">LIVE</span></h2>
+      <div id="positions"><p class="empty">Loading...</p></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card full">
+      <h2>Bot Strategies <span class="badge badge-live">LIVE</span></h2>
+      <div id="strategyControls" class="strategy-controls"></div>
+      <div id="strategies"><p class="empty">Loading strategies...</p></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card full">
+      <h2>Trade Proof Reader <span class="badge badge-live">LIVE</span></h2>
+      <div id="proofreadControls" class="strategy-controls"></div>
+      <div id="proofread"><p class="empty">Loading proof reader config...</p></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card full">
+      <h2>Recent Alerts <span class="badge badge-snap">SNAPSHOT</span></h2>
+      <div id="alerts"><p class="empty">No alerts</p></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card full">
+      <h2>Trade Verification Audit Trail</h2>
+      <div id="verifyLog"><p class="empty">No trade verifications recorded</p></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card full">
+      <h2>Processes & Bots <span class="badge badge-live">LIVE</span></h2>
+      <div id="processesPanel"><p class="empty">Loading...</p></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card full">
+      <h2>Bot Activity Log <span class="badge badge-snap">SNAPSHOT</span></h2>
+      <div id="botLog"><p class="empty">No bot log</p></div>
+    </div>
+  </div>
+</div>
+
+<div class="search-overlay" id="searchOverlay">
+  <div class="search-box">
+    <input class="search-input" id="searchInput" type="text" placeholder="Search instruments (e.g. Gold, Tesla, EUR/USD...)">
+    <div class="search-results" id="searchResults">
+      <p class="empty">Type to search IG markets</p>
+    </div>
+  </div>
+</div>
+
+<script src="/token-init.js"></script>
+<script src="/nav-inject.js"></script>
+<script src="/__openclaw__/canvas/ig-live-prices.js"></script>
+<script src="/__openclaw__/canvas/ig-strategy-manager.js"></script>
+<script>
+var TOKEN = '';
+try {
+  var s = localStorage.getItem('openclaw.control.settings.v1');
+  if (s) { var obj = JSON.parse(s); TOKEN = obj.token || ''; }
+} catch(e) {}
+if (!TOKEN) {
+  try { var m = document.cookie.match(/openclaw_token=([^;]+)/); if (m) TOKEN = m[1]; } catch(e) {}
+}
+
+var priceChart = null;
+var authFailed = false;
+var editingStrategy = -1;
+var editingPosition = null;
+var editingProofread = false;
+var selectedEpic = null;
+var selectedInstrument = null;
+var selectedMarketData = null;
+var dealDirection = 'BUY';
+var currentTimeframe = 'HOUR';
+var watchedInstruments = [];
+var livePrices = {};
+var cachedPositions = [];
+if (typeof cachedStrategies === 'undefined') var cachedStrategies = [];
+
+var TIMEFRAMES = [
+  { key: 'MINUTE', label: '1M' },
+  { key: 'MINUTE_5', label: '5M' },
+  { key: 'MINUTE_15', label: '15M' },
+  { key: 'HOUR', label: '1H' },
+  { key: 'HOUR_4', label: '4H' },
+  { key: 'DAY', label: '1D' },
+  { key: 'WEEK', label: '1W' }
+];
+
+function showToast(msg, ok) {
+  var t = document.createElement('div');
+  t.className = 'toast ' + (ok ? 'toast-ok' : 'toast-err');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function() { t.remove(); }, 3000);
+}
+
+function apiFetch(url, opts) {
+  opts = opts || {};
+  opts.headers = opts.headers || {};
+  if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+  return fetch(url, opts).then(function(res) {
+    if (res.status === 401) {
+      if (!authFailed) {
+        authFailed = true;
+        var banner = document.createElement('div');
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#da3633;color:#fff;padding:10px;text-align:center;font-weight:600;z-index:9999;font-size:14px';
+        banner.textContent = 'Authentication failed (401) — token may be stale. Hard-refresh with Ctrl+Shift+R.';
+        document.body.appendChild(banner);
+      }
+      return null;
+    }
+    return res.text().then(function(t) {
+      if (!t.trim()) return null;
+      try {
+        var data = JSON.parse(t);
+        if (!res.ok) { data._httpError = res.status; return data; }
+        return data;
+      } catch(e) { return null; }
+    });
+  }).catch(function() { return null; });
+}
+
+function apiPost(url, body) {
+  return apiFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+}
+
+function apiPut(url, body) {
+  return apiFetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+}
+
+function apiDelete(url) {
+  return apiFetch(url, { method: 'DELETE' });
+}
+
+function fetchJSON(path) {
+  return fetch(window.location.origin + path).then(function(res) {
+    if (!res.ok) return null;
+    return res.text().then(function(t) {
+      if (!t.trim()) return null;
+      try { return JSON.parse(t); } catch(e) { return null; }
+    });
+  }).catch(function() { return null; });
+}
+
+function fmtNum(n, decimals) {
+  if (n == null) return '--';
+  return Number(n).toFixed(decimals != null ? decimals : 2);
+}
+
+function pnlClass(v) {
+  if (v > 0) return 'pos';
+  if (v < 0) return 'neg';
+  return '';
+}
+
+function badgeType(type) {
+  if (type === 'drop' || type === 'reversal_down' || type === 'trend_down' || type === 'session_low') return 'badge-alert';
+  if (type === 'spike' || type === 'reversal_up' || type === 'trend_up' || type === 'session_high') return 'badge-on';
+  if (type === 'spread' || type === 'high_volatility') return 'badge-spread';
+  if (type === 'breakout_above' || type === 'breakout_below') return 'badge-spike';
+  return 'badge-off';
+}
+
+async function loadAccount() {
+  var data = await apiFetch('/api/ig/account');
+  if (!data || !data.accounts) {
+    document.getElementById('balance').textContent = 'N/A';
+    document.getElementById('available').textContent = 'N/A';
+    document.getElementById('pnl').textContent = 'N/A';
+    return;
+  }
+  var acct = data.accounts[0];
+  if (!acct) return;
+  var b = acct.balance || {};
+  document.getElementById('balance').textContent = (b.balance != null ? b.balance.toFixed(2) : '--') + ' ' + (acct.currency || '');
+  document.getElementById('available').textContent = b.available != null ? b.available.toFixed(2) : '--';
+  var pnlVal = b.profitLoss != null ? b.profitLoss : 0;
+  var pnlEl = document.getElementById('pnl');
+  pnlEl.textContent = (pnlVal >= 0 ? '+' : '') + pnlVal.toFixed(2);
+  pnlEl.className = 'value ' + pnlClass(pnlVal);
+}
+
+async function loadWatchlist() {
+  var data = await apiFetch('/api/ig/watchedlist');
+  if (!data) return;
+  watchedInstruments = data.instruments || [];
+  renderWatchlistTabs();
+  if (watchedInstruments.length > 0 && !selectedEpic) {
+    selectInstrument(0);
+  }
+}
+
+function renderWatchlistTabs() {
+  var el = document.getElementById('watchlistTabs');
+  var html = '';
+  for (var i = 0; i < watchedInstruments.length; i++) {
+    var inst = watchedInstruments[i];
+    var isActive = selectedEpic === inst.epic;
+    var price = livePrices[inst.epic];
+    var statusClass = price && price.marketState === 'TRADEABLE' ? 'open' : 'closed';
+    var priceStr = price ? fmtNum(price.mid || ((price.bid + price.offer) / 2), 1) : '';
+    var changeStr = '';
+    if (price && price.percentageChange != null) {
+      var pct = price.percentageChange;
+      changeStr = '<span class="' + (pct >= 0 ? 'pos' : 'neg') + '" style="font-size:11px">' + (pct >= 0 ? '+' : '') + fmtNum(pct, 2) + '%</span>';
+    }
+
+    html += '<button class="wl-tab' + (isActive ? ' active' : '') + '" onclick="selectInstrument(' + i + ')">';
+    html += '<span class="wl-status ' + statusClass + '"></span>';
+    html += '<span>' + (inst.name || inst.epic) + '</span>';
+    if (priceStr) html += ' <span style="font-size:12px;color:#c9d1d9">' + priceStr + '</span>';
+    if (changeStr) html += ' ' + changeStr;
+    html += '<span class="wl-close" onclick="event.stopPropagation();removeInstrument(' + i + ')" title="Remove">&times;</span>';
+    html += '</button>';
+  }
+  html += '<button class="wl-tab-add" id="btnAddInstrument" title="Search & add instrument" onclick="openSearch()">+</button>';
+  el.innerHTML = html;
+}
+
+async function selectInstrument(idx) {
+  if (idx < 0 || idx >= watchedInstruments.length) return;
+  var inst = watchedInstruments[idx];
+  selectedEpic = inst.epic;
+  selectedInstrument = inst;
+  renderWatchlistTabs();
+  loadMarketData(inst.epic);
+  loadChart(inst.epic, currentTimeframe);
+  updateDealStrategySelector();
+}
+
+async function loadMarketData(epic) {
+  var data = await apiFetch('/api/ig/markets/' + epic);
+  if (!data || data._httpError) {
+    document.getElementById('instrumentHeader').style.display = 'none';
+    return;
+  }
+  selectedMarketData = data;
+  var snap = data.snapshot || {};
+  var inst = data.instrument || {};
+  var deal = data.dealingRules || {};
+
+  var bid = snap.bid || 0;
+  var offer = snap.offer || 0;
+  var mid = (bid + offer) / 2;
+  var spread = offer - bid;
+  var pctChange = snap.percentageChange || 0;
+  var high = snap.high || 0;
+  var low = snap.low || 0;
+  var status = snap.marketStatus || 'UNKNOWN';
+
+  livePrices[epic] = { bid: bid, offer: offer, mid: mid, marketState: status, percentageChange: pctChange, timestamp: Date.now() };
+  renderWatchlistTabs();
+
+  var hdrEl = document.getElementById('instrumentHeader');
+  hdrEl.style.display = 'flex';
+  hdrEl.innerHTML =
+    '<span class="wl-status ' + (status === 'TRADEABLE' ? 'open' : 'closed') + '" style="width:10px;height:10px"></span>' +
+    '<span style="font-weight:700;font-size:16px">' + (inst.name || epic) + '</span>' +
+    '<span class="inst-price">' + fmtNum(mid, 1) + '</span>' +
+    '<span class="inst-change ' + (pctChange >= 0 ? 'pos' : 'neg') + '">' + (pctChange >= 0 ? '+' : '') + fmtNum(pctChange, 2) + '%</span>' +
+    '<span class="inst-details">H ' + fmtNum(high, 1) + ' L ' + fmtNum(low, 1) + '</span>' +
+    '<span class="badge ' + (status === 'TRADEABLE' ? 'badge-on' : 'badge-off') + '">' + status + '</span>';
+
+  updateDealPanel(data);
+}
+
+function updateDealPanel(marketData) {
+  var panel = document.getElementById('dealPanel');
+  panel.style.display = 'block';
+  var snap = marketData.snapshot || {};
+  var inst = marketData.instrument || {};
+  var deal = marketData.dealingRules || {};
+
+  var bid = snap.bid || 0;
+  var offer = snap.offer || 0;
+  var spread = (offer - bid).toFixed(1);
+
+  var minSize = 0.01;
+  if (deal.minDealSize && deal.minDealSize.value) minSize = deal.minDealSize.value;
+  var minStop = '';
+  if (deal.minNormalStopOrLimitDistance && deal.minNormalStopOrLimitDistance.value) {
+    minStop = deal.minNormalStopOrLimitDistance.value;
+  }
+
+  document.getElementById('dealPrices').innerHTML =
+    '<button class="deal-btn sell' + (dealDirection === 'SELL' ? ' selected' : '') + '" onclick="setDealDirection(\'SELL\')">' +
+      '<span class="deal-label">SELL</span><span class="deal-price">' + fmtNum(bid, 1) + '</span>' +
+    '</button>' +
+    '<button class="deal-btn buy' + (dealDirection === 'BUY' ? ' selected' : '') + '" onclick="setDealDirection(\'BUY\')">' +
+      '<span class="deal-label">BUY</span><span class="deal-price">' + fmtNum(offer, 1) + '</span>' +
+    '</button>';
+  document.getElementById('dealSpread').textContent = spread;
+
+  document.getElementById('orderPrices').innerHTML =
+    '<button class="deal-btn sell' + (dealDirection === 'SELL' ? ' selected' : '') + '" onclick="setDealDirection(\'SELL\')">' +
+      '<span class="deal-label">SELL</span><span class="deal-price">' + fmtNum(bid, 1) + '</span>' +
+    '</button>' +
+    '<button class="deal-btn buy' + (dealDirection === 'BUY' ? ' selected' : '') + '" onclick="setDealDirection(\'BUY\')">' +
+      '<span class="deal-label">BUY</span><span class="deal-price">' + fmtNum(offer, 1) + '</span>' +
+    '</button>';
+  document.getElementById('orderSpread').textContent = spread;
+
+  document.getElementById('dealSizeInfo').textContent = 'contracts' + (minSize ? ' min: ' + minSize : '');
+  if (minStop) {
+    document.getElementById('dealStop').placeholder = 'min: ' + minStop;
+    document.getElementById('orderStop').placeholder = 'min: ' + minStop;
+    document.getElementById('dealStopSuffix').textContent = 'pts away  min: ' + minStop;
+  }
+
+  var submitBtn = document.getElementById('dealSubmit');
+  submitBtn.className = 'deal-submit ' + (dealDirection === 'BUY' ? 'buy-mode' : 'sell-mode');
+  submitBtn.textContent = 'Place deal';
+
+  var orderSubmitBtn = document.getElementById('orderSubmit');
+  orderSubmitBtn.className = 'deal-submit ' + (dealDirection === 'BUY' ? 'buy-mode' : 'sell-mode');
+  orderSubmitBtn.textContent = 'Place order';
+
+  var infoEl = document.getElementById('marketInfoContent');
+  var infoHtml = '<table>';
+  infoHtml += '<tr><td class="mi-label">Minimum size</td><td class="mi-value">' + minSize + '</td></tr>';
+  if (inst.contractSize) infoHtml += '<tr><td class="mi-label">Contract size per point</td><td class="mi-value">' + inst.contractSize + '</td></tr>';
+  if (inst.onePipMeans) infoHtml += '<tr><td class="mi-label">One point means</td><td class="mi-value">' + inst.onePipMeans + '</td></tr>';
+  if (inst.valueOfOnePip) infoHtml += '<tr><td class="mi-label">Value of one point</td><td class="mi-value">' + inst.valueOfOnePip + '</td></tr>';
+  if (minStop) infoHtml += '<tr><td class="mi-label">Minimum stop distance</td><td class="mi-value">' + minStop + '</td></tr>';
+  if (inst.slippageFactor && inst.slippageFactor.value) infoHtml += '<tr><td class="mi-label">Slippage factor</td><td class="mi-value">' + (inst.slippageFactor.value * 100) + '%</td></tr>';
+  if (inst.marginFactor) infoHtml += '<tr><td class="mi-label">Margin factor</td><td class="mi-value">' + inst.marginFactor + '%</td></tr>';
+  if (inst.currencies) {
+    var currs = inst.currencies.map(function(c) { return c.code; }).join(', ');
+    infoHtml += '<tr><td class="mi-label">Currencies</td><td class="mi-value">' + currs + '</td></tr>';
+  }
+  infoHtml += '<tr><td class="mi-label">EPIC</td><td class="mi-value" style="font-size:11px">' + (inst.epic || selectedEpic) + '</td></tr>';
+  infoHtml += '</table>';
+  infoEl.innerHTML = infoHtml;
+}
+
+function setDealDirection(dir) {
+  dealDirection = dir;
+  if (selectedMarketData) updateDealPanel(selectedMarketData);
+}
+
+function switchDealTab(tab) {
+  document.querySelectorAll('.deal-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelector('.deal-tab[data-deal="' + tab + '"]').classList.add('active');
+  document.getElementById('dealTabContent').style.display = tab === 'deal' ? 'block' : 'none';
+  document.getElementById('orderTabContent').style.display = tab === 'order' ? 'block' : 'none';
+  document.getElementById('infoTabContent').style.display = tab === 'info' ? 'block' : 'none';
+  if (tab === 'order') {
+    document.getElementById('dealPriceLevelField').style.display = 'none';
+    document.getElementById('dealExpiryField').style.display = 'none';
+  }
+}
+
+async function placeDeal() {
+  if (!selectedEpic) { showToast('No instrument selected', false); return; }
+  var btn = document.getElementById('dealSubmit');
+  btn.disabled = true;
+  btn.textContent = 'Placing...';
+
+  var stop = document.getElementById('dealStop').value;
+  var limit = document.getElementById('dealLimit').value;
+  var hasStopLimit = (stop && parseFloat(stop) > 0) || (limit && parseFloat(limit) > 0);
+
+  var forceOpenRadio = document.querySelector('input[name="dealNetOff"]:checked');
+  var forceOpen = forceOpenRadio ? forceOpenRadio.value === 'true' : false;
+  if (hasStopLimit) forceOpen = true;
+
+  var dealCurrency = 'AUD';
+  if (selectedMarketData && selectedMarketData.instrument && selectedMarketData.instrument.currencies) {
+    var currs = selectedMarketData.instrument.currencies;
+    if (currs.length > 0) dealCurrency = currs[0].name || currs[0].code;
+  }
+
+  var body = {
+    epic: selectedEpic,
+    direction: dealDirection,
+    size: parseFloat(document.getElementById('dealSize').value),
+    orderType: 'MARKET',
+    currencyCode: dealCurrency,
+    forceOpen: forceOpen
+  };
+
+  if (stop && parseFloat(stop) > 0) body.stopDistance = parseFloat(stop);
+  if (limit && parseFloat(limit) > 0) body.limitDistance = parseFloat(limit);
+
+  var result = await apiPost('/api/ig/positions/open', body);
+  btn.disabled = false;
+  btn.textContent = 'Place deal';
+
+  var conf = result && result.confirmation ? result.confirmation : result;
+  if (conf && conf.dealStatus === 'ACCEPTED') {
+    showToast('Deal placed: ' + dealDirection + ' ' + body.size + ' ' + selectedEpic, true);
+    var stratSel = document.getElementById('dealStrategy');
+    if (stratSel && stratSel.value !== '' && conf.dealId) {
+      var stratIdx = parseInt(stratSel.value, 10);
+      apiPost('/api/ig/strategies/' + stratIdx + '/attach', { dealId: conf.dealId }).then(function(r) {
+        if (r && r.ok) showToast('Strategy attached to deal', true);
+        loadStrategy();
+      });
+      stratSel.value = '';
+    }
+    setTimeout(function() { loadPositions(); loadAccount(); }, 1500);
+  } else if (conf && conf.dealStatus === 'REJECTED') {
+    showToast('Deal rejected: ' + (conf.reason || 'unknown'), false);
+  } else if (result && result.error) {
+    showToast('Error: ' + result.error, false);
+  } else {
+    showToast('Deal may have been placed — check positions', false);
+  }
+}
+
+async function placeOrder() {
+  if (!selectedEpic) { showToast('No instrument selected', false); return; }
+  var btn = document.getElementById('orderSubmit');
+  btn.disabled = true;
+  btn.textContent = 'Placing...';
+
+  var priceLevel = parseFloat(document.getElementById('orderPriceLevel').value);
+  if (!priceLevel || isNaN(priceLevel)) {
+    showToast('Price level required for limit/stop orders', false);
+    btn.disabled = false;
+    btn.textContent = 'Place order';
+    return;
+  }
+
+  var snap = selectedMarketData && selectedMarketData.snapshot ? selectedMarketData.snapshot : {};
+  var mid = ((snap.bid || 0) + (snap.offer || 0)) / 2;
+  var orderType;
+  if (dealDirection === 'BUY') {
+    orderType = priceLevel < mid ? 'LIMIT' : 'STOP';
+  } else {
+    orderType = priceLevel > mid ? 'LIMIT' : 'STOP';
+  }
+
+  var orderCurrency = 'AUD';
+  if (selectedMarketData && selectedMarketData.instrument && selectedMarketData.instrument.currencies) {
+    var currs = selectedMarketData.instrument.currencies;
+    if (currs.length > 0) orderCurrency = currs[0].name || currs[0].code;
+  }
+
+  var body = {
+    epic: selectedEpic,
+    direction: dealDirection,
+    size: parseFloat(document.getElementById('orderSize').value),
+    level: priceLevel,
+    type: orderType,
+    currencyCode: orderCurrency,
+    expiry: document.getElementById('orderExpiry').value === 'DFB' ? 'DFB' : '-',
+    guaranteedStop: false,
+    forceOpen: true
+  };
+
+  var stop = document.getElementById('orderStop').value;
+  if (stop && parseFloat(stop) > 0) body.stopDistance = parseFloat(stop);
+  var limit = document.getElementById('orderLimit').value;
+  if (limit && parseFloat(limit) > 0) body.limitDistance = parseFloat(limit);
+
+  var result = await apiPost('/api/ig/workingorders/create', body);
+  btn.disabled = false;
+  btn.textContent = 'Place order';
+
+  var conf = result && result.confirmation ? result.confirmation : result;
+  if (conf && conf.dealStatus === 'ACCEPTED') {
+    showToast('Order placed: ' + orderType + ' ' + dealDirection + ' @ ' + priceLevel, true);
+  } else if (conf && conf.dealStatus === 'REJECTED') {
+    showToast('Order rejected: ' + (conf.reason || 'unknown'), false);
+  } else if (result && result.error) {
+    showToast('Error: ' + result.error, false);
+  } else {
+    showToast('Order may have been placed — check working orders', false);
+  }
+}
+
+async function loadChart(epic, resolution) {
+  var emptyEl = document.getElementById('chartEmpty');
+  var canvas = document.getElementById('priceChart');
+
+  renderTimeframeTabs(resolution);
+
+  if (!epic) {
+    emptyEl.style.display = 'block';
+    canvas.style.display = 'none';
+    return;
+  }
+
+  emptyEl.style.display = 'none';
+  emptyEl.textContent = 'Loading chart...';
+  emptyEl.style.display = 'block';
+  canvas.style.display = 'none';
+
+  var maxPoints = 100;
+  if (resolution === 'MINUTE') maxPoints = 120;
+  if (resolution === 'MINUTE_5') maxPoints = 120;
+  if (resolution === 'MINUTE_15') maxPoints = 100;
+  if (resolution === 'HOUR_4') maxPoints = 80;
+  if (resolution === 'DAY') maxPoints = 60;
+  if (resolution === 'WEEK') maxPoints = 52;
+
+  var data = await apiFetch('/api/ig/pricehistory/' + epic + '?resolution=' + resolution + '&max=' + maxPoints);
+  if (!data || !data.prices || data.prices.length === 0) {
+    emptyEl.textContent = 'No price history for this timeframe';
+    return;
+  }
+
+  emptyEl.style.display = 'none';
+  canvas.style.display = 'block';
+
+  var prices = data.prices;
+  var labels = [];
+  var opens = [];
+  var highs = [];
+  var lows = [];
+  var closes = [];
+  var mids = [];
+
+  for (var i = 0; i < prices.length; i++) {
+    var p = prices[i];
+    var dt = new Date(p.snapshotTime || p.snapshotTimeUTC);
+    if (resolution === 'DAY' || resolution === 'WEEK') {
+      labels.push(dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }));
+    } else if (resolution === 'HOUR' || resolution === 'HOUR_4') {
+      labels.push(dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' + dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
+    } else {
+      labels.push(dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
+    }
+    var cm = p.closePrice || {};
+    var om = p.openPrice || {};
+    var hm = p.highPrice || {};
+    var lm = p.lowPrice || {};
+    var midClose = ((cm.bid || 0) + (cm.ask || 0)) / 2;
+    var midOpen = ((om.bid || 0) + (om.ask || 0)) / 2;
+    var midHigh = ((hm.bid || 0) + (hm.ask || 0)) / 2;
+    var midLow = ((lm.bid || 0) + (lm.ask || 0)) / 2;
+    opens.push(midOpen);
+    highs.push(midHigh);
+    lows.push(midLow);
+    closes.push(midClose);
+    mids.push(midClose);
+  }
+
+  if (priceChart) priceChart.destroy();
+
+  var ctx = canvas.getContext('2d');
+  priceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Close',
+          data: closes,
+          borderColor: '#58a6ff',
+          backgroundColor: 'rgba(88,166,255,0.08)',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          fill: true,
+          tension: 0.2
+        },
+        {
+          label: 'High',
+          data: highs,
+          borderColor: 'rgba(45,198,83,0.4)',
+          borderWidth: 1,
+          pointRadius: 0,
+          fill: false,
+          borderDash: [3, 3],
+          tension: 0.2
+        },
+        {
+          label: 'Low',
+          data: lows,
+          borderColor: 'rgba(248,81,73,0.4)',
+          borderWidth: 1,
+          pointRadius: 0,
+          fill: false,
+          borderDash: [3, 3],
+          tension: 0.2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#8b949e', font: { size: 11 } } },
+        tooltip: {
+          backgroundColor: '#161b22',
+          borderColor: '#30363d',
+          borderWidth: 1,
+          titleColor: '#c9d1d9',
+          bodyColor: '#8b949e',
+          callbacks: {
+            label: function(ctx) {
+              return ctx.dataset.label + ': ' + fmtNum(ctx.parsed.y, 2);
+            }
+          }
+        },
+        zoom: {
+          pan: {
+            enabled: true,
+            mode: 'x'
+          },
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: 'x'
+          }
+        },
+        annotation: {
+          annotations: buildChartAnnotations(epic)
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#484f58', maxTicksLimit: 12, font: { size: 10 }, maxRotation: 45, minRotation: 0 },
+          grid: { color: 'rgba(48,54,61,0.5)' }
+        },
+        y: {
+          ticks: { color: '#484f58', font: { size: 10 } },
+          grid: { color: 'rgba(48,54,61,0.5)' }
+        }
+      }
+    }
+  });
+}
+
+function renderTimeframeTabs(activeResolution) {
+  var el = document.getElementById('timeframeTabs');
+  var html = '';
+  for (var i = 0; i < TIMEFRAMES.length; i++) {
+    var tf = TIMEFRAMES[i];
+    html += '<button class="tf-tab' + (tf.key === activeResolution ? ' active' : '') + '" onclick="changeTimeframe(\'' + tf.key + '\')">' + tf.label + '</button>';
+  }
+  html += '<button class="tf-tab" onclick="resetChartZoom()" title="Reset zoom" style="margin-left:8px">Reset</button>';
+  el.innerHTML = html;
+}
+
+function changeTimeframe(tf) {
+  currentTimeframe = tf;
+  if (selectedEpic) loadChart(selectedEpic, tf);
+}
+
+function resetChartZoom() {
+  if (priceChart) priceChart.resetZoom();
+}
+
+function buildChartAnnotations(epic) {
+  var annotations = {};
+  if (!epic) return annotations;
+  var posIdx = 0;
+  for (var i = 0; i < cachedPositions.length; i++) {
+    var p = cachedPositions[i];
+    var pos = p.position || {};
+    var mkt = p.market || {};
+    if (mkt.epic !== epic) continue;
+    var entry = pos.level || pos.openLevel;
+    var dir = pos.direction || '';
+    var label = dir + ' @ ' + fmtNum(entry, 2);
+    if (entry) {
+      annotations['pos_entry_' + posIdx] = {
+        type: 'line', yMin: entry, yMax: entry,
+        borderColor: '#f0e68c', borderWidth: 2,
+        label: { display: true, content: 'Entry ' + fmtNum(entry, 2), position: 'end', backgroundColor: 'rgba(240,230,140,0.15)', color: '#f0e68c', font: { size: 10 } }
+      };
+    }
+    if (pos.stopLevel != null) {
+      annotations['pos_stop_' + posIdx] = {
+        type: 'line', yMin: pos.stopLevel, yMax: pos.stopLevel,
+        borderColor: '#f85149', borderWidth: 1.5, borderDash: [6, 3],
+        label: { display: true, content: 'SL ' + fmtNum(pos.stopLevel, 2), position: 'end', backgroundColor: 'rgba(248,81,73,0.15)', color: '#f85149', font: { size: 10 } }
+      };
+    }
+    if (pos.limitLevel != null) {
+      annotations['pos_limit_' + posIdx] = {
+        type: 'line', yMin: pos.limitLevel, yMax: pos.limitLevel,
+        borderColor: '#2dd654', borderWidth: 1.5, borderDash: [6, 3],
+        label: { display: true, content: 'TP ' + fmtNum(pos.limitLevel, 2), position: 'end', backgroundColor: 'rgba(45,214,84,0.15)', color: '#2dd654', font: { size: 10 } }
+      };
+    }
+    posIdx++;
+  }
+  for (var j = 0; j < cachedStrategies.length; j++) {
+    var s = cachedStrategies[j];
+    if (s.instrument !== epic) continue;
+    var stratEntry = s.entryBelow != null ? s.entryBelow : (s.entryAbove != null ? s.entryAbove : null);
+    var stratLabel = (s.name || s.instrument).substring(0, 20);
+    var entrySign = s.entryBelow != null ? '< ' : '> ';
+    if (stratEntry != null) {
+      annotations['strat_entry_' + j] = {
+        type: 'line', yMin: stratEntry, yMax: stratEntry,
+        borderColor: '#f0883e', borderWidth: 1.5, borderDash: [4, 4],
+        label: { display: true, content: stratLabel + ' ' + entrySign + fmtNum(stratEntry, 2), position: 'start', backgroundColor: 'rgba(240,136,62,0.15)', color: '#f0883e', font: { size: 10 } }
+      };
+      if (s.stopDistance) {
+        var stopLvl = s.direction === 'BUY' ? stratEntry - s.stopDistance : stratEntry + s.stopDistance;
+        annotations['strat_stop_' + j] = {
+          type: 'line', yMin: stopLvl, yMax: stopLvl,
+          borderColor: 'rgba(248,81,73,0.5)', borderWidth: 1, borderDash: [3, 3],
+          label: { display: true, content: 'S.SL ' + fmtNum(stopLvl, 2), position: 'start', backgroundColor: 'rgba(248,81,73,0.1)', color: 'rgba(248,81,73,0.7)', font: { size: 9 } }
+        };
+      }
+      if (s.limitDistance) {
+        var limitLvl = s.direction === 'BUY' ? stratEntry + s.limitDistance : stratEntry - s.limitDistance;
+        annotations['strat_limit_' + j] = {
+          type: 'line', yMin: limitLvl, yMax: limitLvl,
+          borderColor: 'rgba(45,214,84,0.5)', borderWidth: 1, borderDash: [3, 3],
+          label: { display: true, content: 'S.TP ' + fmtNum(limitLvl, 2), position: 'start', backgroundColor: 'rgba(45,214,84,0.1)', color: 'rgba(45,214,84,0.7)', font: { size: 9 } }
+        };
+      }
+    }
+  }
+  return annotations;
+}
+
+function updateChartAnnotations() {
+  if (!priceChart || !selectedEpic) return;
+  priceChart.options.plugins.annotation = { annotations: buildChartAnnotations(selectedEpic) };
+  priceChart.update('none');
+}
+
+function updateDealStrategySelector() {
+  var sel = document.getElementById('dealStrategy');
+  if (!sel) return;
+  var html = '<option value="">— None —</option>';
+  for (var i = 0; i < cachedStrategies.length; i++) {
+    var s = cachedStrategies[i];
+    if (selectedEpic && s.instrument !== selectedEpic) continue;
+    if (s.dealId) continue;
+    var label = (s.name || s.instrument).substring(0, 30);
+    label += ' (' + s.direction + ' ' + s.size + ')';
+    html += '<option value="' + i + '">' + label + '</option>';
+  }
+  sel.innerHTML = html;
+}
+
+function onDealStrategyChange() {
+  var sel = document.getElementById('dealStrategy');
+  if (!sel || sel.value === '') return;
+  var idx = parseInt(sel.value, 10);
+  var s = cachedStrategies[idx];
+  if (!s) return;
+  if (s.stopDistance) document.getElementById('dealStop').value = s.stopDistance;
+  if (s.limitDistance) document.getElementById('dealLimit').value = s.limitDistance;
+  if (s.size) document.getElementById('dealSize').value = s.size;
+  if (s.direction) {
+    setDealDirection(s.direction);
+  }
+}
+
+function openSearch() {
+  var overlay = document.getElementById('searchOverlay');
+  overlay.classList.add('visible');
+  var input = document.getElementById('searchInput');
+  input.value = '';
+  input.focus();
+  document.getElementById('searchResults').innerHTML = '<p class="empty">Type to search IG markets</p>';
+}
+
+function closeSearch() {
+  document.getElementById('searchOverlay').classList.remove('visible');
+}
+
+document.getElementById('searchOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeSearch();
+});
+
+var searchTimeout = null;
+document.getElementById('searchInput').addEventListener('input', function() {
+  var q = this.value.trim();
+  if (searchTimeout) clearTimeout(searchTimeout);
+  if (q.length < 2) {
+    document.getElementById('searchResults').innerHTML = '<p class="empty">Type at least 2 characters</p>';
+    return;
+  }
+  searchTimeout = setTimeout(function() { doSearch(q); }, 400);
+});
+
+document.getElementById('searchInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeSearch();
+});
+
+async function doSearch(q) {
+  var resultsEl = document.getElementById('searchResults');
+  resultsEl.innerHTML = '<p class="empty">Searching...</p>';
+
+  var data = await apiFetch('/api/ig/markets?q=' + encodeURIComponent(q));
+  if (!data || !data.markets || data.markets.length === 0) {
+    resultsEl.innerHTML = '<p class="empty">No results for "' + q + '"</p>';
+    return;
+  }
+
+  var markets = data.markets;
+  var html = '';
+  for (var i = 0; i < markets.length && i < 30; i++) {
+    var m = markets[i];
+    var already = watchedInstruments.some(function(w) { return w.epic === m.epic; });
+    var statusBadge = m.marketStatus === 'TRADEABLE' ?
+      '<span class="badge badge-on">' + m.marketStatus + '</span>' :
+      '<span class="badge badge-off">' + (m.marketStatus || 'CLOSED') + '</span>';
+
+    html += '<div class="search-result">';
+    html += '<div><div class="sr-name">' + (m.instrumentName || m.epic) + '</div>';
+    html += '<div class="sr-epic">' + m.epic + ' ' + statusBadge + '</div></div>';
+    html += '<div>';
+    if (m.bid) html += '<span style="font-size:13px;font-weight:600;margin-right:8px">' + fmtNum(m.bid, 1) + ' / ' + fmtNum(m.offer, 1) + '</span>';
+    if (already) {
+      html += '<button class="sr-add" disabled>Added</button>';
+    } else {
+      html += '<button class="sr-add" onclick="addInstrument(\'' + m.epic + '\', \'' + (m.instrumentName || '').replace(/'/g, "\\'") + '\')">Add</button>';
+    }
+    html += '</div></div>';
+  }
+  resultsEl.innerHTML = html;
+}
+
+async function addInstrument(epic, name) {
+  var result = await apiPost('/api/ig/watchedlist', { epic: epic, name: name });
+  if (result && result.ok) {
+    showToast('Added: ' + name, true);
+    watchedInstruments = result.instruments;
+    renderWatchlistTabs();
+    closeSearch();
+    var idx = watchedInstruments.findIndex(function(w) { return w.epic === epic; });
+    if (idx >= 0) selectInstrument(idx);
+  } else if (result && result.error) {
+    showToast(result.error, false);
+  } else {
+    showToast('Failed to add instrument', false);
+  }
+}
+
+async function removeInstrument(idx) {
+  var inst = watchedInstruments[idx];
+  if (!inst) return;
+  if (!confirm('Remove "' + (inst.name || inst.epic) + '" from watchlist?')) return;
+  var result = await apiDelete('/api/ig/watchedlist/' + idx);
+  if (result && result.ok) {
+    showToast('Removed: ' + (inst.name || inst.epic), true);
+    watchedInstruments = result.instruments || [];
+    if (selectedEpic === inst.epic) {
+      selectedEpic = null;
+      selectedInstrument = null;
+      selectedMarketData = null;
+      document.getElementById('instrumentHeader').style.display = 'none';
+      document.getElementById('dealPanel').style.display = 'none';
+      if (priceChart) { priceChart.destroy(); priceChart = null; }
+      document.getElementById('priceChart').style.display = 'none';
+      document.getElementById('chartEmpty').style.display = 'block';
+      document.getElementById('chartEmpty').textContent = 'Select an instrument to view chart';
+    }
+    renderWatchlistTabs();
+    if (watchedInstruments.length > 0 && !selectedEpic) selectInstrument(0);
+  } else {
+    showToast('Failed to remove', false);
+  }
+}
+
+async function loadPositions() {
+  var el = document.getElementById('positions');
+  var data = await apiFetch('/api/ig/positions');
+  if (!data) {
+    cachedPositions = [];
+    el.innerHTML = '<p class="empty">API unavailable — check IG credentials</p>';
+    updateChartAnnotations();
+    return;
+  }
+  var positions = data.positions || [];
+  cachedPositions = positions;
+  if (positions.length === 0) {
+    el.innerHTML = '<p class="empty">No open positions</p>';
+    updateChartAnnotations();
+    return;
+  }
+  var html = '<table><tr><th>Market</th><th>Dir</th><th>Size</th><th>Entry</th><th>Current</th><th>P&L</th><th>Stop</th><th>Limit</th><th>Strategy</th><th>Actions</th></tr>';
+  for (var i = 0; i < positions.length; i++) {
+    var pos = positions[i].position || {};
+    var mkt = positions[i].market || {};
+    var dir = pos.direction || '?';
+    var entry = pos.level || pos.openLevel || 0;
+    var current = dir === 'BUY' ? (mkt.bid || 0) : (mkt.offer || 0);
+    var diff = dir === 'BUY' ? (current - entry) : (entry - current);
+    var pl = diff * (pos.size || pos.dealSize || 1);
+    var stopLevel = pos.stopLevel;
+    var limitLevel = pos.limitLevel;
+    var dealId = pos.dealId || '';
+    var isEditing = editingPosition === dealId;
+
+    html += '<tr>';
+    html += '<td style="font-weight:600">' + (mkt.instrumentName || mkt.epic || '?') + '</td>';
+    html += '<td><span class="badge ' + (dir === 'BUY' ? 'badge-on' : 'badge-alert') + '">' + dir + '</span></td>';
+    html += '<td>' + fmtNum(pos.size || pos.dealSize) + '</td>';
+    html += '<td>' + fmtNum(entry, 5) + '</td>';
+    html += '<td>' + fmtNum(current, 5) + '</td>';
+    html += '<td class="' + pnlClass(pl) + '" style="font-weight:600">' + (pl >= 0 ? '+' : '') + fmtNum(pl) + '</td>';
+
+    if (isEditing) {
+      html += '<td><input class="edit-input" id="editStop_' + dealId + '" type="number" step="any" value="' + (stopLevel != null ? stopLevel : '') + '"></td>';
+      html += '<td><input class="edit-input" id="editLimit_' + dealId + '" type="number" step="any" value="' + (limitLevel != null ? limitLevel : '') + '"></td>';
+      html += '<td></td>';
+      html += '<td style="white-space:nowrap">';
+      html += '<button class="btn-sm btn-save" onclick="savePosition(\'' + dealId + '\')">Save</button> ';
+      html += '<button class="btn-sm btn-cancel" onclick="cancelEditPosition()">Cancel</button>';
+      html += '</td>';
+    } else {
+      html += '<td>' + (stopLevel != null ? fmtNum(stopLevel, 5) : '-') + '</td>';
+      html += '<td>' + (limitLevel != null ? fmtNum(limitLevel, 5) : '-') + '</td>';
+      html += '<td>' + buildStrategyDropdown(dealId, cachedStrategies) + '</td>';
+      html += '<td style="white-space:nowrap">';
+      html += '<button class="btn-sm btn-edit" onclick="editPosition(\'' + dealId + '\')">Edit</button> ';
+      html += '<button class="btn-sm btn-danger" onclick="closePosition(\'' + dealId + '\', \'' + (mkt.instrumentName || mkt.epic || '').replace(/'/g, "\\'") + '\')">Close</button>';
+      html += '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</table>';
+  el.innerHTML = html;
+  updateChartAnnotations();
+}
+
+function editPosition(dealId) { editingPosition = dealId; loadPositions(); }
+function cancelEditPosition() { editingPosition = null; loadPositions(); }
+
+async function savePosition(dealId) {
+  var stopEl = document.getElementById('editStop_' + dealId);
+  var limitEl = document.getElementById('editLimit_' + dealId);
+  var body = { dealId: dealId };
+  if (stopEl && stopEl.value) body.stopLevel = parseFloat(stopEl.value);
+  if (limitEl && limitEl.value) body.limitLevel = parseFloat(limitEl.value);
+  var result = await apiPut('/api/ig/positions/update', body);
+  if (result && !result._httpError) {
+    showToast('Position updated', true);
+    editingPosition = null;
+    loadPositions();
+  } else {
+    showToast(result && result.error ? result.error : 'Failed to update position', false);
+  }
+}
+
+async function closePosition(dealId, name) {
+  if (!confirm('Close position on ' + name + '?\n\nDealId: ' + dealId)) return;
+  var result = await apiPost('/api/ig/positions/close', { dealId: dealId });
+  if (result && !result._httpError) {
+    showToast('Position closed', true);
+    setTimeout(function() { loadPositions(); loadAccount(); }, 1000);
+  } else {
+    showToast(result && result.error ? result.error : 'Failed to close position', false);
+  }
+}
+
+
+async function loadStrategy() {
+  var config = await apiFetch('/api/ig/strategies');
+  var el = document.getElementById('strategies');
+  var controlsEl = document.getElementById('strategyControls');
+
+  if (!config || !config.strategies) {
+    controlsEl.innerHTML = '';
+    return;
+  }
+
+  cachedStrategies = config.strategies || [];
+
+  var masterClass = config.enabled ? 'btn-master on' : 'btn-master off';
+  var masterText = config.enabled ? 'Bot: ON' : 'Bot: OFF';
+  controlsEl.innerHTML = '<button class="' + masterClass + '" onclick="toggleMaster(' + !config.enabled + ')">' + masterText + '</button>' +
+    ' <button class="btn-bot btn-bot-stop" onclick="stopBot()">Stop Bot Process</button>' +
+    ' <button class="btn-bot btn-bot-start" onclick="startBot()">Start Bot Process</button>' +
+    ' <button class="btn-sm btn-edit" onclick="showAddStrategyModal()">+ Add Strategy</button>' +
+    ' <select class="deal-select deal-input" id="templateDropdown" style="width:180px;font-size:11px;vertical-align:middle;margin-left:4px" onchange="onTemplateSelect(this)"><option value="">Templates...</option></select>';
+  loadTemplateDropdown();
+
+  if (config.strategies.length === 0) {
+    el.innerHTML = '<p class="empty">No strategies configured</p>';
+    return;
+  }
+
+  var html = '<table><tr><th>Name</th><th>Instrument</th><th>Dir</th><th>Entry</th><th>Stop Dist</th><th>Limit Dist</th><th>Size</th><th>Status</th><th>Linked</th><th>Actions</th></tr>';
+  for (var i = 0; i < config.strategies.length; i++) {
+    var s = config.strategies[i];
+    var isEditing = editingStrategy === i;
+
+    if (isEditing) {
+      var entryVal = s.entryBelow != null ? s.entryBelow : (s.entryAbove != null ? s.entryAbove : '');
+      var entryType = s.entryBelow != null ? 'below' : 'above';
+      html += '<tr style="background:rgba(88,166,255,0.08)">';
+      html += '<td><input class="edit-input" style="width:140px" id="editName" value="' + (s.name || '').replace(/"/g, '&quot;') + '"></td>';
+      html += '<td style="font-size:11px;color:#8b949e">' + s.instrument + '</td>';
+      html += '<td>' + s.direction + '</td>';
+      html += '<td><select id="editEntryType" class="edit-input" style="width:55px"><option value="below"' + (entryType === 'below' ? ' selected' : '') + '>&lt;</option><option value="above"' + (entryType === 'above' ? ' selected' : '') + '>&gt;</option></select> <input class="edit-input" id="editEntry" type="number" step="any" value="' + entryVal + '"></td>';
+      html += '<td><input class="edit-input" id="editStop" type="number" step="any" value="' + (s.stopDistance || '') + '"></td>';
+      html += '<td><input class="edit-input" id="editLimitD" type="number" step="any" value="' + (s.limitDistance || '') + '"></td>';
+      html += '<td><input class="edit-input" style="width:50px" id="editSize" type="number" step="any" value="' + (s.size || '') + '"></td>';
+      html += '<td>' + (s.enabled ? '<span class="badge badge-on">ON</span>' : '<span class="badge badge-off">OFF</span>') + '</td>';
+      html += '<td></td>';
+      html += '<td style="white-space:nowrap"><button class="btn-sm btn-save" onclick="saveStrategy(' + i + ')">Save</button> <button class="btn-sm btn-cancel" onclick="cancelEditStrategy()">Cancel</button></td>';
+    } else {
+      var entry = s.entryBelow != null ? '< ' + s.entryBelow : (s.entryAbove != null ? '> ' + s.entryAbove : '-');
+      var toggleClass = s.enabled ? 'btn-sm btn-toggle' : 'btn-sm btn-toggle off';
+      var toggleText = s.enabled ? 'ON' : 'OFF';
+      var linkedHtml = '-';
+      if (s.dealId) {
+        var pauseClass = s.paused ? 'btn-sm btn-toggle off' : 'btn-sm btn-toggle';
+        var pauseLabel = s.paused ? 'PAUSED' : 'ACTIVE';
+        linkedHtml = '<span style="font-size:10px;color:#8b949e" title="' + s.dealId + '">' + s.dealId.substring(0, 12) + '...</span> ';
+        linkedHtml += '<button class="' + pauseClass + '" style="font-size:9px;padding:1px 5px" onclick="toggleStrategyPause(' + i + ')">' + pauseLabel + '</button>';
+      }
+      html += '<tr>';
+      html += '<td style="font-weight:600">' + (s.name || s.instrument) + '</td>';
+      html += '<td style="font-size:11px;color:#8b949e">' + s.instrument + '</td>';
+      html += '<td>' + s.direction + '</td>';
+      html += '<td>' + entry + '</td>';
+      html += '<td>' + (s.stopDistance || '-') + '</td>';
+      html += '<td>' + (s.limitDistance || '-') + '</td>';
+      html += '<td>' + s.size + '</td>';
+      html += '<td><button class="' + toggleClass + '" onclick="toggleStrategy(' + i + ')">' + toggleText + '</button></td>';
+      html += '<td>' + linkedHtml + '</td>';
+      html += '<td style="white-space:nowrap"><button class="btn-sm btn-edit" onclick="editStrategy(' + i + ')">Edit</button> <button class="btn-sm btn-danger" onclick="deleteStrategy(' + i + ', \'' + (s.name || '').replace(/'/g, "\\'") + '\')">Del</button> <button class="btn-sm" style="font-size:10px;padding:2px 5px;color:#8b949e;border-color:#30363d" onclick="saveAsTemplate(' + i + ')" title="Save as template">Save</button></td>';
+    }
+    html += '</tr>';
+  }
+  html += '</table>';
+  el.innerHTML = html;
+  updateChartAnnotations();
+  updateDealStrategySelector();
+}
+
+function editStrategy(idx) { editingStrategy = idx; loadStrategy(); }
+function cancelEditStrategy() { editingStrategy = -1; loadStrategy(); }
+
+async function toggleStrategy(idx) {
+  var result = await apiPost('/api/ig/strategies/' + idx + '/toggle');
+  if (result && result.ok) {
+    showToast('Strategy ' + (result.enabled ? 'enabled' : 'disabled'), true);
+    loadStrategy();
+  } else {
+    showToast(result && result.error ? result.error : 'Failed to toggle strategy', false);
+  }
+}
+
+async function saveStrategy(idx) {
+  var body = {};
+  var nameEl = document.getElementById('editName');
+  var entryEl = document.getElementById('editEntry');
+  var entryTypeEl = document.getElementById('editEntryType');
+  var stopEl = document.getElementById('editStop');
+  var limitEl = document.getElementById('editLimitD');
+  var sizeEl = document.getElementById('editSize');
+
+  if (nameEl) body.name = nameEl.value;
+  if (entryEl && entryEl.value) {
+    if (entryTypeEl && entryTypeEl.value === 'above') {
+      body.entryAbove = parseFloat(entryEl.value);
+    } else {
+      body.entryBelow = parseFloat(entryEl.value);
+    }
+  }
+  if (stopEl && stopEl.value) body.stopDistance = parseFloat(stopEl.value);
+  if (limitEl && limitEl.value) body.limitDistance = parseFloat(limitEl.value);
+  if (sizeEl && sizeEl.value) body.size = parseFloat(sizeEl.value);
+
+  var result = await apiPut('/api/ig/strategies/' + idx, body);
+  if (result && result.ok) {
+    showToast('Strategy saved', true);
+    editingStrategy = -1;
+    loadStrategy();
+  } else {
+    showToast(result && result.error ? result.error : 'Failed to save strategy', false);
+  }
+}
+
+async function deleteStrategy(idx, name) {
+  if (!confirm('Delete strategy "' + name + '"?\n\nThis cannot be undone.')) return;
+  var result = await apiDelete('/api/ig/strategies/' + idx);
+  if (result && result.ok) {
+    showToast('Strategy deleted', true);
+    editingStrategy = -1;
+    loadStrategy();
+  } else {
+    showToast(result && result.error ? result.error : 'Failed to delete strategy', false);
+  }
+}
+
+async function toggleMaster(enable) {
+  var result = await apiPost('/api/ig/strategies/global', { enabled: enable });
+  if (result && result.ok) {
+    showToast('Bot ' + (enable ? 'enabled' : 'disabled'), true);
+    loadStrategy();
+  } else {
+    showToast(result && result.error ? result.error : 'Failed to toggle bot', false);
+  }
+}
+
+async function stopBot() {
+  var result = await apiPost('/api/bots/ig-trading-bot/stop');
+  if (result) { showToast('Trading bot stopped', true); } else { showToast('Failed to stop bot', false); }
+}
+
+async function startBot() {
+  var result = await apiPost('/api/bots/ig-trading-bot/start');
+  if (result) { showToast('Trading bot started', true); } else { showToast('Failed to start bot', false); }
+}
+
+var cachedTemplates = [];
+
+async function loadTemplateDropdown() {
+  var dd = document.getElementById('templateDropdown');
+  if (!dd) return;
+  var data = await apiFetch('/api/ig/strategy-templates');
+  if (!data || !data.templates) return;
+  cachedTemplates = data.templates;
+  var html = '<option value="">Templates...</option>';
+  var groups = {};
+  for (var i = 0; i < data.templates.length; i++) {
+    var t = data.templates[i];
+    var group = t.instrumentName || t.instrument || 'Other';
+    if (!groups[group]) groups[group] = [];
+    groups[group].push({ idx: i, t: t });
+  }
+  for (var g in groups) {
+    html += '<optgroup label="' + g + '">';
+    for (var j = 0; j < groups[g].length; j++) {
+      var item = groups[g][j];
+      var dirBadge = item.t.direction === 'BUY' ? 'BUY' : 'SELL';
+      html += '<option value="' + item.idx + '">' + item.t.name + ' (' + dirBadge + ')</option>';
+    }
+    html += '</optgroup>';
+  }
+  dd.innerHTML = html;
+}
+
+function onTemplateSelect(sel) {
+  if (sel.value === '') return;
+  var idx = parseInt(sel.value, 10);
+  var t = cachedTemplates[idx];
+  if (!t) return;
+  sel.value = '';
+  showTemplatePreview(t);
+}
+
+function showTemplatePreview(t) {
+  var existing = document.getElementById('templateOverlay');
+  if (existing) existing.remove();
+
+  var entryField = '';
+  if (t.entryBelow != null) entryField = 'Entry Below: ' + t.entryBelow;
+  else if (t.entryAbove != null) entryField = 'Entry Above: ' + t.entryAbove;
+  else entryField = 'No entry level set';
+
+  var overlay = document.createElement('div');
+  overlay.id = 'templateOverlay';
+  overlay.className = 'search-overlay visible';
+  overlay.innerHTML =
+    '<div class="search-box" style="width:550px">' +
+      '<div style="padding:16px;border-bottom:1px solid #30363d">' +
+        '<h3 style="color:#c9d1d9;font-size:16px;margin:0">Strategy Template: ' + (t.name || 'Unnamed') + '</h3>' +
+      '</div>' +
+      '<div style="padding:16px">' +
+        (t.description ? '<p style="color:#8b949e;font-size:13px;margin-bottom:12px">' + t.description + '</p>' : '') +
+        '<table style="width:100%;font-size:13px;margin-bottom:16px">' +
+          '<tr><td style="color:#8b949e;padding:4px 8px">Instrument</td><td style="padding:4px 8px">' + (t.instrumentName || t.instrument) + '</td></tr>' +
+          '<tr><td style="color:#8b949e;padding:4px 8px">Direction</td><td style="padding:4px 8px"><span class="badge ' + (t.direction === 'BUY' ? 'badge-on' : 'badge-alert') + '">' + t.direction + '</span></td></tr>' +
+          '<tr><td style="color:#8b949e;padding:4px 8px">Entry</td><td style="padding:4px 8px">' + entryField + '</td></tr>' +
+          '<tr><td style="color:#8b949e;padding:4px 8px">Stop Distance</td><td style="padding:4px 8px">' + (t.stopDistance || '-') + '</td></tr>' +
+          '<tr><td style="color:#8b949e;padding:4px 8px">Limit Distance</td><td style="padding:4px 8px">' + (t.limitDistance || '-') + '</td></tr>' +
+          '<tr><td style="color:#8b949e;padding:4px 8px">Size</td><td style="padding:4px 8px">' + (t.size || '-') + '</td></tr>' +
+        '</table>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+          '<button class="btn-sm btn-danger" onclick="deleteTemplate(\'' + (t.id || '').replace(/'/g, "\\'") + '\')">Delete Template</button>' +
+          '<button class="btn-sm btn-cancel" onclick="closeTemplatePreview()">Cancel</button>' +
+          '<button class="btn-sm btn-edit" onclick="duplicateTemplate(\'' + (t.id || '').replace(/'/g, "\\'") + '\')">Duplicate & Edit</button>' +
+          '<button class="btn-sm btn-save" onclick="useTemplate(\'' + (t.id || '').replace(/'/g, "\\'") + '\')">Use Template</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) closeTemplatePreview();
+  });
+  document.body.appendChild(overlay);
+}
+
+function closeTemplatePreview() {
+  var overlay = document.getElementById('templateOverlay');
+  if (overlay) overlay.remove();
+}
+
+async function useTemplate(id) {
+  var t = cachedTemplates.find(function(x) { return x.id === id; });
+  if (!t) { showToast('Template not found', false); return; }
+  var body = {
+    instrument: t.instrument,
+    name: t.name,
+    direction: t.direction,
+    stopDistance: t.stopDistance,
+    limitDistance: t.limitDistance,
+    size: t.size,
+    enabled: false
+  };
+  if (t.entryBelow != null) body.entryBelow = t.entryBelow;
+  if (t.entryAbove != null) body.entryAbove = t.entryAbove;
+  var result = await apiPost('/api/ig/strategies', body);
+  if (result && result.ok) {
+    showToast('Strategy added from template: ' + t.name, true);
+    closeTemplatePreview();
+    loadStrategy();
+  } else {
+    showToast(result && result.error ? result.error : 'Failed to add strategy', false);
+  }
+}
+
+async function duplicateTemplate(id) {
+  var t = cachedTemplates.find(function(x) { return x.id === id; });
+  if (!t) { showToast('Template not found', false); return; }
+  closeTemplatePreview();
+  var templateData = {
+    instrument: t.instrument || '',
+    name: (t.name || '') + ' (copy)',
+    direction: t.direction || 'BUY',
+    stopDistance: t.stopDistance || 10,
+    limitDistance: t.limitDistance || 20,
+    size: t.size || 0.5,
+    enabled: false
+  };
+  if (t.entryBelow != null) templateData.entryBelow = t.entryBelow;
+  if (t.entryAbove != null) templateData.entryAbove = t.entryAbove;
+
+  var existing = document.getElementById('addStrategyOverlay');
+  if (existing) existing.remove();
+  showAddStrategyModal();
+  setTimeout(function() {
+    var ta = document.getElementById('addStrategyJSON');
+    if (ta) ta.value = JSON.stringify(templateData, null, 2);
+  }, 150);
+}
+
+async function deleteTemplate(id) {
+  if (!confirm('Delete template "' + id + '"?')) return;
+  var result = await apiDelete('/api/ig/strategy-templates/' + id);
+  if (result && result.ok) {
+    showToast('Template deleted', true);
+    closeTemplatePreview();
+    loadTemplateDropdown();
+  } else {
+    showToast(result && result.error ? result.error : 'Failed to delete template', false);
+  }
+}
+
+async function saveAsTemplate(idx) {
+  var s = cachedStrategies[idx];
+  if (!s) return;
+  var body = {
+    name: s.name || s.instrument,
+    instrument: s.instrument,
+    direction: s.direction,
+    stopDistance: s.stopDistance,
+    limitDistance: s.limitDistance,
+    size: s.size
+  };
+  if (s.entryBelow != null) body.entryBelow = s.entryBelow;
+  if (s.entryAbove != null) body.entryAbove = s.entryAbove;
+  if (s.description) body.description = s.description;
+
+  var result = await apiPost('/api/ig/strategy-templates', body);
+  if (result && result.ok) {
+    showToast('Saved as template: ' + body.name, true);
+    loadTemplateDropdown();
+  } else {
+    showToast(result && result.error ? result.error : 'Failed to save template', false);
+  }
+}
+
+async function loadProofread() {
+  var config = await apiFetch('/api/ig/proofread');
+  var el = document.getElementById('proofread');
+  var controlsEl = document.getElementById('proofreadControls');
+
+  if (!config || config._httpError) {
+    controlsEl.innerHTML = '';
+    el.innerHTML = '<p class="empty">Could not load proof reader config</p>';
+    return;
+  }
+
+  var masterClass = config.enabled ? 'btn-master on' : 'btn-master off';
+  var masterText = config.enabled ? 'Proof Reader: ON' : 'Proof Reader: OFF';
+  controlsEl.innerHTML = '<button class="' + masterClass + '" onclick="toggleProofread(' + !config.enabled + ')">' + masterText + '</button>';
+
+  if (editingProofread) {
+    el.innerHTML = '<table>' +
+      '<tr><th>Setting</th><th>Value</th><th>Description</th></tr>' +
+      '<tr><td>Max Staleness</td><td><input class="edit-input" id="prMaxStale" type="number" value="' + config.maxStalenessSeconds + '"> sec</td><td>Max age of price data before rejecting</td></tr>' +
+      '<tr><td>Spread Limit (High)</td><td><input class="edit-input" id="prSpreadHigh" type="number" step="0.1" value="' + config.spreadLimitPctHigh + '"> %</td><td>Max spread % for instruments with mid &gt; threshold</td></tr>' +
+      '<tr><td>Spread Limit (Low)</td><td><input class="edit-input" id="prSpreadLow" type="number" step="0.1" value="' + config.spreadLimitPctLow + '"> %</td><td>Max spread % for instruments with mid &lt; threshold</td></tr>' +
+      '<tr><td>Spread Threshold Mid</td><td><input class="edit-input" id="prSpreadThresh" type="number" value="' + config.spreadThresholdMid + '"></td><td>Mid price cutoff for high/low spread limit</td></tr>' +
+      '<tr><td>Min Risk:Reward</td><td>1:<input class="edit-input" style="width:50px" id="prMinRR" type="number" step="0.1" value="' + config.minRiskReward + '"></td><td>Minimum risk:reward ratio</td></tr>' +
+      '<tr><td>Max Risk %</td><td><input class="edit-input" id="prMaxRisk" type="number" step="0.1" value="' + config.maxRiskPct + '"> %</td><td>Max % of balance at risk per trade</td></tr>' +
+      '<tr><td>Max Entry Deviation</td><td><input class="edit-input" id="prMaxDev" type="number" step="0.5" value="' + config.maxEntryDeviationPct + '"> %</td><td>Max % entry can differ from live mid price</td></tr>' +
+      '<tr><td>Allow Duplicates</td><td><select class="edit-input" style="width:60px" id="prDupes"><option value="false"' + (!config.allowDuplicatePositions ? ' selected' : '') + '>No</option><option value="true"' + (config.allowDuplicatePositions ? ' selected' : '') + '>Yes</option></select></td><td>Allow same-direction position on same instrument</td></tr>' +
+      '<tr><td>Require Stop Loss</td><td><select class="edit-input" style="width:60px" id="prReqSL"><option value="true"' + (config.requireStopLoss ? ' selected' : '') + '>Yes</option><option value="false"' + (!config.requireStopLoss ? ' selected' : '') + '>No</option></select></td><td>Block trades without stop-loss</td></tr>' +
+      '<tr><td>Require Take Profit</td><td><select class="edit-input" style="width:60px" id="prReqTP"><option value="true"' + (config.requireTakeProfit ? ' selected' : '') + '>Yes</option><option value="false"' + (!config.requireTakeProfit ? ' selected' : '') + '>No</option></select></td><td>Block trades without take-profit</td></tr>' +
+      '</table>' +
+      '<div style="margin-top:10px"><button class="btn-sm btn-save" onclick="saveProofread()">Save</button> <button class="btn-sm btn-cancel" onclick="cancelEditProofread()">Cancel</button></div>';
+  } else {
+    el.innerHTML = '<table>' +
+      '<tr><th>Setting</th><th>Value</th><th>Description</th></tr>' +
+      '<tr><td>Max Staleness</td><td>' + config.maxStalenessSeconds + 's</td><td>Max age of price data before rejecting</td></tr>' +
+      '<tr><td>Spread Limit (High)</td><td>' + config.spreadLimitPctHigh + '%</td><td>For mid &gt; ' + config.spreadThresholdMid + '</td></tr>' +
+      '<tr><td>Spread Limit (Low)</td><td>' + config.spreadLimitPctLow + '%</td><td>For mid &lt; ' + config.spreadThresholdMid + '</td></tr>' +
+      '<tr><td>Min Risk:Reward</td><td>1:' + config.minRiskReward + '</td><td>Minimum risk:reward ratio</td></tr>' +
+      '<tr><td>Max Risk %</td><td>' + config.maxRiskPct + '%</td><td>Max % of balance at risk per trade</td></tr>' +
+      '<tr><td>Max Entry Deviation</td><td>' + config.maxEntryDeviationPct + '%</td><td>Max % entry can differ from live mid</td></tr>' +
+      '<tr><td>Allow Duplicates</td><td>' + (config.allowDuplicatePositions ? 'Yes' : 'No') + '</td><td>Same-direction on same instrument</td></tr>' +
+      '<tr><td>Require Stop Loss</td><td>' + (config.requireStopLoss ? 'Yes' : 'No') + '</td><td></td></tr>' +
+      '<tr><td>Require Take Profit</td><td>' + (config.requireTakeProfit ? 'Yes' : 'No') + '</td><td></td></tr>' +
+      '</table>' +
+      '<div style="margin-top:10px"><button class="btn-sm btn-edit" onclick="editProofread()">Edit Settings</button></div>';
+  }
+}
+
+function editProofread() { editingProofread = true; loadProofread(); }
+function cancelEditProofread() { editingProofread = false; loadProofread(); }
+
+async function toggleProofread(enable) {
+  var result = await apiPut('/api/ig/proofread', { enabled: enable });
+  if (result && result.ok) {
+    showToast('Proof reader ' + (enable ? 'enabled' : 'disabled'), true);
+    loadProofread();
+  } else {
+    showToast(result && result.error ? result.error : 'Failed to toggle proof reader', false);
+  }
+}
+
+async function saveProofread() {
+  var body = {};
+  var v;
+  v = document.getElementById('prMaxStale'); if (v) body.maxStalenessSeconds = parseFloat(v.value);
+  v = document.getElementById('prSpreadHigh'); if (v) body.spreadLimitPctHigh = parseFloat(v.value);
+  v = document.getElementById('prSpreadLow'); if (v) body.spreadLimitPctLow = parseFloat(v.value);
+  v = document.getElementById('prSpreadThresh'); if (v) body.spreadThresholdMid = parseFloat(v.value);
+  v = document.getElementById('prMinRR'); if (v) body.minRiskReward = parseFloat(v.value);
+  v = document.getElementById('prMaxRisk'); if (v) body.maxRiskPct = parseFloat(v.value);
+  v = document.getElementById('prMaxDev'); if (v) body.maxEntryDeviationPct = parseFloat(v.value);
+  v = document.getElementById('prDupes'); if (v) body.allowDuplicatePositions = v.value === 'true';
+  v = document.getElementById('prReqSL'); if (v) body.requireStopLoss = v.value === 'true';
+  v = document.getElementById('prReqTP'); if (v) body.requireTakeProfit = v.value === 'true';
+
+  var result = await apiPut('/api/ig/proofread', body);
+  if (result && result.ok) {
+    showToast('Proof reader settings saved', true);
+    editingProofread = false;
+    loadProofread();
+  } else {
+    showToast(result && result.error ? result.error : 'Failed to save settings', false);
+  }
+}
+
+async function loadAlerts() {
+  var alerts = await fetchJSON('/__openclaw__/canvas/ig-alerts-snapshot.json');
+  var el = document.getElementById('alerts');
+  if (!alerts || !Array.isArray(alerts) || alerts.length === 0) {
+    el.innerHTML = '<p class="empty">No alerts recorded</p>';
+    return;
+  }
+  var recent = alerts.slice(-25).reverse();
+  var html = '<table><tr><th>Time</th><th>Instrument</th><th>Type</th><th>Message</th><th>Mid</th></tr>';
+  for (var i = 0; i < recent.length; i++) {
+    var a = recent[i];
+    var time = a.timestamp ? new Date(a.timestamp).toLocaleString() : '?';
+    var typeBadge = '<span class="badge ' + badgeType(a.type) + '">' + (a.type || '?') + '</span>';
+    html += '<tr><td style="white-space:nowrap;font-size:12px">' + time + '</td><td>' + (a.name || a.epic) + '</td><td>' + typeBadge + '</td><td style="font-size:12px">' + (a.message || '') + '</td><td>' + (a.mid != null ? a.mid.toFixed(5) : '-') + '</td></tr>';
+  }
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+async function loadBotLog() {
+  var log = await fetchJSON('/__openclaw__/canvas/ig-bot-log-snapshot.json');
+  var el = document.getElementById('botLog');
+  if (!log || !Array.isArray(log) || log.length === 0) {
+    el.innerHTML = '<p class="empty">No bot activity logged</p>';
+    return;
+  }
+  var recent = log.slice(-30).reverse();
+  var html = '<table><tr><th>Time</th><th>Level</th><th>Message</th></tr>';
+  for (var i = 0; i < recent.length; i++) {
+    var e = recent[i];
+    var time = e.timestamp ? new Date(e.timestamp).toLocaleString() : '?';
+    var levelAttr = e.level === 'ERROR' ? ' class="error"' : (e.level === 'TRADE' ? ' style="color:#2dc653;font-weight:600"' : '');
+    html += '<tr><td style="white-space:nowrap;font-size:12px">' + time + '</td><td' + levelAttr + '>' + e.level + '</td><td style="font-size:12px">' + e.message + '</td></tr>';
+  }
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+async function loadVerifyLog() {
+  var log = await fetchJSON('/__openclaw__/canvas/ig-verify-log.json');
+  var el = document.getElementById('verifyLog');
+  if (!log || !Array.isArray(log) || log.length === 0) {
+    el.innerHTML = '<p class="empty">No trade verifications recorded</p>';
+    return;
+  }
+  var recent = log.slice(-20).reverse();
+  var html = '<table><tr><th>Time</th><th>Instrument</th><th>Direction</th><th>Size</th><th>Spread</th><th>Verdict</th><th>Details</th></tr>';
+  for (var i = 0; i < recent.length; i++) {
+    var v = recent[i];
+    var time = v.timestamp ? new Date(v.timestamp).toLocaleString() : '?';
+    var verdictClass = v.verdict === 'APPROVED' ? 'badge-on' : 'badge-alert';
+    var verdictBadge = '<span class="badge ' + verdictClass + '">' + v.verdict + '</span>';
+    var failedChecks = '';
+    if (v.checks) {
+      var failed = v.checks.filter(function(c) { return !c.pass; });
+      failedChecks = failed.length > 0 ? failed.map(function(c) { return c.check; }).join(', ') : 'All passed';
+    }
+    html += '<tr><td style="white-space:nowrap;font-size:12px">' + time + '</td>';
+    html += '<td>' + (v.name || v.instrument || '?') + '</td>';
+    html += '<td>' + (v.direction || '?') + '</td>';
+    html += '<td>' + (v.size || '?') + '</td>';
+    html += '<td>' + (v.spread != null ? v.spread.toFixed(5) : '-') + '</td>';
+    html += '<td>' + verdictBadge + '</td>';
+    html += '<td style="font-size:11px;color:#8b949e">' + failedChecks + '</td></tr>';
+  }
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+async function loadSessionStatus() {
+  var data = await apiFetch('/api/ig/session');
+  var el = document.getElementById('sessionBadge');
+  if (!data) {
+    el.innerHTML = '<span class="badge badge-off">SESSION UNKNOWN</span>';
+    return;
+  }
+  if (data.status === 'connected') {
+    el.innerHTML = '<span class="badge badge-on">SESSION CONNECTED</span>';
+  } else if (data.status === 'connecting') {
+    el.innerHTML = '<span class="badge badge-spike">CONNECTING...</span>';
+  } else if (data.status === 'error') {
+    el.innerHTML = '<span class="badge badge-alert">SESSION ERROR</span>';
+  } else if (data.status === 'not_configured') {
+    el.innerHTML = '<span class="badge badge-off">NOT CONFIGURED</span>';
+  } else {
+    el.innerHTML = '<span class="badge badge-off">DISCONNECTED</span>';
+  }
+}
+
+document.getElementById('btnRefreshSession').addEventListener('click', function() {
+  var btn = this;
+  btn.textContent = 'Refreshing...';
+  btn.disabled = true;
+  var opts = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
+  if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+  fetch('/api/ig/session/refresh', opts).then(function(res) {
+    return res.json();
+  }).then(function() {
+    btn.textContent = 'Force Refresh Session';
+    btn.disabled = false;
+    refresh();
+  }).catch(function() {
+    btn.textContent = 'Force Refresh Session';
+    btn.disabled = false;
+    refresh();
+  });
+});
+
+document.getElementById('btnRefreshSnap').addEventListener('click', function() {
+  var btn = this;
+  btn.textContent = 'Refreshing...';
+  btn.disabled = true;
+  apiFetch('/api/ig/refresh-snapshots').then(function() {
+    btn.textContent = 'Refresh Snapshots';
+    btn.disabled = false;
+    refresh();
+  }).catch(function() {
+    btn.textContent = 'Refresh Snapshots';
+    btn.disabled = false;
+  });
+});
+
+async function loadProcessesPanel() {
+  var el = document.getElementById('processesPanel');
+  try {
+    var botsRes = await apiFetch('/api/bots');
+    var procsRes = await apiFetch('/api/processes');
+    var bots = (botsRes && botsRes.bots) ? botsRes.bots : [];
+    var procs = (procsRes && procsRes.processes) ? procsRes.processes : [];
+
+    var html = '<div style="margin-bottom:12px;font-size:12px;color:#8b949e;font-weight:600">REGISTERED BOTS</div>';
+    if (bots.length === 0) {
+      html += '<p class="empty" style="padding:8px">No bots registered</p>';
+    } else {
+      html += '<table><tr><th>ID</th><th>Status</th><th>Startup</th><th>PID</th><th>Restarts</th><th>Command</th><th>Actions</th></tr>';
+      for (var i = 0; i < bots.length; i++) {
+        var b = bots[i];
+        var badge = b.running ? '<span class="proc-badge proc-running">RUNNING</span>'
+          : (b.enabled ? '<span class="proc-badge proc-stopped">STOPPED</span>' : '<span class="proc-badge proc-disabled">DISABLED</span>');
+        var checked = b.enabled ? ' checked' : '';
+        html += '<tr>';
+        html += '<td style="font-weight:600;color:#e6edf3">' + b.id + '</td>';
+        html += '<td>' + badge + '</td>';
+        html += '<td><input type="checkbox" class="startup-check" data-proc-startup="' + b.id + '"' + checked + '> <span style="font-size:10px;color:#8b949e">Auto</span></td>';
+        html += '<td style="font-family:monospace;font-size:11px">' + (b.pid || '-') + '</td>';
+        html += '<td>' + (b.restarts || 0) + '</td>';
+        html += '<td><span class="proc-cmd" title="' + (b.cmd || '').replace(/"/g, '&quot;') + '">' + (b.cmd || '') + '</span></td>';
+        html += '<td><div class="proc-actions">';
+        if (b.running) {
+          html += '<button class="proc-btn proc-btn-stop" data-proc-bot="' + b.id + '" data-proc-action="stop">Stop</button>';
+        } else {
+          html += '<button class="proc-btn proc-btn-start" data-proc-bot="' + b.id + '" data-proc-action="start">Start</button>';
+        }
+        html += '<button class="proc-btn proc-btn-remove" data-proc-bot="' + b.id + '" data-proc-action="remove">Remove</button>';
+        html += '</div></td>';
+        html += '</tr>';
+      }
+      html += '</table>';
+    }
+
+    html += '<div style="margin:16px 0 12px;font-size:12px;color:#8b949e;font-weight:600">AD-HOC PROCESSES <span style="font-weight:400">(' + procs.length + ')</span></div>';
+    if (procs.length === 0) {
+      html += '<p class="empty" style="padding:8px">No ad-hoc scripts running</p>';
+    } else {
+      html += '<table><tr><th>Name</th><th>Type</th><th>PID</th><th>CPU</th><th>MEM</th><th>Command</th><th></th></tr>';
+      for (var j = 0; j < procs.length; j++) {
+        var p = procs[j];
+        var typeBadge = p.type === 'bot' ? 'proc-running' : (p.type === 'monitor' ? 'proc-stopped' : 'proc-disabled');
+        html += '<tr>';
+        html += '<td style="font-weight:600;color:#e6edf3">' + p.name + '</td>';
+        html += '<td><span class="proc-badge ' + typeBadge + '">' + p.type + '</span></td>';
+        html += '<td style="font-family:monospace;font-size:11px">' + p.pid + '</td>';
+        html += '<td>' + p.cpu + '%</td>';
+        html += '<td>' + p.mem + '%</td>';
+        html += '<td><span class="proc-cmd" title="' + p.cmd.replace(/"/g, '&quot;') + '">' + p.cmd + '</span></td>';
+        html += '<td><button class="proc-btn proc-btn-kill" data-proc-kill="' + p.pid + '" data-proc-name="' + p.name.replace(/"/g, '&quot;') + '">Kill</button></td>';
+        html += '</tr>';
+      }
+      html += '</table>';
+    }
+
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = '<p class="empty" style="color:#f85149">Error: ' + e.message + '</p>';
+  }
+}
+
+document.getElementById('processesPanel').addEventListener('click', async function(e) {
+  var botBtn = e.target.closest('[data-proc-bot]');
+  if (botBtn) {
+    var id = botBtn.getAttribute('data-proc-bot');
+    var action = botBtn.getAttribute('data-proc-action');
+    if (action === 'remove' && !confirm('Remove bot "' + id + '" from registry?')) return;
+    if (action === 'start' || action === 'stop') {
+      var res = await apiPost('/api/bots/' + encodeURIComponent(id) + '/' + action);
+      showToast(res ? (action === 'start' ? 'Started: ' : 'Stopped: ') + id : 'Failed', !!res);
+    } else if (action === 'remove') {
+      var dres = await apiDelete('/api/bots/' + encodeURIComponent(id));
+      showToast(dres && !dres._httpError ? 'Removed: ' + id : 'Failed to remove', !!(dres && !dres._httpError));
+    }
+    setTimeout(loadProcessesPanel, 1000);
+    return;
+  }
+  var killBtn = e.target.closest('[data-proc-kill]');
+  if (killBtn) {
+    var pid = parseInt(killBtn.getAttribute('data-proc-kill'));
+    var name = killBtn.getAttribute('data-proc-name');
+    if (!confirm('Kill process "' + name + '" (PID ' + pid + ')?')) return;
+    var kres = await apiPost('/api/processes/kill', { pid: pid });
+    showToast(kres ? 'Killed: ' + name : 'Failed to kill', !!kres);
+    setTimeout(loadProcessesPanel, 1000);
+  }
+});
+
+document.getElementById('processesPanel').addEventListener('change', async function(e) {
+  var cb = e.target.closest('[data-proc-startup]');
+  if (!cb) return;
+  var id = cb.getAttribute('data-proc-startup');
+  try {
+    var res = await fetch('/api/bots/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+      body: JSON.stringify({ enabled: cb.checked })
+    });
+    var data = await res.json();
+    if (res.ok) {
+      showToast(id + ': Auto-start ' + (cb.checked ? 'ON' : 'OFF'), true);
+    } else {
+      showToast('Error: ' + (data.error || 'Failed'), false);
+      setTimeout(loadProcessesPanel, 500);
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message, false);
+    setTimeout(loadProcessesPanel, 500);
+  }
+});
+
+async function refresh() {
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
+  await loadStrategy();
+  await Promise.all([loadAccount(), loadPositions(), updateLivePrices(), loadWatchlist(), loadProofread(), loadAlerts(), loadVerifyLog(), loadBotLog(), loadSessionStatus(), loadProcessesPanel()]);
+}
+
+renderTimeframeTabs(currentTimeframe);
+refresh();
+setInterval(function() { updateLivePrices(); }, 5000);
+setInterval(function() {
+  if (selectedEpic) loadMarketData(selectedEpic);
+}, 10000);
+setInterval(function() { refresh(); }, 30000);
+</script>
+</body>
+</html>

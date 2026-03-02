@@ -81,7 +81,7 @@ function isLoginExempt(req) {
       p.startsWith("/api/ig/workingorders") || p.startsWith("/api/ig/markets") || p.startsWith("/api/ig/marketnavigation") ||
       p.startsWith("/api/ig/pricehistory") || p.startsWith("/api/ig/watchlists") || p.startsWith("/api/ig/activity") ||
       p.startsWith("/api/ig/session") || p === "/api/ig/refresh-snapshots" ||
-      p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/proofread") || p.startsWith("/api/ig/watchedlist") ||
+      p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/strategy-templates") || p.startsWith("/api/ig/proofread") || p.startsWith("/api/ig/watchedlist") ||
       p.startsWith("/api/bots") || p.startsWith("/api/processes")) {
     if (hasValidBearerToken(req)) return true;
   }
@@ -1444,6 +1444,44 @@ async function handleIgApi(req, res, p) {
       fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
       writeConfigSnapshots();
       return json(res, 200, { ok: true, removed: removed });
+    }
+
+    const TEMPLATES_DIR = path.join(DATA_DIR, "ig-strategy-templates");
+
+    if (req.method === "GET" && p === "/api/ig/strategy-templates") {
+      if (!fs.existsSync(TEMPLATES_DIR)) return json(res, 200, { templates: [] });
+      const files = fs.readdirSync(TEMPLATES_DIR).filter(f => f.endsWith(".json")).sort();
+      const templates = [];
+      for (const f of files) {
+        try {
+          const data = JSON.parse(fs.readFileSync(path.join(TEMPLATES_DIR, f), "utf8"));
+          templates.push({ id: f.replace(/\.json$/, ""), filename: f, ...data });
+        } catch (_) {}
+      }
+      return json(res, 200, { templates });
+    }
+
+    if (req.method === "POST" && p === "/api/ig/strategy-templates") {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      if (!body.name) return json(res, 400, { error: "Template name is required" });
+      if (!fs.existsSync(TEMPLATES_DIR)) fs.mkdirSync(TEMPLATES_DIR, { recursive: true });
+      const slug = body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").substring(0, 50);
+      const filename = slug + ".json";
+      const template = {};
+      for (const key of ["name","description","instrument","instrumentName","direction","entryBelow","entryAbove","stopDistance","limitDistance","size"]) {
+        if (body[key] !== undefined) template[key] = body[key];
+      }
+      fs.writeFileSync(path.join(TEMPLATES_DIR, filename), JSON.stringify(template, null, 2));
+      return json(res, 200, { ok: true, id: slug, filename, template });
+    }
+
+    const templateDeleteMatch = p.match(/^\/api\/ig\/strategy-templates\/([a-z0-9-]+)$/);
+    if (req.method === "DELETE" && templateDeleteMatch) {
+      const id = templateDeleteMatch[1];
+      const filePath = path.join(TEMPLATES_DIR, id + ".json");
+      if (!fs.existsSync(filePath)) return json(res, 404, { error: "Template not found" });
+      fs.unlinkSync(filePath);
+      return json(res, 200, { ok: true, deleted: id });
     }
 
     if (req.method === "GET" && p === "/api/ig/watchedlist") {
