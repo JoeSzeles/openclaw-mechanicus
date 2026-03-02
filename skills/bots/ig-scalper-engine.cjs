@@ -470,7 +470,12 @@ async function checkPositions() {
 
   try {
     const data = await proxyGet("/api/ig/positions");
-    if (!data || !data.positions) return;
+    if (!data || !data.positions) {
+      log("WARN", "Position check: no data from API (connection may be down), skipping");
+      return;
+    }
+
+    if (!Array.isArray(data.positions)) return;
 
     const igPosMap = {};
     const openDealIds = new Set();
@@ -701,7 +706,10 @@ let positionCheckInterval = null;
 let balanceCheckInterval = null;
 
 function start() {
-  if (running) return;
+  if (running) {
+    log("INFO", "Scalper already running, preserving state (reconnect-safe)");
+    return;
+  }
   loadConfig();
   if (!config.enabled) {
     config.enabled = true;
@@ -709,27 +717,39 @@ function start() {
     log("INFO", "Scalper auto-enabled via start()");
   }
   loadTradeLog();
+
+  const hadOpenPositions = scalperPositions.filter(p => p.status === "open").length;
+  const isRestart = hadOpenPositions > 0;
+
+  if (!isRestart) {
+    realizedPnl = 0;
+    tradeCount = 0;
+    winCount = 0;
+    lossCount = 0;
+    scalperPositions = [];
+    cooldowns = {};
+    tickBuffers = {};
+
+    const restoredPnl = tradeLog
+      .filter(t => t.type === "close")
+      .reduce((sum, t) => sum + (t.pnl || 0), 0);
+    realizedPnl = restoredPnl;
+    tradeCount = tradeLog.filter(t => t.type === "open").length;
+    winCount = tradeLog.filter(t => t.type === "close" && t.pnl >= 0).length;
+    lossCount = tradeLog.filter(t => t.type === "close" && t.pnl < 0).length;
+  } else {
+    log("INFO", `Preserving ${hadOpenPositions} open position(s) across restart`);
+    tickBuffers = {};
+    cooldowns = {};
+  }
+
   running = true;
-  startedAt = Date.now();
+  startedAt = startedAt || Date.now();
   config._drawdownTripped = false;
 
-  realizedPnl = 0;
-  tradeCount = 0;
-  winCount = 0;
-  lossCount = 0;
-  scalperPositions = [];
-  cooldowns = {};
-  tickBuffers = {};
-
-  const restoredPnl = tradeLog
-    .filter(t => t.type === "close")
-    .reduce((sum, t) => sum + (t.pnl || 0), 0);
-  realizedPnl = restoredPnl;
-  tradeCount = tradeLog.filter(t => t.type === "open").length;
-  winCount = tradeLog.filter(t => t.type === "close" && t.pnl >= 0).length;
-  lossCount = tradeLog.filter(t => t.type === "close" && t.pnl < 0).length;
-
   fetchBalance();
+  if (positionCheckInterval) clearInterval(positionCheckInterval);
+  if (balanceCheckInterval) clearInterval(balanceCheckInterval);
   positionCheckInterval = setInterval(checkPositions, 5000);
   balanceCheckInterval = setInterval(fetchBalance, 30000);
 
@@ -738,7 +758,7 @@ function start() {
   if (config.indicators?.rsi?.enabled) indList.push("RSI");
   if (config.indicators?.ema?.enabled) indList.push("EMA");
   if (config.indicators?.macd?.enabled) indList.push("MACD");
-  log("INFO", `Scalper STARTED | ${config.strategies.filter(s => s.enabled).length} strategies | budget=$${config.budget} maxDD=$${config.maxDrawdown} | warmup=${warmupSec}s | indicators=${indList.length ? indList.join(",") : "none"}`);
+  log("INFO", `Scalper STARTED${isRestart ? " (reconnect)" : ""} | ${config.strategies.filter(s => s.enabled).length} strategies | budget=$${config.budget} maxDD=$${config.maxDrawdown} | warmup=${warmupSec}s | indicators=${indList.length ? indList.join(",") : "none"} | openPos=${hadOpenPositions}`);
 }
 
 function stop() {

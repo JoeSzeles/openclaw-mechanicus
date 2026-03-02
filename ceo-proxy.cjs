@@ -210,6 +210,61 @@ let lsUpdateCount = 0;
 let lsUpdateCounts = {};
 let lsLastUpdateTs = 0;
 let lsUpdateIntervals = [];
+let lsReconnectTimer = null;
+let lsReconnectAttempts = 0;
+let lsReconnectInFlight = false;
+const LS_MAX_RECONNECT_ATTEMPTS = 20;
+const LS_RECONNECT_BASE_DELAY = 5000;
+const LS_RECONNECT_MAX_DELAY = 120000;
+
+function scheduleLsReconnect(reason) {
+  if (lsReconnectTimer) clearTimeout(lsReconnectTimer);
+  if (lsReconnectInFlight) {
+    console.log("[lightstreamer] Reconnect already in-flight, skipping schedule");
+    return;
+  }
+  if (lsReconnectAttempts >= LS_MAX_RECONNECT_ATTEMPTS) {
+    console.log(`[lightstreamer] Max reconnect attempts (${LS_MAX_RECONNECT_ATTEMPTS}) reached. Use Force Reconnect button.`);
+    lsStatus = "error";
+    return;
+  }
+  const delay = Math.min(LS_RECONNECT_BASE_DELAY * Math.pow(1.5, lsReconnectAttempts), LS_RECONNECT_MAX_DELAY);
+  lsReconnectAttempts++;
+  console.log(`[lightstreamer] Scheduling reconnect attempt ${lsReconnectAttempts}/${LS_MAX_RECONNECT_ATTEMPTS} in ${Math.round(delay / 1000)}s (reason: ${reason})`);
+  lsStatus = "reconnecting";
+  lsReconnectTimer = setTimeout(async () => {
+    lsReconnectTimer = null;
+    if (lsReconnectInFlight) return;
+    lsReconnectInFlight = true;
+    try {
+      if (lsLiveActive) {
+        console.log("[lightstreamer] Reconnecting with live session refresh...");
+        try { await liveStreamingLogin(); } catch (e) {
+          console.log("[lightstreamer] Live session refresh failed during reconnect:", e.message);
+        }
+      } else if (igConfigured()) {
+        console.log("[lightstreamer] Reconnecting with session refresh...");
+        igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: igSession.lightstreamerEndpoint };
+        try { await igSessionLogin(); } catch (e) {
+          console.log("[lightstreamer] Session refresh failed during reconnect:", e.message);
+          lsReconnectInFlight = false;
+          scheduleLsReconnect("session_refresh_failed");
+          return;
+        }
+      }
+      stopLightstreamer(true);
+      await startLightstreamer();
+      lsReconnectInFlight = false;
+      if (lsStatus === "connected" || lsStatus === "reconnecting") {
+        console.log("[lightstreamer] Reconnect attempt initiated successfully");
+      }
+    } catch (e) {
+      console.log("[lightstreamer] Reconnect attempt failed:", e.message);
+      lsReconnectInFlight = false;
+      scheduleLsReconnect("reconnect_error");
+    }
+  }, delay);
+}
 
 // Independent live streaming session (decoupled from trading profile)
 let lsLiveSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
@@ -283,13 +338,39 @@ async function startLightstreamer() {
     client.addListener({
       onStatusChange: (status) => {
         console.log("[lightstreamer] Status:", status);
-        if (status.startsWith("CONNECTED")) { lsStatus = "connected"; if (!lsConnectedAt) lsConnectedAt = Date.now(); try { const sc = scalperEngine.getConfig(); if (sc && sc.enabled) { scalperEngine.start(); } } catch(_) {} }
-        else if (status.startsWith("DISCONNECTED")) { lsStatus = "disconnected"; lsConnectedAt = null; }
-        else if (status.startsWith("CONNECTING") || status.startsWith("STALLED")) lsStatus = "reconnecting";
+        if (status.startsWith("CONNECTED")) {
+          lsStatus = "connected";
+          lsReconnectAttempts = 0;
+          if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
+          if (!lsConnectedAt) lsConnectedAt = Date.now();
+          try {
+            const sc = scalperEngine.getConfig();
+            if (sc && sc.enabled && !scalperEngine.getStatus().running) {
+              scalperEngine.start();
+            }
+          } catch(_) {}
+        } else if (status === "DISCONNECTED:WILL-RETRY") {
+          lsStatus = "reconnecting";
+          console.log("[lightstreamer] Library will retry connection automatically");
+        } else if (status.startsWith("DISCONNECTED")) {
+          lsStatus = "disconnected";
+          lsConnectedAt = null;
+          if (!lsReconnectTimer) {
+            scheduleLsReconnect("disconnected");
+          }
+        } else if (status.startsWith("CONNECTING") || status.startsWith("STALLED")) {
+          lsStatus = "reconnecting";
+          if (status.startsWith("STALLED") && !lsReconnectTimer) {
+            scheduleLsReconnect("stalled");
+          }
+        }
       },
       onServerError: (code, msg) => {
         console.log("[lightstreamer] Server error:", code, msg);
         lsStatus = "error";
+        if (!lsReconnectTimer) {
+          scheduleLsReconnect("server_error_" + code);
+        }
       }
     });
 
@@ -385,10 +466,14 @@ async function startLightstreamer() {
   } catch (e) {
     console.error("[lightstreamer] Error starting:", e.message);
     lsStatus = "error";
+    if (!lsReconnectTimer) {
+      scheduleLsReconnect("start_error");
+    }
   }
 }
 
-function stopLightstreamer() {
+function stopLightstreamer(keepReconnect) {
+  if (!keepReconnect) { if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; } lsReconnectAttempts = 0; lsReconnectInFlight = false; }
   if (lsClient) {
     try {
       if (lsSubscription) lsClient.unsubscribe(lsSubscription);
@@ -465,6 +550,9 @@ async function startLiveLightstreamer() {
   if (!profile) throw new Error("No live profile credentials configured");
   if (!profile.accountId) throw new Error("Live profile missing accountId");
   try {
+    lsReconnectAttempts = 0;
+    lsReconnectInFlight = false;
+    if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
     await liveStreamingLogin();
     lsLiveActive = true;
     stopLightstreamer();
@@ -480,6 +568,9 @@ async function startLiveLightstreamer() {
 
 function stopLiveLightstreamer() {
   lsLiveActive = false;
+  lsReconnectAttempts = 0;
+  lsReconnectInFlight = false;
+  if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
   if (lsLiveRefreshTimer) { clearTimeout(lsLiveRefreshTimer); lsLiveRefreshTimer = null; }
   lsLiveSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
   stopLightstreamer();
@@ -678,7 +769,7 @@ async function handleIgApi(req, res, p) {
         pr.password = maskSecret(pr.password);
         pr.hasCredentials = !!(config.profiles[key].apiKey && config.profiles[key].username && config.profiles[key].password);
       }
-      masked.streaming = { status: lsStatus, connectedEpics: lsConnectedEpics, priceCount: streamedPrices.size, liveStreamingActive: lsLiveActive, streamingSource: lsLiveActive ? "live" : config.activeProfile };
+      masked.streaming = { status: lsStatus, connectedEpics: lsConnectedEpics, priceCount: streamedPrices.size, liveStreamingActive: lsLiveActive, streamingSource: lsLiveActive ? "live" : config.activeProfile, reconnectAttempts: lsReconnectAttempts, reconnectPending: !!lsReconnectTimer };
       masked.session = getIgSessionInfo();
       return json(res, 200, masked);
     }
@@ -827,6 +918,11 @@ async function handleIgApi(req, res, p) {
         lightstreamerEndpoint: lsLiveActive ? lsLiveSession.lightstreamerEndpoint : (igSession.lightstreamerEndpoint || null),
         liveStreamingActive: lsLiveActive,
         streamingSource: lsLiveActive ? "live" : (getActiveIgProfile()?.profileName || null),
+        reconnect: {
+          attempts: lsReconnectAttempts,
+          maxAttempts: LS_MAX_RECONNECT_ATTEMPTS,
+          pending: !!lsReconnectTimer
+        },
         metrics: {
           connectedAt: lsConnectedAt,
           uptimeMs,
@@ -862,6 +958,9 @@ async function handleIgApi(req, res, p) {
     if (req.method === "POST" && p === "/api/ig/session/refresh") {
       if (!igConfigured()) return json(res, 400, { error: "No credentials configured for active profile" });
       try {
+        lsReconnectAttempts = 0;
+        lsReconnectInFlight = false;
+        if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
         igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: igSession.lightstreamerEndpoint };
         igCacheInvalidate();
         await igSessionLogin();
