@@ -888,7 +888,7 @@ async function handleIgApi(req, res, p) {
         direction: body.direction.toUpperCase(),
         size: String(body.size),
         orderType: body.orderType || "MARKET",
-        currencyCode: body.currencyCode || "USD",
+        currencyCode: body.currencyCode || "AUD",
         expiry: body.expiry || "-",
         forceOpen: body.forceOpen !== undefined ? body.forceOpen : true,
         guaranteedStop: body.guaranteedStop || false,
@@ -897,7 +897,8 @@ async function handleIgApi(req, res, p) {
       if (body.limitDistance) orderBody.limitDistance = body.limitDistance;
       if (body.stopLevel) orderBody.stopLevel = body.stopLevel;
       if (body.limitLevel) orderBody.limitLevel = body.limitLevel;
-      console.log(`[ig-trade] Opening ${orderBody.direction} ${orderBody.size} ${orderBody.epic}`);
+      if (!orderBody.forceOpen) { delete orderBody.stopDistance; delete orderBody.limitDistance; delete orderBody.stopLevel; delete orderBody.limitLevel; }
+      console.log(`[ig-trade] Opening ${orderBody.direction} ${orderBody.size} ${orderBody.epic} forceOpen=${orderBody.forceOpen}`);
       const r = await igRequest("POST", "/positions/otc", { ...igHeaders(session), Version: "2" }, JSON.stringify(orderBody));
       igCacheInvalidate();
       if (r.status !== 200) {
@@ -1051,7 +1052,7 @@ async function handleIgApi(req, res, p) {
         size: body.size,
         level: body.level,
         type: body.type.toUpperCase(),
-        currencyCode: body.currencyCode || "USD",
+        currencyCode: body.currencyCode || "AUD",
         expiry: body.expiry || "-",
         forceOpen: body.forceOpen !== undefined ? body.forceOpen : true,
         guaranteedStop: body.guaranteedStop || false,
