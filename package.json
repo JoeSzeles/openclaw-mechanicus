@@ -196,7 +196,7 @@
     "ollama": "^0.6.3",
     "oxfmt": "0.33.0",
     "oxlint": "^1.48.0",
-    "oxlint-tsgolint": "^0.14.0",
+    "oxlint-tsgolint": "^0.15.0",
     "rolldown": "1.0.0-rc.4",
     "tsdown": "^0.20.3",
     "tsx": "^4.21.0",
@@ -210,7 +210,7 @@
   "engines": {
     "node": ">=22.12.0"
   },
-  "packageManager": "pnpm@10.23.0",
+  "packageManager": "npm@10.2.3",
   "pnpm": {
     "minimumReleaseAge": 2880,
     "overrides": {
