@@ -17,6 +17,10 @@ const DEFAULT_CONFIG = {
   cooldownMs: 10000,
   tickWindow: 15,
   minMomentumPct: 0.03,
+  minSize: 0.5,
+  maxSize: 10,
+  profitTarget: 0,
+  trailingStop: 0,
   strategies: []
 };
 
@@ -188,7 +192,11 @@ async function evaluateEntry(strat, epic, ticks) {
     return;
   }
 
-  const size = strat.size || 1;
+  let size = strat.size || 1;
+  const minSize = config.minSize || 0.5;
+  const maxSize = config.maxSize || 10;
+  if (size < minSize) size = minSize;
+  if (size > maxSize) size = maxSize;
   const riskAmount = stopDist * size;
 
   const totalScalperRisk = scalperPositions
@@ -291,22 +299,27 @@ async function checkPositions() {
     const data = await proxyGet("/api/ig/positions");
     if (!data || !data.positions) return;
 
+    const igPosMap = {};
     const openDealIds = new Set();
     for (const p of data.positions) {
-      if (p.position && p.position.dealId) openDealIds.add(p.position.dealId);
+      if (p.position && p.position.dealId) {
+        openDealIds.add(p.position.dealId);
+        igPosMap[p.position.dealId] = p;
+      }
     }
 
     for (const sp of scalperPositions) {
       if (sp.status !== "open") continue;
+
       if (!openDealIds.has(sp.dealId)) {
         sp.status = "closed";
         sp.closedAt = new Date().toISOString();
 
-        const igPos = data.positions.find(p => p.position?.dealId === sp.dealId);
         let exitPrice = sp.entry;
-        if (igPos) {
-          const mkt = igPos.market || {};
-          exitPrice = sp.direction === "BUY" ? (mkt.bid || sp.entry) : (mkt.offer || sp.entry);
+        const lastTick = tickBuffers[sp.epic];
+        if (lastTick && lastTick.length > 0) {
+          const lt = lastTick[lastTick.length - 1];
+          exitPrice = sp.direction === "BUY" ? (lt.bid || sp.entry) : (lt.offer || sp.entry);
         }
 
         const pnl = sp.direction === "BUY"
@@ -340,6 +353,66 @@ async function checkPositions() {
           timestamp: new Date().toISOString()
         });
         saveTradeLog();
+        continue;
+      }
+
+      const igPos = igPosMap[sp.dealId];
+      if (!igPos) continue;
+      const mkt = igPos.market || {};
+      const pos = igPos.position || {};
+      const currentPrice = sp.direction === "BUY" ? (mkt.bid || 0) : (mkt.offer || 0);
+      if (!currentPrice) continue;
+
+      const unrealized = sp.direction === "BUY"
+        ? (currentPrice - sp.entry) * sp.size
+        : (sp.entry - currentPrice) * sp.size;
+      sp.unrealizedPnl = Math.round(unrealized * 100) / 100;
+
+      const profitTarget = config.profitTarget || 0;
+      if (profitTarget > 0 && unrealized >= profitTarget) {
+        log("TRADE", `PROFIT TARGET hit: ${sp.epic} unrealized=${unrealized.toFixed(2)} >= target=${profitTarget}. Closing...`);
+        try {
+          await proxyPost("/api/ig/positions/close", { dealId: sp.dealId });
+        } catch (e) {
+          log("ERROR", `Failed to close for profit target: ${e.message}`);
+        }
+        continue;
+      }
+
+      const trailingStop = config.trailingStop || 0;
+      if (trailingStop > 0) {
+        const priceMove = sp.direction === "BUY"
+          ? currentPrice - sp.entry
+          : sp.entry - currentPrice;
+
+        if (priceMove > 0) {
+          let newStop;
+          if (sp.direction === "BUY") {
+            newStop = currentPrice - trailingStop;
+            const currentStop = pos.stopLevel || (sp.entry - sp.stopDistance);
+            if (newStop > currentStop + 0.5) {
+              log("TRAIL", `Moving stop UP for ${sp.epic}: ${currentStop.toFixed(2)} -> ${newStop.toFixed(2)} (price=${currentPrice.toFixed(2)})`);
+              try {
+                await proxyPut("/api/ig/positions/update", { dealId: sp.dealId, stopLevel: newStop });
+                sp.trailingStopMoved = true;
+              } catch (e) {
+                log("ERROR", `Trailing stop update failed: ${e.message}`);
+              }
+            }
+          } else {
+            newStop = currentPrice + trailingStop;
+            const currentStop = pos.stopLevel || (sp.entry + sp.stopDistance);
+            if (newStop < currentStop - 0.5) {
+              log("TRAIL", `Moving stop DOWN for ${sp.epic}: ${currentStop.toFixed(2)} -> ${newStop.toFixed(2)} (price=${currentPrice.toFixed(2)})`);
+              try {
+                await proxyPut("/api/ig/positions/update", { dealId: sp.dealId, stopLevel: newStop });
+                sp.trailingStopMoved = true;
+              } catch (e) {
+                log("ERROR", `Trailing stop update failed: ${e.message}`);
+              }
+            }
+          }
+        }
       }
     }
   } catch (e) {
@@ -397,6 +470,37 @@ function proxyPost(urlPath, body) {
       port: 5000,
       path: urlPath,
       method: "POST",
+      headers: {
+        "Authorization": "Bearer " + (process.env.OPENCLAW_GATEWAY_TOKEN || ""),
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Content-Length": Buffer.byteLength(bodyStr)
+      },
+      timeout: 15000
+    };
+    const req = http.request(opts, (res) => {
+      const chunks = [];
+      res.on("data", c => chunks.push(c));
+      res.on("end", () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+        catch (_) { resolve(null); }
+      });
+    });
+    req.on("error", () => resolve(null));
+    req.on("timeout", () => { req.destroy(); resolve(null); });
+    req.write(bodyStr);
+    req.end();
+  });
+}
+
+function proxyPut(urlPath, body) {
+  return new Promise((resolve) => {
+    const bodyStr = JSON.stringify(body);
+    const opts = {
+      hostname: "127.0.0.1",
+      port: 5000,
+      path: urlPath,
+      method: "PUT",
       headers: {
         "Authorization": "Bearer " + (process.env.OPENCLAW_GATEWAY_TOKEN || ""),
         "Content-Type": "application/json",
@@ -489,6 +593,10 @@ function getStatus() {
     maxOpenPositions: config ? config.maxOpenPositions : 0,
     tickWindow: config ? config.tickWindow : 0,
     minMomentumPct: config ? config.minMomentumPct : 0,
+    minSize: config ? config.minSize : 0.5,
+    maxSize: config ? config.maxSize : 10,
+    profitTarget: config ? config.profitTarget : 0,
+    trailingStop: config ? config.trailingStop : 0,
     realizedPnl: Math.round(realizedPnl * 100) / 100,
     unrealizedPnl,
     tradeCount,
@@ -520,6 +628,10 @@ function updateConfig(updates) {
   if (updates.cooldownMs !== undefined) { const v = Number(updates.cooldownMs); if (Number.isFinite(v) && v >= 1000 && v <= 300000) config.cooldownMs = v; }
   if (updates.tickWindow !== undefined) { const v = Number(updates.tickWindow); if (Number.isFinite(v) && v >= 3 && v <= 100) config.tickWindow = Math.floor(v); }
   if (updates.minMomentumPct !== undefined) { const v = Number(updates.minMomentumPct); if (Number.isFinite(v) && v > 0 && v < 10) config.minMomentumPct = v; }
+  if (updates.minSize !== undefined) { const v = Number(updates.minSize); if (Number.isFinite(v) && v >= 0.1 && v <= 100) config.minSize = v; }
+  if (updates.maxSize !== undefined) { const v = Number(updates.maxSize); if (Number.isFinite(v) && v >= 0.1 && v <= 1000) config.maxSize = v; }
+  if (updates.profitTarget !== undefined) { const v = Number(updates.profitTarget); if (Number.isFinite(v) && v >= 0) config.profitTarget = v; }
+  if (updates.trailingStop !== undefined) { const v = Number(updates.trailingStop); if (Number.isFinite(v) && v >= 0) config.trailingStop = v; }
   if (updates.enabled !== undefined) config.enabled = !!updates.enabled;
   saveConfig();
   return config;
