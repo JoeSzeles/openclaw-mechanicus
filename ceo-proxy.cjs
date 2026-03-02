@@ -81,7 +81,8 @@ function isLoginExempt(req) {
       p.startsWith("/api/ig/workingorders") || p.startsWith("/api/ig/markets") || p.startsWith("/api/ig/marketnavigation") ||
       p.startsWith("/api/ig/pricehistory") || p.startsWith("/api/ig/watchlists") || p.startsWith("/api/ig/activity") ||
       p.startsWith("/api/ig/session") || p === "/api/ig/refresh-snapshots" ||
-      p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/proofread") || p.startsWith("/api/ig/watchedlist")) {
+      p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/proofread") || p.startsWith("/api/ig/watchedlist") ||
+      p.startsWith("/api/bots")) {
     if (hasValidBearerToken(req)) return true;
   }
   if (p.startsWith("/__openclaw__/canvas/")) return true;
