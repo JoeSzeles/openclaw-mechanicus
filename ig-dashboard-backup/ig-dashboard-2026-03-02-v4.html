@@ -509,10 +509,11 @@ function pnlClass(v) {
 }
 
 function badgeType(type) {
-  if (type === 'drop') return 'badge-alert';
-  if (type === 'spike') return 'badge-spike';
-  if (type === 'spread') return 'badge-spread';
-  return 'badge-on';
+  if (type === 'drop' || type === 'reversal_down' || type === 'trend_down' || type === 'session_low') return 'badge-alert';
+  if (type === 'spike' || type === 'reversal_up' || type === 'trend_up' || type === 'session_high') return 'badge-on';
+  if (type === 'spread' || type === 'high_volatility') return 'badge-spread';
+  if (type === 'breakout_above' || type === 'breakout_below') return 'badge-spike';
+  return 'badge-off';
 }
 
 async function loadAccount() {

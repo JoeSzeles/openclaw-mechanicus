@@ -15,10 +15,21 @@ const PROXY_BASE = "http://localhost:5000";
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
 
 const priceHistory = {};
+const sessionHighLow = {};
+const alertCooldowns = {};
+const COOLDOWN_MS = 5 * 60 * 1000;
 
 function log(msg) {
   const ts = new Date().toISOString();
   console.log(`[${ts}] ${msg}`);
+}
+
+function canAlert(epic, type) {
+  const key = epic + ":" + type;
+  const now = Date.now();
+  if (alertCooldowns[key] && (now - alertCooldowns[key]) < COOLDOWN_MS) return false;
+  alertCooldowns[key] = now;
+  return true;
 }
 
 
@@ -126,6 +137,14 @@ function recordTick(epic, bid, offer) {
   }
 }
 
+function makeSignal(epic, name, type, message, latest) {
+  return {
+    timestamp: new Date().toISOString(),
+    epic, name, type, message,
+    bid: latest.bid, offer: latest.offer, mid: latest.mid,
+  };
+}
+
 function detectSignals(instrument, config) {
   const epic = instrument.epic;
   const history = priceHistory[epic];
@@ -133,82 +152,118 @@ function detectSignals(instrument, config) {
 
   const signals = [];
   const latest = history[history.length - 1];
+  const name = instrument.name;
+
+  if (!sessionHighLow[epic]) {
+    sessionHighLow[epic] = { high: latest.mid, low: latest.mid, highTime: latest.time, lowTime: latest.time };
+  }
+  const shl = sessionHighLow[epic];
+  if (latest.mid > shl.high) { shl.high = latest.mid; shl.highTime = latest.time; }
+  if (latest.mid < shl.low) { shl.low = latest.mid; shl.lowTime = latest.time; }
+
   const windowMs = (config.signals.windowSeconds || 30) * 1000;
   const cutoff = latest.time - windowMs;
-
   const windowTicks = history.filter((t) => t.time >= cutoff);
-  if (windowTicks.length < 2) return signals;
 
-  const oldest = windowTicks[0];
-  const pctChange = ((latest.mid - oldest.mid) / oldest.mid) * 100;
+  if (windowTicks.length >= 2) {
+    const oldest = windowTicks[0];
+    const pctChange = ((latest.mid - oldest.mid) / oldest.mid) * 100;
+    const dropThreshold = config.signals.dropPercent || 0.5;
+    const spikeThreshold = config.signals.spikePercent || 0.5;
 
-  const dropThreshold = config.signals.dropPercent || 0.5;
-  const spikeThreshold = config.signals.spikePercent || 0.5;
-
-  if (pctChange <= -dropThreshold) {
-    signals.push({
-      timestamp: new Date().toISOString(),
-      epic,
-      name: instrument.name,
-      type: "drop",
-      message: `${instrument.name} dropped ${Math.abs(pctChange).toFixed(2)}% in ${config.signals.windowSeconds}s`,
-      bid: latest.bid,
-      offer: latest.offer,
-      mid: latest.mid,
-    });
+    if (pctChange <= -dropThreshold && canAlert(epic, "drop")) {
+      signals.push(makeSignal(epic, name, "drop",
+        `${name} dropped ${Math.abs(pctChange).toFixed(2)}% in ${config.signals.windowSeconds}s (${oldest.mid.toFixed(2)} → ${latest.mid.toFixed(2)})`, latest));
+    }
+    if (pctChange >= spikeThreshold && canAlert(epic, "spike")) {
+      signals.push(makeSignal(epic, name, "spike",
+        `${name} spiked ${pctChange.toFixed(2)}% in ${config.signals.windowSeconds}s (${oldest.mid.toFixed(2)} → ${latest.mid.toFixed(2)})`, latest));
+    }
   }
 
-  if (pctChange >= spikeThreshold) {
-    signals.push({
-      timestamp: new Date().toISOString(),
-      epic,
-      name: instrument.name,
-      type: "spike",
-      message: `${instrument.name} spiked ${pctChange.toFixed(2)}% in ${config.signals.windowSeconds}s`,
-      bid: latest.bid,
-      offer: latest.offer,
-      mid: latest.mid,
-    });
+  const trend5m = latest.time - 5 * 60 * 1000;
+  const trend5Ticks = history.filter((t) => t.time >= trend5m);
+  if (trend5Ticks.length >= 5) {
+    const t5oldest = trend5Ticks[0];
+    const t5pct = ((latest.mid - t5oldest.mid) / t5oldest.mid) * 100;
+    let allUp = true, allDown = true;
+    for (let i = 1; i < trend5Ticks.length; i++) {
+      if (trend5Ticks[i].mid < trend5Ticks[i - 1].mid) allUp = false;
+      if (trend5Ticks[i].mid > trend5Ticks[i - 1].mid) allDown = false;
+    }
+    if (allUp && t5pct > 0.05 && canAlert(epic, "trend_up")) {
+      signals.push(makeSignal(epic, name, "trend_up",
+        `${name} trending UP over ${trend5Ticks.length} ticks (+${t5pct.toFixed(3)}%, ${t5oldest.mid.toFixed(2)} → ${latest.mid.toFixed(2)})`, latest));
+    }
+    if (allDown && t5pct < -0.05 && canAlert(epic, "trend_down")) {
+      signals.push(makeSignal(epic, name, "trend_down",
+        `${name} trending DOWN over ${trend5Ticks.length} ticks (${t5pct.toFixed(3)}%, ${t5oldest.mid.toFixed(2)} → ${latest.mid.toFixed(2)})`, latest));
+    }
   }
 
-  if (instrument.breakoutAbove != null && latest.mid > instrument.breakoutAbove) {
-    signals.push({
-      timestamp: new Date().toISOString(),
-      epic,
-      name: instrument.name,
-      type: "breakout_above",
-      message: `${instrument.name} broke above ${instrument.breakoutAbove} (mid: ${latest.mid})`,
-      bid: latest.bid,
-      offer: latest.offer,
-      mid: latest.mid,
-    });
+  if (history.length >= 10) {
+    const recent20 = history.slice(-20);
+    const mids = recent20.map(t => t.mid);
+    const avg = mids.reduce((a, b) => a + b, 0) / mids.length;
+    const variance = mids.reduce((s, m) => s + (m - avg) ** 2, 0) / mids.length;
+    const stddev = Math.sqrt(variance);
+    const volatilityPct = avg > 0 ? (stddev / avg) * 100 : 0;
+    if (volatilityPct > 0.15 && canAlert(epic, "high_volatility")) {
+      signals.push(makeSignal(epic, name, "high_volatility",
+        `${name} high volatility: stddev ${stddev.toFixed(2)} (${volatilityPct.toFixed(3)}% of price) over ${recent20.length} ticks`, latest));
+    }
   }
 
-  if (instrument.breakoutBelow != null && latest.mid < instrument.breakoutBelow) {
-    signals.push({
-      timestamp: new Date().toISOString(),
-      epic,
-      name: instrument.name,
-      type: "breakout_below",
-      message: `${instrument.name} broke below ${instrument.breakoutBelow} (mid: ${latest.mid})`,
-      bid: latest.bid,
-      offer: latest.offer,
-      mid: latest.mid,
-    });
+  const sessionRange = shl.high - shl.low;
+  const minSessionRangePct = shl.high > 0 ? (sessionRange / shl.high) * 100 : 0;
+  if (minSessionRangePct > 0.02 && history.length >= 20) {
+    if (latest.mid === shl.high && canAlert(epic, "session_high")) {
+      signals.push(makeSignal(epic, name, "session_high",
+        `${name} new session HIGH ${latest.mid.toFixed(2)} (range: ${shl.low.toFixed(2)} – ${shl.high.toFixed(2)}, span: ${sessionRange.toFixed(2)})`, latest));
+    }
+    if (latest.mid === shl.low && canAlert(epic, "session_low")) {
+      signals.push(makeSignal(epic, name, "session_low",
+        `${name} new session LOW ${latest.mid.toFixed(2)} (range: ${shl.low.toFixed(2)} – ${shl.high.toFixed(2)}, span: ${sessionRange.toFixed(2)})`, latest));
+    }
+  }
+
+  if (history.length >= 6) {
+    const recentSlice = history.slice(-6);
+    let peakIdx = 0, troughIdx = 0;
+    for (let i = 1; i < recentSlice.length; i++) {
+      if (recentSlice[i].mid > recentSlice[peakIdx].mid) peakIdx = i;
+      if (recentSlice[i].mid < recentSlice[troughIdx].mid) troughIdx = i;
+    }
+    const minReversalPct = 0.03;
+    if (peakIdx > 0 && peakIdx < recentSlice.length - 1) {
+      const dropFromPeak = ((recentSlice[peakIdx].mid - latest.mid) / recentSlice[peakIdx].mid) * 100;
+      if (dropFromPeak > minReversalPct && canAlert(epic, "reversal_down")) {
+        signals.push(makeSignal(epic, name, "reversal_down",
+          `${name} reversal DOWN: peaked at ${recentSlice[peakIdx].mid.toFixed(2)}, now ${latest.mid.toFixed(2)} (-${dropFromPeak.toFixed(3)}%)`, latest));
+      }
+    }
+    if (troughIdx > 0 && troughIdx < recentSlice.length - 1) {
+      const riseFromTrough = ((latest.mid - recentSlice[troughIdx].mid) / recentSlice[troughIdx].mid) * 100;
+      if (riseFromTrough > minReversalPct && canAlert(epic, "reversal_up")) {
+        signals.push(makeSignal(epic, name, "reversal_up",
+          `${name} reversal UP: bottomed at ${recentSlice[troughIdx].mid.toFixed(2)}, now ${latest.mid.toFixed(2)} (+${riseFromTrough.toFixed(3)}%)`, latest));
+      }
+    }
+  }
+
+  if (instrument.breakoutAbove != null && latest.mid > instrument.breakoutAbove && canAlert(epic, "breakout_above")) {
+    signals.push(makeSignal(epic, name, "breakout_above",
+      `${name} broke above ${instrument.breakoutAbove} (mid: ${latest.mid.toFixed(2)})`, latest));
+  }
+  if (instrument.breakoutBelow != null && latest.mid < instrument.breakoutBelow && canAlert(epic, "breakout_below")) {
+    signals.push(makeSignal(epic, name, "breakout_below",
+      `${name} broke below ${instrument.breakoutBelow} (mid: ${latest.mid.toFixed(2)})`, latest));
   }
 
   const spread = latest.offer - latest.bid;
-  if (instrument.maxSpread != null && spread > instrument.maxSpread) {
-    signals.push({
-      timestamp: new Date().toISOString(),
-      epic,
-      name: instrument.name,
-      type: "spread",
-      message: `${instrument.name} spread ${spread.toFixed(4)} exceeds max ${instrument.maxSpread}`,
-      bid: latest.bid,
-      offer: latest.offer,
-      mid: latest.mid,
-    });
+  if (instrument.maxSpread != null && spread > instrument.maxSpread && canAlert(epic, "spread")) {
+    signals.push(makeSignal(epic, name, "spread",
+      `${name} spread ${spread.toFixed(4)} exceeds max ${instrument.maxSpread}`, latest));
   }
 
   return signals;
