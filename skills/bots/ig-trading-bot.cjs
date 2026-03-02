@@ -383,13 +383,14 @@ async function openPosition(strategy) {
     direction: strategy.direction,
     size: strategy.size,
     orderType: "MARKET",
-    currencyCode: "USD",
     expiry: "-",
     forceOpen: true,
     guaranteedStop: false,
     stopDistance: strategy.stopDistance,
     limitDistance: strategy.limitDistance
   };
+  const cc = strategy.currencyCode || currentConfig.currencyCode;
+  if (cc) body.currencyCode = cc;
 
   log("TRADE", `Opening ${strategy.direction} position on ${strategy.name || strategy.instrument}`, body);
 

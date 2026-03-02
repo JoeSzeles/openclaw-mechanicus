@@ -884,12 +884,24 @@ async function handleIgApi(req, res, p) {
         return json(res, 400, { error: "Missing required fields: epic, direction, size" });
       }
       const session = await igAuth();
+      let currencyCode = body.currencyCode;
+      if (!currencyCode) {
+        try {
+          const mr = await igRequest("GET", `/markets/${body.epic}`, igHeaders(session));
+          if (mr.status === 200) {
+            const md = JSON.parse(mr.body);
+            const currs = md.instrument?.currencies;
+            if (currs && currs.length > 0) currencyCode = currs[0].name || currs[0].code;
+          }
+        } catch (_) {}
+        if (!currencyCode) currencyCode = "AUD";
+      }
       const orderBody = {
         epic: body.epic,
         direction: body.direction.toUpperCase(),
         size: String(body.size),
         orderType: body.orderType || "MARKET",
-        currencyCode: body.currencyCode || "AUD",
+        currencyCode,
         expiry: body.expiry || "-",
         forceOpen: body.forceOpen !== undefined ? body.forceOpen : true,
         guaranteedStop: body.guaranteedStop || false,
@@ -1047,13 +1059,25 @@ async function handleIgApi(req, res, p) {
         return json(res, 400, { error: "Missing required fields: epic, direction, size, level, type (LIMIT or STOP)" });
       }
       const session = await igAuth();
+      let woCurrencyCode = body.currencyCode;
+      if (!woCurrencyCode) {
+        try {
+          const mr = await igRequest("GET", `/markets/${body.epic}`, igHeaders(session));
+          if (mr.status === 200) {
+            const md = JSON.parse(mr.body);
+            const currs = md.instrument?.currencies;
+            if (currs && currs.length > 0) woCurrencyCode = currs[0].name || currs[0].code;
+          }
+        } catch (_) {}
+        if (!woCurrencyCode) woCurrencyCode = "AUD";
+      }
       const orderBody = {
         epic: body.epic,
         direction: body.direction.toUpperCase(),
         size: body.size,
         level: body.level,
         type: body.type.toUpperCase(),
-        currencyCode: body.currencyCode || "AUD",
+        currencyCode: woCurrencyCode,
         expiry: body.expiry || "-",
         forceOpen: body.forceOpen !== undefined ? body.forceOpen : true,
         guaranteedStop: body.guaranteedStop || false,

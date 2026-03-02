@@ -710,7 +710,7 @@ async function placeDeal() {
   var dealCurrency = 'AUD';
   if (selectedMarketData && selectedMarketData.instrument && selectedMarketData.instrument.currencies) {
     var currs = selectedMarketData.instrument.currencies;
-    if (currs.length > 0) dealCurrency = currs[0].code;
+    if (currs.length > 0) dealCurrency = currs[0].name || currs[0].code;
   }
 
   var body = {
@@ -768,7 +768,7 @@ async function placeOrder() {
   var orderCurrency = 'AUD';
   if (selectedMarketData && selectedMarketData.instrument && selectedMarketData.instrument.currencies) {
     var currs = selectedMarketData.instrument.currencies;
-    if (currs.length > 0) orderCurrency = currs[0].code;
+    if (currs.length > 0) orderCurrency = currs[0].name || currs[0].code;
   }
 
   var body = {

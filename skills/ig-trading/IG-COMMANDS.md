@@ -28,7 +28,7 @@ POST /api/ig/positions/open
 }
 ```
 Required: `epic`, `direction` (BUY/SELL), `size`
-Optional: `stopDistance`, `limitDistance`, `stopLevel`, `limitLevel`, `currencyCode` (default USD), `orderType` (default MARKET), `expiry` (default "-"), `forceOpen` (default true), `guaranteedStop` (default false)
+Optional: `stopDistance`, `limitDistance`, `stopLevel`, `limitLevel`, `currencyCode` (default AUD), `orderType` (default MARKET), `expiry` (default "-"), `forceOpen` (default true), `guaranteedStop` (default false)
 Returns: `{ ok: true/false, dealReference, confirmation: { dealId, dealStatus, level, size, direction, profit, ... } }`
 **IMPORTANT**: Always check `ok` field AND `confirmation.dealStatus`. Only `ACCEPTED` means the trade went through.
 
