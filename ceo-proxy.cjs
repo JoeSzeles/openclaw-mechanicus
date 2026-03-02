@@ -1291,8 +1291,87 @@ async function handleIgApi(req, res, p) {
       return json(res, 200, { ok: true, ...cfg });
     }
 
+    if (req.method === "POST" && p === "/api/ig/strategies") {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      if (!body.instrument || typeof body.instrument !== "string") return json(res, 400, { error: "Missing or invalid 'instrument' (IG EPIC code)" });
+      if (!body.direction || (body.direction !== "BUY" && body.direction !== "SELL")) return json(res, 400, { error: "Missing or invalid 'direction' (BUY or SELL)" });
+      if (body.size === undefined || !Number.isFinite(Number(body.size)) || Number(body.size) <= 0) return json(res, 400, { error: "Missing or invalid 'size' (must be positive number)" });
+      const cfgPath = path.join(DATA_DIR, "ig-strategy.json");
+      const cfg = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, "utf8")) : { strategies: [], enabled: false, maxOpenPositions: 6, maxRiskPercent: 10, checkIntervalSeconds: 60 };
+      if (!Array.isArray(cfg.strategies)) cfg.strategies = [];
+      const newStrategy = {
+        instrument: String(body.instrument).trim(),
+        name: body.name ? String(body.name).trim() : String(body.instrument).trim(),
+        direction: body.direction,
+        size: Number(body.size),
+        enabled: body.enabled !== undefined ? !!body.enabled : false,
+        stopDistance: undefined,
+        limitDistance: undefined,
+      };
+      if (body.stopDistance !== undefined) { const v = Number(body.stopDistance); if (!Number.isFinite(v) || v <= 0) return json(res, 400, { error: "stopDistance must be a positive number" }); newStrategy.stopDistance = v; }
+      if (body.limitDistance !== undefined) { const v = Number(body.limitDistance); if (!Number.isFinite(v) || v <= 0) return json(res, 400, { error: "limitDistance must be a positive number" }); newStrategy.limitDistance = v; }
+      if (body.entryBelow !== undefined) { const v = Number(body.entryBelow); if (!Number.isFinite(v) || v <= 0) return json(res, 400, { error: "entryBelow must be a positive number" }); newStrategy.entryBelow = v; }
+      if (body.entryAbove !== undefined) { const v = Number(body.entryAbove); if (!Number.isFinite(v) || v <= 0) return json(res, 400, { error: "entryAbove must be a positive number" }); newStrategy.entryAbove = v; }
+      if (body.dealId) newStrategy.dealId = String(body.dealId);
+      if (body.paused) newStrategy.paused = true;
+      Object.keys(newStrategy).forEach(k => { if (newStrategy[k] === undefined) delete newStrategy[k]; });
+      cfg.strategies.push(newStrategy);
+      fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+      writeConfigSnapshots();
+      return json(res, 200, { ok: true, index: cfg.strategies.length - 1, strategy: newStrategy });
+    }
+
     const strategyMatch = p.match(/^\/api\/ig\/strategies\/(\d+)$/);
     const strategyToggleMatch = p.match(/^\/api\/ig\/strategies\/(\d+)\/toggle$/);
+    const strategyAttachMatch = p.match(/^\/api\/ig\/strategies\/(\d+)\/attach$/);
+    const strategyDetachMatch = p.match(/^\/api\/ig\/strategies\/(\d+)\/detach$/);
+    const strategyPauseMatch = p.match(/^\/api\/ig\/strategies\/(\d+)\/pause$/);
+
+    if (req.method === "POST" && strategyAttachMatch) {
+      const idx = parseInt(strategyAttachMatch[1], 10);
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      if (!body.dealId || typeof body.dealId !== "string") return json(res, 400, { error: "Missing dealId" });
+      const cfgPath = path.join(DATA_DIR, "ig-strategy.json");
+      if (!fs.existsSync(cfgPath)) return json(res, 404, { error: "No strategy config" });
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+      if (idx < 0 || idx >= cfg.strategies.length) return json(res, 404, { error: "Strategy index out of range" });
+      if (cfg.strategies[idx].dealId && cfg.strategies[idx].dealId !== body.dealId) return json(res, 409, { error: "Strategy already linked to position " + cfg.strategies[idx].dealId + ". Detach first." });
+      const existingLink = cfg.strategies.findIndex((s, i) => i !== idx && s.dealId === body.dealId);
+      if (existingLink >= 0) {
+        delete cfg.strategies[existingLink].dealId;
+        delete cfg.strategies[existingLink].paused;
+      }
+      cfg.strategies[idx].dealId = body.dealId;
+      fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+      writeConfigSnapshots();
+      return json(res, 200, { ok: true, index: idx, strategy: cfg.strategies[idx] });
+    }
+
+    if (req.method === "POST" && strategyDetachMatch) {
+      const idx = parseInt(strategyDetachMatch[1], 10);
+      const cfgPath = path.join(DATA_DIR, "ig-strategy.json");
+      if (!fs.existsSync(cfgPath)) return json(res, 404, { error: "No strategy config" });
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+      if (idx < 0 || idx >= cfg.strategies.length) return json(res, 404, { error: "Strategy index out of range" });
+      delete cfg.strategies[idx].dealId;
+      delete cfg.strategies[idx].paused;
+      fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+      writeConfigSnapshots();
+      return json(res, 200, { ok: true, index: idx, strategy: cfg.strategies[idx] });
+    }
+
+    if (req.method === "POST" && strategyPauseMatch) {
+      const idx = parseInt(strategyPauseMatch[1], 10);
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { body = {}; }
+      const cfgPath = path.join(DATA_DIR, "ig-strategy.json");
+      if (!fs.existsSync(cfgPath)) return json(res, 404, { error: "No strategy config" });
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+      if (idx < 0 || idx >= cfg.strategies.length) return json(res, 404, { error: "Strategy index out of range" });
+      cfg.strategies[idx].paused = body.paused !== undefined ? !!body.paused : !cfg.strategies[idx].paused;
+      fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+      writeConfigSnapshots();
+      return json(res, 200, { ok: true, index: idx, paused: cfg.strategies[idx].paused, strategy: cfg.strategies[idx] });
+    }
 
     if (req.method === "POST" && strategyToggleMatch) {
       const idx = parseInt(strategyToggleMatch[1], 10);
@@ -1323,6 +1402,8 @@ async function handleIgApi(req, res, p) {
       if (body.entryAbove !== undefined) { const v = Number(body.entryAbove); if (!Number.isFinite(v) || v <= 0) return json(res, 400, { error: "Entry level must be positive" }); s.entryAbove = v; delete s.entryBelow; }
       if (body.direction !== undefined) { if (body.direction !== "BUY" && body.direction !== "SELL") return json(res, 400, { error: "Direction must be BUY or SELL" }); s.direction = body.direction; }
       if (body.instrument !== undefined) s.instrument = String(body.instrument);
+      if (body.dealId !== undefined) { if (body.dealId) s.dealId = String(body.dealId); else delete s.dealId; }
+      if (body.paused !== undefined) s.paused = !!body.paused;
       fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
       writeConfigSnapshots();
       return json(res, 200, { ok: true, index: idx, strategy: s });
@@ -1378,7 +1459,7 @@ async function handleIgApi(req, res, p) {
       return json(res, 200, { ok: true, removed, instruments: cfg.instruments });
     }
 
-    return json(res, 404, { error: "Unknown IG endpoint. Available: GET positions, POST positions/open, POST positions/close, PUT positions/update, GET workingorders, POST workingorders/create, PUT workingorders/update, DELETE workingorders/delete, GET account, GET prices, GET markets, GET markets/{epic}, GET marketnavigation, GET pricehistory/{epic}, GET watchlists, GET history, GET activity, GET confirms/{ref}, GET session, POST session/refresh, GET stream/prices, GET stream/status, GET strategies, PUT strategies/:i, DELETE strategies/:i, POST strategies/:i/toggle, POST strategies/global, GET/POST/DELETE watchedlist" });
+    return json(res, 404, { error: "Unknown IG endpoint. Available: GET positions, POST positions/open, POST positions/close, PUT positions/update, GET workingorders, POST workingorders/create, PUT workingorders/update, DELETE workingorders/delete, GET account, GET prices, GET markets, GET markets/{epic}, GET marketnavigation, GET pricehistory/{epic}, GET watchlists, GET history, GET activity, GET confirms/{ref}, GET session, POST session/refresh, GET stream/prices, GET stream/status, GET/POST strategies, PUT strategies/:i, DELETE strategies/:i, POST strategies/:i/toggle, POST strategies/:i/attach, POST strategies/:i/detach, POST strategies/:i/pause, POST strategies/global, GET/POST/DELETE watchedlist" });
   } catch (e) {
     return json(res, 500, { error: e.message });
   }
