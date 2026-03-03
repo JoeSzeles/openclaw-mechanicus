@@ -3289,7 +3289,21 @@ async function handleApi(req, res) {
     return json(res, 201, { ok: true, taskId: task.id, workerName: w.name }), true;
   }
 
-  if (p.startsWith("/api/ig/")) { await handleIgApi(req, res, p); return true; }
+  if (p.startsWith("/api/ig/")) {
+    if (p === "/api/ig/logs/scalper-trades") {
+      const filePath = path.join(DATA_DIR, "ig-scalper-trades.json");
+      if (!fs.existsSync(filePath)) { res.writeHead(404); return res.end("Not found"), true; }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return fs.createReadStream(filePath).pipe(res), true;
+    }
+    if (p === "/api/ig/logs/bot-log") {
+      const filePath = path.join(DATA_DIR, "ig-bot-log.json");
+      if (!fs.existsSync(filePath)) { res.writeHead(404); return res.end("Not found"), true; }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return fs.createReadStream(filePath).pipe(res), true;
+    }
+    await handleIgApi(req, res, p); return true;
+  }
   if (p.startsWith("/api/bots")) { await handleBotsApi(req, res, p); return true; }
   if (p.startsWith("/api/processes")) { await handleProcesses(req, res, p); return true; }
   if (p.startsWith("/api/canvas")) { await handleCanvasApi(req, res, p); return true; }
