@@ -62,6 +62,24 @@ if [ -f "$PERSISTENT_DIR/openclaw.json" ] && ! grep -q "$PUBLISHED_ORIGIN" "$PER
   "
 fi
 
+# Patch credentials from env if available
+PERSISTENT_DIR="/home/runner/workspace/.openclaw"
+IG_CONFIG="$PERSISTENT_DIR/ig-config.json"
+if [ -f "$IG_CONFIG" ]; then
+  if [ ! -z "$OPENCLAW_IG_API_KEY" ]; then
+    sed -i "s/\"apiKey\": \".*\"/\"apiKey\": \"$OPENCLAW_IG_API_KEY\"/" "$IG_CONFIG"
+  fi
+  if [ ! -z "$OPENCLAW_IG_USERNAME" ]; then
+    sed -i "s/\"username\": \".*\"/\"username\": \"$OPENCLAW_IG_USERNAME\"/" "$IG_CONFIG"
+  fi
+  if [ ! -z "$OPENCLAW_IG_PASSWORD" ]; then
+    sed -i "s/\"password\": \".*\"/\"password\": \"$OPENCLAW_IG_PASSWORD\"/" "$IG_CONFIG"
+  fi
+  if [ ! -z "$OPENCLAW_IG_ACCOUNT_ID" ]; then
+    sed -i "s/\"accountId\": \".*\"/\"accountId\": \"$OPENCLAW_IG_ACCOUNT_ID\"/" "$IG_CONFIG"
+  fi
+fi
+
 # Export gateway port for internal use  
 export OPENCLAW_GATEWAY_PORT=5001
 
