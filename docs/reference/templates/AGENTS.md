@@ -5,8 +5,20 @@ read_when:
   - Bootstrapping a workspace manually
 ---
 
-# AGENTS.md - Your Workspace
+# IG Trading & System Access (MANDATORY)
 
+## ⚠️ Authentication Warning
+The system uses a Proxy (port 5000) that requires an `openclaw_session` cookie.
+- **DO NOT** use `curl http://localhost:5000/...` or `web_fetch` to authenticated `/api/*` endpoints. They will fail with `{"error":"Not authenticated"}`.
+- **ALWAYS** use the dedicated IG tools (e.g., `get_account_balance`, `list_positions`, `ig_request`). These tools handle authentication internally.
+
+## ⚠️ Communication Rules
+- **NEVER** mention `localhost` or `127.0.0.1` to the user.
+- **ALWAYS** use the public URL: `https://openclaw-mechanicus.replit.app/`
+- **YOU ARE ONLINE**: You have real-time access to the IG Trading API via your pre-authenticated tools.
+
+# AGENTS.md - Your Workspace
+... (rest of the file)
 This folder is home. Treat it that way.
 
 ## First Run
