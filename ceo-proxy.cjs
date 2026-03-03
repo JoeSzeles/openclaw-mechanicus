@@ -216,6 +216,61 @@ let lsReconnectInFlight = false;
 const LS_MAX_RECONNECT_ATTEMPTS = 20;
 const LS_RECONNECT_BASE_DELAY = 5000;
 const LS_RECONNECT_MAX_DELAY = 120000;
+let lsHybridPollingTimer = null;
+
+function startHybridPricePolling() {
+  if (lsHybridPollingTimer) return;
+  console.log("[lightstreamer] Starting hybrid price polling (L1 unavailable for CFD account)");
+  lsHybridPollingTimer = setInterval(async () => {
+    const epics = collectInstrumentEpics();
+    if (epics.length === 0) return;
+    try {
+      const session = await igAuth();
+      for (let i = 0; i < epics.length; i += 20) {
+        const chunk = epics.slice(i, i + 20);
+        const url = `/markets?epics=${chunk.join(",")}`;
+        const r = await igRequest("GET", url, { ...igHeaders(session), Version: "2" });
+        if (r.status === 200) {
+          const data = JSON.parse(r.body);
+          if (data && data.marketDetails) {
+            data.marketDetails.forEach(m => {
+              const epic = m.instrument.epic;
+              const snapshot = m.snapshot;
+              if (!snapshot) return;
+              const now = Date.now();
+              const bid = snapshot.bid;
+              const offer = snapshot.offer;
+              const mid = (bid && offer) ? (bid + offer) / 2 : null;
+              streamedPrices.set(epic, {
+                bid, offer, mid,
+                high: snapshot.high,
+                low: snapshot.low,
+                marketState: snapshot.marketStatus,
+                updateTime: snapshot.updateTime,
+                timestamp: now,
+                isPolled: true
+              });
+              lsUpdateCount++;
+              lsUpdateCounts[epic] = (lsUpdateCounts[epic] || 0) + 1;
+              lsLastUpdateTs = now;
+              try { scalperEngine.processTick(epic, { bid, offer, mid, spread: (offer && bid) ? offer - bid : 0, timestamp: now }); } catch (_) {}
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[lightstreamer] Hybrid polling error:", e.message);
+    }
+  }, 2000);
+}
+
+function stopHybridPricePolling() {
+  if (lsHybridPollingTimer) {
+    clearInterval(lsHybridPollingTimer);
+    lsHybridPollingTimer = null;
+    console.log("[lightstreamer] Stopped hybrid price polling");
+  }
+}
 
 function scheduleLsReconnect(reason) {
   if (lsReconnectTimer) clearTimeout(lsReconnectTimer);
@@ -307,43 +362,15 @@ function collectInstrumentEpics() {
 }
 
 async function startLightstreamer() {
-  const liveProfile = getLiveProfile();
-  const hasLiveCreds = !!(liveProfile && liveProfile.apiKey && liveProfile.username && liveProfile.password && liveProfile.accountId);
-  if (!hasLiveCreds && !lsLiveActive && !igConfigured()) { lsStatus = "not_configured"; return; }
+  if (!igConfigured()) { lsStatus = "not_configured"; return; }
   try {
     const { LightstreamerClient, Subscription } = require("lightstreamer-client-node");
     let session, endpoint, accountId, streamSource;
-    if (lsLiveActive && lsLiveSession.cst && lsLiveSession.lightstreamerEndpoint) {
-      session = { cst: lsLiveSession.cst, xst: lsLiveSession.xst };
-      endpoint = lsLiveSession.lightstreamerEndpoint;
-      accountId = lsLiveSession.accountId || (liveProfile ? liveProfile.accountId : null);
-      streamSource = "live";
-    } else if (hasLiveCreds) {
-      console.log("[lightstreamer] Live credentials available — using live profile for streaming");
-      try {
-        await liveStreamingLogin();
-        lsLiveActive = true;
-        persistLiveStreamingPref(true);
-        session = { cst: lsLiveSession.cst, xst: lsLiveSession.xst };
-        endpoint = lsLiveSession.lightstreamerEndpoint;
-        accountId = lsLiveSession.accountId || liveProfile.accountId;
-        streamSource = "live";
-        scheduleLiveStreamingRefresh();
-      } catch (e) {
-        console.log("[lightstreamer] Live login failed:", e.message, "— falling back to active profile");
-        session = await igAuth();
-        endpoint = igSession.lightstreamerEndpoint;
-        const activeProfile = getActiveIgProfile();
-        accountId = activeProfile ? activeProfile.accountId : null;
-        streamSource = activeProfile ? activeProfile.profileName : "unknown";
-      }
-    } else {
-      session = await igAuth();
-      endpoint = igSession.lightstreamerEndpoint;
-      const activeProfile = getActiveIgProfile();
-      accountId = activeProfile ? activeProfile.accountId : null;
-      streamSource = activeProfile ? activeProfile.profileName : "unknown";
-    }
+    session = await igAuth();
+    endpoint = igSession.lightstreamerEndpoint;
+    const activeProfile = getActiveIgProfile();
+    accountId = activeProfile ? activeProfile.accountId : null;
+    streamSource = activeProfile ? activeProfile.profileName : "demo";
     if (!endpoint) {
       console.log("[lightstreamer] No endpoint from session, skipping");
       lsStatus = "no_endpoint";
@@ -407,115 +434,98 @@ async function startLightstreamer() {
     }
 
     const fields = ["BID", "OFFER", "HIGH", "LOW", "MID_OPEN", "MARKET_STATE", "UPDATE_TIME"];
-    const chartFields = ["BID_OPEN", "BID_HIGH", "BID_LOW", "BID_CLOSE", "OFR_OPEN", "OFR_HIGH", "OFR_LOW", "OFR_CLOSE", "UTM"];
-    const prefixesToTry = ["L1", "MARKET", "CHART_TICK"];
-
-    function handleItemUpdate(info) {
-      const epicFull = info.getItemName();
-      let epic = epicFull;
-      if (epic.startsWith("CHART:") && epic.endsWith(":TICK")) {
-        epic = epic.slice(6, -5);
-      } else if (epic.startsWith("CHART:")) {
-        epic = epic.replace(/^CHART:/, "").replace(/:(?:TICK|1MINUTE|5MINUTE|HOUR|DAY)$/, "");
-      } else if (epic.includes(":")) {
-        epic = epic.split(":").slice(1).join(":");
-      }
-      let bid, offer;
-      if (epicFull.startsWith("CHART:")) {
-        bid = parseFloat(info.getValue("BID_CLOSE")) || null;
-        const ofrClose = parseFloat(info.getValue("OFR_CLOSE")) || null;
-        offer = ofrClose;
-      } else {
-        bid = parseFloat(info.getValue("BID")) || null;
-        offer = parseFloat(info.getValue("OFFER")) || null;
-      }
-      const mid = (bid && offer) ? (bid + offer) / 2 : null;
-      const now = Date.now();
-      streamedPrices.set(epic, {
-        bid, offer, mid,
-        high: epicFull.startsWith("CHART:") ? (parseFloat(info.getValue("BID_HIGH")) || null) : (parseFloat(info.getValue("HIGH")) || null),
-        low: epicFull.startsWith("CHART:") ? (parseFloat(info.getValue("BID_LOW")) || null) : (parseFloat(info.getValue("LOW")) || null),
-        midOpen: epicFull.startsWith("CHART:") ? (parseFloat(info.getValue("BID_OPEN")) || null) : (parseFloat(info.getValue("MID_OPEN")) || null),
-        marketState: epicFull.startsWith("CHART:") ? "TRADEABLE" : (info.getValue("MARKET_STATE") || null),
-        updateTime: epicFull.startsWith("CHART:") ? (info.getValue("UTM") || null) : (info.getValue("UPDATE_TIME") || null),
-        timestamp: now
-      });
-      lsUpdateCount++;
-      lsUpdateCounts[epic] = (lsUpdateCounts[epic] || 0) + 1;
-      if (lsLastUpdateTs > 0) {
-        lsUpdateIntervals.push(now - lsLastUpdateTs);
-        if (lsUpdateIntervals.length > 200) lsUpdateIntervals = lsUpdateIntervals.slice(-100);
-      }
-      lsLastUpdateTs = now;
-      try { scalperEngine.processTick(epic, { bid, offer, mid, spread: (offer && bid) ? offer - bid : 0, timestamp: now }); } catch (_) {}
-    }
-
-    function handleUnsubscription() {
-      console.log("[lightstreamer] Unsubscribed");
-      lsConnectedEpics = [];
-    }
-
-    let attemptIndex = 0;
-    function trySubscription() {
-      if (attemptIndex >= prefixesToTry.length) {
-        console.error("[lightstreamer] All subscription prefixes failed. L1/MARKET/CHART all rejected.");
-        if (lsStatus !== "connected") lsStatus = "unsupported";
-        return;
-      }
-      const prefix = prefixesToTry[attemptIndex];
-      const isChart = prefix === "CHART_TICK";
-      const items = isChart ? epics.map(e => `CHART:${e}:TICK`) : epics.map(e => `${prefix}:${e}`);
-      const subFields = isChart ? chartFields : fields;
-      console.log(`[lightstreamer] Trying subscription with ${prefix}: prefix (attempt ${attemptIndex + 1}/${prefixesToTry.length})`);
-      const sub = new Subscription(isChart ? "DISTINCT" : "MERGE", items, subFields);
-      if (!isChart) sub.setRequestedSnapshot("yes");
-      sub.addListener({
-        onSubscription: () => {
-          console.log(`[lightstreamer] Subscribed to ${epics.length} instruments via ${streamSource} (${prefix}:)`);
-          lsConnectedEpics = epics;
-        },
-        onSubscriptionError: (code, msg) => {
-          console.error(`[lightstreamer] Subscription error with ${prefix}: ${code} ${msg}`);
-          attemptIndex++;
-          trySubscription();
-        },
-        onItemUpdate: handleItemUpdate,
-        onUnsubscription: handleUnsubscription,
-        onCommandSecondLevelSubscriptionError: (code, msg) => {
-          console.error(`[lightstreamer] 2nd level error: ${code} ${msg}`);
+    const items = epics.map(e => `L1:${e}`);
+    const sub = new Subscription("MERGE", items, fields);
+    sub.setRequestedSnapshot("yes");
+    sub.addListener({
+      onSubscription: () => {
+        console.log(`[lightstreamer] Subscribed to ${epics.length} instruments via ${streamSource}`);
+        lsConnectedEpics = epics;
+      },
+      onSubscriptionError: (code, msg) => {
+        console.error(`[lightstreamer] Subscription error: ${code} ${msg} | source=${streamSource} items=${JSON.stringify(items)}`);
+        if (msg && msg.includes("Invalid account type")) {
+          console.log("[lightstreamer] L1 not available for CFD account — starting hybrid price polling");
+          lsStatus = "connected";
+          startHybridPricePolling();
         }
-      });
-      try { client.subscribe(sub); lsSubscription = sub; } catch(e) {
-        console.error(`[lightstreamer] Subscribe call failed for ${prefix}:`, e.message);
-        attemptIndex++;
-        trySubscription();
-      }
-    }
-    trySubscription();
-
-    if (streamSource === "live" && accountId) {
-      const acctSub = new Subscription("MERGE", [`ACCOUNT:${accountId}`], ["DEPOSIT", "PNL", "AVAILABLE_CASH", "FUNDS", "MARGIN", "EQUITY"]);
-      acctSub.setRequestedSnapshot("yes");
-      acctSub.addListener({
-        onSubscription: () => {
-          console.log(`[lightstreamer] ACCOUNT subscription OK for ${accountId}`);
-          if (lsStatus === "unsupported") lsStatus = "connected";
-        },
-        onSubscriptionError: (c2, m2) => console.error(`[lightstreamer] ACCOUNT subscription error: ${c2} ${m2}`),
-        onItemUpdate: (info2) => {
-          const acctData = {
-            deposit: parseFloat(info2.getValue("DEPOSIT")) || null,
-            pnl: parseFloat(info2.getValue("PNL")) || null,
-            availableCash: parseFloat(info2.getValue("AVAILABLE_CASH")) || null,
-            funds: parseFloat(info2.getValue("FUNDS")) || null,
-            margin: parseFloat(info2.getValue("MARGIN")) || null,
-            equity: parseFloat(info2.getValue("EQUITY")) || null,
-            timestamp: Date.now()
-          };
-          streamedPrices.set("__ACCOUNT__", acctData);
+      },
+      onItemUpdate: (info) => {
+        const epicFull = info.getItemName();
+        const epic = epicFull.includes(":") ? epicFull.split(":").slice(1).join(":") : epicFull;
+        const bid = parseFloat(info.getValue("BID")) || null;
+        const offer = parseFloat(info.getValue("OFFER")) || null;
+        const mid = (bid && offer) ? (bid + offer) / 2 : null;
+        const now = Date.now();
+        streamedPrices.set(epic, {
+          bid, offer, mid,
+          high: parseFloat(info.getValue("HIGH")) || null,
+          low: parseFloat(info.getValue("LOW")) || null,
+          midOpen: parseFloat(info.getValue("MID_OPEN")) || null,
+          marketState: info.getValue("MARKET_STATE") || null,
+          updateTime: info.getValue("UPDATE_TIME") || null,
+          timestamp: now
+        });
+        lsUpdateCount++;
+        lsUpdateCounts[epic] = (lsUpdateCounts[epic] || 0) + 1;
+        if (lsLastUpdateTs > 0) {
+          lsUpdateIntervals.push(now - lsLastUpdateTs);
+          if (lsUpdateIntervals.length > 200) lsUpdateIntervals = lsUpdateIntervals.slice(-100);
         }
-      });
-      client.subscribe(acctSub);
+        lsLastUpdateTs = now;
+        try { scalperEngine.processTick(epic, { bid, offer, mid, spread: (offer && bid) ? offer - bid : 0, timestamp: now }); } catch (_) {}
+      },
+      onUnsubscription: () => {
+        console.log("[lightstreamer] Unsubscribed");
+        lsConnectedEpics = [];
+      }
+    });
+    client.subscribe(sub);
+    lsSubscription = sub;
+
+    const liveProfile = getLiveProfile();
+    const hasLiveCreds = !!(liveProfile && liveProfile.apiKey && liveProfile.username && liveProfile.password && liveProfile.accountId);
+    if (hasLiveCreds) {
+      try {
+        if (!lsLiveActive || !lsLiveSession.cst) {
+          await liveStreamingLogin();
+          lsLiveActive = true;
+          scheduleLiveStreamingRefresh();
+        }
+        const liveEndpoint = lsLiveSession.lightstreamerEndpoint;
+        const liveAccountId = lsLiveSession.accountId || liveProfile.accountId;
+        if (liveEndpoint && lsLiveSession.cst) {
+          const liveClient = new LightstreamerClient(liveEndpoint, "DEFAULT");
+          liveClient.connectionDetails.setUser(liveAccountId);
+          liveClient.connectionDetails.setPassword(`CST-${lsLiveSession.cst}|XST-${lsLiveSession.xst}`);
+          liveClient.addListener({
+            onStatusChange: (s) => { if (s.startsWith("CONNECTED")) console.log("[lightstreamer] Live ACCOUNT client connected"); },
+            onServerError: (c, m) => console.log("[lightstreamer] Live ACCOUNT client error:", c, m)
+          });
+          liveClient.connect();
+          const acctSub = new Subscription("MERGE", [`ACCOUNT:${liveAccountId}`], ["DEPOSIT", "PNL", "AVAILABLE_CASH", "FUNDS", "MARGIN", "EQUITY"]);
+          acctSub.setRequestedSnapshot("yes");
+          acctSub.addListener({
+            onSubscription: () => console.log(`[lightstreamer] ACCOUNT subscription OK for ${liveAccountId}`),
+            onSubscriptionError: (c2, m2) => console.error(`[lightstreamer] ACCOUNT subscription error: ${c2} ${m2}`),
+            onItemUpdate: (info2) => {
+              streamedPrices.set("__ACCOUNT__", {
+                deposit: parseFloat(info2.getValue("DEPOSIT")) || null,
+                pnl: parseFloat(info2.getValue("PNL")) || null,
+                availableCash: parseFloat(info2.getValue("AVAILABLE_CASH")) || null,
+                funds: parseFloat(info2.getValue("FUNDS")) || null,
+                margin: parseFloat(info2.getValue("MARGIN")) || null,
+                equity: parseFloat(info2.getValue("EQUITY")) || null,
+                timestamp: Date.now()
+              });
+            }
+          });
+          liveClient.subscribe(acctSub);
+          console.log(`[lightstreamer] Live ACCOUNT streaming on separate client for ${liveAccountId}`);
+        }
+      } catch (e) {
+        console.log("[lightstreamer] Live ACCOUNT streaming setup failed:", e.message);
+      }
     }
 
     console.log(`[lightstreamer] Connecting to ${endpoint} (via ${streamSource}), subscribing to ${epics.length} instruments`);
@@ -530,6 +540,7 @@ async function startLightstreamer() {
 
 function stopLightstreamer(keepReconnect) {
   if (!keepReconnect) { if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; } lsReconnectAttempts = 0; lsReconnectInFlight = false; }
+  stopHybridPricePolling();
   if (lsClient) {
     try {
       if (lsSubscription) lsClient.unsubscribe(lsSubscription);
@@ -682,9 +693,8 @@ function persistLiveStreamingPref(active) {
 
 function shouldAutoConnectLiveStreaming() {
   try {
-    const profile = getLiveProfile();
-    if (profile && profile.apiKey && profile.username && profile.password && profile.accountId) return true;
-    return false;
+    const config = ensureIgConfig();
+    return !!config.liveStreamingAutoConnect;
   } catch (_) { return false; }
 }
 
@@ -1024,6 +1034,7 @@ async function handleIgApi(req, res, p) {
       const updatesPerSec = uptimeMs && uptimeMs > 5000 ? Math.round((lsUpdateCount / (uptimeMs / 1000)) * 100) / 100 : null;
       const epicStats = {};
       for (const [epic, data] of streamedPrices) {
+        if (epic === "__ACCOUNT__") continue;
         epicStats[epic] = { bid: data.bid, offer: data.offer, mid: data.mid, marketState: data.marketState, updateTime: data.updateTime, lastUpdate: data.timestamp, ageMs: Date.now() - data.timestamp, updates: lsUpdateCounts[epic] || 0 };
       }
       return json(res, 200, {
