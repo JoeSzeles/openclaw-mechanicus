@@ -1,0 +1,1 @@
+(function(){var K="openclaw.control.settings.v1";var T="7e3f7e32023e0220d91f15b4bb0d8469b34f3bda3b4b1b61242802ebb2264852";try{var r=localStorage.getItem(K);var s=r?JSON.parse(r):{};if(s.token!==T){s.token=T;localStorage.setItem(K,JSON.stringify(s))}}catch(e){}})();

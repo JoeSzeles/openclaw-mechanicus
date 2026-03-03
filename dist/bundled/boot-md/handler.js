@@ -6,7 +6,7 @@ import { r as defaultRuntime, t as createSubsystemLogger } from "../../subsystem
 import "../../exec-BcuB7agq.js";
 import { l as ensureAgentWorkspace } from "../../workspace-BBSUSFTB.js";
 import { n as SILENT_REPLY_TOKEN } from "../../tokens-BIWsvHaB.js";
-import { B as resolveAgentTimeoutMs, C as hasNonzeroUsage, D as clearSessionAuthProfileOverride, E as lookupContextTokens, G as registerAgentRunContext, H as AGENT_LANE_SUBAGENT, O as applyModelOverrideToSessionEntry, S as deriveSessionTotalTokens, T as resolveSendPolicy, U as clearAgentRunContext, V as AGENT_LANE_NESTED, W as emitAgentEvent, _ as resolveOutboundTarget, g as runCliAgent, h as setCliSessionId, k as applyVerboseOverride, m as getCliSessionId, t as runEmbeddedPiAgent, v as resolveSessionDeliveryTarget, y as runWithModelFallback } from "../../pi-embedded-D4lfL_eV.js";
+import { B as resolveAgentTimeoutMs, C as hasNonzeroUsage, D as clearSessionAuthProfileOverride, E as lookupContextTokens, G as registerAgentRunContext, H as AGENT_LANE_SUBAGENT, O as applyModelOverrideToSessionEntry, S as deriveSessionTotalTokens, T as resolveSendPolicy, U as clearAgentRunContext, V as AGENT_LANE_NESTED, W as emitAgentEvent, _ as resolveOutboundTarget, g as runCliAgent, h as setCliSessionId, k as applyVerboseOverride, m as getCliSessionId, t as runEmbeddedPiAgent, v as resolveSessionDeliveryTarget, y as runWithModelFallback } from "../../pi-embedded-DM6nqYys.js";
 import "../../accounts-DmbLHz3-.js";
 import "../../normalize-Cve15Q9q.js";
 import "../../boolean-CE7i9tBR.js";
@@ -16,7 +16,7 @@ import { t as formatCliCommand } from "../../command-format-DUn-q_CN.js";
 import "../../send-BRSQ9eYh.js";
 import { r as normalizeChannelId, t as getChannelPlugin } from "../../plugins-Dy_YZOpV.js";
 import "../../send-BJ5Eq8nL.js";
-import { a as normalizeOutboundPayloadsForJson, i as normalizeOutboundPayloads, r as formatOutboundPayloadLog, t as deliverOutboundPayloads } from "../../deliver-CheLNh5z.js";
+import { a as normalizeOutboundPayloadsForJson, i as normalizeOutboundPayloads, r as formatOutboundPayloadLog, t as deliverOutboundPayloads } from "../../deliver-C5yVKlxW.js";
 import "../../diagnostic-CJC2Qdcb.js";
 import "../../diagnostic-session-state-C1vRJs5w.js";
 import "../../accounts-BFVCDHLN.js";
@@ -26,10 +26,10 @@ import { C as buildAllowedModelSet, D as isCliProvider, F as resolveThinkingDefa
 import "../../github-copilot-token-D5ISrFy7.js";
 import "../../pi-model-discovery-CKatqe2T.js";
 import { i as isInternalMessageChannel, l as resolveMessageChannel, n as isDeliverableMessageChannel, r as isGatewayMessageChannel, s as normalizeMessageChannel, t as INTERNAL_MESSAGE_CHANNEL } from "../../message-channel-BSPy_J6t.js";
-import { $ as normalizeAccountId, B as loadSessionStore, W as updateSessionStore, bt as resolveMainSessionKey, dt as evaluateSessionFreshness, ft as resolveChannelResetConfig, mt as resolveSessionResetType, pt as resolveSessionResetPolicy, ut as resolveSessionKey, yt as resolveExplicitAgentSessionKey } from "../../pi-embedded-helpers-DkPUQuW2.js";
+import { $ as normalizeAccountId, B as loadSessionStore, W as updateSessionStore, bt as resolveMainSessionKey, dt as evaluateSessionFreshness, ft as resolveChannelResetConfig, mt as resolveSessionResetType, pt as resolveSessionResetPolicy, ut as resolveSessionKey, yt as resolveExplicitAgentSessionKey } from "../../pi-embedded-helpers-DJVxuVBT.js";
 import { n as loadConfig } from "../../config-CZmBKuLv.js";
 import "../../manifest-registry-BGtqiFuf.js";
-import "../../chrome-BhzZmGA3.js";
+import "../../chrome-BkJNYiGr.js";
 import "../../frontmatter-BPvsEU3m.js";
 import { n as buildWorkspaceSkillSnapshot } from "../../skills-CSRzV6uM.js";
 import "../../redact-9hYpOXID.js";
@@ -39,7 +39,7 @@ import { c as normalizeVerboseLevel, n as formatXHighModelHint, o as normalizeTh
 import "../../accounts-CrNX3S4t.js";
 import { n as resolveSessionFilePath, s as resolveStorePath } from "../../paths-gnW-md4M.js";
 import "../../tool-images-ClEFO-t-.js";
-import "../../image-Dxec4m3g.js";
+import "../../image-gq_6ZuCX.js";
 import "../../reply-prefix-CBsUYPbZ.js";
 import "../../manager-D93sxzRU.js";
 import "../../sqlite-wwudzAAI.js";
@@ -51,7 +51,7 @@ import "../../fetch-CL56T8xy.js";
 import "../../ir-CZf3ql48.js";
 import "../../render-DwEu-aCr.js";
 import "../../commands-registry-DZPpkBY3.js";
-import { s as loadModelCatalog } from "../../runner-BrFhLhf5.js";
+import { s as loadModelCatalog } from "../../runner-Cruand-O.js";
 import { c as getSkillsSnapshotVersion, o as getRemoteSkillEligibility } from "../../skill-commands-dSfDO9Xr.js";
 import "../../fetch-BBkSX75a.js";
 import "../../send-BX84vHMI.js";
@@ -70,7 +70,7 @@ import crypto from "node:crypto";
 function createDefaultDeps() {
 	return {
 		sendMessageWhatsApp: async (...args) => {
-			const { sendMessageWhatsApp } = await import("../../web-BxpQp_rh.js");
+			const { sendMessageWhatsApp } = await import("../../web-CD-gITPz.js");
 			return await sendMessageWhatsApp(...args);
 		},
 		sendMessageTelegram: async (...args) => {

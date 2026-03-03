@@ -46,6 +46,10 @@ function which(cmd) {
 }
 
 function resolveRunner() {
+  const npm = which("npm");
+  if (npm) {
+    return { cmd: npm, kind: "npm" };
+  }
   const pnpm = which("pnpm");
   if (pnpm) {
     return { cmd: pnpm, kind: "pnpm" };
@@ -168,7 +172,7 @@ export function main(argv = process.argv.slice(2)) {
 
   const runner = resolveRunner();
   if (!runner) {
-    process.stderr.write("Missing UI runner: install pnpm, then retry.\n");
+    process.stderr.write("Missing UI runner: install npm or pnpm, then retry.\n");
     process.exit(1);
   }
 
