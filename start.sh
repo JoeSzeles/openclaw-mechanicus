@@ -38,6 +38,26 @@ if [ ! -f "$PERSISTENT_DIR/openclaw.json" ]; then
   cp /home/runner/workspace/openclaw.json "$PERSISTENT_DIR/openclaw.json"
 fi
 
+# Ensure published origin is in persistent config allowedOrigins
+PUBLISHED_ORIGIN="https://openclaw-mechanicus.replit.app"
+if [ -f "$PERSISTENT_DIR/openclaw.json" ] && ! grep -q "$PUBLISHED_ORIGIN" "$PERSISTENT_DIR/openclaw.json" 2>/dev/null; then
+  node -e "
+    const fs = require('fs');
+    const f = '$PERSISTENT_DIR/openclaw.json';
+    try {
+      const c = JSON.parse(fs.readFileSync(f, 'utf8'));
+      if (!c.gateway) c.gateway = {};
+      if (!c.gateway.controlUi) c.gateway.controlUi = {};
+      if (!c.gateway.controlUi.allowedOrigins) c.gateway.controlUi.allowedOrigins = [];
+      if (!c.gateway.controlUi.allowedOrigins.includes('$PUBLISHED_ORIGIN')) {
+        c.gateway.controlUi.allowedOrigins.unshift('$PUBLISHED_ORIGIN');
+        fs.writeFileSync(f, JSON.stringify(c, null, 2));
+        console.log('[start] Added published origin to persistent config');
+      }
+    } catch(e) { console.log('[start] Config origin patch skipped:', e.message); }
+  "
+fi
+
 # Export gateway port for internal use  
 export OPENCLAW_GATEWAY_PORT=5001
 
