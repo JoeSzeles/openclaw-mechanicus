@@ -213,65 +213,9 @@ let lsUpdateIntervals = [];
 let lsReconnectTimer = null;
 let lsReconnectAttempts = 0;
 let lsReconnectInFlight = false;
-let lsHybridPollingTimer = null;
 const LS_MAX_RECONNECT_ATTEMPTS = 20;
 const LS_RECONNECT_BASE_DELAY = 5000;
 const LS_RECONNECT_MAX_DELAY = 120000;
-
-function startHybridPricePolling() {
-  if (lsHybridPollingTimer) return;
-  console.log("[lightstreamer] Starting Hybrid Price Polling for L1-restricted account");
-  lsHybridPollingTimer = setInterval(async () => {
-    const epics = collectInstrumentEpics();
-    if (epics.length === 0) return;
-    try {
-      const session = await igAuth();
-      // Poll in chunks of 20 to avoid URL length issues
-      for (let i = 0; i < epics.length; i += 20) {
-        const chunk = epics.slice(i, i + 20);
-        const url = `/markets?epics=${chunk.join(",")}`;
-        const r = await igRequest("GET", url, { ...igHeaders(session), Version: "2" });
-        if (r.status === 200) {
-          const data = JSON.parse(r.body);
-          if (data && data.marketDetails) {
-            data.marketDetails.forEach(m => {
-              const epic = m.instrument.epic;
-              const snapshot = m.snapshot;
-              if (!snapshot) return;
-              const now = Date.now();
-              const bid = snapshot.bid;
-              const offer = snapshot.offer;
-              const mid = (bid && offer) ? (bid + offer) / 2 : null;
-              streamedPrices.set(epic, {
-                bid, offer, mid,
-                high: snapshot.high,
-                low: snapshot.low,
-                marketState: snapshot.marketStatus,
-                updateTime: snapshot.updateTime,
-                timestamp: now,
-                isPolled: true
-              });
-              lsUpdateCount++;
-              lsUpdateCounts[epic] = (lsUpdateCounts[epic] || 0) + 1;
-              lsLastUpdateTs = now;
-              try { scalperEngine.processTick(epic, { bid, offer, mid, spread: (offer && bid) ? offer - bid : 0, timestamp: now }); } catch (_) {}
-            });
-          }
-        }
-      }
-    } catch (e) {
-      console.error("[lightstreamer] Hybrid polling error:", e.message);
-    }
-  }, 2000); // 2 second polling for "real-time" feel without L1
-}
-
-function stopHybridPricePolling() {
-  if (lsHybridPollingTimer) {
-    clearInterval(lsHybridPollingTimer);
-    lsHybridPollingTimer = null;
-    console.log("[lightstreamer] Stopped Hybrid Price Polling");
-  }
-}
 
 function scheduleLsReconnect(reason) {
   if (lsReconnectTimer) clearTimeout(lsReconnectTimer);
