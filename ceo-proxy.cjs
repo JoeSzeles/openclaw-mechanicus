@@ -307,15 +307,36 @@ function collectInstrumentEpics() {
 }
 
 async function startLightstreamer() {
-  if (!lsLiveActive && !igConfigured()) { lsStatus = "not_configured"; return; }
+  const liveProfile = getLiveProfile();
+  const hasLiveCreds = !!(liveProfile && liveProfile.apiKey && liveProfile.username && liveProfile.password && liveProfile.accountId);
+  if (!hasLiveCreds && !lsLiveActive && !igConfigured()) { lsStatus = "not_configured"; return; }
   try {
     const { LightstreamerClient, Subscription } = require("lightstreamer-client-node");
     let session, endpoint, accountId, streamSource;
     if (lsLiveActive && lsLiveSession.cst && lsLiveSession.lightstreamerEndpoint) {
       session = { cst: lsLiveSession.cst, xst: lsLiveSession.xst };
       endpoint = lsLiveSession.lightstreamerEndpoint;
-      accountId = lsLiveSession.accountId || (getLiveProfile() ? getLiveProfile().accountId : null);
+      accountId = lsLiveSession.accountId || (liveProfile ? liveProfile.accountId : null);
       streamSource = "live";
+    } else if (hasLiveCreds) {
+      console.log("[lightstreamer] Live credentials available — using live profile for streaming");
+      try {
+        await liveStreamingLogin();
+        lsLiveActive = true;
+        persistLiveStreamingPref(true);
+        session = { cst: lsLiveSession.cst, xst: lsLiveSession.xst };
+        endpoint = lsLiveSession.lightstreamerEndpoint;
+        accountId = lsLiveSession.accountId || liveProfile.accountId;
+        streamSource = "live";
+        scheduleLiveStreamingRefresh();
+      } catch (e) {
+        console.log("[lightstreamer] Live login failed:", e.message, "— falling back to active profile");
+        session = await igAuth();
+        endpoint = igSession.lightstreamerEndpoint;
+        const activeProfile = getActiveIgProfile();
+        accountId = activeProfile ? activeProfile.accountId : null;
+        streamSource = activeProfile ? activeProfile.profileName : "unknown";
+      }
     } else {
       session = await igAuth();
       endpoint = igSession.lightstreamerEndpoint;
@@ -385,57 +406,92 @@ async function startLightstreamer() {
       return;
     }
 
-    const items = epics.map(e => `L1:${e}`);
     const fields = ["BID", "OFFER", "HIGH", "LOW", "MID_OPEN", "MARKET_STATE", "UPDATE_TIME"];
-    const sub = new Subscription("MERGE", items, fields);
-    sub.setRequestedSnapshot("yes");
-    sub.addListener({
-      onSubscription: () => {
-        console.log(`[lightstreamer] Subscribed to ${epics.length} instruments via ${streamSource}`);
-        lsConnectedEpics = epics;
-      },
-      onSubscriptionError: (code, msg) => {
-        console.error(`[lightstreamer] Subscription error: ${code} ${msg} | source=${streamSource} items=${JSON.stringify(items)}`);
-        if (msg && msg.includes("Invalid account type")) {
-          console.log("[lightstreamer] L1 market data not available for this account type. Account-level streaming may still work.");
-          if (lsStatus !== "connected") lsStatus = "unsupported";
-        }
-      },
-      onItemUpdate: (info) => {
-        const epicFull = info.getItemName();
-        const epic = epicFull.includes(":") ? epicFull.split(":").slice(1).join(":") : epicFull;
-        const bid = parseFloat(info.getValue("BID")) || null;
-        const offer = parseFloat(info.getValue("OFFER")) || null;
-        const mid = (bid && offer) ? (bid + offer) / 2 : null;
-        const now = Date.now();
-        streamedPrices.set(epic, {
-          bid, offer, mid,
-          high: parseFloat(info.getValue("HIGH")) || null,
-          low: parseFloat(info.getValue("LOW")) || null,
-          midOpen: parseFloat(info.getValue("MID_OPEN")) || null,
-          marketState: info.getValue("MARKET_STATE") || null,
-          updateTime: info.getValue("UPDATE_TIME") || null,
-          timestamp: now
-        });
-        lsUpdateCount++;
-        lsUpdateCounts[epic] = (lsUpdateCounts[epic] || 0) + 1;
-        if (lsLastUpdateTs > 0) {
-          lsUpdateIntervals.push(now - lsLastUpdateTs);
-          if (lsUpdateIntervals.length > 200) lsUpdateIntervals = lsUpdateIntervals.slice(-100);
-        }
-        lsLastUpdateTs = now;
-        try { scalperEngine.processTick(epic, { bid, offer, mid, spread: (offer && bid) ? offer - bid : 0, timestamp: now }); } catch (_) {}
-      },
-      onUnsubscription: () => {
-        console.log("[lightstreamer] Unsubscribed");
-        lsConnectedEpics = [];
-      },
-      onCommandSecondLevelSubscriptionError: (code, msg) => {
-        console.error(`[lightstreamer] 2nd level error: ${code} ${msg}`);
+    const chartFields = ["BID_OPEN", "BID_HIGH", "BID_LOW", "BID_CLOSE", "OFR_OPEN", "OFR_HIGH", "OFR_LOW", "OFR_CLOSE", "UTM"];
+    const prefixesToTry = ["L1", "MARKET", "CHART_TICK"];
+
+    function handleItemUpdate(info) {
+      const epicFull = info.getItemName();
+      let epic = epicFull;
+      if (epic.startsWith("CHART:") && epic.endsWith(":TICK")) {
+        epic = epic.slice(6, -5);
+      } else if (epic.startsWith("CHART:")) {
+        epic = epic.replace(/^CHART:/, "").replace(/:(?:TICK|1MINUTE|5MINUTE|HOUR|DAY)$/, "");
+      } else if (epic.includes(":")) {
+        epic = epic.split(":").slice(1).join(":");
       }
-    });
-    client.subscribe(sub);
-    lsSubscription = sub;
+      let bid, offer;
+      if (epicFull.startsWith("CHART:")) {
+        bid = parseFloat(info.getValue("BID_CLOSE")) || null;
+        const ofrClose = parseFloat(info.getValue("OFR_CLOSE")) || null;
+        offer = ofrClose;
+      } else {
+        bid = parseFloat(info.getValue("BID")) || null;
+        offer = parseFloat(info.getValue("OFFER")) || null;
+      }
+      const mid = (bid && offer) ? (bid + offer) / 2 : null;
+      const now = Date.now();
+      streamedPrices.set(epic, {
+        bid, offer, mid,
+        high: epicFull.startsWith("CHART:") ? (parseFloat(info.getValue("BID_HIGH")) || null) : (parseFloat(info.getValue("HIGH")) || null),
+        low: epicFull.startsWith("CHART:") ? (parseFloat(info.getValue("BID_LOW")) || null) : (parseFloat(info.getValue("LOW")) || null),
+        midOpen: epicFull.startsWith("CHART:") ? (parseFloat(info.getValue("BID_OPEN")) || null) : (parseFloat(info.getValue("MID_OPEN")) || null),
+        marketState: epicFull.startsWith("CHART:") ? "TRADEABLE" : (info.getValue("MARKET_STATE") || null),
+        updateTime: epicFull.startsWith("CHART:") ? (info.getValue("UTM") || null) : (info.getValue("UPDATE_TIME") || null),
+        timestamp: now
+      });
+      lsUpdateCount++;
+      lsUpdateCounts[epic] = (lsUpdateCounts[epic] || 0) + 1;
+      if (lsLastUpdateTs > 0) {
+        lsUpdateIntervals.push(now - lsLastUpdateTs);
+        if (lsUpdateIntervals.length > 200) lsUpdateIntervals = lsUpdateIntervals.slice(-100);
+      }
+      lsLastUpdateTs = now;
+      try { scalperEngine.processTick(epic, { bid, offer, mid, spread: (offer && bid) ? offer - bid : 0, timestamp: now }); } catch (_) {}
+    }
+
+    function handleUnsubscription() {
+      console.log("[lightstreamer] Unsubscribed");
+      lsConnectedEpics = [];
+    }
+
+    let attemptIndex = 0;
+    function trySubscription() {
+      if (attemptIndex >= prefixesToTry.length) {
+        console.error("[lightstreamer] All subscription prefixes failed. L1/MARKET/CHART all rejected.");
+        if (lsStatus !== "connected") lsStatus = "unsupported";
+        return;
+      }
+      const prefix = prefixesToTry[attemptIndex];
+      const isChart = prefix === "CHART_TICK";
+      const items = isChart ? epics.map(e => `CHART:${e}:TICK`) : epics.map(e => `${prefix}:${e}`);
+      const subFields = isChart ? chartFields : fields;
+      console.log(`[lightstreamer] Trying subscription with ${prefix}: prefix (attempt ${attemptIndex + 1}/${prefixesToTry.length})`);
+      const sub = new Subscription(isChart ? "DISTINCT" : "MERGE", items, subFields);
+      if (!isChart) sub.setRequestedSnapshot("yes");
+      sub.addListener({
+        onSubscription: () => {
+          console.log(`[lightstreamer] Subscribed to ${epics.length} instruments via ${streamSource} (${prefix}:)`);
+          lsConnectedEpics = epics;
+        },
+        onSubscriptionError: (code, msg) => {
+          console.error(`[lightstreamer] Subscription error with ${prefix}: ${code} ${msg}`);
+          attemptIndex++;
+          trySubscription();
+        },
+        onItemUpdate: handleItemUpdate,
+        onUnsubscription: handleUnsubscription,
+        onCommandSecondLevelSubscriptionError: (code, msg) => {
+          console.error(`[lightstreamer] 2nd level error: ${code} ${msg}`);
+        }
+      });
+      try { client.subscribe(sub); lsSubscription = sub; } catch(e) {
+        console.error(`[lightstreamer] Subscribe call failed for ${prefix}:`, e.message);
+        attemptIndex++;
+        trySubscription();
+      }
+    }
+    trySubscription();
 
     if (streamSource === "live" && accountId) {
       const acctSub = new Subscription("MERGE", [`ACCOUNT:${accountId}`], ["DEPOSIT", "PNL", "AVAILABLE_CASH", "FUNDS", "MARGIN", "EQUITY"]);
@@ -518,12 +574,47 @@ async function liveStreamingLogin() {
   const cst = res.headers["cst"] || res.headers["CST"];
   const xst = res.headers["x-security-token"] || res.headers["X-SECURITY-TOKEN"];
   if (!cst || !xst) throw new Error("Live auth missing tokens");
-  let lsEndpoint = null;
   let sessionBody = {};
-  try { sessionBody = JSON.parse(res.body); lsEndpoint = sessionBody.lightstreamerEndpoint || null; } catch (_) {}
+  try { sessionBody = JSON.parse(res.body); } catch (_) {}
+  let lsEndpoint = sessionBody.lightstreamerEndpoint || null;
   if (!lsEndpoint) throw new Error("Live account did not return a Lightstreamer endpoint");
-  lsLiveSession = { cst, xst, ts: Date.now(), lightstreamerEndpoint: lsEndpoint, accountType: sessionBody.accountType || null, accountId: sessionBody.currentAccountId || profile.accountId };
-  console.log("[live-streaming] Authenticated successfully, endpoint:", lsEndpoint, "accountType:", sessionBody.accountType, "accountId:", sessionBody.currentAccountId);
+  let accountType = sessionBody.accountType || "CFD";
+  let accountId = sessionBody.currentAccountId || profile.accountId;
+  try {
+    const acctRes = await igRequest("GET", "/accounts", {
+      "X-IG-API-KEY": profile.apiKey,
+      CST: cst,
+      "X-SECURITY-TOKEN": xst,
+      Version: "1",
+    }, null, profile.baseUrl);
+    if (acctRes.status === 200) {
+      const acctBody = JSON.parse(acctRes.body);
+      const accounts = acctBody.accounts || [];
+      console.log("[live-streaming] Available accounts:", accounts.map(a => `${a.accountId}(${a.accountType}/${a.status})`).join(", "));
+      const spreadbetAccount = accounts.find(a => a.accountType === "SPREADBET" && a.status === "ENABLED");
+      if (spreadbetAccount && spreadbetAccount.accountId !== accountId) {
+        console.log(`[live-streaming] Switching to spreadbet account ${spreadbetAccount.accountId} for L1 market data streaming`);
+        const switchRes = await igRequest("PUT", "/session", {
+          "Content-Type": "application/json; charset=UTF-8",
+          Accept: "application/json; charset=UTF-8",
+          "X-IG-API-KEY": profile.apiKey,
+          CST: cst, "X-SECURITY-TOKEN": xst,
+          Version: "1",
+        }, JSON.stringify({ accountId: spreadbetAccount.accountId }), profile.baseUrl);
+        if (switchRes.status === 200) {
+          console.log("[live-streaming] Switched to spreadbet account successfully");
+          accountId = spreadbetAccount.accountId;
+          accountType = "SPREADBET";
+        } else {
+          console.log("[live-streaming] Account switch failed:", switchRes.status);
+        }
+      }
+    }
+  } catch (e) {
+    console.log("[live-streaming] Accounts lookup failed:", e.message);
+  }
+  lsLiveSession = { cst, xst, ts: Date.now(), lightstreamerEndpoint: lsEndpoint, accountType, accountId };
+  console.log("[live-streaming] Authenticated successfully, endpoint:", lsEndpoint, "accountType:", accountType, "accountId:", accountId);
   return { cst, xst, lightstreamerEndpoint: lsEndpoint };
 }
 
@@ -591,8 +682,9 @@ function persistLiveStreamingPref(active) {
 
 function shouldAutoConnectLiveStreaming() {
   try {
-    const config = ensureIgConfig();
-    return !!config.liveStreamingAutoConnect;
+    const profile = getLiveProfile();
+    if (profile && profile.apiKey && profile.username && profile.password && profile.accountId) return true;
+    return false;
   } catch (_) { return false; }
 }
 
