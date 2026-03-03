@@ -31,6 +31,9 @@ export OPENAI_BASE_URL="${AI_INTEGRATIONS_OPENAI_BASE_URL}"
 # Data stored in /home/runner/workspace/.openclaw/ (persistent storage)
 export OPENCLAW_HOME="/home/runner/workspace"
 
+# Ensure docs/templates are reachable from gateway fallback path
+ln -sf /home/runner/workspace/docs /home/runner/docs 2>/dev/null
+
 # Seed config if not present yet
 PERSISTENT_DIR="/home/runner/workspace/.openclaw"
 mkdir -p "$PERSISTENT_DIR"

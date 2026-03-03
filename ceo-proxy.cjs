@@ -218,12 +218,19 @@ const LS_RECONNECT_BASE_DELAY = 5000;
 const LS_RECONNECT_MAX_DELAY = 120000;
 let lsHybridPollingTimer = null;
 
+let hybridPollErrorCount = 0;
 function startHybridPricePolling() {
   if (lsHybridPollingTimer) return;
+  hybridPollErrorCount = 0;
   console.log("[lightstreamer] Starting hybrid price polling (L1 unavailable for CFD account)");
-  lsHybridPollingTimer = setInterval(async () => {
+  function scheduleNext() {
+    const delay = hybridPollErrorCount > 0 ? Math.min(30000, 5000 * hybridPollErrorCount) : 3000;
+    lsHybridPollingTimer = setTimeout(pollOnce, delay);
+  }
+  async function pollOnce() {
+    if (!lsHybridPollingTimer) return;
     const epics = collectInstrumentEpics();
-    if (epics.length === 0) return;
+    if (epics.length === 0) { scheduleNext(); return; }
     try {
       const session = await igAuth();
       for (let i = 0; i < epics.length; i += 20) {
@@ -256,17 +263,23 @@ function startHybridPricePolling() {
               try { scalperEngine.processTick(epic, { bid, offer, mid, spread: (offer && bid) ? offer - bid : 0, timestamp: now }); } catch (_) {}
             });
           }
+          hybridPollErrorCount = 0;
+        } else if (r.status === 403 || r.status === 401) {
+          hybridPollErrorCount++;
         }
       }
     } catch (e) {
-      console.error("[lightstreamer] Hybrid polling error:", e.message);
+      hybridPollErrorCount++;
+      if (hybridPollErrorCount <= 3) console.error("[lightstreamer] Hybrid polling error:", e.message);
     }
-  }, 2000);
+    scheduleNext();
+  }
+  scheduleNext();
 }
 
 function stopHybridPricePolling() {
   if (lsHybridPollingTimer) {
-    clearInterval(lsHybridPollingTimer);
+    clearTimeout(lsHybridPollingTimer);
     lsHybridPollingTimer = null;
     console.log("[lightstreamer] Stopped hybrid price polling");
   }
