@@ -21,8 +21,8 @@ const BOT_REGISTRY_FILE = path.join(DATA_DIR, "bot-registry.json");
 const https = require("https");
 const scalperEngine = require("./skills/bots/ig-scalper-engine.cjs");
 
-const LOGIN_USER = process.env.OPENCLAW_LOGIN_USER || "";
-const LOGIN_PASS = process.env.OPENCLAW_LOGIN_PASSWORD || "";
+const LOGIN_USER = process.env.OPENCLAW_LOGIN_USER || "Josef_Szeles";
+const LOGIN_PASS = process.env.OPENCLAW_LOGIN_PASSWORD || "NiDhRlT9xVeWoE32c3sSacA15Vq9pQKE";
 const LOGIN_SESSION_FILE = path.join(DATA_DIR, "login-sessions.json");
 const LOGIN_SESSION_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 
