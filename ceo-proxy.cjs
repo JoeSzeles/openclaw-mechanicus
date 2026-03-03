@@ -3184,11 +3184,9 @@ async function handleApi(req, res) {
 }
 
 const LOADING_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>OpenClaw Cloud</title>
-<meta http-equiv="refresh" content="3">
 <style>body{background:#1a1a2e;color:#e0e0e0;font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
-.c{text-align:center}.s{font-size:48px;animation:spin 1s linear infinite;display:inline-block}
-@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style></head>
-<body><div class="c"><div class="s">🦞</div><h2>OpenClaw Gateway Starting...</h2><p>This page will auto-refresh in a few seconds.</p></div></body></html>`;
+.c{text-align:center}h2{margin-bottom:8px}</style></head>
+<body><div class="c"><h2>OpenClaw Cloud</h2><p style="color:#8b949e">Gateway is starting up. <a href="/" style="color:#58a6ff">Reload</a></p></div></body></html>`;
 
 function proxyReq(req, res, retries = 3) {
   const opts = {
