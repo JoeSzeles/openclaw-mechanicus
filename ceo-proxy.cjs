@@ -46,6 +46,10 @@ function createLoginSession() {
 }
 function validateLoginSession(req) {
   if (!LOGIN_USER || !LOGIN_PASS) return true;
+  // Trust localhost/loopback requests (from agents or bots on same machine)
+  const remote = req.socket.remoteAddress;
+  if (remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1") return true;
+
   const cookies = (req.headers.cookie || "").split(";").map(c => c.trim());
   for (const c of cookies) {
     if (c.startsWith("openclaw_session=")) {
