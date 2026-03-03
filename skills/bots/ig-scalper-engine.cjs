@@ -398,6 +398,19 @@ async function evaluateEntry(strat, epic, ticks) {
   }
 }
 
+async function fetchContractSize(epic) {
+  try {
+    const data = await proxyGet("/api/ig/markets/" + epic);
+    if (data && data.instrument && data.instrument.contractSize) {
+      return parseFloat(data.instrument.contractSize) || 1;
+    }
+    if (data && data.snapshot && data.snapshot.scalingFactor) {
+      return parseFloat(data.snapshot.scalingFactor) || 1;
+    }
+  } catch (_) {}
+  return 1;
+}
+
 async function openScalperTrade(strat, stratIdx, epic, direction, size, stopDist, limitDist, tick, momentum, htfBias) {
   const body = {
     epic,
@@ -416,6 +429,8 @@ async function openScalperTrade(strat, stratIdx, epic, direction, size, stopDist
     return;
   }
 
+  const contractSize = await fetchContractSize(epic);
+
   const conf = result.confirmation || result;
   if (conf && conf.dealStatus === "ACCEPTED") {
     const entry = conf.level || tick.mid;
@@ -425,9 +440,10 @@ async function openScalperTrade(strat, stratIdx, epic, direction, size, stopDist
       direction,
       size,
       entry,
+      contractSize,
       stopDistance: stopDist,
       limitDistance: limitDist,
-      riskAmount: stopDist * size,
+      riskAmount: stopDist * size * contractSize,
       openedAt: new Date().toISOString(),
       momentum: momentum.toFixed(4),
       htfBias: htfBias || "neutral",
@@ -500,9 +516,10 @@ async function checkPositions() {
           exitPrice = sp.direction === "BUY" ? (lt.bid || sp.entry) : (lt.offer || sp.entry);
         }
 
+        const cs = sp.contractSize || 1;
         const pnl = sp.direction === "BUY"
-          ? (exitPrice - sp.entry) * sp.size
-          : (sp.entry - exitPrice) * sp.size;
+          ? (exitPrice - sp.entry) * sp.size * cs
+          : (sp.entry - exitPrice) * sp.size * cs;
 
         sp.exitPrice = exitPrice;
         sp.pnl = pnl;
@@ -541,9 +558,14 @@ async function checkPositions() {
       const currentPrice = sp.direction === "BUY" ? (mkt.bid || 0) : (mkt.offer || 0);
       if (!currentPrice) continue;
 
+      if (!sp.contractSize && mkt.scalingFactor) {
+        sp.contractSize = parseFloat(mkt.scalingFactor) || 1;
+      }
+      const cs = sp.contractSize || 1;
+
       const unrealized = sp.direction === "BUY"
-        ? (currentPrice - sp.entry) * sp.size
-        : (sp.entry - currentPrice) * sp.size;
+        ? (currentPrice - sp.entry) * sp.size * cs
+        : (sp.entry - currentPrice) * sp.size * cs;
       sp.unrealizedPnl = Math.round(unrealized * 100) / 100;
 
       const profitTarget = config.profitTarget || 0;
@@ -775,7 +797,7 @@ function stop() {
 function getStatus() {
   loadConfig();
   const openPositions = scalperPositions.filter(p => p.status === "open");
-  const unrealizedPnl = 0;
+  const unrealizedPnl = openPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0);
   const uptimeMs = startedAt ? Date.now() - startedAt : 0;
   const winRate = (winCount + lossCount) > 0 ? Math.round((winCount / (winCount + lossCount)) * 100) : 0;
 
@@ -810,6 +832,7 @@ function getStatus() {
     accountBalance,
     accountMargin,
     strategies: config ? config.strategies : [],
+    allTrades: tradeLog,
     recentTrades: tradeLog.slice(-20).reverse()
   };
 }

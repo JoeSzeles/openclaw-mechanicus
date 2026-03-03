@@ -1894,6 +1894,14 @@ function writeConfigSnapshots() {
     if (fs.existsSync(botLog)) {
       fs.writeFileSync(path.join(CANVAS_DIR, "ig-bot-log-snapshot.json"), fs.readFileSync(botLog));
     }
+    const scalperTrades = path.join(DATA_DIR, "ig-scalper-trades.json");
+    if (fs.existsSync(scalperTrades)) {
+      fs.writeFileSync(path.join(CANVAS_DIR, "all-scalper-trades-data.json"), fs.readFileSync(scalperTrades));
+    }
+    const scalperConfig = path.join(DATA_DIR, "ig-scalper-config.json");
+    if (fs.existsSync(scalperConfig)) {
+      fs.writeFileSync(path.join(CANVAS_DIR, "ig-scalper-config-snapshot.json"), fs.readFileSync(scalperConfig));
+    }
     console.log("[ceo-proxy] Config snapshots written to canvas");
   } catch (e) {
     console.error("[ceo-proxy] Snapshot write error:", e.message);
