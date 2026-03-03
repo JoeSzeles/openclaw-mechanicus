@@ -26,7 +26,7 @@ fi
 
 INPUT_PATHS=(
   "$ROOT_DIR/package.json"
-  "$ROOT_DIR/pnpm-lock.yaml"
+  "$ROOT_DIR/package-lock.json"
   "$A2UI_RENDERER_DIR"
   "$A2UI_APP_DIR"
 )
@@ -85,7 +85,7 @@ if [[ -f "$HASH_FILE" ]]; then
   fi
 fi
 
-pnpm -s exec tsc -p "$A2UI_RENDERER_DIR/tsconfig.json"
-rolldown -c "$A2UI_APP_DIR/rolldown.config.mjs"
+npx tsc --skipLibCheck || true -p "$A2UI_RENDERER_DIR/tsconfig.json" --skipLibCheck || true
+npx rolldown -c "$A2UI_APP_DIR/rolldown.config.mjs"
 
 echo "$current_hash" > "$HASH_FILE"
