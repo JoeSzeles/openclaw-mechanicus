@@ -1,4 +1,5 @@
 #!/bin/bash
+echo "[start] Starting OpenClaw Cloud..."
 
 # Trap to support clean restarts
 trap 'kill -9 1' TERM INT

@@ -8,7 +8,7 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-OPENCLAW_GATEWAY_PORT = "5000"
+OPENCLAW_GATEWAY_PORT = "5001"
 OPENCLAW_SKIP_CHANNELS = "1"
 IG_API_KEY = "20849c0791ed15479752204f9632c949f742ddc5"
 IG_USERNAME = "Hoerbinator2"
