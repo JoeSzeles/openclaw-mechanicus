@@ -4,7 +4,7 @@ const fs = require('fs/promises');
 const path = require('path');
 
 const SHARED_PATH = '/home/runner/workspace/.openclaw/sharedspace/btc-ticks.jsonl';
-const LOG_PATH = '/home/runner/workspace/.openclaw/btc-receiver-log.json';
+const LOG_PATH = path.join(process.cwd(), '../../.openclaw/btc-receiver-log.json');
 const POLL_MS = 500;
 const MAX_TICKS = 100;
 
@@ -48,17 +48,5 @@ if (process.argv.includes('--test')) {
   process.exit(0);
 }
 
-async function ensureDirs() {
-  const sharedDir = path.dirname(SHARED_PATH);
-  const logDir = path.dirname(LOG_PATH);
-  await fs.mkdir(sharedDir, { recursive: true });
-  await fs.mkdir(logDir, { recursive: true });
-}
-
-ensureDirs().then(() => {
-  setInterval(loadTicks, POLL_MS);
-  console.log('Binance Receiver LIVE - polling SharedSpace btc-ticks.jsonl');
-}).catch(e => {
-  console.error('Binance Receiver failed to initialize:', e.message);
-  process.exit(1);
-});
+setInterval(loadTicks, POLL_MS);
+console.log('Binance Receiver LIVE - polling SharedSpace btc-ticks.jsonl');

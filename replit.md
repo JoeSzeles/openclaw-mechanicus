@@ -42,7 +42,7 @@ OpenClaw Cloud employs a "CEO Proxy + Gateway" architecture, where two component
 
 ### Technical Implementation Details:
 -   **Language**: TypeScript (Node.js >= 22.12.0)
--   **Package Manager**: npm (10.2.3)
+-   **Package Manager**: pnpm (10.23.0)
 -   **Build Tool**: tsdown
 -   **UI**: Vite-based Lit web components.
 

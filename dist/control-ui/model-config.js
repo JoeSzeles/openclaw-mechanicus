@@ -211,8 +211,6 @@ function renderStreamingStatus(streaming) {
   if (streaming.status === 'connected') {
     if (isLive) html += ' <span class="badge" style="background:#1a7f37;color:#fff;font-weight:600">LIVE STREAMING</span>';
     else html += ' <span class="badge badge-primary">STREAMING</span>';
-  } else if (streaming.status === 'reconnecting' || streaming.reconnectPending) {
-    html += ' <span class="badge badge-warn">RECONNECTING' + (streaming.reconnectAttempts ? ' (' + streaming.reconnectAttempts + ')' : '') + '</span>';
   } else {
     html += ' <span class="badge badge-warn">POLLING</span>';
   }
@@ -224,18 +222,11 @@ function renderStreamingStatus(streaming) {
   html += '<div class="streaming-stat">Price updates: <strong>' + (streaming.priceCount || 0) + '</strong></div>';
   html += '</div>';
 
-  if (streaming.reconnectAttempts > 0 && streaming.status !== 'connected') {
-    html += '<div style="margin-top:8px;font-size:12px;color:#d29922">Reconnect attempt ' + streaming.reconnectAttempts + (streaming.reconnectPending ? ' (pending)' : '') + '</div>';
-  }
-
-  html += '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+  html += '<div style="margin-top:12px;display:flex;gap:8px;align-items:center">';
   if (isLive) {
     html += '<button id="liveStreamBtn" class="btn btn-sm" style="background:#da3633;border-color:#da3633;color:#fff">Disconnect Live Streaming</button>';
   } else {
     html += '<button id="liveStreamBtn" class="btn btn-sm" style="background:#1a7f37;border-color:#1a7f37;color:#fff">Connect to Live Streaming</button>';
-  }
-  if (streaming.status !== 'connected') {
-    html += '<button id="forceReconnectBtn" class="btn btn-sm" style="background:#1f6feb;border-color:#1f6feb;color:#fff">Force Reconnect</button>';
   }
   html += '</div>';
 
@@ -252,16 +243,6 @@ function renderStreamingStatus(streaming) {
     btn.addEventListener('click', function() {
       if (isLive) disconnectLiveStreaming();
       else connectLiveStreaming();
-    });
-  }
-  var reconnBtn = document.getElementById('forceReconnectBtn');
-  if (reconnBtn) {
-    reconnBtn.addEventListener('click', function() {
-      reconnBtn.disabled = true;
-      reconnBtn.textContent = 'Reconnecting...';
-      fetch('/api/ig/session/refresh', { method: 'POST', headers: { 'Authorization': 'Bearer ' + (window.gatewayToken || '') } })
-        .then(function() { setTimeout(loadIgConfig, 2000); })
-        .catch(function() { setTimeout(loadIgConfig, 2000); });
     });
   }
 }
