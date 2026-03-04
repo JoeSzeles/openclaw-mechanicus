@@ -57,5 +57,5 @@ externalPort = 3002
 [deployment]
 deploymentTarget = "vm"
 run = ["bash", "/home/runner/workspace/start.sh"]
-build = ["bash", "-c", "cd /home/runner/workspace && npm install --omit=dev --prefer-offline --no-audit --no-fund"]
+build = ["bash", "-c", "cd /home/runner/workspace && npm install --omit=dev --legacy-peer-deps --no-audit --no-fund"]
 publicDir = "dist"

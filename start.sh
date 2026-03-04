@@ -15,7 +15,7 @@ fi
 # Ensure runtime dependencies are installed (fast if already present)
 if [ ! -d "node_modules/ws" ] || [ ! -d "node_modules/lightstreamer-client-node" ]; then
   echo "[start] Installing runtime dependencies..."
-  npm install --omit=dev --prefer-offline --no-audit --no-fund 2>&1 | tail -5
+  npm install --omit=dev --legacy-peer-deps --prefer-offline --no-audit --no-fund 2>&1 | tail -5
 fi
 
 TOKEN="${OPENCLAW_GATEWAY_TOKEN}"
