@@ -1,8 +1,16 @@
 #!/bin/bash
+set -e
 echo "[start] Starting OpenClaw Cloud..."
+echo "[start] CWD: $(pwd)"
+echo "[start] Node: $(node --version 2>/dev/null || echo 'NOT FOUND')"
+echo "[start] Date: $(date -u)"
 
-# Trap to support clean restarts
-trap 'kill -9 1' TERM INT
+cd /home/runner/workspace
+
+# Trap to support clean restarts (only in dev, not PID 1 in deployment)
+if [ "$$" != "1" ]; then
+  trap 'kill -9 1' TERM INT
+fi
 
 # Ensure runtime dependencies are installed (fast if already present)
 if [ ! -d "node_modules/ws" ] || [ ! -d "node_modules/lightstreamer-client-node" ]; then
@@ -29,7 +37,6 @@ export OPENAI_API_KEY="${AI_INTEGRATIONS_OPENAI_API_KEY}"
 export OPENAI_BASE_URL="${AI_INTEGRATIONS_OPENAI_BASE_URL}"
 
 # Use workspace as OPENCLAW_HOME so all data persists across restarts
-# Data stored in /home/runner/workspace/.openclaw/ (persistent storage)
 export OPENCLAW_HOME="/home/runner/workspace"
 
 # Ensure docs/templates are reachable from gateway fallback path
@@ -65,12 +72,18 @@ fi
 # Export gateway port for internal use  
 export OPENCLAW_GATEWAY_PORT=5001
 
-# Start CEO proxy on port 5000 (exposed port) in background
+echo "[start] Launching CEO proxy on port 5000..."
 node ceo-proxy.cjs &
 PROXY_PID=$!
 
-# Small delay to let proxy bind
-sleep 1
+# Wait for proxy to bind
+for i in $(seq 1 10); do
+  if node -e "const n=require('net');const c=n.createConnection(5000,'127.0.0.1');c.on('connect',()=>{c.end();process.exit(0)});c.on('error',()=>process.exit(1))" 2>/dev/null; then
+    echo "[start] CEO proxy ready on port 5000 (attempt $i)"
+    break
+  fi
+  sleep 1
+done
 
-# Start OpenClaw gateway on internal port 5001 (foreground)
+echo "[start] Launching OpenClaw gateway on port 5001..."
 exec node dist/entry.js gateway --bind loopback --port 5001 --allow-unconfigured
