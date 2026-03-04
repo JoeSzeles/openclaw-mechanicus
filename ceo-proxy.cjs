@@ -1944,57 +1944,97 @@ function writeConfigSnapshots() {
   }
 }
 
-function writeDashboardSnapshot() {
+let _demoAccountCache = null;
+let _demoAccountCacheTs = 0;
+
+async function fetchDemoAccountForSnapshot() {
+  if (_demoAccountCache && Date.now() - _demoAccountCacheTs < 60000) return _demoAccountCache;
   try {
-    if (!fs.existsSync(CANVAS_DIR)) fs.mkdirSync(CANVAS_DIR, { recursive: true });
-    const acct = streamedPrices.get("__ACCOUNT__") || {};
-    const prices = {};
-    for (const [epic, data] of streamedPrices) {
-      if (epic === "__ACCOUNT__") continue;
-      prices[epic] = { bid: data.bid, offer: data.offer, mid: data.mid, status: data.marketState, timestamp: data.timestamp };
+    const session = await igAuth();
+    const r = await igRequest("GET", "/accounts", igHeaders(session));
+    if (r.status === 200) {
+      const data = safeParseIgBody(r.body);
+      if (data && data.accounts) {
+        const ic = loadIgConfig();
+        const profileId = (ic && ic.activeProfile) || "demo";
+        const profiles = (ic && ic.profiles) || {};
+        const prof = profiles[profileId] || {};
+        const targetAccountId = prof.accountId || process.env.IG_ACCOUNT_ID || "Z3MJKY";
+        const acct = data.accounts.find(a => a.accountId === targetAccountId) || data.accounts[0];
+        if (acct) {
+          _demoAccountCache = {
+            accountId: acct.accountId,
+            accountName: acct.accountName,
+            accountType: acct.accountType,
+            currency: acct.currency,
+            balance: acct.balance ? acct.balance.balance : null,
+            available: acct.balance ? acct.balance.available : null,
+            deposit: acct.balance ? acct.balance.deposit : null,
+            profitLoss: acct.balance ? acct.balance.profitLoss : null,
+          };
+          _demoAccountCacheTs = Date.now();
+          return _demoAccountCache;
+        }
+      }
     }
-    let scalperStatus;
-    try { scalperStatus = scalperEngine.getStatus(); } catch (_) { scalperStatus = {}; }
-    let activeProfile = "unknown";
-    try { const ic = loadIgConfig(); activeProfile = (ic && ic.activeProfile) || "unknown"; } catch (_) {}
-    const snapshot = {
-      timestamp: new Date().toISOString(),
-      account: {
-        profile: activeProfile,
-        accountId: process.env.IG_ACCOUNT_ID || "Z3MJKY",
-        balance: acct.deposit || null,
-        available: acct.availableCash || null,
-        pnl: acct.pnl || null,
-        margin: acct.margin || null,
-        equity: acct.equity || null,
-        funds: acct.funds || null,
-      },
-      streaming: {
-        status: lsStatus,
-        method: lsConnectedEpics.length > 0 ? "LIGHTSTREAMER" : (lsHybridPollingTimer ? "REST_POLLING" : "DISCONNECTED"),
-        connectedEpics: lsConnectedEpics,
-        priceCount: streamedPrices.size - (streamedPrices.has("__ACCOUNT__") ? 1 : 0),
-      },
-      prices,
-      scalper: {
-        running: scalperStatus.running,
-        enabled: scalperStatus.enabled,
-        realizedPnl: scalperStatus.realizedPnl,
-        unrealizedPnl: scalperStatus.unrealizedPnl,
-        tradeCount: scalperStatus.tradeCount,
-        winCount: scalperStatus.winCount,
-        lossCount: scalperStatus.lossCount,
-        winRate: scalperStatus.winRate,
-        openPositions: scalperStatus.openPositions,
-        positions: scalperStatus.positions,
-        drawdownTripped: scalperStatus.drawdownTripped,
-        strategies: scalperStatus.strategies,
-      },
-    };
-    fs.writeFileSync(path.join(CANVAS_DIR, "ig-dashboard-snapshot.json"), JSON.stringify(snapshot, null, 2));
-  } catch (e) {
-    console.error("[ceo-proxy] Dashboard snapshot error:", e.message);
+  } catch (_) {}
+  return _demoAccountCache;
+}
+
+function writeDashboardSnapshot() {
+  writeDashboardSnapshotAsync().catch(e => console.error("[ceo-proxy] Dashboard snapshot error:", e.message));
+}
+
+async function writeDashboardSnapshotAsync() {
+  if (!fs.existsSync(CANVAS_DIR)) fs.mkdirSync(CANVAS_DIR, { recursive: true });
+  const prices = {};
+  for (const [epic, data] of streamedPrices) {
+    if (epic === "__ACCOUNT__") continue;
+    prices[epic] = { bid: data.bid, offer: data.offer, mid: data.mid, status: data.marketState, timestamp: data.timestamp };
   }
+  let scalperStatus;
+  try { scalperStatus = scalperEngine.getStatus(); } catch (_) { scalperStatus = {}; }
+  let activeProfile = "unknown";
+  try { const ic = loadIgConfig(); activeProfile = (ic && ic.activeProfile) || "unknown"; } catch (_) {}
+
+  const demoAcct = await fetchDemoAccountForSnapshot();
+
+  const snapshot = {
+    timestamp: new Date().toISOString(),
+    account: {
+      profile: activeProfile,
+      accountId: demoAcct ? demoAcct.accountId : (process.env.IG_ACCOUNT_ID || "Z3MJKY"),
+      accountType: demoAcct ? demoAcct.accountType : null,
+      currency: demoAcct ? demoAcct.currency : null,
+      balance: demoAcct ? demoAcct.balance : null,
+      available: demoAcct ? demoAcct.available : null,
+      deposit: demoAcct ? demoAcct.deposit : null,
+      pnl: demoAcct ? demoAcct.profitLoss : null,
+      source: "demo-rest-api",
+    },
+    streaming: {
+      status: lsStatus,
+      method: lsConnectedEpics.length > 0 ? "LIGHTSTREAMER" : (lsHybridPollingTimer ? "REST_POLLING" : "DISCONNECTED"),
+      connectedEpics: lsConnectedEpics,
+      priceCount: streamedPrices.size - (streamedPrices.has("__ACCOUNT__") ? 1 : 0),
+    },
+    prices,
+    scalper: {
+      running: scalperStatus.running,
+      enabled: scalperStatus.enabled,
+      realizedPnl: scalperStatus.realizedPnl,
+      unrealizedPnl: scalperStatus.unrealizedPnl,
+      tradeCount: scalperStatus.tradeCount,
+      winCount: scalperStatus.winCount,
+      lossCount: scalperStatus.lossCount,
+      winRate: scalperStatus.winRate,
+      openPositions: scalperStatus.openPositions,
+      positions: scalperStatus.positions,
+      drawdownTripped: scalperStatus.drawdownTripped,
+      strategies: scalperStatus.strategies,
+    },
+  };
+  fs.writeFileSync(path.join(CANVAS_DIR, "ig-dashboard-snapshot.json"), JSON.stringify(snapshot, null, 2));
 }
 
 // === Bot Process Manager ===
