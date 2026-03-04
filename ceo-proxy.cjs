@@ -48,9 +48,10 @@ function createLoginSession() {
 }
 function validateLoginSession(req) {
   if (!LOGIN_USER || !LOGIN_PASS) return true;
-  // Trust internal requests (from agents/bots on the same Replit server)
   const remote = req.socket.remoteAddress;
-  if (remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1") return true;
+  const forwarded = req.headers["x-forwarded-for"];
+  const isLocal = (remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1");
+  if (isLocal && !forwarded) return true;
 
   const cookies = (req.headers.cookie || "").split(";").map(c => c.trim());
   for (const c of cookies) {
