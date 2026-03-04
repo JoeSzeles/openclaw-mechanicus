@@ -57,5 +57,5 @@ externalPort = 3002
 [deployment]
 deploymentTarget = "vm"
 run = ["bash", "start.sh"]
-build = ["bash", "-c", "npm install --omit=dev --legacy-peer-deps --no-audit --no-fund"]
+build = ["npm", "install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund"]
 publicDir = "dist"
