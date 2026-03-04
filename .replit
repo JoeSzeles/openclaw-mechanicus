@@ -39,7 +39,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd /home/runner/workspace && COREPACK_ENABLE_STRICT=0 bash start.sh"
+args = "COREPACK_ENABLE_STRICT=0 bash start.sh"
 waitForPort = 5000
 
 [[ports]]
@@ -56,6 +56,6 @@ externalPort = 3002
 
 [deployment]
 deploymentTarget = "vm"
-run = ["bash", "/home/runner/workspace/start.sh"]
-build = ["bash", "-c", "cd /home/runner/workspace && npm install --omit=dev --legacy-peer-deps --no-audit --no-fund"]
+run = ["bash", "start.sh"]
+build = ["bash", "-c", "npm install --omit=dev --legacy-peer-deps --no-audit --no-fund"]
 publicDir = "dist"

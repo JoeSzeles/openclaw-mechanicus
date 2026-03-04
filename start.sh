@@ -5,28 +5,28 @@ echo "[start] CWD: $(pwd)"
 echo "[start] Node: $(node --version 2>/dev/null || echo 'NOT FOUND')"
 echo "[start] Date: $(date -u)"
 
-cd /home/runner/workspace
+WORKSPACE="$(cd "$(dirname "$0")" && pwd)"
+cd "$WORKSPACE"
+echo "[start] Workspace: $WORKSPACE"
 
-# Trap to support clean restarts (only in dev, not PID 1 in deployment)
 if [ "$$" != "1" ]; then
   trap 'kill -9 1' TERM INT
 fi
 
-# Ensure runtime dependencies are installed (fast if already present)
 if [ ! -d "node_modules/ws" ] || [ ! -d "node_modules/lightstreamer-client-node" ]; then
   echo "[start] Installing runtime dependencies..."
   npm install --omit=dev --legacy-peer-deps --prefer-offline --no-audit --no-fund 2>&1 | tail -5
 fi
 
 TOKEN="${OPENCLAW_GATEWAY_TOKEN}"
-TOKEN_JS="/home/runner/workspace/dist/control-ui/token-init.js"
+TOKEN_JS="$WORKSPACE/dist/control-ui/token-init.js"
 CACHE_BUST=$(date +%s)
 
 cat > "$TOKEN_JS" << JSEOF
 (function(){var K="openclaw.control.settings.v1";var T="${TOKEN}";try{var r=localStorage.getItem(K);var s=r?JSON.parse(r):{};if(s.token!==T){s.token=T;localStorage.setItem(K,JSON.stringify(s))}}catch(e){}})();
 JSEOF
 
-for htmlfile in /home/runner/workspace/dist/control-ui/model-config.html /home/runner/workspace/dist/control-ui/workers.html /home/runner/workspace/dist/control-ui/processes.html; do
+for htmlfile in "$WORKSPACE/dist/control-ui/model-config.html" "$WORKSPACE/dist/control-ui/workers.html" "$WORKSPACE/dist/control-ui/processes.html"; do
   if [ -f "$htmlfile" ]; then
     sed -i "s|\.js\"|.js?v=${CACHE_BUST}\"|g" "$htmlfile"
     sed -i "s|\.js?v=[0-9]*\"|.js?v=${CACHE_BUST}\"|g" "$htmlfile"
@@ -36,20 +36,16 @@ done
 export OPENAI_API_KEY="${AI_INTEGRATIONS_OPENAI_API_KEY}"
 export OPENAI_BASE_URL="${AI_INTEGRATIONS_OPENAI_BASE_URL}"
 
-# Use workspace as OPENCLAW_HOME so all data persists across restarts
-export OPENCLAW_HOME="/home/runner/workspace"
+export OPENCLAW_HOME="$WORKSPACE"
 
-# Ensure docs/templates are reachable from gateway fallback path
-ln -sf /home/runner/workspace/docs /home/runner/docs 2>/dev/null
+ln -sf "$WORKSPACE/docs" /home/runner/docs 2>/dev/null || true
 
-# Seed config if not present yet
-PERSISTENT_DIR="/home/runner/workspace/.openclaw"
+PERSISTENT_DIR="$WORKSPACE/.openclaw"
 mkdir -p "$PERSISTENT_DIR"
 if [ ! -f "$PERSISTENT_DIR/openclaw.json" ]; then
-  cp /home/runner/workspace/openclaw.json "$PERSISTENT_DIR/openclaw.json"
+  cp "$WORKSPACE/openclaw.json" "$PERSISTENT_DIR/openclaw.json"
 fi
 
-# Ensure published origin is in persistent config allowedOrigins
 PUBLISHED_ORIGIN="https://openclaw-mechanicus.replit.app"
 if [ -f "$PERSISTENT_DIR/openclaw.json" ] && ! grep -q "$PUBLISHED_ORIGIN" "$PERSISTENT_DIR/openclaw.json" 2>/dev/null; then
   node -e "
@@ -69,14 +65,12 @@ if [ -f "$PERSISTENT_DIR/openclaw.json" ] && ! grep -q "$PUBLISHED_ORIGIN" "$PER
   "
 fi
 
-# Export gateway port for internal use  
 export OPENCLAW_GATEWAY_PORT=5001
 
 echo "[start] Launching CEO proxy on port 5000..."
 node ceo-proxy.cjs &
 PROXY_PID=$!
 
-# Wait for proxy to bind
 for i in $(seq 1 10); do
   if node -e "const n=require('net');const c=n.createConnection(5000,'127.0.0.1');c.on('connect',()=>{c.end();process.exit(0)});c.on('error',()=>process.exit(1))" 2>/dev/null; then
     echo "[start] CEO proxy ready on port 5000 (attempt $i)"
