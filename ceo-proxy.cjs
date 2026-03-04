@@ -367,7 +367,10 @@ const LS_LIVE_SESSION_REFRESH = 4 * 60 * 1000;
 
 function getStreamedPrices() {
   const result = {};
+  const config = ensureIgConfig();
+  const activeProfile = config.activeProfile || "demo";
   for (const [epic, data] of streamedPrices) {
+    if (epic === "__ACCOUNT__" && data.source !== activeProfile) continue;
     result[epic] = { ...data };
   }
   return result;
@@ -548,6 +551,8 @@ async function startLightstreamer() {
             onSubscriptionError: (c2, m2) => console.error(`[lightstreamer] ACCOUNT subscription error: ${c2} ${m2}`),
             onItemUpdate: (info2) => {
               streamedPrices.set("__ACCOUNT__", {
+                source: "live",
+                accountId: liveAccountId,
                 deposit: parseFloat(info2.getValue("DEPOSIT")) || null,
                 pnl: parseFloat(info2.getValue("PNL")) || null,
                 availableCash: parseFloat(info2.getValue("AVAILABLE_CASH")) || null,
