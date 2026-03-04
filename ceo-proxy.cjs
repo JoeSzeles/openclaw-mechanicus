@@ -1923,33 +1923,77 @@ async function handleIgApi(req, res, p) {
 function writeConfigSnapshots() {
   try {
     if (!fs.existsSync(CANVAS_DIR)) fs.mkdirSync(CANVAS_DIR, { recursive: true });
-    const monitorCfg = path.join(DATA_DIR, "ig-monitor-config.json");
-    if (fs.existsSync(monitorCfg)) {
-      fs.writeFileSync(path.join(CANVAS_DIR, "ig-monitor-config-snapshot.json"), fs.readFileSync(monitorCfg));
+    const filesToCopy = [
+      ["ig-monitor-config.json", "ig-monitor-config-snapshot.json"],
+      ["ig-strategy.json", "ig-strategy-snapshot.json"],
+      ["ig-alerts.json", "ig-alerts-snapshot.json"],
+      ["ig-bot-log.json", "ig-bot-log-snapshot.json"],
+      ["ig-scalper-trades.json", "all-scalper-trades-data.json"],
+      ["ig-scalper-config.json", "ig-scalper-config-snapshot.json"],
+    ];
+    for (const [src, dst] of filesToCopy) {
+      const srcPath = path.join(DATA_DIR, src);
+      if (fs.existsSync(srcPath)) {
+        fs.writeFileSync(path.join(CANVAS_DIR, dst), fs.readFileSync(srcPath));
+      }
     }
-    const strategyCfg = path.join(DATA_DIR, "ig-strategy.json");
-    if (fs.existsSync(strategyCfg)) {
-      fs.writeFileSync(path.join(CANVAS_DIR, "ig-strategy-snapshot.json"), fs.readFileSync(strategyCfg));
-    }
-    const alerts = path.join(DATA_DIR, "ig-alerts.json");
-    if (fs.existsSync(alerts)) {
-      fs.writeFileSync(path.join(CANVAS_DIR, "ig-alerts-snapshot.json"), fs.readFileSync(alerts));
-    }
-    const botLog = path.join(DATA_DIR, "ig-bot-log.json");
-    if (fs.existsSync(botLog)) {
-      fs.writeFileSync(path.join(CANVAS_DIR, "ig-bot-log-snapshot.json"), fs.readFileSync(botLog));
-    }
-    const scalperTrades = path.join(DATA_DIR, "ig-scalper-trades.json");
-    if (fs.existsSync(scalperTrades)) {
-      fs.writeFileSync(path.join(CANVAS_DIR, "all-scalper-trades-data.json"), fs.readFileSync(scalperTrades));
-    }
-    const scalperConfig = path.join(DATA_DIR, "ig-scalper-config.json");
-    if (fs.existsSync(scalperConfig)) {
-      fs.writeFileSync(path.join(CANVAS_DIR, "ig-scalper-config-snapshot.json"), fs.readFileSync(scalperConfig));
-    }
+    writeDashboardSnapshot();
     console.log("[ceo-proxy] Config snapshots written to canvas");
   } catch (e) {
     console.error("[ceo-proxy] Snapshot write error:", e.message);
+  }
+}
+
+function writeDashboardSnapshot() {
+  try {
+    if (!fs.existsSync(CANVAS_DIR)) fs.mkdirSync(CANVAS_DIR, { recursive: true });
+    const acct = streamedPrices.get("__ACCOUNT__") || {};
+    const prices = {};
+    for (const [epic, data] of streamedPrices) {
+      if (epic === "__ACCOUNT__") continue;
+      prices[epic] = { bid: data.bid, offer: data.offer, mid: data.mid, status: data.marketState, timestamp: data.timestamp };
+    }
+    let scalperStatus;
+    try { scalperStatus = scalperEngine.getStatus(); } catch (_) { scalperStatus = {}; }
+    let activeProfile = "unknown";
+    try { const ic = loadIgConfig(); activeProfile = (ic && ic.activeProfile) || "unknown"; } catch (_) {}
+    const snapshot = {
+      timestamp: new Date().toISOString(),
+      account: {
+        profile: activeProfile,
+        accountId: process.env.IG_ACCOUNT_ID || "Z3MJKY",
+        balance: acct.deposit || null,
+        available: acct.availableCash || null,
+        pnl: acct.pnl || null,
+        margin: acct.margin || null,
+        equity: acct.equity || null,
+        funds: acct.funds || null,
+      },
+      streaming: {
+        status: lsStatus,
+        method: lsConnectedEpics.length > 0 ? "LIGHTSTREAMER" : (lsHybridPollingTimer ? "REST_POLLING" : "DISCONNECTED"),
+        connectedEpics: lsConnectedEpics,
+        priceCount: streamedPrices.size - (streamedPrices.has("__ACCOUNT__") ? 1 : 0),
+      },
+      prices,
+      scalper: {
+        running: scalperStatus.running,
+        enabled: scalperStatus.enabled,
+        realizedPnl: scalperStatus.realizedPnl,
+        unrealizedPnl: scalperStatus.unrealizedPnl,
+        tradeCount: scalperStatus.tradeCount,
+        winCount: scalperStatus.winCount,
+        lossCount: scalperStatus.lossCount,
+        winRate: scalperStatus.winRate,
+        openPositions: scalperStatus.openPositions,
+        positions: scalperStatus.positions,
+        drawdownTripped: scalperStatus.drawdownTripped,
+        strategies: scalperStatus.strategies,
+      },
+    };
+    fs.writeFileSync(path.join(CANVAS_DIR, "ig-dashboard-snapshot.json"), JSON.stringify(snapshot, null, 2));
+  } catch (e) {
+    console.error("[ceo-proxy] Dashboard snapshot error:", e.message);
   }
 }
 
@@ -3774,4 +3818,5 @@ setInterval(() => {
   updateBeesFile();
   updateCrewFile();
   autoRegisterBotScripts();
+  writeDashboardSnapshot();
 }, 30000);

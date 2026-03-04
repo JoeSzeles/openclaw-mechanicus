@@ -85,7 +85,7 @@ function loadTradeLog() {
 
 function saveTradeLog() {
   try {
-    if (tradeLog.length > 200) tradeLog = tradeLog.slice(-200);
+    if (tradeLog.length > 2000) tradeLog = tradeLog.slice(-2000);
     const data = JSON.stringify(tradeLog, null, 2);
     fs.writeFileSync(TRADE_LOG_FILE, data);
     const canvasDir = path.join(DATA_DIR, "canvas");
