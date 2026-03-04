@@ -3718,10 +3718,99 @@ function buildCanvasManifest() {
   return manifest;
 }
 
+function handleCanvasApi(req, res) {
+  const url = new URL(req.url, "http://localhost");
+  const p = url.pathname;
+  if (!p.startsWith("/__openclaw__/canvas/api/")) return false;
+  const route = p.slice("/__openclaw__/canvas/api/".length);
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" });
+    res.end();
+    return true;
+  }
+
+  const configMap = {
+    "scalper-config": "ig-scalper-config.json",
+    "strategy": "ig-strategy.json",
+    "monitor-config": "ig-monitor-config.json",
+    "proofread-config": "ig-proofread-config.json",
+  };
+
+  if (route.startsWith("config/")) {
+    const configKey = route.slice("config/".length);
+    const fileName = configMap[configKey];
+    if (!fileName) { json(res, 404, { error: "Unknown config: " + configKey, available: Object.keys(configMap) }); return true; }
+    const filePath = path.join(DATA_DIR, fileName);
+
+    if (req.method === "GET") {
+      try {
+        const data = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, "utf8")) : {};
+        json(res, 200, data);
+      } catch (e) { json(res, 500, { error: e.message }); }
+      return true;
+    }
+
+    if (req.method === "POST" || req.method === "PUT") {
+      let body = "";
+      req.on("data", c => body += c);
+      req.on("end", () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (req.method === "PUT") {
+            fs.writeFileSync(filePath, JSON.stringify(parsed, null, 2));
+            console.log(`[canvas-api] Config ${configKey} replaced by agent`);
+          } else {
+            let existing = {};
+            try { existing = JSON.parse(fs.readFileSync(filePath, "utf8")); } catch (_) {}
+            const merged = { ...existing, ...parsed };
+            fs.writeFileSync(filePath, JSON.stringify(merged, null, 2));
+            console.log(`[canvas-api] Config ${configKey} patched by agent`);
+          }
+          writeConfigSnapshots();
+          json(res, 200, { ok: true, config: JSON.parse(fs.readFileSync(filePath, "utf8")) });
+        } catch (e) { json(res, 400, { error: "Invalid JSON: " + e.message }); }
+      });
+      return true;
+    }
+
+    json(res, 405, { error: "Method not allowed" });
+    return true;
+  }
+
+  if (route === "scalper/status" && req.method === "GET") {
+    try {
+      const status = scalperEngine.getStatus();
+      json(res, 200, status);
+    } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  if (route === "scalper/start" && req.method === "POST") {
+    try { scalperEngine.start(false); json(res, 200, { ok: true }); } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  if (route === "scalper/stop" && req.method === "POST") {
+    try { scalperEngine.stop(); json(res, 200, { ok: true }); } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  if (route === "scalper/reset" && req.method === "POST") {
+    try { scalperEngine.resetStats(); json(res, 200, { ok: true }); } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  json(res, 404, { error: "Unknown canvas API route", available: ["config/scalper-config", "config/strategy", "config/monitor-config", "config/proofread-config", "scalper/status", "scalper/start", "scalper/stop", "scalper/reset"] });
+  return true;
+}
+
 function serveCanvas(req, res) {
   const url = new URL(req.url, "http://localhost");
   const prefix = "/__openclaw__/canvas/";
-  if (req.method !== "GET" || !url.pathname.startsWith(prefix)) return false;
+  if (!url.pathname.startsWith(prefix)) return false;
+  if (url.pathname.startsWith("/__openclaw__/canvas/api/")) return handleCanvasApi(req, res);
+  if (req.method !== "GET") return false;
   const relPath = decodeURIComponent(url.pathname.slice(prefix.length)) || "index.html";
   if (relPath === "manifest.json") {
     const manifest = buildCanvasManifest();
