@@ -3725,9 +3725,20 @@ function handleCanvasApi(req, res) {
   const route = p.slice("/__openclaw__/canvas/api/".length);
 
   if (req.method === "OPTIONS") {
-    res.writeHead(204, { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" });
+    res.writeHead(204, { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-Api-Key, Authorization" });
     res.end();
     return true;
+  }
+
+  if (req.method !== "GET") {
+    const apiKey = process.env.CANVAS_API_KEY;
+    if (apiKey) {
+      const provided = req.headers["x-api-key"] || url.searchParams.get("key") || (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+      if (provided !== apiKey) {
+        json(res, 403, { error: "Invalid or missing API key. Provide via X-Api-Key header, ?key= param, or Authorization: Bearer token." });
+        return true;
+      }
+    }
   }
 
   const configMap = {
