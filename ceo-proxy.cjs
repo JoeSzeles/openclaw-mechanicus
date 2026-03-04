@@ -598,7 +598,6 @@ function stopLightstreamer(keepReconnect) {
     lsSubscription = null;
     lsStatus = "disconnected";
     lsConnectedEpics = [];
-    streamedPrices.clear();
     lsConnectedAt = null;
     lsUpdateCount = 0;
     lsUpdateCounts = {};
