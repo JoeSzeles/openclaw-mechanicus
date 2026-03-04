@@ -684,8 +684,12 @@ function scheduleLiveStreamingRefresh() {
     console.log("[live-streaming] Proactive token refresh...");
     try {
       await liveStreamingLogin();
-      stopLightstreamer();
-      setTimeout(() => startLightstreamer(), 500);
+      if (lsLiveClient && lsConnectedEpics.length > 0) {
+        stopLightstreamer();
+        setTimeout(() => startLightstreamer(), 500);
+      } else {
+        console.log("[live-streaming] Token refreshed (hybrid polling continues uninterrupted)");
+      }
       scheduleLiveStreamingRefresh();
     } catch (e) {
       console.log("[live-streaming] Refresh failed:", e.message, "— will retry in 60s");
