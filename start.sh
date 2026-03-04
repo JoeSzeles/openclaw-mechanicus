@@ -1,13 +1,13 @@
 #!/bin/bash
-set -e
 echo "[start] Starting OpenClaw Cloud..."
 echo "[start] CWD: $(pwd)"
+echo "[start] HOME: $HOME"
 echo "[start] Node: $(node --version 2>/dev/null || echo 'NOT FOUND')"
 echo "[start] Date: $(date -u)"
 
-WORKSPACE="$(cd "$(dirname "$0")" && pwd)"
-cd "$WORKSPACE"
-echo "[start] Workspace: $WORKSPACE"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+echo "[start] Workspace: $SCRIPT_DIR"
 
 if [ "$$" != "1" ]; then
   trap 'kill -9 1' TERM INT
@@ -19,31 +19,35 @@ if [ ! -d "node_modules/ws" ] || [ ! -d "node_modules/lightstreamer-client-node"
 fi
 
 TOKEN="${OPENCLAW_GATEWAY_TOKEN}"
-TOKEN_JS="$WORKSPACE/dist/control-ui/token-init.js"
+TOKEN_JS="$SCRIPT_DIR/dist/control-ui/token-init.js"
 CACHE_BUST=$(date +%s)
 
-cat > "$TOKEN_JS" << JSEOF
+if [ -d "$SCRIPT_DIR/dist/control-ui" ]; then
+  cat > "$TOKEN_JS" << JSEOF
 (function(){var K="openclaw.control.settings.v1";var T="${TOKEN}";try{var r=localStorage.getItem(K);var s=r?JSON.parse(r):{};if(s.token!==T){s.token=T;localStorage.setItem(K,JSON.stringify(s))}}catch(e){}})();
 JSEOF
 
-for htmlfile in "$WORKSPACE/dist/control-ui/model-config.html" "$WORKSPACE/dist/control-ui/workers.html" "$WORKSPACE/dist/control-ui/processes.html"; do
-  if [ -f "$htmlfile" ]; then
-    sed -i "s|\.js\"|.js?v=${CACHE_BUST}\"|g" "$htmlfile"
-    sed -i "s|\.js?v=[0-9]*\"|.js?v=${CACHE_BUST}\"|g" "$htmlfile"
-  fi
-done
+  for htmlfile in "$SCRIPT_DIR/dist/control-ui/model-config.html" "$SCRIPT_DIR/dist/control-ui/workers.html" "$SCRIPT_DIR/dist/control-ui/processes.html"; do
+    if [ -f "$htmlfile" ]; then
+      sed -i "s|\.js\"|.js?v=${CACHE_BUST}\"|g" "$htmlfile" 2>/dev/null || true
+      sed -i "s|\.js?v=[0-9]*\"|.js?v=${CACHE_BUST}\"|g" "$htmlfile" 2>/dev/null || true
+    fi
+  done
+fi
 
 export OPENAI_API_KEY="${AI_INTEGRATIONS_OPENAI_API_KEY}"
 export OPENAI_BASE_URL="${AI_INTEGRATIONS_OPENAI_BASE_URL}"
 
-export OPENCLAW_HOME="$WORKSPACE"
+export OPENCLAW_HOME="$SCRIPT_DIR"
 
-ln -sf "$WORKSPACE/docs" /home/runner/docs 2>/dev/null || true
+if [ -d "$SCRIPT_DIR/docs" ] && [ -d "/home/runner" ]; then
+  ln -sf "$SCRIPT_DIR/docs" /home/runner/docs 2>/dev/null || true
+fi
 
-PERSISTENT_DIR="$WORKSPACE/.openclaw"
+PERSISTENT_DIR="$SCRIPT_DIR/.openclaw"
 mkdir -p "$PERSISTENT_DIR"
-if [ ! -f "$PERSISTENT_DIR/openclaw.json" ]; then
-  cp "$WORKSPACE/openclaw.json" "$PERSISTENT_DIR/openclaw.json"
+if [ ! -f "$PERSISTENT_DIR/openclaw.json" ] && [ -f "$SCRIPT_DIR/openclaw.json" ]; then
+  cp "$SCRIPT_DIR/openclaw.json" "$PERSISTENT_DIR/openclaw.json"
 fi
 
 PUBLISHED_ORIGIN="https://openclaw-mechanicus.replit.app"
@@ -62,7 +66,7 @@ if [ -f "$PERSISTENT_DIR/openclaw.json" ] && ! grep -q "$PUBLISHED_ORIGIN" "$PER
         console.log('[start] Added published origin to persistent config');
       }
     } catch(e) { console.log('[start] Config origin patch skipped:', e.message); }
-  "
+  " 2>/dev/null || true
 fi
 
 export OPENCLAW_GATEWAY_PORT=5001
@@ -71,7 +75,7 @@ echo "[start] Launching CEO proxy on port 5000..."
 node ceo-proxy.cjs &
 PROXY_PID=$!
 
-for i in $(seq 1 10); do
+for i in 1 2 3 4 5 6 7 8 9 10; do
   if node -e "const n=require('net');const c=n.createConnection(5000,'127.0.0.1');c.on('connect',()=>{c.end();process.exit(0)});c.on('error',()=>process.exit(1))" 2>/dev/null; then
     echo "[start] CEO proxy ready on port 5000 (attempt $i)"
     break
