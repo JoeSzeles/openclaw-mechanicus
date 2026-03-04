@@ -131,6 +131,21 @@ tr:hover{background:#1c2128}
 </div>
 
 <div class="section">
+<div class="section-title"><span class="section-icon">📁</span> Agent Workspaces</div>
+<div id="wsAgentTabs" style="display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap"></div>
+<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<label class="btn-secondary" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">
+Upload Files <input type="file" id="wsFileInput" multiple style="display:none">
+</label>
+<label class="btn-secondary" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">
+Upload Folder <input type="file" id="wsFolderInput" webkitdirectory multiple style="display:none">
+</label>
+<span id="wsUploadStatus" style="font-size:12px;color:#8b949e"></span>
+</div>
+<div id="wsFileList"><p class="empty">Loading...</p></div>
+</div>
+
+<div class="section">
 <div class="section-title"><span class="section-icon">📂</span> File Exchange</div>
 <div id="exchangeList"><p class="empty">Loading...</p></div>
 </div>
@@ -151,8 +166,8 @@ tr:hover{background:#1c2128}
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="/token-init.js"></script>
-<script src="/workers.js"></script>
-<script src="/nav-inject.js"></script>
+<script src="/token-init.js?v=1772585540"></script>
+<script src="/workers.js?v=1772585540"></script>
+<script src="/nav-inject.js?v=1772585540"></script>
 </body>
 </html>

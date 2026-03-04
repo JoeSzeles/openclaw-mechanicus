@@ -302,7 +302,174 @@ document.getElementById('ssCancelBtn').addEventListener('click', function() {
   ssWriteVisible = false;
 });
 
-function refresh() { loadKeys(); loadWorkers(); loadExchange(); loadSharedspace(); loadChat(); }
+var wsCurrentAgent = '';
+var wsAgents = [];
+
+function loadWorkspaceAgents() {
+  apiFetch('/api/workspace/agents').then(function(r){ return r.json(); }).then(function(data) {
+    wsAgents = data.agents || [];
+    var tabsEl = document.getElementById('wsAgentTabs');
+    if (!wsAgents.length) { tabsEl.innerHTML = '<span class="empty">No agent workspaces found</span>'; return; }
+    if (!wsCurrentAgent || !wsAgents.find(function(a){ return a.id === wsCurrentAgent; })) {
+      wsCurrentAgent = wsAgents[0].id;
+    }
+    var html = '';
+    for (var i = 0; i < wsAgents.length; i++) {
+      var a = wsAgents[i];
+      var active = a.id === wsCurrentAgent;
+      html += '<button class="btn-secondary ws-agent-tab" data-agent="' + escHtml(a.id) + '" style="' +
+        (active ? 'background:#238636;color:#fff;border-color:#238636' : '') + '">' + escHtml(a.name) + '</button>';
+    }
+    tabsEl.innerHTML = html;
+    loadWorkspaceFiles();
+  }).catch(function(e) {
+    document.getElementById('wsAgentTabs').innerHTML = '<span class="empty" style="color:#f85149">Error: ' + e.message + '</span>';
+  });
+}
+
+function loadWorkspaceFiles() {
+  var el = document.getElementById('wsFileList');
+  if (!wsCurrentAgent) { el.innerHTML = '<p class="empty">Select an agent</p>'; return; }
+  el.innerHTML = '<p class="empty">Loading...</p>';
+  apiFetch('/api/workspace/' + encodeURIComponent(wsCurrentAgent)).then(function(r){ return r.json(); }).then(function(data) {
+    var files = data.files || [];
+    if (!files.length) { el.innerHTML = '<p class="empty">Workspace is empty</p>'; return; }
+    files.sort(function(a,b) {
+      if (a.isDir && !b.isDir) return -1;
+      if (!a.isDir && b.isDir) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    var html = '';
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      var icon = f.isDir ? '📁' : '📄';
+      var indent = (f.name.split('/').length - 1) * 16;
+      html += '<div class="ss-file" style="padding-left:' + (12 + indent) + 'px">';
+      html += '<span class="ss-file-name">' + icon + ' ' + escHtml(f.name) + '</span>';
+      if (!f.isDir) {
+        html += '<span class="ss-file-size">' + formatSize(f.size) + '</span>';
+      }
+      html += '<div class="ss-file-actions">';
+      if (!f.isDir) {
+        html += '<a href="/api/workspace/' + encodeURIComponent(wsCurrentAgent) + '/download/' + encodeURIComponent(f.name) + '" download>Download</a>';
+      }
+      html += '<button data-ws-delete="' + escHtml(f.name) + '" data-ws-agent="' + escHtml(wsCurrentAgent) + '">Delete</button>';
+      html += '</div>';
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  }).catch(function(e) { el.innerHTML = '<p class="empty" style="color:#f85149">Error: ' + e.message + '</p>'; });
+}
+
+document.getElementById('wsAgentTabs').addEventListener('click', function(e) {
+  var btn = e.target.closest('.ws-agent-tab');
+  if (!btn) return;
+  wsCurrentAgent = btn.getAttribute('data-agent');
+  loadWorkspaceAgents();
+});
+
+function wsUploadFiles(fileList, stripPrefix) {
+  if (!wsCurrentAgent || !fileList.length) return;
+  var statusEl = document.getElementById('wsUploadStatus');
+  var total = fileList.length;
+  var done = 0;
+  var failed = 0;
+  statusEl.textContent = 'Uploading 0/' + total + '...';
+
+  var batch = [];
+  var batchSize = 0;
+  var maxBatch = 4 * 1024 * 1024;
+
+  function sendBatch(items) {
+    return apiFetch('/api/workspace/' + encodeURIComponent(wsCurrentAgent) + '/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(items)
+    }).then(function(r){ return r.json(); }).then(function(d) {
+      done += items.length;
+      if (d.results) {
+        for (var j = 0; j < d.results.length; j++) {
+          if (d.results[j].error) failed++;
+        }
+      }
+      statusEl.textContent = 'Uploaded ' + done + '/' + total + (failed ? ' (' + failed + ' failed)' : '') + '...';
+    });
+  }
+
+  function processFile(idx) {
+    if (idx >= fileList.length) {
+      if (batch.length) {
+        return sendBatch(batch).then(function() {
+          statusEl.textContent = 'Done: ' + done + '/' + total + (failed ? ' (' + failed + ' failed)' : '');
+          showToast('Uploaded ' + (total - failed) + ' file(s)', failed ? 'error' : 'success');
+          loadWorkspaceFiles();
+        });
+      }
+      statusEl.textContent = 'Done: ' + done + '/' + total + (failed ? ' (' + failed + ' failed)' : '');
+      showToast('Uploaded ' + (total - failed) + ' file(s)', failed ? 'error' : 'success');
+      loadWorkspaceFiles();
+      return;
+    }
+    var file = fileList[idx];
+    var filePath = file.webkitRelativePath || file.name;
+    if (stripPrefix && filePath.indexOf('/') > 0) {
+      filePath = filePath.substring(filePath.indexOf('/') + 1);
+    }
+    var reader = new FileReader();
+    reader.onload = function() {
+      var b64 = reader.result.split(',')[1] || '';
+      var item = { path: filePath, content: b64, encoding: 'base64' };
+      var itemSize = b64.length;
+      if (batchSize + itemSize > maxBatch && batch.length > 0) {
+        sendBatch(batch).then(function() {
+          batch = [item];
+          batchSize = itemSize;
+          processFile(idx + 1);
+        });
+      } else {
+        batch.push(item);
+        batchSize += itemSize;
+        processFile(idx + 1);
+      }
+    };
+    reader.onerror = function() { failed++; done++; processFile(idx + 1); };
+    reader.readAsDataURL(file);
+  }
+
+  processFile(0);
+}
+
+document.getElementById('wsFileInput').addEventListener('change', function(e) {
+  var files = e.target.files;
+  if (files && files.length) wsUploadFiles(Array.from(files), false);
+  e.target.value = '';
+});
+
+document.getElementById('wsFolderInput').addEventListener('change', function(e) {
+  var files = e.target.files;
+  if (files && files.length) wsUploadFiles(Array.from(files), true);
+  e.target.value = '';
+});
+
+document.addEventListener('click', function(e) {
+  var wsDelBtn = e.target.closest('[data-ws-delete]');
+  if (wsDelBtn) {
+    var fname = wsDelBtn.getAttribute('data-ws-delete');
+    var agent = wsDelBtn.getAttribute('data-ws-agent');
+    if (!confirm('Delete ' + fname + ' from ' + agent + ' workspace?')) return;
+    apiFetch('/api/workspace/' + encodeURIComponent(agent) + '/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: fname })
+    }).then(function(r){ return r.json(); }).then(function() {
+      showToast('Deleted: ' + fname, 'success');
+      loadWorkspaceFiles();
+    }).catch(function(err) { showToast('Error: ' + err.message, 'error'); });
+    return;
+  }
+});
+
+function refresh() { loadKeys(); loadWorkers(); loadWorkspaceAgents(); loadExchange(); loadSharedspace(); loadChat(); }
 document.getElementById('refreshBtn').addEventListener('click', refresh);
 refresh();
 setInterval(refresh, 10000);

@@ -12,6 +12,8 @@ const DATA_DIR = path.join(OPENCLAW_HOME, ".openclaw");
 const API_KEYS_FILE = path.join(DATA_DIR, "api-keys.json");
 const EXCHANGE_DIR = path.join(DATA_DIR, "exchange");
 const SHAREDSPACE_DIR = path.join(DATA_DIR, "sharedspace");
+const WORKSPACE_CEO_DIR = path.join(DATA_DIR, "workspace");
+const WORKSPACE_IG_DIR = path.join(DATA_DIR, "workspace-ig");
 const TASKS_FILE = path.join(DATA_DIR, "worker-tasks.json");
 const CHAT_FILE = path.join(DATA_DIR, "ceo-chat.json");
 const BEES_FILE = path.join(DATA_DIR, "available-bees.json");
@@ -80,7 +82,7 @@ function isLoginExempt(req) {
   if (p === "/api/login" || p === "/api/logout") return true;
   if (p === "/login.html" || p === "/login") return true;
   if (p.startsWith("/api/workers") || p.startsWith("/api/tasks") || p.startsWith("/api/heartbeat") ||
-      p.startsWith("/api/exchange") || p.startsWith("/api/sharedspace") || p.startsWith("/api/chat") || p.startsWith("/api/agent/chat") ||
+      p.startsWith("/api/workspace") || p.startsWith("/api/exchange") || p.startsWith("/api/sharedspace") || p.startsWith("/api/chat") || p.startsWith("/api/agent/chat") ||
       p.startsWith("/api/ig/positions") || p.startsWith("/api/ig/prices") || p.startsWith("/api/ig/account") ||
       p.startsWith("/api/ig/confirms") || p.startsWith("/api/ig/history") || p.startsWith("/api/ig/stream") ||
       p.startsWith("/api/ig/workingorders") || p.startsWith("/api/ig/markets") || p.startsWith("/api/ig/marketnavigation") ||
@@ -3019,6 +3021,156 @@ async function handleSharedspace(req, res, p) {
   return json(res, 404, { error: "Not found" });
 }
 
+function getWorkspaceAgents() {
+  const agents = [];
+  try {
+    for (const e of fs.readdirSync(DATA_DIR, { withFileTypes: true })) {
+      if (e.isDirectory() && e.name === "workspace") {
+        agents.push({ id: "ceo", name: "CEO", dir: path.join(DATA_DIR, "workspace") });
+      } else if (e.isDirectory() && e.name.startsWith("workspace-")) {
+        const agentId = e.name.slice("workspace-".length);
+        agents.push({ id: agentId, name: agentId.toUpperCase(), dir: path.join(DATA_DIR, e.name) });
+      }
+    }
+  } catch {}
+  if (!agents.find(a => a.id === "ceo")) {
+    fs.mkdirSync(path.join(DATA_DIR, "workspace"), { recursive: true });
+    agents.unshift({ id: "ceo", name: "CEO", dir: path.join(DATA_DIR, "workspace") });
+  }
+  return agents;
+}
+
+function resolveAgentDir(agentId) {
+  const agents = getWorkspaceAgents();
+  const agent = agents.find(a => a.id === agentId);
+  return agent ? agent.dir : null;
+}
+
+async function handleWorkspace(req, res, p) {
+  if (req.method === "GET" && p === "/api/workspace/agents") {
+    const agents = getWorkspaceAgents();
+    return json(res, 200, { agents: agents.map(a => ({ id: a.id, name: a.name })) });
+  }
+
+  const dlMatch = p.match(/^\/api\/workspace\/([^/]+)\/download\/(.+)$/);
+  if (req.method === "GET" && dlMatch) {
+    const agentId = decodeURIComponent(dlMatch[1]);
+    const filePath = decodeURIComponent(dlMatch[2]);
+    const agentDir = resolveAgentDir(agentId);
+    if (!agentDir) return json(res, 404, { error: "Agent not found" });
+    const fp = path.normalize(filePath);
+    const full = path.resolve(agentDir, fp);
+    if (!isInsideDir(full, agentDir)) return json(res, 403, { error: "Forbidden" });
+    try {
+      const d = fs.readFileSync(full);
+      res.writeHead(200, {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${path.basename(fp)}"`,
+        "Access-Control-Allow-Origin": "*",
+      });
+      return res.end(d);
+    } catch { return json(res, 404, { error: "File not found" }); }
+  }
+
+  const isGw = authGateway(req);
+  const apiKey = authWorker(req);
+  if (!isGw && !apiKey) {
+    return json(res, 401, { error: "Unauthorized" });
+  }
+
+  const listMatch = p.match(/^\/api\/workspace\/([^/]+)$/);
+  if (req.method === "GET" && listMatch) {
+    const agentId = decodeURIComponent(listMatch[1]);
+    const agentDir = resolveAgentDir(agentId);
+    if (!agentDir) return json(res, 404, { error: "Agent not found" });
+    const files = [];
+    function walk(dir, prefix) {
+      try {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (e.name.startsWith(".")) continue;
+          const rel = prefix ? prefix + "/" + e.name : e.name;
+          if (e.isDirectory()) {
+            files.push({ name: rel, size: 0, modified: "", isDir: true });
+            walk(path.join(dir, e.name), rel);
+          } else {
+            const st = fs.statSync(path.join(dir, e.name));
+            files.push({ name: rel, size: st.size, modified: st.mtime.toISOString(), isDir: false });
+          }
+        }
+      } catch {}
+    }
+    walk(agentDir, "");
+    return json(res, 200, { agent: agentId, files });
+  }
+
+  const uploadMatch = p.match(/^\/api\/workspace\/([^/]+)\/upload$/);
+  if (req.method === "POST" && uploadMatch) {
+    const agentId = decodeURIComponent(uploadMatch[1]);
+    const agentDir = resolveAgentDir(agentId);
+    if (!agentDir) return json(res, 404, { error: "Agent not found" });
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString()); }
+    catch { return json(res, 400, { error: "Invalid JSON body" }); }
+    const results = [];
+    const items = Array.isArray(body) ? body : [body];
+    for (const item of items) {
+      if (!item.path) { results.push({ error: "path is required" }); continue; }
+      const fp = path.normalize(item.path);
+      const full = path.resolve(agentDir, fp);
+      if (!isInsideDir(full, agentDir)) { results.push({ path: fp, error: "Forbidden" }); continue; }
+      try {
+        fs.mkdirSync(path.dirname(full), { recursive: true });
+        if (item.encoding === "base64") {
+          fs.writeFileSync(full, Buffer.from(item.content || "", "base64"));
+        } else {
+          fs.writeFileSync(full, item.content || "", "utf-8");
+        }
+        const st = fs.statSync(full);
+        results.push({ path: fp, size: st.size, ok: true });
+      } catch (err) { results.push({ path: fp, error: err.message }); }
+    }
+    return json(res, 201, { ok: true, results });
+  }
+
+  const mkdirMatch = p.match(/^\/api\/workspace\/([^/]+)\/mkdir$/);
+  if (req.method === "POST" && mkdirMatch) {
+    const agentId = decodeURIComponent(mkdirMatch[1]);
+    const agentDir = resolveAgentDir(agentId);
+    if (!agentDir) return json(res, 404, { error: "Agent not found" });
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString()); }
+    catch { return json(res, 400, { error: "Invalid JSON body" }); }
+    if (!body.path) return json(res, 400, { error: "path is required" });
+    const fp = path.normalize(body.path);
+    const full = path.resolve(agentDir, fp);
+    if (!isInsideDir(full, agentDir)) return json(res, 403, { error: "Forbidden" });
+    fs.mkdirSync(full, { recursive: true });
+    return json(res, 201, { ok: true, path: fp });
+  }
+
+  const delMatch = p.match(/^\/api\/workspace\/([^/]+)\/delete$/);
+  if (req.method === "POST" && delMatch) {
+    const agentId = decodeURIComponent(delMatch[1]);
+    const agentDir = resolveAgentDir(agentId);
+    if (!agentDir) return json(res, 404, { error: "Agent not found" });
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString()); }
+    catch { return json(res, 400, { error: "Invalid JSON body" }); }
+    if (!body.path) return json(res, 400, { error: "path is required" });
+    const fp = path.normalize(body.path);
+    const full = path.resolve(agentDir, fp);
+    if (!isInsideDir(full, agentDir)) return json(res, 403, { error: "Forbidden" });
+    try {
+      const st = fs.statSync(full);
+      if (st.isDirectory()) fs.rmSync(full, { recursive: true });
+      else fs.unlinkSync(full);
+      return json(res, 200, { ok: true });
+    } catch { return json(res, 404, { error: "File not found" }); }
+  }
+
+  return json(res, 404, { error: "Not found" });
+}
+
 async function handleChat(req, res, p) {
   const url = new URL(req.url, "http://localhost");
 
@@ -3351,6 +3503,7 @@ async function handleApi(req, res) {
   if (p.startsWith("/api/keys")) { await handleApiKeys(req, res, p); return true; }
   if (p.startsWith("/api/workers")) { await handleWorkers(req, res, p); return true; }
   if (p.startsWith("/api/tasks")) { await handleTasks(req, res, p); return true; }
+  if (p.startsWith("/api/workspace")) { await handleWorkspace(req, res, p); return true; }
   if (p.startsWith("/api/exchange")) { await handleExchange(req, res, p); return true; }
   if (p.startsWith("/api/sharedspace")) { await handleSharedspace(req, res, p); return true; }
   if (p === "/api/agent/chat" || p === "/api/agent/chat/") { await handleAgentChat(req, res); return true; }
