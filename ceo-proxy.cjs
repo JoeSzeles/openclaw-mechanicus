@@ -925,7 +925,7 @@ function igJsonResponse(res, statusCode, body) {
 }
 
 async function handleIgApi(req, res, p) {
-  if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" });
+  if (!authGateway(req) && !validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" });
 
   try {
     if (req.method === "GET" && p === "/api/ig/config") {
