@@ -86,7 +86,12 @@ function loadTradeLog() {
 function saveTradeLog() {
   try {
     if (tradeLog.length > 200) tradeLog = tradeLog.slice(-200);
-    fs.writeFileSync(TRADE_LOG_FILE, JSON.stringify(tradeLog, null, 2));
+    const data = JSON.stringify(tradeLog, null, 2);
+    fs.writeFileSync(TRADE_LOG_FILE, data);
+    const canvasDir = path.join(DATA_DIR, "canvas");
+    if (fs.existsSync(canvasDir)) {
+      fs.writeFileSync(path.join(canvasDir, "all-scalper-trades-data.json"), data);
+    }
   } catch (_) {}
 }
 
