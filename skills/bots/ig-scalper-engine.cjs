@@ -401,11 +401,11 @@ async function evaluateEntry(strat, epic, ticks) {
 async function fetchContractSize(epic) {
   try {
     const data = await proxyGet("/api/ig/markets/" + epic);
+    if (data && data.instrument && data.instrument.valueOfOnePip) {
+      return parseFloat(data.instrument.valueOfOnePip) || 1;
+    }
     if (data && data.instrument && data.instrument.contractSize) {
       return parseFloat(data.instrument.contractSize) || 1;
-    }
-    if (data && data.snapshot && data.snapshot.scalingFactor) {
-      return parseFloat(data.snapshot.scalingFactor) || 1;
     }
   } catch (_) {}
   return 1;
@@ -558,8 +558,10 @@ async function checkPositions() {
       const currentPrice = sp.direction === "BUY" ? (mkt.bid || 0) : (mkt.offer || 0);
       if (!currentPrice) continue;
 
-      if (!sp.contractSize && mkt.scalingFactor) {
-        sp.contractSize = parseFloat(mkt.scalingFactor) || 1;
+      if (!sp.contractSize && mkt.valueOfOnePip) {
+        sp.contractSize = parseFloat(mkt.valueOfOnePip) || 1;
+      } else if (!sp.contractSize && mkt.contractSize) {
+        sp.contractSize = parseFloat(mkt.contractSize) || 1;
       }
       const cs = sp.contractSize || 1;
 

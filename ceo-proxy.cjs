@@ -118,6 +118,25 @@ let igSessionRefreshTimer = null;
 const igResponseCache = new Map();
 const IG_CACHE_TTL = 30000;
 
+// Long-lived market details cache (contract sizes / pip values don't change)
+const marketDetailsCache = new Map();
+async function getMarketDetails(epic, session) {
+  if (marketDetailsCache.has(epic)) return marketDetailsCache.get(epic);
+  try {
+    const r = await igRequest("GET", "/markets/" + epic, igHeaders(session));
+    if (r.status === 200) {
+      const d = safeParseIgBody(r.body);
+      const details = {
+        valueOfOnePip: parseFloat(d?.instrument?.valueOfOnePip) || 1,
+        contractSize: parseFloat(d?.instrument?.contractSize) || 1
+      };
+      marketDetailsCache.set(epic, details);
+      return details;
+    }
+  } catch (_) {}
+  return { valueOfOnePip: 1, contractSize: 1 };
+}
+
 function igCacheGet(key) {
   const entry = igResponseCache.get(key);
   if (!entry) return null;
@@ -1126,6 +1145,20 @@ async function handleIgApi(req, res, p) {
       if (r.status !== 200) return json(res, r.status, { error: "IG API error", detail: r.body });
       const data = safeParseIgBody(r.body);
       if (data._parseError) return json(res, 502, { error: "IG returned non-JSON", detail: data._raw });
+      // Enrich positions with real valueOfOnePip and contractSize from /markets endpoint
+      const positions = data.positions || data;
+      if (Array.isArray(positions)) {
+        const epics = [...new Set(positions.map(p => p?.market?.epic).filter(Boolean))];
+        const detailsMap = {};
+        await Promise.all(epics.map(async epic => { detailsMap[epic] = await getMarketDetails(epic, session); }));
+        for (const pos of positions) {
+          const epic = pos?.market?.epic;
+          if (epic && detailsMap[epic]) {
+            pos.market.valueOfOnePip = detailsMap[epic].valueOfOnePip;
+            pos.market.contractSize = detailsMap[epic].contractSize;
+          }
+        }
+      }
       igCacheSet("positions", data);
       return json(res, 200, data);
     }
