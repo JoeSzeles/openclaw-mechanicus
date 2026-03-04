@@ -1944,25 +1944,26 @@ function writeConfigSnapshots() {
   }
 }
 
-let _demoAccountCache = null;
-let _demoAccountCacheTs = 0;
+let _snapshotAccountCache = null;
+let _snapshotAccountCacheTs = 0;
+let _snapshotAccountProfile = null;
 
-async function fetchDemoAccountForSnapshot() {
-  if (_demoAccountCache && Date.now() - _demoAccountCacheTs < 60000) return _demoAccountCache;
+async function fetchAccountForSnapshot() {
+  const ic = loadIgConfig();
+  const profileId = (ic && ic.activeProfile) || "demo";
+  if (_snapshotAccountCache && _snapshotAccountProfile === profileId && Date.now() - _snapshotAccountCacheTs < 60000) return _snapshotAccountCache;
   try {
     const session = await igAuth();
     const r = await igRequest("GET", "/accounts", igHeaders(session));
     if (r.status === 200) {
       const data = safeParseIgBody(r.body);
       if (data && data.accounts) {
-        const ic = loadIgConfig();
-        const profileId = (ic && ic.activeProfile) || "demo";
         const profiles = (ic && ic.profiles) || {};
         const prof = profiles[profileId] || {};
         const targetAccountId = prof.accountId || process.env.IG_ACCOUNT_ID || "Z3MJKY";
         const acct = data.accounts.find(a => a.accountId === targetAccountId) || data.accounts[0];
         if (acct) {
-          _demoAccountCache = {
+          _snapshotAccountCache = {
             accountId: acct.accountId,
             accountName: acct.accountName,
             accountType: acct.accountType,
@@ -1972,13 +1973,14 @@ async function fetchDemoAccountForSnapshot() {
             deposit: acct.balance ? acct.balance.deposit : null,
             profitLoss: acct.balance ? acct.balance.profitLoss : null,
           };
-          _demoAccountCacheTs = Date.now();
-          return _demoAccountCache;
+          _snapshotAccountCacheTs = Date.now();
+          _snapshotAccountProfile = profileId;
+          return _snapshotAccountCache;
         }
       }
     }
   } catch (_) {}
-  return _demoAccountCache;
+  return _snapshotAccountCache;
 }
 
 function writeDashboardSnapshot() {
@@ -1997,20 +1999,20 @@ async function writeDashboardSnapshotAsync() {
   let activeProfile = "unknown";
   try { const ic = loadIgConfig(); activeProfile = (ic && ic.activeProfile) || "unknown"; } catch (_) {}
 
-  const demoAcct = await fetchDemoAccountForSnapshot();
+  const acctData = await fetchAccountForSnapshot();
 
   const snapshot = {
     timestamp: new Date().toISOString(),
     account: {
       profile: activeProfile,
-      accountId: demoAcct ? demoAcct.accountId : (process.env.IG_ACCOUNT_ID || "Z3MJKY"),
-      accountType: demoAcct ? demoAcct.accountType : null,
-      currency: demoAcct ? demoAcct.currency : null,
-      balance: demoAcct ? demoAcct.balance : null,
-      available: demoAcct ? demoAcct.available : null,
-      deposit: demoAcct ? demoAcct.deposit : null,
-      pnl: demoAcct ? demoAcct.profitLoss : null,
-      source: "demo-rest-api",
+      accountId: acctData ? acctData.accountId : (process.env.IG_ACCOUNT_ID || "Z3MJKY"),
+      accountType: acctData ? acctData.accountType : null,
+      currency: acctData ? acctData.currency : null,
+      balance: acctData ? acctData.balance : null,
+      available: acctData ? acctData.available : null,
+      deposit: acctData ? acctData.deposit : null,
+      pnl: acctData ? acctData.profitLoss : null,
+      source: activeProfile + "-rest-api",
     },
     streaming: {
       status: lsStatus,
