@@ -49,13 +49,15 @@ export OPENAI_BASE_URL="${AI_INTEGRATIONS_OPENAI_BASE_URL}"
 
 export OPENCLAW_HOME="$SCRIPT_DIR"
 
-if [ -d "$SCRIPT_DIR/docs" ]; then
+TEMPLATES_SRC="$SCRIPT_DIR/docs/reference/templates"
+TEMPLATES_DIST="$SCRIPT_DIR/dist/docs/reference/templates"
+if [ -d "$TEMPLATES_SRC" ]; then
+  mkdir -p "$TEMPLATES_DIST" 2>/dev/null || true
+  cp -f "$TEMPLATES_SRC"/*.md "$TEMPLATES_DIST/" 2>/dev/null || true
   ln -sf "$SCRIPT_DIR/docs" /home/runner/docs 2>/dev/null || true
-  mkdir -p "$SCRIPT_DIR/dist/../docs" 2>/dev/null || true
-  if [ ! -e "/home/runner/docs/reference/templates/AGENTS.md" ]; then
-    mkdir -p /home/runner/docs 2>/dev/null || true
-    cp -r "$SCRIPT_DIR/docs/"* /home/runner/docs/ 2>/dev/null || true
-  fi
+  mkdir -p /home/runner/docs/reference/templates 2>/dev/null || true
+  cp -f "$TEMPLATES_SRC"/*.md /home/runner/docs/reference/templates/ 2>/dev/null || true
+  echo "[start] Workspace templates synced ($(ls "$TEMPLATES_SRC"/*.md 2>/dev/null | wc -l) files)"
 fi
 
 PERSISTENT_DIR="$SCRIPT_DIR/.openclaw"
