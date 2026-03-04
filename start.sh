@@ -40,8 +40,13 @@ export OPENAI_BASE_URL="${AI_INTEGRATIONS_OPENAI_BASE_URL}"
 
 export OPENCLAW_HOME="$SCRIPT_DIR"
 
-if [ -d "$SCRIPT_DIR/docs" ] && [ -d "/home/runner" ]; then
+if [ -d "$SCRIPT_DIR/docs" ]; then
   ln -sf "$SCRIPT_DIR/docs" /home/runner/docs 2>/dev/null || true
+  mkdir -p "$SCRIPT_DIR/dist/../docs" 2>/dev/null || true
+  if [ ! -e "/home/runner/docs/reference/templates/AGENTS.md" ]; then
+    mkdir -p /home/runner/docs 2>/dev/null || true
+    cp -r "$SCRIPT_DIR/docs/"* /home/runner/docs/ 2>/dev/null || true
+  fi
 fi
 
 PERSISTENT_DIR="$SCRIPT_DIR/.openclaw"
