@@ -304,8 +304,11 @@ document.getElementById('ssCancelBtn').addEventListener('click', function() {
 
 var wsCurrentAgent = '';
 var wsAgents = [];
+var wsLoaded = false;
+var wsExpandedFolders = {};
 
-function loadWorkspaceAgents() {
+function loadWorkspaceAgents(force) {
+  if (wsLoaded && !force) return;
   apiFetch('/api/workspace/agents').then(function(r){ return r.json(); }).then(function(data) {
     wsAgents = data.agents || [];
     var tabsEl = document.getElementById('wsAgentTabs');
@@ -322,41 +325,81 @@ function loadWorkspaceAgents() {
     }
     tabsEl.innerHTML = html;
     loadWorkspaceFiles();
+    wsLoaded = true;
   }).catch(function(e) {
     document.getElementById('wsAgentTabs').innerHTML = '<span class="empty" style="color:#f85149">Error: ' + e.message + '</span>';
   });
 }
 
+function buildTree(files) {
+  var root = { children: {}, files: [] };
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    if (f.isDir) continue;
+    var parts = f.name.split('/');
+    var node = root;
+    for (var j = 0; j < parts.length - 1; j++) {
+      var dirName = parts[j];
+      if (!node.children[dirName]) {
+        var dirPath = parts.slice(0, j + 1).join('/');
+        node.children[dirName] = { children: {}, files: [], path: dirPath };
+      }
+      node = node.children[dirName];
+    }
+    node.files.push(f);
+  }
+  return root;
+}
+
+function renderTree(node, depth) {
+  var html = '';
+  var indent = depth * 20;
+  var dirNames = Object.keys(node.children).sort();
+  for (var d = 0; d < dirNames.length; d++) {
+    var dirName = dirNames[d];
+    var child = node.children[dirName];
+    var expanded = wsExpandedFolders[wsCurrentAgent + ':' + child.path];
+    var arrow = expanded ? '▼' : '▶';
+    html += '<div class="ws-folder" style="padding-left:' + (12 + indent) + 'px;cursor:pointer;user-select:none" data-ws-toggle="' + escHtml(child.path) + '">';
+    html += '<span style="color:#8b949e;font-size:11px;margin-right:4px">' + arrow + '</span>';
+    html += '<span class="ss-file-name">📁 ' + escHtml(dirName) + '</span>';
+    html += '<div class="ss-file-actions" style="margin-left:auto">';
+    html += '<button data-ws-delete="' + escHtml(child.path) + '" data-ws-agent="' + escHtml(wsCurrentAgent) + '" style="font-size:10px;padding:1px 6px">Delete</button>';
+    html += '</div>';
+    html += '</div>';
+    if (expanded) {
+      html += '<div class="ws-folder-contents">';
+      html += renderTree(child, depth + 1);
+      html += '</div>';
+    }
+  }
+  var sortedFiles = node.files.slice().sort(function(a, b) { return a.name.localeCompare(b.name); });
+  for (var fi = 0; fi < sortedFiles.length; fi++) {
+    var f = sortedFiles[fi];
+    var fileName = f.name.split('/').pop();
+    html += '<div class="ss-file" style="padding-left:' + (12 + indent) + 'px">';
+    html += '<span class="ss-file-name">📄 ' + escHtml(fileName) + '</span>';
+    html += '<span class="ss-file-size">' + formatSize(f.size) + '</span>';
+    html += '<div class="ss-file-actions">';
+    html += '<a href="/api/workspace/' + encodeURIComponent(wsCurrentAgent) + '/download/' + encodeURIComponent(f.name) + '" download>Download</a>';
+    html += '<button data-ws-delete="' + escHtml(f.name) + '" data-ws-agent="' + escHtml(wsCurrentAgent) + '">Delete</button>';
+    html += '</div>';
+    html += '</div>';
+  }
+  return html;
+}
+
 function loadWorkspaceFiles() {
   var el = document.getElementById('wsFileList');
   if (!wsCurrentAgent) { el.innerHTML = '<p class="empty">Select an agent</p>'; return; }
-  el.innerHTML = '<p class="empty">Loading...</p>';
+  if (!el.innerHTML || el.innerHTML.indexOf('empty') !== -1) {
+    el.innerHTML = '<p class="empty">Loading...</p>';
+  }
   apiFetch('/api/workspace/' + encodeURIComponent(wsCurrentAgent)).then(function(r){ return r.json(); }).then(function(data) {
     var files = data.files || [];
     if (!files.length) { el.innerHTML = '<p class="empty">Workspace is empty</p>'; return; }
-    files.sort(function(a,b) {
-      if (a.isDir && !b.isDir) return -1;
-      if (!a.isDir && b.isDir) return 1;
-      return a.name.localeCompare(b.name);
-    });
-    var html = '';
-    for (var i = 0; i < files.length; i++) {
-      var f = files[i];
-      var icon = f.isDir ? '📁' : '📄';
-      var indent = (f.name.split('/').length - 1) * 16;
-      html += '<div class="ss-file" style="padding-left:' + (12 + indent) + 'px">';
-      html += '<span class="ss-file-name">' + icon + ' ' + escHtml(f.name) + '</span>';
-      if (!f.isDir) {
-        html += '<span class="ss-file-size">' + formatSize(f.size) + '</span>';
-      }
-      html += '<div class="ss-file-actions">';
-      if (!f.isDir) {
-        html += '<a href="/api/workspace/' + encodeURIComponent(wsCurrentAgent) + '/download/' + encodeURIComponent(f.name) + '" download>Download</a>';
-      }
-      html += '<button data-ws-delete="' + escHtml(f.name) + '" data-ws-agent="' + escHtml(wsCurrentAgent) + '">Delete</button>';
-      html += '</div>';
-      html += '</div>';
-    }
+    var tree = buildTree(files);
+    var html = renderTree(tree, 0);
     el.innerHTML = html;
   }).catch(function(e) { el.innerHTML = '<p class="empty" style="color:#f85149">Error: ' + e.message + '</p>'; });
 }
@@ -365,7 +408,18 @@ document.getElementById('wsAgentTabs').addEventListener('click', function(e) {
   var btn = e.target.closest('.ws-agent-tab');
   if (!btn) return;
   wsCurrentAgent = btn.getAttribute('data-agent');
-  loadWorkspaceAgents();
+  wsLoaded = false;
+  loadWorkspaceAgents(true);
+});
+
+document.getElementById('wsFileList').addEventListener('click', function(e) {
+  var toggle = e.target.closest('[data-ws-toggle]');
+  if (toggle) {
+    var folderPath = toggle.getAttribute('data-ws-toggle');
+    var key = wsCurrentAgent + ':' + folderPath;
+    wsExpandedFolders[key] = !wsExpandedFolders[key];
+    loadWorkspaceFiles();
+  }
 });
 
 function wsUploadFiles(fileList, stripPrefix) {
@@ -469,7 +523,9 @@ document.addEventListener('click', function(e) {
   }
 });
 
-function refresh() { loadKeys(); loadWorkers(); loadWorkspaceAgents(); loadExchange(); loadSharedspace(); loadChat(); }
-document.getElementById('refreshBtn').addEventListener('click', refresh);
+function refresh() { loadKeys(); loadWorkers(); loadExchange(); loadSharedspace(); loadChat(); }
+function refreshAll() { refresh(); loadWorkspaceAgents(true); }
+document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+loadWorkspaceAgents(false);
 refresh();
 setInterval(refresh, 10000);
