@@ -501,7 +501,7 @@ document.getElementById('wsFileInput').addEventListener('change', function(e) {
 
 document.getElementById('wsFolderInput').addEventListener('change', function(e) {
   var files = e.target.files;
-  if (files && files.length) wsUploadFiles(Array.from(files), true);
+  if (files && files.length) wsUploadFiles(Array.from(files), false);
   e.target.value = '';
 });
 
