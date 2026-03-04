@@ -4,18 +4,27 @@ echo "[start] CWD: $(pwd)"
 echo "[start] HOME: $HOME"
 echo "[start] Node: $(node --version 2>/dev/null || echo 'NOT FOUND')"
 echo "[start] Date: $(date -u)"
+echo "[start] PID: $$ (PID 1: $(cat /proc/1/comm 2>/dev/null || echo unknown))"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 echo "[start] Workspace: $SCRIPT_DIR"
 
-if [ "$$" != "1" ]; then
+if [ "$$" = "1" ]; then
+  echo "[start] Running as PID 1 (deployment mode)"
+else
   trap 'kill -9 1' TERM INT
 fi
 
 if [ ! -d "node_modules/ws" ] || [ ! -d "node_modules/lightstreamer-client-node" ]; then
   echo "[start] Installing runtime dependencies..."
   npm install --omit=dev --legacy-peer-deps --prefer-offline --no-audit --no-fund 2>&1 | tail -5
+  echo "[start] npm install done (exit: $?)"
+fi
+
+if [ ! -f "dist/entry.js" ]; then
+  echo "[start] FATAL: dist/entry.js not found — cannot start gateway"
+  exit 1
 fi
 
 TOKEN="${OPENCLAW_GATEWAY_TOKEN}"
@@ -79,10 +88,15 @@ export OPENCLAW_GATEWAY_PORT=5001
 echo "[start] Launching CEO proxy on port 5000..."
 node ceo-proxy.cjs &
 PROXY_PID=$!
+echo "[start] CEO proxy PID: $PROXY_PID"
 
-for i in 1 2 3 4 5 6 7 8 9 10; do
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
   if node -e "const n=require('net');const c=n.createConnection(5000,'127.0.0.1');c.on('connect',()=>{c.end();process.exit(0)});c.on('error',()=>process.exit(1))" 2>/dev/null; then
     echo "[start] CEO proxy ready on port 5000 (attempt $i)"
+    break
+  fi
+  if ! kill -0 $PROXY_PID 2>/dev/null; then
+    echo "[start] ERROR: CEO proxy process died (PID $PROXY_PID)"
     break
   fi
   sleep 1
