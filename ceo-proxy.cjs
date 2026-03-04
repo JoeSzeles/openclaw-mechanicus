@@ -1074,7 +1074,9 @@ async function handleIgApi(req, res, p) {
 
     if (req.method === "GET" && p === "/api/ig/stream/prices") {
       const prices = getStreamedPrices();
-      return json(res, 200, { streaming: lsStatus === "connected", prices });
+      const isL1Streaming = lsStatus === "connected" && lsConnectedEpics.length > 0;
+      const isHybridPolling = !!lsHybridPollingTimer;
+      return json(res, 200, { streaming: isL1Streaming, polling: isHybridPolling, method: isL1Streaming ? "lightstreamer" : isHybridPolling ? "rest-polling" : "none", prices });
     }
 
     if (req.method === "GET" && p === "/api/ig/stream/status") {
@@ -1095,8 +1097,10 @@ async function handleIgApi(req, res, p) {
         activeProfile: getActiveIgProfile()?.profileName || null,
         lightstreamerEndpoint: lsLiveClient ? (lsLiveSession.lightstreamerEndpoint || null) : (igSession.lightstreamerEndpoint || null),
         liveStreamingActive: !!lsLiveClient,
+        hybridPolling: !!lsHybridPollingTimer,
         streamingSource: lsLiveClient ? "live" : (getActiveIgProfile()?.profileName || null),
-        priceSource: lsLiveClient ? "live-api" : (lsConnectedEpics.length > 0 ? "active-profile" : "hybrid-polling"),
+        priceSource: lsConnectedEpics.length > 0 ? (lsLiveClient ? "lightstreamer-live" : "lightstreamer-" + (getActiveIgProfile()?.profileName || "demo")) : (lsHybridPollingTimer ? "rest-polling" : "none"),
+        priceMethod: lsConnectedEpics.length > 0 ? "LIGHTSTREAMER L1" : (lsHybridPollingTimer ? "REST POLLING (every 3s)" : "DISCONNECTED"),
         reconnect: {
           attempts: lsReconnectAttempts,
           maxAttempts: LS_MAX_RECONNECT_ATTEMPTS,
