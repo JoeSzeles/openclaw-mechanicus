@@ -1231,6 +1231,9 @@ async function resetStats() {
   scalperPositions = [];
   tradeLog = [];
   saveTradeLog();
+  if (dbAvailable) {
+    try { await db.clearTrades(); } catch (e) { log("WARN", "DB clearTrades failed: " + e.message); }
+  }
   if (config) {
     config._drawdownTripped = false;
     for (const s of (config.strategies || [])) {
@@ -1241,7 +1244,7 @@ async function resetStats() {
     }
     await saveConfig();
   }
-  log("INFO", "Stats reset (all strategy dealIds cleared)");
+  log("INFO", "Stats reset (all strategy dealIds cleared, DB trades cleared)");
   return { ok: true };
 }
 

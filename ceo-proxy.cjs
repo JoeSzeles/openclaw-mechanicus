@@ -90,6 +90,7 @@ function isLoginExempt(req) {
       p.startsWith("/api/ig/pricehistory") || p.startsWith("/api/ig/watchlists") || p.startsWith("/api/ig/activity") ||
       p.startsWith("/api/ig/session") || p === "/api/ig/refresh-snapshots" ||
       p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/strategy-templates") || p.startsWith("/api/ig/proofread") || p.startsWith("/api/ig/watchedlist") || p.startsWith("/api/ig/scalper") ||
+      p.startsWith("/api/agents/") ||
       p.startsWith("/api/bots") || p.startsWith("/api/processes")) {
     if (hasValidBearerToken(req)) return true;
   }
@@ -2082,7 +2083,81 @@ async function handleIgApi(req, res, p) {
       return json(res, 200, bt);
     }
 
-    return json(res, 404, { error: "Unknown IG endpoint. Available: GET positions, POST positions/open, POST positions/close, PUT positions/update, GET workingorders, POST workingorders/create, PUT workingorders/update, DELETE workingorders/delete, GET account, GET prices, GET markets, GET markets/{epic}, GET marketnavigation, GET pricehistory/{epic}, GET watchlists, GET history, GET activity, GET confirms/{ref}, GET session, POST session/refresh, GET stream/prices, GET stream/status, GET/POST strategies, PUT strategies/:i, DELETE strategies/:i, POST strategies/:i/toggle, POST strategies/:i/attach, POST strategies/:i/detach, POST strategies/:i/pause, POST strategies/global, GET/POST/DELETE watchedlist, GET/PUT scalper, GET scalper/status, POST scalper/start, POST scalper/stop, POST scalper/reset, GET/POST scalper/strategies, PUT/DELETE scalper/strategies/:i, POST scalper/strategies/:i/toggle, POST scalper/strategies/:i/backtest, GET scalper/strategies/:i/backtests, GET scalper/backtests/:i" });
+    return json(res, 404, { error: "Unknown IG endpoint" });
+  } catch (e) {
+    return json(res, 500, { error: e.message });
+  }
+}
+
+async function handleAgentsApi(req, res, p) {
+  const agentBackupMatch = p.match(/^\/api\/agents\/([^/]+)\/backup$/);
+  const agentBackupsMatch = p.match(/^\/api\/agents\/([^/]+)\/backups$/);
+  const agentRestoreMatch = p.match(/^\/api\/agents\/([^/]+)\/restore\/(\d+)$/);
+  const agentBackupDelMatch = p.match(/^\/api\/agents\/([^/]+)\/backup\/(\d+)$/);
+  const agentMemoryMatch = p.match(/^\/api\/agents\/([^/]+)\/memory$/);
+  const agentDailyListMatch = p.match(/^\/api\/agents\/([^/]+)\/memory\/daily$/);
+  const agentDailyMatch = p.match(/^\/api\/agents\/([^/]+)\/memory\/daily\/(\d{4}-\d{2}-\d{2})$/);
+  const agentMemSearchMatch = p.match(/^\/api\/agents\/([^/]+)\/memory\/search$/);
+  const agentSubAllMatch = p.match(/^\/api\/agents\/([^/]+)\/subconscious$/);
+  const agentSubReflectMatch = p.match(/^\/api\/agents\/([^/]+)\/subconscious\/reflect$/);
+  const agentSubCatMatch = p.match(/^\/api\/agents\/([^/]+)\/subconscious\/([^/]+)$/);
+  const agentSubEntryMatch = p.match(/^\/api\/agents\/([^/]+)\/subconscious\/([^/]+)\/(.+)$/);
+
+  const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+  try {
+    if (req.method === "POST" && agentBackupMatch) {
+      let body = {}; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) {}
+      return json(res, 200, await scalperDb.backupAgent(agentBackupMatch[1], body.name));
+    }
+    if (req.method === "GET" && agentBackupsMatch) {
+      return json(res, 200, { backups: await scalperDb.listAgentBackups(agentBackupsMatch[1]) });
+    }
+    if (req.method === "POST" && agentRestoreMatch) {
+      return json(res, 200, await scalperDb.restoreAgentBackup(parseInt(agentRestoreMatch[2], 10)));
+    }
+    if (req.method === "DELETE" && agentBackupDelMatch) {
+      return json(res, 200, await scalperDb.deleteAgentBackup(parseInt(agentBackupDelMatch[2], 10)));
+    }
+    if (req.method === "GET" && agentMemoryMatch) {
+      return json(res, 200, await scalperDb.getAgentMemory(agentMemoryMatch[1]));
+    }
+    if (req.method === "PUT" && agentMemoryMatch) {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      return json(res, 200, await scalperDb.setAgentMemory(agentMemoryMatch[1], body.content || ""));
+    }
+    if (req.method === "GET" && agentDailyListMatch) {
+      return json(res, 200, { entries: await scalperDb.listDailyMemories(agentDailyListMatch[1]) });
+    }
+    if (req.method === "GET" && agentDailyMatch) {
+      return json(res, 200, await scalperDb.getDailyMemory(agentDailyMatch[1], agentDailyMatch[2]));
+    }
+    if (req.method === "PUT" && agentDailyMatch) {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      return json(res, 200, await scalperDb.setDailyMemory(agentDailyMatch[1], agentDailyMatch[2], body.content || ""));
+    }
+    if (req.method === "GET" && agentMemSearchMatch) {
+      const searchUrl = new URL(req.url, "http://localhost");
+      const q = searchUrl.searchParams.get("q") || "";
+      if (!q) return json(res, 400, { error: "Missing ?q= search term" });
+      return json(res, 200, { results: await scalperDb.searchMemory(agentMemSearchMatch[1], q) });
+    }
+    if (req.method === "GET" && agentSubReflectMatch) {
+      return json(res, 200, { reflection: await scalperDb.reflectSubconscious(agentSubReflectMatch[1]) });
+    }
+    if (req.method === "GET" && agentSubAllMatch) {
+      return json(res, 200, await scalperDb.getAllSubconscious(agentSubAllMatch[1]));
+    }
+    if (req.method === "GET" && agentSubCatMatch) {
+      return json(res, 200, { entries: await scalperDb.getSubconscious(agentSubCatMatch[1], agentSubCatMatch[2]) });
+    }
+    if (req.method === "PUT" && agentSubEntryMatch) {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      return json(res, 200, await scalperDb.setSubconscious(agentSubEntryMatch[1], agentSubEntryMatch[2], decodeURIComponent(agentSubEntryMatch[3]), body.value || ""));
+    }
+    if (req.method === "DELETE" && agentSubEntryMatch) {
+      return json(res, 200, await scalperDb.deleteSubconscious(agentSubEntryMatch[1], agentSubEntryMatch[2], decodeURIComponent(agentSubEntryMatch[3])));
+    }
+    return json(res, 404, { error: "Unknown agent endpoint" });
   } catch (e) {
     return json(res, 500, { error: e.message });
   }
@@ -3780,6 +3855,7 @@ async function handleApi(req, res) {
     }
     await handleIgApi(req, res, p); return true;
   }
+  if (p.startsWith("/api/agents/")) { await handleAgentsApi(req, res, p); return true; }
   if (p.startsWith("/api/bots")) { await handleBotsApi(req, res, p); return true; }
   if (p.startsWith("/api/processes")) { await handleProcesses(req, res, p); return true; }
   if (p.startsWith("/api/canvas")) { await handleCanvasApi(req, res, p); return true; }

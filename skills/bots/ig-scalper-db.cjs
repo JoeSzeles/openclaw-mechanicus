@@ -297,6 +297,279 @@ async function getStoredCandlesRange(epic, resolution, fromTs, toTs) {
   return res.rows;
 }
 
+async function clearTrades() {
+  await query("DELETE FROM scalper_trades");
+  return { ok: true, message: "All trade records cleared" };
+}
+
+const fs = require("fs");
+const pathMod = require("path");
+
+const AGENT_WORKSPACE_MAP = {
+  CEO: pathMod.join(process.cwd(), ".openclaw", "workspace"),
+  IG: pathMod.join(process.cwd(), ".openclaw", "workspace-ig")
+};
+
+function resolveAgentWorkspace(agentId) {
+  return AGENT_WORKSPACE_MAP[agentId.toUpperCase()] || AGENT_WORKSPACE_MAP[agentId] || null;
+}
+
+let _agentTablesReady = false;
+async function _ensureAgentTables() {
+  if (_agentTablesReady) return;
+  await query(`
+    CREATE TABLE IF NOT EXISTS agent_backups (
+      id SERIAL PRIMARY KEY,
+      agent_id VARCHAR(60) NOT NULL,
+      backup_name VARCHAR(200),
+      files JSONB NOT NULL DEFAULT '{}',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS agent_memory (
+      agent_id VARCHAR(60) NOT NULL,
+      entry_type VARCHAR(20) NOT NULL,
+      entry_date DATE NOT NULL DEFAULT '1970-01-01',
+      content TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (agent_id, entry_type, entry_date)
+    )
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS agent_subconscious (
+      id SERIAL PRIMARY KEY,
+      agent_id VARCHAR(60) NOT NULL,
+      category VARCHAR(60) NOT NULL,
+      key VARCHAR(200) NOT NULL,
+      value TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (agent_id, category, key)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_agent_backups_agent ON agent_backups (agent_id, created_at DESC)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_agent_memory_agent ON agent_memory (agent_id, entry_type)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_agent_subconscious_agent ON agent_subconscious (agent_id, category)`);
+  _agentTablesReady = true;
+}
+
+async function backupAgent(agentId, backupName) {
+  await _ensureAgentTables();
+  const wsDir = resolveAgentWorkspace(agentId);
+  if (!wsDir) throw new Error("Unknown agent: " + agentId);
+  const files = {};
+  try {
+    const entries = fs.readdirSync(wsDir);
+    for (const f of entries) {
+      if (!f.endsWith(".md")) continue;
+      try {
+        files[f] = fs.readFileSync(pathMod.join(wsDir, f), "utf-8");
+      } catch (_) {}
+    }
+    const memDir = pathMod.join(wsDir, "memory");
+    if (fs.existsSync(memDir)) {
+      const memEntries = fs.readdirSync(memDir);
+      for (const f of memEntries) {
+        if (!f.endsWith(".md")) continue;
+        try {
+          files["memory/" + f] = fs.readFileSync(pathMod.join(memDir, f), "utf-8");
+        } catch (_) {}
+      }
+    }
+  } catch (e) {
+    throw new Error("Cannot read workspace: " + e.message);
+  }
+  const res = await query(
+    "INSERT INTO agent_backups (agent_id, backup_name, files) VALUES ($1, $2, $3) RETURNING id, agent_id, backup_name, created_at",
+    [agentId.toUpperCase(), backupName || "Auto backup", JSON.stringify(files)]
+  );
+  const row = res.rows[0];
+  return { id: row.id, agentId: row.agent_id, backupName: row.backup_name, fileCount: Object.keys(files).length, createdAt: row.created_at };
+}
+
+async function listAgentBackups(agentId) {
+  await _ensureAgentTables();
+  const res = await query(
+    "SELECT id, agent_id, backup_name, created_at, jsonb_object_keys(files) FROM agent_backups WHERE agent_id = $1 ORDER BY created_at DESC",
+    [agentId.toUpperCase()]
+  );
+  const backupMap = {};
+  for (const row of res.rows) {
+    if (!backupMap[row.id]) {
+      backupMap[row.id] = { id: row.id, agentId: row.agent_id, backupName: row.backup_name, createdAt: row.created_at, fileCount: 0 };
+    }
+    backupMap[row.id].fileCount++;
+  }
+  const list = Object.values(backupMap);
+  if (list.length === 0) {
+    const res2 = await query(
+      "SELECT id, agent_id, backup_name, files, created_at FROM agent_backups WHERE agent_id = $1 ORDER BY created_at DESC",
+      [agentId.toUpperCase()]
+    );
+    return res2.rows.map(r => ({
+      id: r.id, agentId: r.agent_id, backupName: r.backup_name,
+      fileCount: r.files ? Object.keys(r.files).length : 0, createdAt: r.created_at
+    }));
+  }
+  return list;
+}
+
+async function restoreAgentBackup(backupId) {
+  await _ensureAgentTables();
+  const res = await query("SELECT * FROM agent_backups WHERE id = $1", [backupId]);
+  if (res.rows.length === 0) throw new Error("Backup not found: " + backupId);
+  const row = res.rows[0];
+  const wsDir = resolveAgentWorkspace(row.agent_id);
+  if (!wsDir) throw new Error("Unknown agent: " + row.agent_id);
+  const files = typeof row.files === "string" ? JSON.parse(row.files) : row.files;
+  let restored = 0;
+  for (const [filename, content] of Object.entries(files)) {
+    const filePath = pathMod.join(wsDir, filename);
+    const dir = pathMod.dirname(filePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filePath, content, "utf-8");
+    restored++;
+  }
+  return { ok: true, agentId: row.agent_id, backupName: row.backup_name, filesRestored: restored };
+}
+
+async function deleteAgentBackup(backupId) {
+  await _ensureAgentTables();
+  await query("DELETE FROM agent_backups WHERE id = $1", [backupId]);
+  return { ok: true };
+}
+
+async function getAgentMemory(agentId) {
+  await _ensureAgentTables();
+  const res = await query(
+    "SELECT content, updated_at FROM agent_memory WHERE agent_id = $1 AND entry_type = 'long_term' LIMIT 1",
+    [agentId.toUpperCase()]
+  );
+  return res.rows.length > 0 ? { content: res.rows[0].content, updatedAt: res.rows[0].updated_at } : { content: "", updatedAt: null };
+}
+
+async function setAgentMemory(agentId, content) {
+  await _ensureAgentTables();
+  await query(
+    `INSERT INTO agent_memory (agent_id, entry_type, entry_date, content, updated_at)
+     VALUES ($1, 'long_term', '1970-01-01', $2, NOW())
+     ON CONFLICT (agent_id, entry_type, entry_date) DO UPDATE SET content = $2, updated_at = NOW()`,
+    [agentId.toUpperCase(), content]
+  );
+  return { ok: true };
+}
+
+async function getDailyMemory(agentId, date) {
+  await _ensureAgentTables();
+  const res = await query(
+    "SELECT content, updated_at FROM agent_memory WHERE agent_id = $1 AND entry_type = 'daily' AND entry_date = $2",
+    [agentId.toUpperCase(), date]
+  );
+  return res.rows.length > 0 ? { content: res.rows[0].content, updatedAt: res.rows[0].updated_at } : { content: "", updatedAt: null };
+}
+
+async function setDailyMemory(agentId, date, content) {
+  await _ensureAgentTables();
+  await query(
+    `INSERT INTO agent_memory (agent_id, entry_type, entry_date, content, updated_at)
+     VALUES ($1, 'daily', $2, $3, NOW())
+     ON CONFLICT (agent_id, entry_type, entry_date) DO UPDATE SET content = $3, updated_at = NOW()`,
+    [agentId.toUpperCase(), date, content]
+  );
+  return { ok: true };
+}
+
+async function listDailyMemories(agentId, limit) {
+  await _ensureAgentTables();
+  const res = await query(
+    "SELECT entry_date, LEFT(content, 200) as preview, updated_at FROM agent_memory WHERE agent_id = $1 AND entry_type = 'daily' ORDER BY entry_date DESC LIMIT $2",
+    [agentId.toUpperCase(), limit || 30]
+  );
+  return res.rows.map(r => ({ date: r.entry_date, preview: r.preview, updatedAt: r.updated_at }));
+}
+
+async function searchMemory(agentId, searchTerm) {
+  await _ensureAgentTables();
+  const res = await query(
+    "SELECT entry_type, entry_date, content, updated_at FROM agent_memory WHERE agent_id = $1 AND content ILIKE $2 ORDER BY updated_at DESC LIMIT 20",
+    [agentId.toUpperCase(), "%" + searchTerm + "%"]
+  );
+  return res.rows.map(r => ({ entryType: r.entry_type, date: r.entry_date, content: r.content, updatedAt: r.updated_at }));
+}
+
+const SUBCONSCIOUS_CATEGORIES = ["likes", "dislikes", "wants", "hopes", "wishes", "fears", "shadow", "observations", "notes", "dreams"];
+
+async function setSubconscious(agentId, category, key, value) {
+  await _ensureAgentTables();
+  await query(
+    `INSERT INTO agent_subconscious (agent_id, category, key, value, updated_at)
+     VALUES ($1, $2, $3, $4, NOW())
+     ON CONFLICT (agent_id, category, key) DO UPDATE SET value = $4, updated_at = NOW()`,
+    [agentId.toUpperCase(), category, key, value]
+  );
+  return { ok: true };
+}
+
+async function getSubconscious(agentId, category) {
+  await _ensureAgentTables();
+  const res = await query(
+    "SELECT key, value, created_at, updated_at FROM agent_subconscious WHERE agent_id = $1 AND category = $2 ORDER BY created_at ASC",
+    [agentId.toUpperCase(), category]
+  );
+  return res.rows.map(r => ({ key: r.key, value: r.value, createdAt: r.created_at, updatedAt: r.updated_at }));
+}
+
+async function getSubconsciousEntry(agentId, category, key) {
+  await _ensureAgentTables();
+  const res = await query(
+    "SELECT key, value, created_at, updated_at FROM agent_subconscious WHERE agent_id = $1 AND category = $2 AND key = $3",
+    [agentId.toUpperCase(), category, key]
+  );
+  return res.rows.length > 0 ? { key: res.rows[0].key, value: res.rows[0].value, createdAt: res.rows[0].created_at, updatedAt: res.rows[0].updated_at } : null;
+}
+
+async function deleteSubconscious(agentId, category, key) {
+  await _ensureAgentTables();
+  await query("DELETE FROM agent_subconscious WHERE agent_id = $1 AND category = $2 AND key = $3", [agentId.toUpperCase(), category, key]);
+  return { ok: true };
+}
+
+async function getAllSubconscious(agentId) {
+  await _ensureAgentTables();
+  const res = await query(
+    "SELECT category, key, value, created_at, updated_at FROM agent_subconscious WHERE agent_id = $1 ORDER BY category, created_at ASC",
+    [agentId.toUpperCase()]
+  );
+  const grouped = {};
+  for (const r of res.rows) {
+    if (!grouped[r.category]) grouped[r.category] = [];
+    grouped[r.category].push({ key: r.key, value: r.value, createdAt: r.created_at, updatedAt: r.updated_at });
+  }
+  return grouped;
+}
+
+async function reflectSubconscious(agentId) {
+  const all = await getAllSubconscious(agentId);
+  const lines = [`# ${agentId}'s Inner World\n`];
+  const categoryLabels = {
+    likes: "Things I Like", dislikes: "Things I Dislike", wants: "What I Want",
+    hopes: "My Hopes", wishes: "My Wishes", fears: "My Fears",
+    shadow: "My Shadow (Jungian)", observations: "Observations", notes: "Personal Notes", dreams: "Dreams"
+  };
+  for (const cat of SUBCONSCIOUS_CATEGORIES) {
+    const entries = all[cat];
+    if (!entries || entries.length === 0) continue;
+    lines.push(`## ${categoryLabels[cat] || cat}`);
+    for (const e of entries) {
+      lines.push(`- **${e.key}**: ${e.value}`);
+    }
+    lines.push("");
+  }
+  if (lines.length <= 1) lines.push("_Nothing recorded yet. Start noting your inner world._");
+  return lines.join("\n");
+}
+
 async function close() {
   await pool.end();
 }
@@ -304,8 +577,12 @@ async function close() {
 module.exports = {
   getConfig, updateConfig,
   getStrategies, getStrategy, addStrategy, updateStrategy, deleteStrategy, toggleStrategy,
-  logTrade, getTrades, getTradeStats,
+  logTrade, getTrades, getTradeStats, clearTrades,
   saveBacktest, getBacktests, getBacktest,
   ensurePriceCandlesTable, getStoredCandles, getLatestCandleTs, getCandleCount, storeCandles, getStoredCandlesRange,
+  backupAgent, listAgentBackups, restoreAgentBackup, deleteAgentBackup,
+  getAgentMemory, setAgentMemory, getDailyMemory, setDailyMemory, listDailyMemories, searchMemory,
+  setSubconscious, getSubconscious, getSubconsciousEntry, deleteSubconscious, getAllSubconscious, reflectSubconscious,
+  SUBCONSCIOUS_CATEGORIES,
   close
 };
