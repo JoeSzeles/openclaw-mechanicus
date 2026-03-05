@@ -73,7 +73,7 @@ const STRATEGY_COLS = [
   "rsi_enabled", "rsi_period", "rsi_overbought", "rsi_oversold",
   "ema_enabled", "ema_short", "ema_long",
   "macd_enabled", "macd_fast", "macd_slow", "macd_signal",
-  "contract_size", "deal_id"
+  "contract_size", "deal_id", "timeframe"
 ];
 
 const CAMEL_TO_SNAKE = {};
@@ -190,6 +190,30 @@ async function getTradeStats() {
   };
 }
 
+async function saveBacktest(data) {
+  const res = await query(
+    `INSERT INTO scalper_backtests (strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl, max_drawdown, sharpe_ratio, avg_win, avg_loss, trades, config_snapshot)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+    [data.strategyId, data.timeframe, data.candleCount, data.totalTrades, data.winCount, data.lossCount,
+     data.winRate, data.totalPnl, data.maxDrawdown, data.sharpeRatio, data.avgWin, data.avgLoss,
+     JSON.stringify(data.trades), JSON.stringify(data.configSnapshot)]
+  );
+  return camel(res.rows[0]);
+}
+
+async function getBacktests(strategyId, limit = 20) {
+  const res = await query(
+    "SELECT id, strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl, max_drawdown, sharpe_ratio, avg_win, avg_loss, created_at FROM scalper_backtests WHERE strategy_id = $1 ORDER BY created_at DESC LIMIT $2",
+    [strategyId, limit]
+  );
+  return res.rows.map(camel);
+}
+
+async function getBacktest(id) {
+  const res = await query("SELECT * FROM scalper_backtests WHERE id = $1", [id]);
+  return camel(res.rows[0]);
+}
+
 async function close() {
   await pool.end();
 }
@@ -198,5 +222,6 @@ module.exports = {
   getConfig, updateConfig,
   getStrategies, getStrategy, addStrategy, updateStrategy, deleteStrategy, toggleStrategy,
   logTrade, getTrades, getTradeStats,
+  saveBacktest, getBacktests, getBacktest,
   close
 };

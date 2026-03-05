@@ -1587,16 +1587,40 @@ async function handleIgApi(req, res, p) {
       if (!epic) return json(res, 400, { error: "Missing epic" });
       const url = new URL("http://localhost" + req.url);
       const resolution = url.searchParams.get("resolution") || "HOUR";
-      const max = url.searchParams.get("max") || "50";
+      const max = parseInt(url.searchParams.get("max") || "50", 10);
       const from = url.searchParams.get("from") || "";
       const to = url.searchParams.get("to") || "";
-      let qs = `?resolution=${resolution}&max=${max}`;
-      if (from) qs += `&from=${from}`;
-      if (to) qs += `&to=${to}`;
+      const priceCacheKey = `prices:${epic}:${resolution}:${max}:${from}:${to}`;
+      const priceCached = igCacheGet(priceCacheKey);
+      if (priceCached) return json(res, 200, priceCached);
       const session = await igAuth();
-      const r = await igRequest("GET", "/prices/" + epic + qs, { ...igHeaders(session), Version: "3" });
-      if (r.status !== 200) return json(res, r.status, { error: "IG API error", detail: r.body });
-      return igJsonResponse(res, 200, r.body);
+      let allPrices = [];
+      let pageNum = 1;
+      const maxPages = Math.ceil(max / 20) + 1;
+      while (pageNum <= maxPages && allPrices.length < max) {
+        let qs = `?resolution=${resolution}&max=${max}&pageNumber=${pageNum}`;
+        if (from) qs += `&from=${encodeURIComponent(from)}`;
+        if (to) qs += `&to=${encodeURIComponent(to)}`;
+        const r = await igRequest("GET", "/prices/" + epic + qs, { ...igHeaders(session), Version: "3" });
+        if (r.status !== 200) {
+          if (allPrices.length > 0) break;
+          return json(res, r.status, { error: "IG API error", detail: r.body });
+        }
+        const body = safeParseIgBody(r.body);
+        if (body._parseError) {
+          if (allPrices.length > 0) break;
+          return json(res, 502, { error: "IG returned non-JSON", detail: body._raw });
+        }
+        const prices = body.prices || [];
+        allPrices = allPrices.concat(prices);
+        const pd = body.metadata && body.metadata.pageData;
+        if (!pd || pageNum >= pd.totalPages) break;
+        pageNum++;
+        if (pageNum <= maxPages) await new Promise(r => setTimeout(r, 200));
+      }
+      const result = { prices: allPrices, instrumentType: "CURRENCIES", metadata: { size: allPrices.length, pages: pageNum } };
+      igCacheSet(priceCacheKey, result);
+      return json(res, 200, result);
     }
 
     if (req.method === "GET" && p === "/api/ig/watchlists") {
@@ -1924,6 +1948,34 @@ async function handleIgApi(req, res, p) {
       return json(res, 200, result);
     }
 
+    const backtestRunMatch = p.match(/^\/api\/ig\/scalper\/strategies\/(\d+)\/backtest$/);
+    if (req.method === "POST" && backtestRunMatch) {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      try {
+        const backtestEngine = require("./skills/bots/ig-scalper-backtest.cjs");
+        const result = await backtestEngine.runAndSave(parseInt(backtestRunMatch[1], 10), {
+          timeframe: body.timeframe,
+          candleCount: parseInt(body.candleCount, 10) || 500
+        });
+        return json(res, 200, { ok: true, ...result });
+      } catch (e) {
+        return json(res, 500, { error: e.message });
+      }
+    }
+    const backtestListMatch = p.match(/^\/api\/ig\/scalper\/strategies\/(\d+)\/backtests$/);
+    if (req.method === "GET" && backtestListMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const list = await scalperDb.getBacktests(parseInt(backtestListMatch[1], 10));
+      return json(res, 200, { backtests: list });
+    }
+    const backtestDetailMatch = p.match(/^\/api\/ig\/scalper\/backtests\/(\d+)$/);
+    if (req.method === "GET" && backtestDetailMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const bt = await scalperDb.getBacktest(parseInt(backtestDetailMatch[1], 10));
+      if (!bt) return json(res, 404, { error: "Backtest not found" });
+      return json(res, 200, bt);
+    }
+
     return json(res, 404, { error: "Unknown IG endpoint. Available: GET positions, POST positions/open, POST positions/close, PUT positions/update, GET workingorders, POST workingorders/create, PUT workingorders/update, DELETE workingorders/delete, GET account, GET prices, GET markets, GET markets/{epic}, GET marketnavigation, GET pricehistory/{epic}, GET watchlists, GET history, GET activity, GET confirms/{ref}, GET session, POST session/refresh, GET stream/prices, GET stream/status, GET/POST strategies, PUT strategies/:i, DELETE strategies/:i, POST strategies/:i/toggle, POST strategies/:i/attach, POST strategies/:i/detach, POST strategies/:i/pause, POST strategies/global, GET/POST/DELETE watchedlist, GET/PUT scalper, GET scalper/status, POST scalper/start, POST scalper/stop, POST scalper/reset, GET/POST scalper/strategies, PUT/DELETE scalper/strategies/:i, POST scalper/strategies/:i/toggle" });
   } catch (e) {
     return json(res, 500, { error: e.message });
@@ -2143,7 +2195,7 @@ function autoRegisterBotScripts() {
   const registry = loadBotRegistry();
   const newBots = [];
   try {
-    const SKIP_BOTS = new Set(["ig-scalper-engine", "ig-scalper-db"]);
+    const SKIP_BOTS = new Set(["ig-scalper-engine", "ig-scalper-db", "ig-scalper-backtest"]);
     const files = fs.readdirSync(BOTS_DIR).filter(f => f.endsWith(".cjs") && !SKIP_BOTS.has(f.replace(/\.cjs$/, "")));
     for (const file of files) {
       const id = file.replace(/\.cjs$/, "");
