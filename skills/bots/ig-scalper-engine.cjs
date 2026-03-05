@@ -58,7 +58,9 @@ let startedAt = null;
 let proxyDeps = null;
 
 const TIMEFRAME_MS = {
-  TICK: 0, SECOND: 1000, MINUTE: 60000, MINUTE_2: 120000, MINUTE_3: 180000,
+  TICK: 0, SECOND: 1000, SECOND_2: 2000, SECOND_5: 5000, SECOND_10: 10000,
+  SECOND_20: 20000, SECOND_30: 30000, SECOND_40: 40000,
+  MINUTE: 60000, MINUTE_2: 120000, MINUTE_3: 180000,
   MINUTE_5: 300000, MINUTE_10: 600000, MINUTE_15: 900000, MINUTE_30: 1800000,
   HOUR: 3600000, HOUR_2: 7200000, HOUR_3: 10800000, HOUR_4: 14400000,
   DAY: 86400000, WEEK: 604800000
@@ -1022,6 +1024,22 @@ async function start() {
     log("INFO", `Preserving ${hadOpenPositions} open position(s) across restart`);
     tickBuffers = {}; candleBuffers = {}; currentCandles = {};
     cooldowns = {};
+  }
+
+  try {
+    const igData = await proxyGet("/api/ig/positions");
+    if (igData && Array.isArray(igData.positions)) {
+      const igDealIds = new Set(igData.positions.map(p => p.position?.dealId).filter(Boolean));
+      for (const strat of (config.strategies || [])) {
+        if (strat.dealId && !igDealIds.has(strat.dealId)) {
+          log("INFO", `Clearing stale dealId ${strat.dealId} from strategy "${strat.name}" (position no longer open on IG)`);
+          strat.dealId = null;
+          if (dbAvailable) await saveStrategyField(strat, "dealId", null);
+        }
+      }
+    }
+  } catch (e) {
+    log("WARN", `Stale dealId check failed: ${e.message}`);
   }
 
   running = true;

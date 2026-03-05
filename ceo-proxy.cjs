@@ -255,7 +255,8 @@ const LS_RECONNECT_MAX_DELAY = 120000;
 let lsHybridPollingTimer = null;
 
 const STREAM_RESOLUTIONS = {
-  SECOND: 1, MINUTE: 60, MINUTE_5: 300, MINUTE_15: 900, HOUR: 3600, HOUR_4: 14400, DAY: 86400
+  SECOND: 1, SECOND_2: 2, SECOND_5: 5, SECOND_10: 10, SECOND_20: 20, SECOND_30: 30, SECOND_40: 40,
+  MINUTE: 60, MINUTE_5: 300, MINUTE_15: 900, HOUR: 3600, HOUR_4: 14400, DAY: 86400
 };
 const streamCandleBuilders = new Map();
 let streamCandleFlushTimer = null;
