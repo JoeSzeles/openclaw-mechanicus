@@ -129,15 +129,25 @@ async function getMarketDetails(epic, session) {
     const r = await igRequest("GET", "/markets/" + epic, igHeaders(session));
     if (r.status === 200) {
       const d = safeParseIgBody(r.body);
+      const inst = d?.instrument || {};
+      const valueOfOnePip = parseFloat(inst.valueOfOnePip) || 1;
+      const contractSize = parseFloat(inst.contractSize) || 1;
+      const onePipMeans = parseFloat(inst.onePipMeans) || 1;
+      const scalingFactor = parseFloat(d?.snapshot?.scalingFactor) || parseFloat(inst.scalingFactor) || 1;
+      const pointValue = onePipMeans > 0 ? valueOfOnePip / onePipMeans : valueOfOnePip;
+      console.log(`[market-details] ${epic}: contractSize=${contractSize}, valueOfOnePip=${valueOfOnePip}, onePipMeans=${onePipMeans}, scalingFactor=${scalingFactor}, pointValue=${pointValue}`);
       const details = {
-        valueOfOnePip: parseFloat(d?.instrument?.valueOfOnePip) || 1,
-        contractSize: parseFloat(d?.instrument?.contractSize) || 1
+        valueOfOnePip,
+        contractSize,
+        onePipMeans,
+        scalingFactor,
+        pointValue
       };
       marketDetailsCache.set(epic, details);
       return details;
     }
   } catch (_) {}
-  return { valueOfOnePip: 1, contractSize: 1 };
+  return { valueOfOnePip: 1, contractSize: 1, onePipMeans: 1, scalingFactor: 1, pointValue: 1 };
 }
 
 function igCacheGet(key) {
@@ -1167,7 +1177,8 @@ async function handleIgApi(req, res, p) {
           if (epic && detailsMap[epic]) {
             pos.market.valueOfOnePip = detailsMap[epic].valueOfOnePip;
             pos.market.contractSize = detailsMap[epic].contractSize;
-            console.log(`[positions] ${epic}: contractSize=${detailsMap[epic].contractSize}, valueOfOnePip=${detailsMap[epic].valueOfOnePip}`);
+            pos.market.onePipMeans = detailsMap[epic].onePipMeans;
+            pos.market.pointValue = detailsMap[epic].pointValue;
           }
         }
       }
