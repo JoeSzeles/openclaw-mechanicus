@@ -1613,7 +1613,7 @@ async function handleIgApi(req, res, p) {
       function candleToIgPrice(c) {
         const mid = (v) => ({ bid: v, ask: v, lastTraded: null });
         const t = new Date(c.ts * 1000);
-        return { snapshotTime: t.toISOString().replace("T", " ").replace(/\.\d+Z$/, ""), snapshotTimeUTC: t.toISOString().replace(/\.\d+Z$/, ""), openPrice: mid(c.open), highPrice: mid(c.high), lowPrice: mid(c.low), closePrice: mid(c.close), lastTradedVolume: c.volume || 0 };
+        return { snapshotTime: t.toISOString().replace("T", " ").replace(/\.\d+Z$/, ""), snapshotTimeUTC: t.toISOString(), openPrice: mid(c.open), highPrice: mid(c.high), lowPrice: mid(c.low), closePrice: mid(c.close), lastTradedVolume: c.volume || 0 };
       }
 
       const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
@@ -1668,9 +1668,13 @@ async function handleIgApi(req, res, p) {
       } else {
         let fetchMax = max;
         let latestStoredTs = null;
-        try { latestStoredTs = await scalperDb.getLatestCandleTs(epic, resolution); } catch (_) {}
+        let storedCandleCount = 0;
+        try {
+          latestStoredTs = await scalperDb.getLatestCandleTs(epic, resolution);
+          if (latestStoredTs) storedCandleCount = await scalperDb.getCandleCount(epic, resolution);
+        } catch (_) {}
 
-        if (latestStoredTs) {
+        if (latestStoredTs && storedCandleCount >= max) {
           const gapCandles = Math.ceil((Date.now() / 1000 - latestStoredTs) / resSec) + 5;
           fetchMax = Math.min(Math.max(gapCandles, 20), max);
         }
@@ -1694,7 +1698,7 @@ async function handleIgApi(req, res, p) {
           return json(res, 502, { error: "IG returned non-JSON", detail: body._raw });
         }
         allPrices = body.prices || [];
-        source = latestStoredTs && fetchMax < max ? "mixed" : "ig";
+        source = (latestStoredTs && storedCandleCount >= max && fetchMax < max) ? "mixed" : "ig";
       }
 
       const freshCandles = allPrices.map(igPriceToCandle).filter(c => c.ts > 0);
