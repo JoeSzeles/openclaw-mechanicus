@@ -375,7 +375,11 @@ async function evaluateEntry(strat, epic, ticks) {
   const maxSize = config.maxSize || 10;
   if (size < minSize) size = minSize;
   if (size > maxSize) size = maxSize;
-  const cs = strat.contractSize || 1;
+  let cs = strat.contractSize || 1;
+  if (!strat.contractSize) {
+    cs = await fetchPlMultiplier(strat.epic || strat.instrument || epic);
+    strat.contractSize = cs;
+  }
   const riskAmount = stopDist * size * cs;
 
   const totalScalperRisk = scalperPositions
@@ -404,11 +408,13 @@ async function evaluateEntry(strat, epic, ticks) {
   }
 }
 
-async function fetchContractSize(epic) {
+async function fetchPlMultiplier(epic) {
   try {
     const data = await proxyGet("/api/ig/markets/" + epic);
-    if (data && data.instrument && data.instrument.contractSize) {
-      return parseFloat(data.instrument.contractSize) || 1;
+    if (data && data.instrument) {
+      const vop = parseFloat(data.instrument.valueOfOnePip) || 1;
+      const sf = parseFloat(data.snapshot?.scalingFactor) || parseFloat(data.instrument?.scalingFactor) || 1;
+      return vop * sf;
     }
   } catch (_) {}
   return 1;
@@ -432,7 +438,7 @@ async function openScalperTrade(strat, stratIdx, epic, direction, size, stopDist
     return;
   }
 
-  const contractSize = await fetchContractSize(epic);
+  const plMultiplier = await fetchPlMultiplier(epic);
 
   const conf = result.confirmation || result;
   if (conf && conf.dealStatus === "ACCEPTED") {
@@ -443,10 +449,10 @@ async function openScalperTrade(strat, stratIdx, epic, direction, size, stopDist
       direction,
       size,
       entry,
-      contractSize,
+      contractSize: plMultiplier,
       stopDistance: stopDist,
       limitDistance: limitDist,
-      riskAmount: stopDist * size * contractSize,
+      riskAmount: stopDist * size * plMultiplier,
       openedAt: new Date().toISOString(),
       momentum: momentum.toFixed(4),
       htfBias: htfBias || "neutral",
@@ -561,10 +567,12 @@ async function checkPositions() {
       const currentPrice = sp.direction === "BUY" ? (mkt.bid || 0) : (mkt.offer || 0);
       if (!currentPrice) continue;
 
-      if (!sp.contractSize && mkt.contractSize) {
-        sp.contractSize = parseFloat(mkt.contractSize) || 1;
-      } else if (!sp.contractSize && pos.contractSize) {
-        sp.contractSize = parseFloat(pos.contractSize) || 1;
+      if (!sp.contractSize && mkt.plMultiplier) {
+        sp.contractSize = parseFloat(mkt.plMultiplier) || 1;
+      } else if (!sp.contractSize && mkt.valueOfOnePip && mkt.scalingFactor) {
+        sp.contractSize = (parseFloat(mkt.valueOfOnePip) || 1) * (parseFloat(mkt.scalingFactor) || 1);
+      } else if (!sp.contractSize && mkt.valueOfOnePip) {
+        sp.contractSize = parseFloat(mkt.valueOfOnePip) || 1;
       }
       const cs = sp.contractSize || 1;
 

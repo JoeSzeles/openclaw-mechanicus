@@ -313,8 +313,10 @@ async function proofReadTrade(strategy, marketData) {
   }
 
   if (accountBalance && strategy.stopDistance && strategy.size) {
-    const instContractSize = parseFloat(marketData?.instrument?.contractSize) || 1;
-    const tradeRisk = strategy.stopDistance * strategy.size * instContractSize;
+    const vop = parseFloat(marketData?.instrument?.valueOfOnePip) || 1;
+    const sf = parseFloat(marketData?.snapshot?.scalingFactor) || parseFloat(marketData?.instrument?.scalingFactor) || 1;
+    const plMultiplier = vop * sf;
+    const tradeRisk = strategy.stopDistance * strategy.size * plMultiplier;
     const riskPct = (tradeRisk / accountBalance) * 100;
     if (riskPct > 2) {
       checks.push({ check: "Risk % of balance", pass: false, detail: `${riskPct.toFixed(2)}% exceeds 2% safety limit (risk: ${tradeRisk.toFixed(2)}, balance: ${accountBalance.toFixed(2)})` });
@@ -489,10 +491,12 @@ function checkRiskLimits(strategy, config, positions, marketData) {
   }
 
   if (accountBalance && strategy.stopDistance && strategy.size) {
-    const instContractSize = parseFloat(marketData?.instrument?.contractSize) || 1;
+    const vop = parseFloat(marketData?.instrument?.valueOfOnePip) || 1;
+    const sf = parseFloat(marketData?.snapshot?.scalingFactor) || parseFloat(marketData?.instrument?.scalingFactor) || 1;
+    const plMultiplier = vop * sf;
     const maxRiskPct = config.maxRiskPercent || 1;
     const maxRiskAmount = accountBalance * (maxRiskPct / 100);
-    const tradeRisk = strategy.stopDistance * strategy.size * instContractSize;
+    const tradeRisk = strategy.stopDistance * strategy.size * plMultiplier;
     if (tradeRisk > maxRiskAmount) {
       return { allowed: false, reason: `Trade risk ${tradeRisk} exceeds max ${maxRiskAmount.toFixed(2)} (${maxRiskPct}% of ${accountBalance})` };
     }
