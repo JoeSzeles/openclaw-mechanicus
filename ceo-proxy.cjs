@@ -254,10 +254,93 @@ const LS_RECONNECT_BASE_DELAY = 5000;
 const LS_RECONNECT_MAX_DELAY = 120000;
 let lsHybridPollingTimer = null;
 
+const STREAM_RESOLUTIONS = {
+  SECOND: 1, MINUTE: 60, MINUTE_5: 300, MINUTE_15: 900, HOUR: 3600, HOUR_4: 14400, DAY: 86400
+};
+const streamCandleBuilders = new Map();
+let streamCandleFlushTimer = null;
+
+function getStreamCandleKey(epic, resolution) { return epic + ":" + resolution; }
+
+function feedStreamTick(epic, mid, timestamp) {
+  if (mid == null || isNaN(mid)) return;
+  const tsSec = Math.floor(timestamp / 1000);
+  for (const [res, resSec] of Object.entries(STREAM_RESOLUTIONS)) {
+    const candleTs = Math.floor(tsSec / resSec) * resSec;
+    const key = getStreamCandleKey(epic, res);
+    let builder = streamCandleBuilders.get(key);
+    if (!builder) {
+      builder = { epic, resolution: res, resSec, current: null, completed: [] };
+      streamCandleBuilders.set(key, builder);
+    }
+    if (builder.current && builder.current.ts === candleTs) {
+      const c = builder.current;
+      c.high = Math.max(c.high, mid);
+      c.low = Math.min(c.low, mid);
+      c.close = mid;
+      c.ticks++;
+    } else {
+      if (builder.current && builder.current.ticks > 0) {
+        builder.completed.push({ ...builder.current });
+      }
+      builder.current = { ts: candleTs, open: mid, high: mid, low: mid, close: mid, volume: 0, ticks: 1 };
+    }
+  }
+}
+
+function flushStreamCandles() {
+  const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+  const allCandles = {};
+  for (const [key, builder] of streamCandleBuilders) {
+    if (builder.completed.length === 0) continue;
+    const toStore = builder.completed.splice(0);
+    const storeKey = builder.epic + ":" + builder.resolution;
+    if (!allCandles[storeKey]) allCandles[storeKey] = { epic: builder.epic, resolution: builder.resolution, candles: [] };
+    allCandles[storeKey].candles.push(...toStore);
+  }
+  for (const entry of Object.values(allCandles)) {
+    if (entry.candles.length === 0) continue;
+    scalperDb.storeCandles(entry.epic, entry.resolution, entry.candles).then(stored => {
+      if (stored > 0) console.log(`[stream-candles] Stored ${stored} ${entry.resolution} candles for ${entry.epic}`);
+    }).catch(err => {
+      console.log(`[stream-candles] DB store failed for ${entry.epic} ${entry.resolution}: ${err.message}`);
+    });
+  }
+}
+
+function startStreamCandleFlush() {
+  if (streamCandleFlushTimer) return;
+  streamCandleFlushTimer = setInterval(flushStreamCandles, 10000);
+  console.log("[stream-candles] Started candle aggregation (flush every 10s)");
+}
+
+function getStreamCandleStats() {
+  const stats = {};
+  for (const [key, builder] of streamCandleBuilders) {
+    if (!stats[builder.epic]) stats[builder.epic] = {};
+    stats[builder.epic][builder.resolution] = {
+      currentTs: builder.current ? builder.current.ts : null,
+      currentTicks: builder.current ? builder.current.ticks : 0,
+      pendingCompleted: builder.completed.length
+    };
+  }
+  return stats;
+}
+
+function getStreamCurrentCandles(epic, resolution, count) {
+  const key = getStreamCandleKey(epic, resolution);
+  const builder = streamCandleBuilders.get(key);
+  if (!builder) return [];
+  const result = [...builder.completed];
+  if (builder.current && builder.current.ticks > 0) result.push(builder.current);
+  return result.slice(-count);
+}
+
 let hybridPollErrorCount = 0;
 function startHybridPricePolling() {
   if (lsHybridPollingTimer) return;
   hybridPollErrorCount = 0;
+  startStreamCandleFlush();
   console.log("[lightstreamer] Starting hybrid price polling (L1 unavailable for CFD account)");
   function scheduleNext() {
     const delay = hybridPollErrorCount > 0 ? Math.min(30000, 5000 * hybridPollErrorCount) : 3000;
@@ -297,6 +380,7 @@ function startHybridPricePolling() {
               lsUpdateCounts[epic] = (lsUpdateCounts[epic] || 0) + 1;
               lsLastUpdateTs = now;
               try { scalperEngine.processTick(epic, { bid, offer, mid, spread: (offer && bid) ? offer - bid : 0, timestamp: now }); } catch (_) {}
+              if (mid) feedStreamTick(epic, mid, now);
             });
           }
           hybridPollErrorCount = 0;
@@ -489,6 +573,7 @@ async function startLightstreamer() {
       onSubscription: () => {
         console.log(`[lightstreamer] Subscribed to ${epics.length} instruments via ${streamSource}`);
         lsConnectedEpics = epics;
+        startStreamCandleFlush();
       },
       onSubscriptionError: (code, msg) => {
         console.error(`[lightstreamer] Subscription error: ${code} ${msg} | source=${streamSource} items=${JSON.stringify(items)}`);
@@ -522,6 +607,7 @@ async function startLightstreamer() {
         }
         lsLastUpdateTs = now;
         try { scalperEngine.processTick(epic, { bid, offer, mid, spread: (offer && bid) ? offer - bid : 0, timestamp: now }); } catch (_) {}
+        if (mid) feedStreamTick(epic, mid, now);
       },
       onUnsubscription: () => {
         console.log("[lightstreamer] Unsubscribed");
@@ -1122,6 +1208,41 @@ async function handleIgApi(req, res, p) {
       });
     }
 
+    if (req.method === "GET" && p === "/api/ig/stream/candles") {
+      const u = new URL(req.url, "http://localhost");
+      const epic = u.searchParams.get("epic");
+      const resolution = u.searchParams.get("resolution") || "MINUTE";
+      const max = parseInt(u.searchParams.get("max") || "100", 10);
+      if (!epic) return json(res, 400, { error: "Missing ?epic= parameter" });
+      const inMemory = getStreamCurrentCandles(epic, resolution, max);
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      try {
+        const stored = await scalperDb.getStoredCandles(epic, resolution, max);
+        const storedMap = new Map();
+        for (const c of stored) storedMap.set(c.ts, c);
+        for (const c of inMemory) storedMap.set(c.ts, c);
+        const merged = Array.from(storedMap.values()).sort((a, b) => a.ts - b.ts).slice(-max);
+        function candleToIgPrice(c) {
+          const mid = (v) => ({ bid: v, ask: v, lastTraded: null });
+          const t = new Date(c.ts * 1000);
+          return { snapshotTime: t.toISOString().replace("T", " ").replace(/\.\d+Z$/, ""), snapshotTimeUTC: t.toISOString(), openPrice: mid(c.open), highPrice: mid(c.high), lowPrice: mid(c.low), closePrice: mid(c.close), lastTradedVolume: c.volume || 0 };
+        }
+        const prices = merged.map(candleToIgPrice);
+        return json(res, 200, { prices, instrumentType: "CURRENCIES", metadata: { size: prices.length, source: "stream", storedCount: stored.length, inMemoryCount: inMemory.length } });
+      } catch (err) {
+        const prices = inMemory.map(c => {
+          const mid = (v) => ({ bid: v, ask: v, lastTraded: null });
+          const t = new Date(c.ts * 1000);
+          return { snapshotTime: t.toISOString(), snapshotTimeUTC: t.toISOString(), openPrice: mid(c.open), highPrice: mid(c.high), lowPrice: mid(c.low), closePrice: mid(c.close), lastTradedVolume: 0 };
+        });
+        return json(res, 200, { prices, instrumentType: "CURRENCIES", metadata: { size: prices.length, source: "stream-memory", error: err.message } });
+      }
+    }
+
+    if (req.method === "GET" && p === "/api/ig/stream/candle-stats") {
+      return json(res, 200, { stats: getStreamCandleStats(), resolutions: Object.keys(STREAM_RESOLUTIONS) });
+    }
+
     if (req.method === "POST" && p === "/api/ig/stream/connect-live") {
       try {
         const result = await startLiveLightstreamer();
@@ -1686,9 +1807,14 @@ async function handleIgApi(req, res, p) {
           console.log(`[ig-prices] Path-based request failed (${r.status}): ${igPath} — ${(r.body || "").substring(0, 200)}`);
           try {
             const fallback = await scalperDb.getStoredCandles(epic, resolution, max);
-            if (fallback.length > 0) {
-              const prices = fallback.slice(-max).map(candleToIgPrice);
-              const result = { prices, instrumentType: "CURRENCIES", metadata: { size: prices.length, source: "db-fallback", storedCount: fallback.length } };
+            const inMemStream = getStreamCurrentCandles(epic, resolution, max);
+            const mergedMap = new Map();
+            for (const c of fallback) mergedMap.set(c.ts, c);
+            for (const c of inMemStream) mergedMap.set(c.ts, c);
+            const merged = Array.from(mergedMap.values()).sort((a, b) => a.ts - b.ts).slice(-max);
+            if (merged.length > 0) {
+              const prices = merged.map(candleToIgPrice);
+              const result = { prices, instrumentType: "CURRENCIES", metadata: { size: prices.length, source: "stream-fallback", storedCount: fallback.length, streamCount: inMemStream.length } };
               return json(res, 200, result);
             }
           } catch (_) {}
