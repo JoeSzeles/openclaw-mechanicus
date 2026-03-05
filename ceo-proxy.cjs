@@ -3752,10 +3752,6 @@ async function handleApi(req, res) {
   const url = new URL(req.url, "http://localhost");
   const p = url.pathname;
 
-  if (req.method === "GET" && (p === "/health" || p === "/healthz")) {
-    return json(res, 200, { ok: true }), true;
-  }
-
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
