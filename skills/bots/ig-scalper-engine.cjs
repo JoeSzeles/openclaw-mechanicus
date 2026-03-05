@@ -42,6 +42,8 @@ const STRATEGY_DEFAULTS = {
 let running = false;
 let config = null;
 let tickBuffers = {};
+let candleBuffers = {};
+let currentCandles = {};
 let scalperPositions = [];
 let realizedPnl = 0;
 let tradeCount = 0;
@@ -54,6 +56,66 @@ let lastBalanceFetch = 0;
 let tradeLog = [];
 let startedAt = null;
 let proxyDeps = null;
+
+const TIMEFRAME_MS = {
+  TICK: 0, SECOND: 1000, MINUTE: 60000, MINUTE_2: 120000, MINUTE_3: 180000,
+  MINUTE_5: 300000, MINUTE_10: 600000, MINUTE_15: 900000, MINUTE_30: 1800000,
+  HOUR: 3600000, HOUR_2: 7200000, HOUR_3: 10800000, HOUR_4: 14400000,
+  DAY: 86400000, WEEK: 604800000
+};
+
+function getCandlePeriodStart(ts, periodMs) {
+  return Math.floor(ts / periodMs) * periodMs;
+}
+
+function aggregateTickToCandle(epic, tf, tickData) {
+  const periodMs = TIMEFRAME_MS[tf];
+  if (!periodMs || periodMs === 0) return null;
+
+  const key = `${epic}:${tf}`;
+  const now = tickData.timestamp || Date.now();
+  const periodStart = getCandlePeriodStart(now, periodMs);
+
+  if (!currentCandles[key] || currentCandles[key].periodStart !== periodStart) {
+    const closedCandle = currentCandles[key] || null;
+    currentCandles[key] = {
+      periodStart,
+      open: tickData.mid,
+      high: tickData.mid,
+      low: tickData.mid,
+      close: tickData.mid,
+      bid: tickData.bid,
+      offer: tickData.offer,
+      mid: tickData.mid,
+      spread: tickData.offer - tickData.bid,
+      ts: now,
+      tickCount: 1
+    };
+    return closedCandle;
+  }
+
+  const c = currentCandles[key];
+  if (tickData.mid > c.high) c.high = tickData.mid;
+  if (tickData.mid < c.low) c.low = tickData.mid;
+  c.close = tickData.mid;
+  c.bid = tickData.bid;
+  c.offer = tickData.offer;
+  c.mid = tickData.mid;
+  c.spread = tickData.offer - tickData.bid;
+  c.ts = now;
+  c.tickCount++;
+  return null;
+}
+
+function candlesToTicks(candles) {
+  return candles.map(c => ({
+    bid: c.bid || c.close,
+    offer: c.offer || c.close,
+    mid: c.close,
+    spread: c.spread || 0,
+    ts: c.ts || c.periodStart
+  }));
+}
 
 function log(level, msg) {
   const ts = new Date().toISOString().slice(11, 23);
@@ -104,7 +166,8 @@ async function loadConfig() {
           macdEnabled: !!s.macdEnabled, macdFast: parseInt(s.macdFast) || 12,
           macdSlow: parseInt(s.macdSlow) || 26, macdSignal: parseInt(s.macdSignal) || 9,
           contractSize: s.contractSize ? parseFloat(s.contractSize) : undefined,
-          dealId: s.dealId || undefined
+          dealId: s.dealId || undefined,
+          timeframe: s.timeframe || "TICK"
         }))
       };
       return config;
@@ -158,7 +221,8 @@ function loadConfigFromFile() {
           macdSlow: s.macdSlow || (globalInd.macd && globalInd.macd.slow) || 26,
           macdSignal: s.macdSignal || (globalInd.macd && globalInd.macd.signal) || 9,
           contractSize: s.contractSize,
-          dealId: s.dealId
+          dealId: s.dealId,
+          timeframe: s.timeframe || "TICK"
         }))
       };
     } else {
@@ -403,6 +467,18 @@ function evaluateIndicators(ticks, direction, ind) {
   return results;
 }
 
+function requiredBufferSize(strat) {
+  const ind = stratIndicators(strat);
+  const hasInd = ind.rsi.enabled || ind.ema.enabled || ind.macd.enabled;
+  const indMax = hasInd ? Math.max(
+    (ind.macd.slow || 26) + (ind.macd.signal || 9) + 10,
+    (ind.ema.longPeriod || 21) * 3,
+    (ind.rsi.period || 14) * 4,
+    80
+  ) : 50;
+  return Math.max(strat.tickWindow || 15, indMax);
+}
+
 function processTick(epic, tickData) {
   if (!running || !config || !config.enabled) return;
 
@@ -422,21 +498,32 @@ function processTick(epic, tickData) {
 
   let maxTicks = 50;
   for (const strat of matchingStrategies) {
-    const ind = stratIndicators(strat);
-    const hasInd = ind.rsi.enabled || ind.ema.enabled || ind.macd.enabled;
-    const indMax = hasInd ? Math.max(
-      (ind.macd.slow || 26) + (ind.macd.signal || 9) + 10,
-      (ind.ema.longPeriod || 21) * 3,
-      (ind.rsi.period || 14) * 4,
-      80
-    ) : 50;
-    const needed = Math.max(strat.tickWindow || 15, indMax);
+    const needed = requiredBufferSize(strat);
     if (needed > maxTicks) maxTicks = needed;
   }
   if (buf.length > maxTicks) buf.splice(0, buf.length - maxTicks);
 
   for (const strat of matchingStrategies) {
-    evaluateEntry(strat, epic, buf);
+    const tf = strat.timeframe || "TICK";
+
+    if (tf === "TICK" || !TIMEFRAME_MS[tf]) {
+      evaluateEntry(strat, epic, buf);
+      continue;
+    }
+
+    const closedCandle = aggregateTickToCandle(epic, tf, tickData);
+    if (!closedCandle) continue;
+
+    const cbKey = `${epic}:${tf}`;
+    if (!candleBuffers[cbKey]) candleBuffers[cbKey] = [];
+    candleBuffers[cbKey].push(closedCandle);
+    const maxCandles = requiredBufferSize(strat);
+    if (candleBuffers[cbKey].length > maxCandles) {
+      candleBuffers[cbKey].splice(0, candleBuffers[cbKey].length - maxCandles);
+    }
+
+    const pseudoTicks = candlesToTicks(candleBuffers[cbKey]);
+    evaluateEntry(strat, epic, pseudoTicks);
   }
 }
 
@@ -910,7 +997,7 @@ async function start() {
   if (!isRestart) {
     scalperPositions = [];
     cooldowns = {};
-    tickBuffers = {};
+    tickBuffers = {}; candleBuffers = {}; currentCandles = {};
 
     if (dbAvailable) {
       try {
@@ -933,7 +1020,7 @@ async function start() {
     }
   } else {
     log("INFO", `Preserving ${hadOpenPositions} open position(s) across restart`);
-    tickBuffers = {};
+    tickBuffers = {}; candleBuffers = {}; currentCandles = {};
     cooldowns = {};
   }
 
@@ -956,7 +1043,7 @@ async function stop() {
   startedAt = null;
   if (positionCheckInterval) { clearInterval(positionCheckInterval); positionCheckInterval = null; }
   if (balanceCheckInterval) { clearInterval(balanceCheckInterval); balanceCheckInterval = null; }
-  tickBuffers = {};
+  tickBuffers = {}; candleBuffers = {}; currentCandles = {};
   cooldowns = {};
   if (config) { config.enabled = false; await saveConfig(); }
   log("INFO", "Scalper STOPPED");

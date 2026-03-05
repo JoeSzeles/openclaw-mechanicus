@@ -1595,30 +1595,46 @@ async function handleIgApi(req, res, p) {
       if (priceCached) return json(res, 200, priceCached);
       const session = await igAuth();
       let allPrices = [];
-      let pageNum = 1;
-      const maxPages = Math.ceil(max / 20) + 1;
-      while (pageNum <= maxPages && allPrices.length < max) {
-        let qs = `?resolution=${resolution}&max=${max}&pageNumber=${pageNum}`;
-        if (from) qs += `&from=${encodeURIComponent(from)}`;
-        if (to) qs += `&to=${encodeURIComponent(to)}`;
-        const r = await igRequest("GET", "/prices/" + epic + qs, { ...igHeaders(session), Version: "3" });
+
+      if (from || to) {
+        let pageNum = 1;
+        const maxPages = Math.ceil(max / 20) + 1;
+        while (pageNum <= maxPages && allPrices.length < max) {
+          let qs = `?resolution=${resolution}&max=${max}&pageNumber=${pageNum}`;
+          if (from) qs += `&from=${encodeURIComponent(from)}`;
+          if (to) qs += `&to=${encodeURIComponent(to)}`;
+          const r = await igRequest("GET", "/prices/" + epic + qs, { ...igHeaders(session), Version: "3" });
+          if (r.status !== 200) {
+            if (allPrices.length > 0) break;
+            return json(res, r.status, { error: "IG API error", detail: r.body });
+          }
+          const body = safeParseIgBody(r.body);
+          if (body._parseError) {
+            if (allPrices.length > 0) break;
+            return json(res, 502, { error: "IG returned non-JSON", detail: body._raw });
+          }
+          const prices = body.prices || [];
+          allPrices = allPrices.concat(prices);
+          const pd = body.metadata && body.metadata.pageData;
+          if (!pd || pageNum >= pd.totalPages) break;
+          pageNum++;
+          if (pageNum <= maxPages) await new Promise(r => setTimeout(r, 200));
+        }
+      } else {
+        const igPath = `/prices/${epic}/${resolution}/${max}`;
+        const r = await igRequest("GET", igPath, { ...igHeaders(session), Version: "2" });
         if (r.status !== 200) {
-          if (allPrices.length > 0) break;
+          if (r.status !== 404 || !r.body) console.log(`[ig-prices] Path-based request failed (${r.status}): ${igPath} — ${(r.body || "").substring(0, 200)}`);
           return json(res, r.status, { error: "IG API error", detail: r.body });
         }
         const body = safeParseIgBody(r.body);
         if (body._parseError) {
-          if (allPrices.length > 0) break;
           return json(res, 502, { error: "IG returned non-JSON", detail: body._raw });
         }
-        const prices = body.prices || [];
-        allPrices = allPrices.concat(prices);
-        const pd = body.metadata && body.metadata.pageData;
-        if (!pd || pageNum >= pd.totalPages) break;
-        pageNum++;
-        if (pageNum <= maxPages) await new Promise(r => setTimeout(r, 200));
+        allPrices = body.prices || [];
       }
-      const result = { prices: allPrices, instrumentType: "CURRENCIES", metadata: { size: allPrices.length, pages: pageNum } };
+
+      const result = { prices: allPrices, instrumentType: "CURRENCIES", metadata: { size: allPrices.length } };
       igCacheSet(priceCacheKey, result);
       return json(res, 200, result);
     }
@@ -1976,7 +1992,7 @@ async function handleIgApi(req, res, p) {
       return json(res, 200, bt);
     }
 
-    return json(res, 404, { error: "Unknown IG endpoint. Available: GET positions, POST positions/open, POST positions/close, PUT positions/update, GET workingorders, POST workingorders/create, PUT workingorders/update, DELETE workingorders/delete, GET account, GET prices, GET markets, GET markets/{epic}, GET marketnavigation, GET pricehistory/{epic}, GET watchlists, GET history, GET activity, GET confirms/{ref}, GET session, POST session/refresh, GET stream/prices, GET stream/status, GET/POST strategies, PUT strategies/:i, DELETE strategies/:i, POST strategies/:i/toggle, POST strategies/:i/attach, POST strategies/:i/detach, POST strategies/:i/pause, POST strategies/global, GET/POST/DELETE watchedlist, GET/PUT scalper, GET scalper/status, POST scalper/start, POST scalper/stop, POST scalper/reset, GET/POST scalper/strategies, PUT/DELETE scalper/strategies/:i, POST scalper/strategies/:i/toggle" });
+    return json(res, 404, { error: "Unknown IG endpoint. Available: GET positions, POST positions/open, POST positions/close, PUT positions/update, GET workingorders, POST workingorders/create, PUT workingorders/update, DELETE workingorders/delete, GET account, GET prices, GET markets, GET markets/{epic}, GET marketnavigation, GET pricehistory/{epic}, GET watchlists, GET history, GET activity, GET confirms/{ref}, GET session, POST session/refresh, GET stream/prices, GET stream/status, GET/POST strategies, PUT strategies/:i, DELETE strategies/:i, POST strategies/:i/toggle, POST strategies/:i/attach, POST strategies/:i/detach, POST strategies/:i/pause, POST strategies/global, GET/POST/DELETE watchedlist, GET/PUT scalper, GET scalper/status, POST scalper/start, POST scalper/stop, POST scalper/reset, GET/POST scalper/strategies, PUT/DELETE scalper/strategies/:i, POST scalper/strategies/:i/toggle, POST scalper/strategies/:i/backtest, GET scalper/strategies/:i/backtests, GET scalper/backtests/:i" });
   } catch (e) {
     return json(res, 500, { error: e.message });
   }
