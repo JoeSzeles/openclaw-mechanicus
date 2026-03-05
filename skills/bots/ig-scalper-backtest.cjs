@@ -26,10 +26,8 @@ function proxyFetch(path) {
   });
 }
 
-async function fetchCandles(epic, resolution, max) {
-  const data = await proxyFetch(`/api/ig/pricehistory/${epic}?resolution=${resolution}&max=${max}`);
-  if (!data || !data.prices) return [];
-  return data.prices.map((p) => {
+function parsePrices(prices) {
+  return prices.map((p) => {
     const om = p.openPrice || {};
     const hm = p.highPrice || {};
     const lm = p.lowPrice || {};
@@ -42,7 +40,58 @@ async function fetchCandles(epic, resolution, max) {
       close: ((cm.bid || 0) + (cm.ask || 0)) / 2 || cm.mid || 0,
       volume: p.lastTradedVolume || 0
     };
-  }).sort((a, b) => a.time - b.time);
+  });
+}
+
+const BATCH_SIZE = 2000;
+const BATCH_DELAY_MS = 1500;
+
+async function fetchCandles(epic, resolution, max) {
+  if (max <= BATCH_SIZE) {
+    const data = await proxyFetch(`/api/ig/pricehistory/${epic}?resolution=${resolution}&max=${max}`);
+    if (!data || !data.prices) return [];
+    return parsePrices(data.prices).sort((a, b) => a.time - b.time);
+  }
+
+  let allCandles = [];
+  let toDate = "";
+  let batches = 0;
+  const maxBatches = Math.ceil(max / BATCH_SIZE) + 1;
+
+  while (allCandles.length < max && batches < maxBatches) {
+    let url = `/api/ig/pricehistory/${epic}?resolution=${resolution}&max=${BATCH_SIZE}`;
+    if (toDate) url += `&to=${encodeURIComponent(toDate)}`;
+
+    const data = await proxyFetch(url);
+    if (!data || !data.prices || data.prices.length === 0) break;
+
+    const candles = parsePrices(data.prices);
+    if (candles.length === 0) break;
+
+    allCandles = allCandles.concat(candles);
+    batches++;
+
+    const earliest = candles.reduce((min, c) => c.time < min ? c.time : min, candles[0].time);
+    const newTo = new Date((earliest - 1) * 1000).toISOString().replace(/\.\d{3}Z$/, "");
+    if (newTo === toDate) break;
+    toDate = newTo;
+
+    if (allCandles.length < max) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+    }
+  }
+
+  if (allCandles.length < max && batches > 0) {
+    console.log(`[backtest] Batch fetch stopped early: got ${allCandles.length}/${max} candles in ${batches} batches for ${epic} ${resolution}`);
+  }
+
+  const seen = new Set();
+  const deduped = [];
+  for (const c of allCandles) {
+    if (!seen.has(c.time)) { seen.add(c.time); deduped.push(c); }
+  }
+  deduped.sort((a, b) => a.time - b.time);
+  return deduped.slice(-max);
 }
 
 function calcEMA(prices, period) {
@@ -125,15 +174,21 @@ function checkIndicators(closePrices, direction, strat) {
   return true;
 }
 
+function igResolution(tf) {
+  if (tf === "TICK") return "SECOND";
+  return tf;
+}
+
 async function runBacktest(strategyId, options = {}) {
   const strat = await db.getStrategy(strategyId);
   if (!strat) throw new Error("Strategy not found: " + strategyId);
 
   const timeframe = options.timeframe || strat.timeframe || "MINUTE";
   const candleCount = options.candleCount || 500;
+  const fetchResolution = igResolution(timeframe);
 
-  const candles = await fetchCandles(strat.instrument, timeframe, candleCount);
-  if (candles.length < 20) throw new Error("Insufficient candle data: " + candles.length);
+  const candles = await fetchCandles(strat.instrument, fetchResolution, candleCount);
+  if (candles.length < 20) throw new Error("Insufficient candle data: " + candles.length + " (resolution=" + fetchResolution + ")");
 
   const minMom = strat.minMomentumPct || 0.03;
   const tickWindow = strat.tickWindow || 15;
@@ -301,7 +356,7 @@ async function runBacktest(strategyId, options = {}) {
 
 function resolutionMs(tf) {
   const map = {
-    SECOND: 1000, MINUTE: 60000, MINUTE_2: 120000, MINUTE_3: 180000,
+    TICK: 1000, SECOND: 1000, MINUTE: 60000, MINUTE_2: 120000, MINUTE_3: 180000,
     MINUTE_5: 300000, MINUTE_10: 600000, MINUTE_15: 900000, MINUTE_30: 1800000,
     HOUR: 3600000, HOUR_2: 7200000, HOUR_3: 10800000, HOUR_4: 14400000,
     DAY: 86400000, WEEK: 604800000, MONTH: 2592000000
