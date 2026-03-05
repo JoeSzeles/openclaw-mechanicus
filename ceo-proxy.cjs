@@ -1593,6 +1593,51 @@ async function handleIgApi(req, res, p) {
       const priceCacheKey = `prices:${epic}:${resolution}:${max}:${from}:${to}`;
       const priceCached = igCacheGet(priceCacheKey);
       if (priceCached) return json(res, 200, priceCached);
+
+      const RESOLUTION_SECONDS = { SECOND: 1, MINUTE: 60, MINUTE_2: 120, MINUTE_3: 180, MINUTE_5: 300, MINUTE_10: 600, MINUTE_15: 900, MINUTE_30: 1800, HOUR: 3600, HOUR_2: 7200, HOUR_3: 10800, HOUR_4: 14400, DAY: 86400, WEEK: 604800, MONTH: 2592000 };
+      const resSec = RESOLUTION_SECONDS[resolution] || 3600;
+
+      function igPriceToCandle(p) {
+        const dt = new Date(p.snapshotTimeUTC || p.snapshotTime);
+        const ts = Math.floor(dt.getTime() / 1000);
+        const om = p.openPrice || {}, hm = p.highPrice || {}, lm = p.lowPrice || {}, cm = p.closePrice || {};
+        return {
+          ts,
+          open: ((om.bid || 0) + (om.ask || om.offer || 0)) / 2,
+          high: ((hm.bid || 0) + (hm.ask || hm.offer || 0)) / 2,
+          low: ((lm.bid || 0) + (lm.ask || lm.offer || 0)) / 2,
+          close: ((cm.bid || 0) + (cm.ask || cm.offer || 0)) / 2,
+          volume: p.lastTradedVolume || 0
+        };
+      }
+      function candleToIgPrice(c) {
+        const mid = (v) => ({ bid: v, ask: v, lastTraded: null });
+        const t = new Date(c.ts * 1000);
+        return { snapshotTime: t.toISOString().replace("T", " ").replace(/\.\d+Z$/, ""), snapshotTimeUTC: t.toISOString().replace(/\.\d+Z$/, ""), openPrice: mid(c.open), highPrice: mid(c.high), lowPrice: mid(c.low), closePrice: mid(c.close), lastTradedVolume: c.volume || 0 };
+      }
+
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      let source = "ig";
+
+      if (!from && !to) {
+        try {
+          const stored = await scalperDb.getStoredCandles(epic, resolution, max);
+          if (stored.length >= max) {
+            const latestTs = stored.length > 0 ? stored[stored.length - 1].ts : 0;
+            const nowSec = Math.floor(Date.now() / 1000);
+            const staleThreshold = resSec * 2;
+            if (nowSec - latestTs < staleThreshold) {
+              const prices = stored.slice(-max).map(candleToIgPrice);
+              const result = { prices, instrumentType: "CURRENCIES", metadata: { size: prices.length, source: "db", storedCount: stored.length } };
+              igCacheSet(priceCacheKey, result);
+              return json(res, 200, result);
+            }
+          }
+        } catch (dbErr) {
+          console.log(`[ig-prices] DB cache read failed: ${dbErr.message}`);
+        }
+      }
+
       const session = await igAuth();
       let allPrices = [];
 
@@ -1621,10 +1666,27 @@ async function handleIgApi(req, res, p) {
           if (pageNum <= maxPages) await new Promise(r => setTimeout(r, 200));
         }
       } else {
-        const igPath = `/prices/${epic}/${resolution}/${max}`;
+        let fetchMax = max;
+        let latestStoredTs = null;
+        try { latestStoredTs = await scalperDb.getLatestCandleTs(epic, resolution); } catch (_) {}
+
+        if (latestStoredTs) {
+          const gapCandles = Math.ceil((Date.now() / 1000 - latestStoredTs) / resSec) + 5;
+          fetchMax = Math.min(Math.max(gapCandles, 20), max);
+        }
+
+        const igPath = `/prices/${epic}/${resolution}/${fetchMax}`;
         const r = await igRequest("GET", igPath, { ...igHeaders(session), Version: "2" });
         if (r.status !== 200) {
-          if (r.status !== 404 || !r.body) console.log(`[ig-prices] Path-based request failed (${r.status}): ${igPath} — ${(r.body || "").substring(0, 200)}`);
+          console.log(`[ig-prices] Path-based request failed (${r.status}): ${igPath} — ${(r.body || "").substring(0, 200)}`);
+          try {
+            const fallback = await scalperDb.getStoredCandles(epic, resolution, max);
+            if (fallback.length > 0) {
+              const prices = fallback.slice(-max).map(candleToIgPrice);
+              const result = { prices, instrumentType: "CURRENCIES", metadata: { size: prices.length, source: "db-fallback", storedCount: fallback.length } };
+              return json(res, 200, result);
+            }
+          } catch (_) {}
           return json(res, r.status, { error: "IG API error", detail: r.body });
         }
         const body = safeParseIgBody(r.body);
@@ -1632,9 +1694,33 @@ async function handleIgApi(req, res, p) {
           return json(res, 502, { error: "IG returned non-JSON", detail: body._raw });
         }
         allPrices = body.prices || [];
+        source = latestStoredTs && fetchMax < max ? "mixed" : "ig";
       }
 
-      const result = { prices: allPrices, instrumentType: "CURRENCIES", metadata: { size: allPrices.length } };
+      const freshCandles = allPrices.map(igPriceToCandle).filter(c => c.ts > 0);
+      try {
+        if (freshCandles.length > 0) {
+          const stored = await scalperDb.storeCandles(epic, resolution, freshCandles);
+          if (stored > 0) console.log(`[ig-prices] Stored ${stored} new candles for ${epic} ${resolution}`);
+        }
+      } catch (storeErr) {
+        console.log(`[ig-prices] DB store failed: ${storeErr.message}`);
+      }
+
+      let finalPrices = allPrices;
+      let storedCount = allPrices.length;
+      if (!from && !to && source === "mixed") {
+        try {
+          const allStored = await scalperDb.getStoredCandles(epic, resolution, max);
+          finalPrices = allStored.slice(-max).map(candleToIgPrice);
+          storedCount = allStored.length;
+          source = "mixed";
+        } catch (_) {
+          source = "ig";
+        }
+      }
+
+      const result = { prices: finalPrices, instrumentType: "CURRENCIES", metadata: { size: finalPrices.length, source, storedCount } };
       igCacheSet(priceCacheKey, result);
       return json(res, 200, result);
     }
@@ -4034,6 +4120,7 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
   autoRegisterBotScripts();
   startRegisteredBots();
   setTimeout(async () => {
+    try { const sdb = require("./skills/bots/ig-scalper-db.cjs"); await sdb.ensurePriceCandlesTable(); console.log("[startup] price_candles table ready"); } catch (e) { console.log("[startup] price_candles init failed:", e.message); }
     await igSessionStartup();
     if (shouldAutoConnectLiveStreaming()) {
       console.log("[startup] Auto-connecting to live streaming (was active before restart)");

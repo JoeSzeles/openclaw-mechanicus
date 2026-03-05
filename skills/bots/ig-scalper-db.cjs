@@ -214,6 +214,89 @@ async function getBacktest(id) {
   return camel(res.rows[0]);
 }
 
+let _priceCandlesReady = false;
+async function _ensurePriceCandles() {
+  if (_priceCandlesReady) return;
+  await ensurePriceCandlesTable();
+  _priceCandlesReady = true;
+}
+
+async function ensurePriceCandlesTable() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS price_candles (
+      epic VARCHAR(60) NOT NULL,
+      resolution VARCHAR(20) NOT NULL,
+      ts BIGINT NOT NULL,
+      open DOUBLE PRECISION NOT NULL,
+      high DOUBLE PRECISION NOT NULL,
+      low DOUBLE PRECISION NOT NULL,
+      close DOUBLE PRECISION NOT NULL,
+      volume INTEGER DEFAULT 0,
+      PRIMARY KEY (epic, resolution, ts)
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_price_candles_lookup ON price_candles (epic, resolution, ts DESC)`);
+}
+
+async function getStoredCandles(epic, resolution, limit) {
+  await _ensurePriceCandles();
+  const res = await query(
+    "SELECT ts, open, high, low, close, volume FROM price_candles WHERE epic = $1 AND resolution = $2 ORDER BY ts DESC LIMIT $3",
+    [epic, resolution, limit]
+  );
+  return res.rows.reverse();
+}
+
+async function getLatestCandleTs(epic, resolution) {
+  await _ensurePriceCandles();
+  const res = await query(
+    "SELECT ts FROM price_candles WHERE epic = $1 AND resolution = $2 ORDER BY ts DESC LIMIT 1",
+    [epic, resolution]
+  );
+  return res.rows.length > 0 ? parseInt(res.rows[0].ts) : null;
+}
+
+async function getCandleCount(epic, resolution) {
+  const res = await query(
+    "SELECT COUNT(*)::int as cnt FROM price_candles WHERE epic = $1 AND resolution = $2",
+    [epic, resolution]
+  );
+  return res.rows[0].cnt;
+}
+
+async function storeCandles(epic, resolution, candles) {
+  if (!candles || candles.length === 0) return 0;
+  await _ensurePriceCandles();
+  const BATCH = 500;
+  let stored = 0;
+  for (let b = 0; b < candles.length; b += BATCH) {
+    const batch = candles.slice(b, b + BATCH);
+    const vals = [];
+    const placeholders = [];
+    let idx = 1;
+    for (const c of batch) {
+      placeholders.push(`($${idx},$${idx+1},$${idx+2},$${idx+3},$${idx+4},$${idx+5},$${idx+6},$${idx+7})`);
+      vals.push(epic, resolution, c.ts, c.open, c.high, c.low, c.close, c.volume || 0);
+      idx += 8;
+    }
+    const res = await query(
+      `INSERT INTO price_candles (epic, resolution, ts, open, high, low, close, volume) VALUES ${placeholders.join(",")} ON CONFLICT (epic, resolution, ts) DO NOTHING`,
+      vals
+    );
+    stored += res.rowCount;
+  }
+  return stored;
+}
+
+async function getStoredCandlesRange(epic, resolution, fromTs, toTs) {
+  await _ensurePriceCandles();
+  const res = await query(
+    "SELECT ts, open, high, low, close, volume FROM price_candles WHERE epic = $1 AND resolution = $2 AND ts >= $3 AND ts <= $4 ORDER BY ts ASC",
+    [epic, resolution, fromTs, toTs]
+  );
+  return res.rows;
+}
+
 async function close() {
   await pool.end();
 }
@@ -223,5 +306,6 @@ module.exports = {
   getStrategies, getStrategy, addStrategy, updateStrategy, deleteStrategy, toggleStrategy,
   logTrade, getTrades, getTradeStats,
   saveBacktest, getBacktests, getBacktest,
+  ensurePriceCandlesTable, getStoredCandles, getLatestCandleTs, getCandleCount, storeCandles, getStoredCandlesRange,
   close
 };

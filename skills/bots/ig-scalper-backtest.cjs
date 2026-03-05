@@ -47,6 +47,23 @@ const BATCH_SIZE = 2000;
 const BATCH_DELAY_MS = 1500;
 
 async function fetchCandles(epic, resolution, max) {
+  try {
+    const stored = await db.getStoredCandles(epic, resolution, max);
+    if (stored.length >= max) {
+      const candles = stored.slice(-max).map(r => ({
+        time: parseInt(r.ts), open: parseFloat(r.open), high: parseFloat(r.high),
+        low: parseFloat(r.low), close: parseFloat(r.close), volume: parseInt(r.volume) || 0
+      }));
+      console.log(`[backtest] Using ${candles.length} cached candles from DB for ${epic} ${resolution}`);
+      return candles;
+    }
+    if (stored.length > 0) {
+      console.log(`[backtest] DB has ${stored.length}/${max} candles for ${epic} ${resolution}, fetching remainder from IG`);
+    }
+  } catch (dbErr) {
+    console.log(`[backtest] DB cache check failed: ${dbErr.message}`);
+  }
+
   if (max <= BATCH_SIZE) {
     const data = await proxyFetch(`/api/ig/pricehistory/${epic}?resolution=${resolution}&max=${max}`);
     if (!data || !data.prices) return [];
