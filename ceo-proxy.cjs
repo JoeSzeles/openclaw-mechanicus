@@ -90,7 +90,7 @@ function isLoginExempt(req) {
       p.startsWith("/api/ig/pricehistory") || p.startsWith("/api/ig/watchlists") || p.startsWith("/api/ig/activity") ||
       p.startsWith("/api/ig/session") || p === "/api/ig/refresh-snapshots" ||
       p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/strategy-templates") || p.startsWith("/api/ig/proofread") || p.startsWith("/api/ig/watchedlist") || p.startsWith("/api/ig/scalper") ||
-      p.startsWith("/api/agents/") || p === "/api/admin/migrate-dev-data" ||
+      p.startsWith("/api/agents/") ||
       p.startsWith("/api/bots") || p.startsWith("/api/processes")) {
     if (hasValidBearerToken(req)) return true;
   }
@@ -3856,20 +3856,6 @@ async function handleApi(req, res) {
     await handleIgApi(req, res, p); return true;
   }
   if (p.startsWith("/api/agents/")) { await handleAgentsApi(req, res, p); return true; }
-  if (p === "/api/admin/migrate-dev-data" && req.method === "POST") {
-    try {
-      const dumpPath = path.join(__dirname, "migrations_dev_data.sql");
-      if (!fs.existsSync(dumpPath)) return json(res, 404, { error: "No migration dump file found" });
-      const sql = fs.readFileSync(dumpPath, "utf-8");
-      const { Pool } = require("pg");
-      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-      const result = await pool.query(sql);
-      await pool.end();
-      return json(res, 200, { ok: true, message: "Dev data migrated successfully", commands: result.length || 1 });
-    } catch (e) {
-      return json(res, 500, { error: e.message });
-    }
-  }
   if (p.startsWith("/api/bots")) { await handleBotsApi(req, res, p); return true; }
   if (p.startsWith("/api/processes")) { await handleProcesses(req, res, p); return true; }
   if (p.startsWith("/api/canvas")) { await handleCanvasApi(req, res, p); return true; }
