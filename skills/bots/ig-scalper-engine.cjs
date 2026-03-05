@@ -3,31 +3,40 @@ const path = require("path");
 const http = require("http");
 
 const DATA_DIR = path.join(process.cwd(), ".openclaw");
+const DEFAULTS_FILE = path.join(DATA_DIR, "ig-scalper-defaults.json");
 const CONFIG_FILE = path.join(DATA_DIR, "ig-scalper-config.json");
 const ALERTS_FILE = path.join(DATA_DIR, "ig-alerts.json");
-const TRADE_LOG_FILE = path.join(DATA_DIR, "ig-scalper-trades.json");
 
-const DEFAULT_CONFIG = {
+let db;
+let dbAvailable = false;
+
+async function initDb() {
+  try {
+    db = require("./ig-scalper-db.cjs");
+    const cfg = await db.getConfig();
+    if (cfg) { dbAvailable = true; log("INFO", "Database connected for scalper config"); }
+  } catch (e) {
+    log("WARN", "Database not available, falling back to JSON config: " + e.message);
+    dbAvailable = false;
+  }
+}
+
+const STRATEGY_DEFAULTS = {
+  direction: "BOTH",
   enabled: false,
-  budget: 5000,
-  maxMarginPct: 10,
-  maxDrawdown: 200,
-  breakEvenBuffer: 1.5,
-  maxOpenPositions: 2,
-  cooldownMs: 10000,
-  tickWindow: 15,
+  size: 1,
   minMomentumPct: 0.03,
+  cooldownMs: 6000,
+  tickWindow: 15,
+  maxOpenPositions: 2,
   minSize: 0.5,
   maxSize: 10,
   profitTarget: 0,
   trailingStop: 0,
   warmupMs: 60000,
-  indicators: {
-    rsi: { enabled: false, period: 14, overbought: 70, oversold: 30 },
-    ema: { enabled: false, shortPeriod: 9, longPeriod: 21 },
-    macd: { enabled: false, fast: 12, slow: 26, signal: 9 }
-  },
-  strategies: []
+  rsiEnabled: false, rsiPeriod: 14, rsiOverbought: 70, rsiOversold: 30,
+  emaEnabled: false, emaShort: 9, emaLong: 21,
+  macdEnabled: false, macdFast: 12, macdSlow: 26, macdSignal: 9
 };
 
 let running = false;
@@ -51,30 +60,162 @@ function log(level, msg) {
   console.log(`[${ts}] [scalper] [${level}] ${msg}`);
 }
 
-function loadConfig() {
+function stratIndicators(strat) {
+  return {
+    rsi: { enabled: !!strat.rsiEnabled, period: strat.rsiPeriod || 14, overbought: strat.rsiOverbought || 70, oversold: strat.rsiOversold || 30 },
+    ema: { enabled: !!strat.emaEnabled, shortPeriod: strat.emaShort || 9, longPeriod: strat.emaLong || 21 },
+    macd: { enabled: !!strat.macdEnabled, fast: strat.macdFast || 12, slow: strat.macdSlow || 26, signal: strat.macdSignal || 9 }
+  };
+}
+
+async function loadConfig() {
+  if (dbAvailable) {
+    try {
+      const cfg = await db.getConfig();
+      const strategies = await db.getStrategies();
+      config = {
+        enabled: cfg.enabled !== false,
+        budget: parseFloat(cfg.budget) || 5000,
+        maxDrawdown: parseFloat(cfg.maxDrawdown) || 200,
+        maxMarginPct: parseFloat(cfg.maxMarginPct) || 10,
+        breakEvenBuffer: parseFloat(cfg.breakEvenBuffer) || 1.5,
+        _drawdownTripped: !!cfg.drawdownTripped,
+        strategies: strategies.map(s => ({
+          id: s.id,
+          instrument: s.instrument,
+          name: s.name || s.instrument,
+          direction: s.direction || "BOTH",
+          enabled: s.enabled !== false,
+          size: parseFloat(s.size) || 1,
+          stopDistance: s.stopDistance ? parseFloat(s.stopDistance) : undefined,
+          limitDistance: s.limitDistance ? parseFloat(s.limitDistance) : undefined,
+          minMomentumPct: parseFloat(s.minMomentumPct) || 0.03,
+          cooldownMs: parseInt(s.cooldownMs) || 6000,
+          tickWindow: parseInt(s.tickWindow) || 15,
+          maxOpenPositions: parseInt(s.maxOpenPositions) || 2,
+          minSize: parseFloat(s.minSize) || 0.5,
+          maxSize: parseFloat(s.maxSize) || 10,
+          profitTarget: parseFloat(s.profitTarget) || 0,
+          trailingStop: parseFloat(s.trailingStop) || 0,
+          warmupMs: parseInt(s.warmupMs) || 60000,
+          rsiEnabled: !!s.rsiEnabled, rsiPeriod: parseInt(s.rsiPeriod) || 14,
+          rsiOverbought: parseInt(s.rsiOverbought) || 70, rsiOversold: parseInt(s.rsiOversold) || 30,
+          emaEnabled: !!s.emaEnabled, emaShort: parseInt(s.emaShort) || 9, emaLong: parseInt(s.emaLong) || 21,
+          macdEnabled: !!s.macdEnabled, macdFast: parseInt(s.macdFast) || 12,
+          macdSlow: parseInt(s.macdSlow) || 26, macdSignal: parseInt(s.macdSignal) || 9,
+          contractSize: s.contractSize ? parseFloat(s.contractSize) : undefined,
+          dealId: s.dealId || undefined
+        }))
+      };
+      return config;
+    } catch (e) {
+      log("ERROR", "DB loadConfig failed: " + e.message);
+    }
+  }
+  return loadConfigFromFile();
+}
+
+function loadConfigFromFile() {
   try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      const raw = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
-      config = { ...DEFAULT_CONFIG, ...raw };
+    const filePath = fs.existsSync(CONFIG_FILE) ? CONFIG_FILE : (fs.existsSync(DEFAULTS_FILE) ? DEFAULTS_FILE : null);
+    if (filePath) {
+      const raw = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      const globalInd = raw.indicators || {};
+      config = {
+        enabled: raw.enabled !== false,
+        budget: raw.budget || 5000,
+        maxDrawdown: raw.maxDrawdown || 200,
+        maxMarginPct: raw.maxMarginPct || 10,
+        breakEvenBuffer: raw.breakEvenBuffer || 1.5,
+        _drawdownTripped: !!raw._drawdownTripped,
+        strategies: (raw.strategies || []).map((s, i) => ({
+          id: i,
+          instrument: s.instrument,
+          name: s.name || s.instrument,
+          direction: s.direction || "BOTH",
+          enabled: !!s.enabled,
+          size: s.size || 1,
+          stopDistance: s.stopDistance,
+          limitDistance: s.limitDistance,
+          minMomentumPct: s.minMomentumPct || raw.minMomentumPct || 0.03,
+          cooldownMs: s.cooldownMs || raw.cooldownMs || 6000,
+          tickWindow: s.tickWindow || raw.tickWindow || 15,
+          maxOpenPositions: s.maxOpenPositions || raw.maxOpenPositions || 2,
+          minSize: s.minSize || raw.minSize || 0.5,
+          maxSize: s.maxSize || raw.maxSize || 10,
+          profitTarget: s.profitTarget != null ? s.profitTarget : (raw.profitTarget || 0),
+          trailingStop: s.trailingStop != null ? s.trailingStop : (raw.trailingStop || 0),
+          warmupMs: s.warmupMs || raw.warmupMs || 60000,
+          rsiEnabled: s.rsiEnabled != null ? s.rsiEnabled : !!(globalInd.rsi && globalInd.rsi.enabled),
+          rsiPeriod: s.rsiPeriod || (globalInd.rsi && globalInd.rsi.period) || 14,
+          rsiOverbought: s.rsiOverbought || (globalInd.rsi && globalInd.rsi.overbought) || 70,
+          rsiOversold: s.rsiOversold || (globalInd.rsi && globalInd.rsi.oversold) || 30,
+          emaEnabled: s.emaEnabled != null ? s.emaEnabled : !!(globalInd.ema && globalInd.ema.enabled),
+          emaShort: s.emaShort || (globalInd.ema && globalInd.ema.shortPeriod) || 9,
+          emaLong: s.emaLong || (globalInd.ema && globalInd.ema.longPeriod) || 21,
+          macdEnabled: s.macdEnabled != null ? s.macdEnabled : !!(globalInd.macd && globalInd.macd.enabled),
+          macdFast: s.macdFast || (globalInd.macd && globalInd.macd.fast) || 12,
+          macdSlow: s.macdSlow || (globalInd.macd && globalInd.macd.slow) || 26,
+          macdSignal: s.macdSignal || (globalInd.macd && globalInd.macd.signal) || 9,
+          contractSize: s.contractSize,
+          dealId: s.dealId
+        }))
+      };
     } else {
-      config = { ...DEFAULT_CONFIG };
+      config = { enabled: false, budget: 5000, maxDrawdown: 200, maxMarginPct: 10, breakEvenBuffer: 1.5, _drawdownTripped: false, strategies: [] };
     }
   } catch (e) {
-    log("ERROR", "Failed to load config: " + e.message);
-    config = { ...DEFAULT_CONFIG };
+    log("ERROR", "Failed to load config file: " + e.message);
+    config = { enabled: false, budget: 5000, maxDrawdown: 200, maxMarginPct: 10, breakEvenBuffer: 1.5, _drawdownTripped: false, strategies: [] };
   }
   return config;
 }
 
-function saveConfig() {
+async function saveConfig() {
+  if (dbAvailable) {
+    try {
+      await db.updateConfig({
+        enabled: config.enabled,
+        budget: config.budget,
+        maxDrawdown: config.maxDrawdown,
+        maxMarginPct: config.maxMarginPct,
+        breakEvenBuffer: config.breakEvenBuffer,
+        drawdownTripped: !!config._drawdownTripped
+      });
+    } catch (e) {
+      log("ERROR", "DB saveConfig failed: " + e.message);
+    }
+    return;
+  }
   try {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+    const legacy = {
+      enabled: config.enabled,
+      budget: config.budget,
+      maxMarginPct: config.maxMarginPct,
+      maxDrawdown: config.maxDrawdown,
+      breakEvenBuffer: config.breakEvenBuffer,
+      _drawdownTripped: config._drawdownTripped,
+      strategies: (config.strategies || []).map(s => ({
+        instrument: s.instrument, name: s.name, direction: s.direction, size: s.size,
+        enabled: s.enabled, stopDistance: s.stopDistance, limitDistance: s.limitDistance,
+        minMomentumPct: s.minMomentumPct, dealId: s.dealId
+      }))
+    };
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(legacy, null, 2));
   } catch (e) {
-    log("ERROR", "Failed to save config: " + e.message);
+    log("ERROR", "Failed to save config file: " + e.message);
+  }
+}
+
+async function saveStrategyField(strat, field, value) {
+  if (dbAvailable && strat.id) {
+    try { await db.updateStrategy(strat.id, { [field]: value }); } catch (e) { log("ERROR", "DB update strategy failed: " + e.message); }
   }
 }
 
 function loadTradeLog() {
+  if (dbAvailable) return;
+  const TRADE_LOG_FILE = path.join(DATA_DIR, "ig-scalper-trades.json");
   try {
     if (fs.existsSync(TRADE_LOG_FILE)) {
       tradeLog = JSON.parse(fs.readFileSync(TRADE_LOG_FILE, "utf8"));
@@ -84,6 +225,8 @@ function loadTradeLog() {
 }
 
 function saveTradeLog() {
+  if (dbAvailable) return;
+  const TRADE_LOG_FILE = path.join(DATA_DIR, "ig-scalper-trades.json");
   try {
     if (tradeLog.length > 2000) tradeLog = tradeLog.slice(-2000);
     const data = JSON.stringify(tradeLog, null, 2);
@@ -93,6 +236,11 @@ function saveTradeLog() {
       fs.writeFileSync(path.join(canvasDir, "all-scalper-trades-data.json"), data);
     }
   } catch (_) {}
+}
+
+async function logTradeToDb(trade) {
+  if (!dbAvailable) return;
+  try { await db.logTrade(trade); } catch (e) { log("ERROR", "DB logTrade failed: " + e.message); }
 }
 
 function getHigherTimeframeBias(epic) {
@@ -189,11 +337,9 @@ function calcMACD(prices, fast, slow, signalPeriod) {
   return { macdLine, signalLine: sig, histogram };
 }
 
-function evaluateIndicators(ticks, direction) {
-  const ind = config.indicators || {};
+function evaluateIndicators(ticks, direction, ind) {
   const rsiPeriod = (ind.rsi && ind.rsi.period) || 14;
   const barPrices = downsampleTicks(ticks, Math.max(rsiPeriod * 3, 40));
-  const prices = ticks.map(t => t.mid);
   const results = { passed: true, details: [] };
 
   if (ind.rsi && ind.rsi.enabled) {
@@ -269,23 +415,25 @@ function processTick(epic, tickData) {
     spread: tickData.offer - tickData.bid,
     ts: tickData.timestamp || Date.now()
   });
-  const hasInd = config.indicators && (
-    (config.indicators.rsi && config.indicators.rsi.enabled) ||
-    (config.indicators.ema && config.indicators.ema.enabled) ||
-    (config.indicators.macd && config.indicators.macd.enabled)
-  );
-  const indMax = hasInd ? Math.max(
-    (config.indicators?.macd?.slow || 26) + (config.indicators?.macd?.signal || 9) + 10,
-    (config.indicators?.ema?.longPeriod || 21) * 3,
-    (config.indicators?.rsi?.period || 14) * 4,
-    80
-  ) : 50;
-  const maxTicks = Math.max(config.tickWindow || 15, indMax);
-  if (buf.length > maxTicks) buf.splice(0, buf.length - maxTicks);
 
   const matchingStrategies = (config.strategies || []).filter(s =>
     s.enabled && s.instrument === epic && !s.dealId
   );
+
+  let maxTicks = 50;
+  for (const strat of matchingStrategies) {
+    const ind = stratIndicators(strat);
+    const hasInd = ind.rsi.enabled || ind.ema.enabled || ind.macd.enabled;
+    const indMax = hasInd ? Math.max(
+      (ind.macd.slow || 26) + (ind.macd.signal || 9) + 10,
+      (ind.ema.longPeriod || 21) * 3,
+      (ind.rsi.period || 14) * 4,
+      80
+    ) : 50;
+    const needed = Math.max(strat.tickWindow || 15, indMax);
+    if (needed > maxTicks) maxTicks = needed;
+  }
+  if (buf.length > maxTicks) buf.splice(0, buf.length - maxTicks);
 
   for (const strat of matchingStrategies) {
     evaluateEntry(strat, epic, buf);
@@ -295,19 +443,18 @@ function processTick(epic, tickData) {
 async function evaluateEntry(strat, epic, ticks) {
   if (ticks.length < 5) return;
 
-  const warmup = config.warmupMs || 60000;
+  const warmup = strat.warmupMs || 60000;
   if (startedAt && (Date.now() - startedAt) < warmup) return;
 
-  const stratIdx = config.strategies.indexOf(strat);
-  const cooldownKey = `${epic}_${stratIdx}`;
-  if (cooldowns[cooldownKey] && Date.now() - cooldowns[cooldownKey] < (config.cooldownMs || 10000)) return;
+  const cooldownKey = `${epic}_${strat.id}`;
+  if (cooldowns[cooldownKey] && Date.now() - cooldowns[cooldownKey] < (strat.cooldownMs || 6000)) return;
 
   const latest = ticks[ticks.length - 1];
   if (!latest.mid || !latest.bid || !latest.offer) return;
   if (latest.spread <= 0) return;
 
   const openScalperCount = scalperPositions.filter(p => p.status === "open").length;
-  if (openScalperCount >= (config.maxOpenPositions || 2)) return;
+  if (openScalperCount >= (strat.maxOpenPositions || 2)) return;
 
   const openRisk = scalperPositions
     .filter(p => p.status === "open")
@@ -321,14 +468,14 @@ async function evaluateEntry(strat, epic, ticks) {
     return;
   }
 
-  const window = Math.min(ticks.length, config.tickWindow || 15);
+  const window = Math.min(ticks.length, strat.tickWindow || 15);
   const recentTicks = ticks.slice(-window);
   const firstMid = recentTicks[0].mid;
   const lastMid = recentTicks[recentTicks.length - 1].mid;
   const momentumPct = ((lastMid - firstMid) / firstMid) * 100;
   const absMomentum = Math.abs(momentumPct);
 
-  const minMom = strat.minMomentumPct || config.minMomentumPct || 0.03;
+  const minMom = strat.minMomentumPct || 0.03;
   if (absMomentum < minMom) return;
 
   let direction = null;
@@ -347,13 +494,10 @@ async function evaluateEntry(strat, epic, ticks) {
 
   if (!direction) return;
 
-  const hasIndicators = config.indicators && (
-    (config.indicators.rsi && config.indicators.rsi.enabled) ||
-    (config.indicators.ema && config.indicators.ema.enabled) ||
-    (config.indicators.macd && config.indicators.macd.enabled)
-  );
+  const ind = stratIndicators(strat);
+  const hasIndicators = ind.rsi.enabled || ind.ema.enabled || ind.macd.enabled;
   if (hasIndicators) {
-    const indResult = evaluateIndicators(ticks, direction);
+    const indResult = evaluateIndicators(ticks, direction, ind);
     if (!indResult.passed) {
       log("IND", `${epic} ${direction} blocked: ${indResult.details.join(", ")}`);
       return;
@@ -371,14 +515,15 @@ async function evaluateEntry(strat, epic, ticks) {
   }
 
   let size = strat.size || 1;
-  const minSize = config.minSize || 0.5;
-  const maxSize = config.maxSize || 10;
+  const minSize = strat.minSize || 0.5;
+  const maxSize = strat.maxSize || 10;
   if (size < minSize) size = minSize;
   if (size > maxSize) size = maxSize;
   let cs = strat.contractSize || 1;
   if (!strat.contractSize) {
-    cs = await fetchPlMultiplier(strat.epic || strat.instrument || epic);
+    cs = await fetchPlMultiplier(strat.instrument || epic);
     strat.contractSize = cs;
+    saveStrategyField(strat, "contractSize", cs);
   }
   const riskAmount = stopDist * size * cs;
 
@@ -402,7 +547,7 @@ async function evaluateEntry(strat, epic, ticks) {
   log("TRADE", `Signal: ${direction} ${epic} | momentum=${momentumPct.toFixed(4)}% | spread=${spread.toFixed(2)} | HTF=${htfBias || "neutral"} | size=${size} stop=${stopDist.toFixed(2)} limit=${limitDist.toFixed(2)}`);
 
   try {
-    await openScalperTrade(strat, stratIdx, epic, direction, size, stopDist, limitDist, latest, momentumPct, htfBias);
+    await openScalperTrade(strat, epic, direction, size, stopDist, limitDist, latest, momentumPct, htfBias);
   } catch (e) {
     log("ERROR", `Trade failed: ${e.message}`);
   }
@@ -420,7 +565,7 @@ async function fetchPlMultiplier(epic) {
   return 1;
 }
 
-async function openScalperTrade(strat, stratIdx, epic, direction, size, stopDist, limitDist, tick, momentum, htfBias) {
+async function openScalperTrade(strat, epic, direction, size, stopDist, limitDist, tick, momentum, htfBias) {
   const body = {
     epic,
     direction,
@@ -457,20 +602,18 @@ async function openScalperTrade(strat, stratIdx, epic, direction, size, stopDist
       momentum: momentum.toFixed(4),
       htfBias: htfBias || "neutral",
       status: "open",
-      strategyIndex: stratIdx,
+      strategyId: strat.id,
       strategyName: strat.name || epic
     };
     scalperPositions.push(pos);
     tradeCount++;
 
-    if (stratIdx >= 0 && config.strategies[stratIdx]) {
-      config.strategies[stratIdx].dealId = conf.dealId;
-      saveConfig();
-    }
+    strat.dealId = conf.dealId;
+    await saveStrategyField(strat, "dealId", conf.dealId);
 
     log("TRADE", `OPENED ${direction} ${size} ${epic} @ ${entry} dealId=${conf.dealId}`);
 
-    tradeLog.push({
+    const tradeEntry = {
       type: "open",
       dealId: conf.dealId,
       epic,
@@ -482,8 +625,10 @@ async function openScalperTrade(strat, stratIdx, epic, direction, size, stopDist
       momentum,
       htfBias,
       timestamp: new Date().toISOString()
-    });
+    };
+    tradeLog.push(tradeEntry);
     saveTradeLog();
+    await logTradeToDb({ dealId: conf.dealId, epic, direction, size, entryPrice: entry, type: "OPEN", strategyName: strat.name || epic, openedAt: new Date().toISOString() });
   } else {
     const reason = conf ? (conf.reason || conf.dealStatus || "unknown") : "no confirmation";
     log("WARN", `Trade rejected: ${reason}`);
@@ -536,15 +681,15 @@ async function checkPositions() {
         if (pnl >= 0) winCount++;
         else lossCount++;
 
-        const stratIdx = sp.strategyIndex;
-        if (stratIdx >= 0 && config.strategies[stratIdx] && config.strategies[stratIdx].dealId === sp.dealId) {
-          delete config.strategies[stratIdx].dealId;
-          saveConfig();
+        const strat = (config.strategies || []).find(s => s.dealId === sp.dealId);
+        if (strat) {
+          delete strat.dealId;
+          await saveStrategyField(strat, "dealId", null);
         }
 
         log("TRADE", `CLOSED ${sp.direction} ${sp.epic} | P&L: ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} | Total: ${realizedPnl.toFixed(2)}`);
 
-        tradeLog.push({
+        const tradeEntry = {
           type: "close",
           dealId: sp.dealId,
           epic: sp.epic,
@@ -555,8 +700,10 @@ async function checkPositions() {
           pnl,
           realizedTotal: realizedPnl,
           timestamp: new Date().toISOString()
-        });
+        };
+        tradeLog.push(tradeEntry);
         saveTradeLog();
+        await logTradeToDb({ dealId: sp.dealId, epic: sp.epic, direction: sp.direction, size: sp.size, entryPrice: sp.entry, exitPrice, pnl, type: "CLOSE", strategyName: sp.strategyName, openedAt: sp.openedAt, closedAt: sp.closedAt });
         continue;
       }
 
@@ -581,7 +728,8 @@ async function checkPositions() {
         : (sp.entry - currentPrice) * sp.size * cs;
       sp.unrealizedPnl = Math.round(unrealized * 100) / 100;
 
-      const profitTarget = config.profitTarget || 0;
+      const strat = (config.strategies || []).find(s => s.id === sp.strategyId);
+      const profitTarget = strat ? (strat.profitTarget || 0) : 0;
       if (profitTarget > 0 && unrealized >= profitTarget) {
         log("TRADE", `PROFIT TARGET hit: ${sp.epic} unrealized=${unrealized.toFixed(2)} >= target=${profitTarget}. Closing...`);
         try {
@@ -592,7 +740,7 @@ async function checkPositions() {
         continue;
       }
 
-      const trailingStop = config.trailingStop || 0;
+      const trailingStop = strat ? (strat.trailingStop || 0) : 0;
       if (trailingStop > 0) {
         const priceMove = sp.direction === "BUY"
           ? currentPrice - sp.entry
@@ -740,15 +888,18 @@ function proxyPut(urlPath, body) {
 let positionCheckInterval = null;
 let balanceCheckInterval = null;
 
-function start() {
+async function start() {
   if (running) {
     log("INFO", "Scalper already running, preserving state (reconnect-safe)");
     return;
   }
-  loadConfig();
+
+  await initDb();
+  await loadConfig();
+
   if (!config.enabled) {
     config.enabled = true;
-    saveConfig();
+    await saveConfig();
     log("INFO", "Scalper auto-enabled via start()");
   }
   loadTradeLog();
@@ -757,21 +908,29 @@ function start() {
   const isRestart = hadOpenPositions > 0;
 
   if (!isRestart) {
-    realizedPnl = 0;
-    tradeCount = 0;
-    winCount = 0;
-    lossCount = 0;
     scalperPositions = [];
     cooldowns = {};
     tickBuffers = {};
 
-    const restoredPnl = tradeLog
-      .filter(t => t.type === "close")
-      .reduce((sum, t) => sum + (t.pnl || 0), 0);
-    realizedPnl = restoredPnl;
-    tradeCount = tradeLog.filter(t => t.type === "open").length;
-    winCount = tradeLog.filter(t => t.type === "close" && t.pnl >= 0).length;
-    lossCount = tradeLog.filter(t => t.type === "close" && t.pnl < 0).length;
+    if (dbAvailable) {
+      try {
+        const stats = await db.getTradeStats();
+        realizedPnl = stats.totalPnl;
+        winCount = stats.wins;
+        lossCount = stats.losses;
+        tradeCount = stats.totalClosed;
+      } catch (_) {
+        realizedPnl = 0; tradeCount = 0; winCount = 0; lossCount = 0;
+      }
+    } else {
+      const restoredPnl = tradeLog
+        .filter(t => t.type === "close")
+        .reduce((sum, t) => sum + (t.pnl || 0), 0);
+      realizedPnl = restoredPnl;
+      tradeCount = tradeLog.filter(t => t.type === "open").length;
+      winCount = tradeLog.filter(t => t.type === "close" && t.pnl >= 0).length;
+      lossCount = tradeLog.filter(t => t.type === "close" && t.pnl < 0).length;
+    }
   } else {
     log("INFO", `Preserving ${hadOpenPositions} open position(s) across restart`);
     tickBuffers = {};
@@ -788,31 +947,32 @@ function start() {
   positionCheckInterval = setInterval(checkPositions, 5000);
   balanceCheckInterval = setInterval(fetchBalance, 30000);
 
-  const warmupSec = Math.round((config.warmupMs || 60000) / 1000);
-  const indList = [];
-  if (config.indicators?.rsi?.enabled) indList.push("RSI");
-  if (config.indicators?.ema?.enabled) indList.push("EMA");
-  if (config.indicators?.macd?.enabled) indList.push("MACD");
-  log("INFO", `Scalper STARTED${isRestart ? " (reconnect)" : ""} | ${config.strategies.filter(s => s.enabled).length} strategies | budget=$${config.budget} maxDD=$${config.maxDrawdown} | warmup=${warmupSec}s | indicators=${indList.length ? indList.join(",") : "none"} | openPos=${hadOpenPositions}`);
+  const enabledStrategies = config.strategies.filter(s => s.enabled);
+  log("INFO", `Scalper STARTED${isRestart ? " (reconnect)" : ""} | ${enabledStrategies.length} strategies | budget=$${config.budget} maxDD=$${config.maxDrawdown} | db=${dbAvailable ? "YES" : "file"} | openPos=${hadOpenPositions}`);
 }
 
-function stop() {
+async function stop() {
   running = false;
   startedAt = null;
   if (positionCheckInterval) { clearInterval(positionCheckInterval); positionCheckInterval = null; }
   if (balanceCheckInterval) { clearInterval(balanceCheckInterval); balanceCheckInterval = null; }
   tickBuffers = {};
   cooldowns = {};
-  if (config) { config.enabled = false; saveConfig(); }
+  if (config) { config.enabled = false; await saveConfig(); }
   log("INFO", "Scalper STOPPED");
 }
 
-function getStatus() {
-  loadConfig();
+async function getStatus() {
+  await loadConfig();
   const openPositions = scalperPositions.filter(p => p.status === "open");
   const unrealizedPnl = openPositions.reduce((sum, p) => sum + (p.unrealizedPnl || 0), 0);
   const uptimeMs = startedAt ? Date.now() - startedAt : 0;
   const winRate = (winCount + lossCount) > 0 ? Math.round((winCount / (winCount + lossCount)) * 100) : 0;
+
+  let allTrades = tradeLog;
+  if (dbAvailable) {
+    try { allTrades = await db.getTrades(200); } catch (_) {}
+  }
 
   return {
     running,
@@ -822,17 +982,6 @@ function getStatus() {
     maxDrawdown: config ? config.maxDrawdown : 0,
     maxMarginPct: config ? config.maxMarginPct : 0,
     breakEvenBuffer: config ? config.breakEvenBuffer : 0,
-    cooldownMs: config ? config.cooldownMs : 0,
-    maxOpenPositions: config ? config.maxOpenPositions : 0,
-    tickWindow: config ? config.tickWindow : 0,
-    minMomentumPct: config ? config.minMomentumPct : 0,
-    minSize: config ? config.minSize : 0.5,
-    maxSize: config ? config.maxSize : 10,
-    profitTarget: config ? config.profitTarget : 0,
-    trailingStop: config ? config.trailingStop : 0,
-    warmupMs: config ? config.warmupMs : 60000,
-    warmupRemaining: (running && startedAt) ? Math.max(0, (config?.warmupMs || 60000) - (Date.now() - startedAt)) : 0,
-    indicators: config ? config.indicators : DEFAULT_CONFIG.indicators,
     realizedPnl: Math.round(realizedPnl * 100) / 100,
     unrealizedPnl,
     tradeCount,
@@ -845,79 +994,88 @@ function getStatus() {
     accountBalance,
     accountMargin,
     strategies: config ? config.strategies : [],
-    allTrades: tradeLog,
-    recentTrades: tradeLog.slice(-20).reverse()
+    allTrades,
+    recentTrades: (Array.isArray(allTrades) ? allTrades.slice(-20).reverse() : []),
+    dbAvailable
   };
 }
 
-function getConfig() {
-  loadConfig();
+async function getConfigExport() {
+  await loadConfig();
   return config;
 }
 
-function updateConfig(updates) {
-  loadConfig();
+async function updateConfigFromApi(updates) {
+  await loadConfig();
   if (updates.budget !== undefined) { const v = Number(updates.budget); if (Number.isFinite(v) && v > 0) config.budget = v; }
   if (updates.maxMarginPct !== undefined) { const v = Number(updates.maxMarginPct); if (Number.isFinite(v) && v > 0 && v <= 100) config.maxMarginPct = v; }
   if (updates.maxDrawdown !== undefined) { const v = Number(updates.maxDrawdown); if (Number.isFinite(v) && v > 0) config.maxDrawdown = v; }
   if (updates.breakEvenBuffer !== undefined) { const v = Number(updates.breakEvenBuffer); if (Number.isFinite(v) && v > 0) config.breakEvenBuffer = v; }
-  if (updates.maxOpenPositions !== undefined) { const v = Number(updates.maxOpenPositions); if (Number.isFinite(v) && v >= 1 && v <= 20) config.maxOpenPositions = Math.floor(v); }
-  if (updates.cooldownMs !== undefined) { const v = Number(updates.cooldownMs); if (Number.isFinite(v) && v >= 1000 && v <= 300000) config.cooldownMs = v; }
-  if (updates.tickWindow !== undefined) { const v = Number(updates.tickWindow); if (Number.isFinite(v) && v >= 3 && v <= 100) config.tickWindow = Math.floor(v); }
-  if (updates.minMomentumPct !== undefined) { const v = Number(updates.minMomentumPct); if (Number.isFinite(v) && v > 0 && v < 10) config.minMomentumPct = v; }
-  if (updates.minSize !== undefined) { const v = Number(updates.minSize); if (Number.isFinite(v) && v >= 0.1 && v <= 100) config.minSize = v; }
-  if (updates.maxSize !== undefined) { const v = Number(updates.maxSize); if (Number.isFinite(v) && v >= 0.1 && v <= 1000) config.maxSize = v; }
-  if (updates.profitTarget !== undefined) { const v = Number(updates.profitTarget); if (Number.isFinite(v) && v >= 0) config.profitTarget = v; }
-  if (updates.trailingStop !== undefined) { const v = Number(updates.trailingStop); if (Number.isFinite(v) && v >= 0) config.trailingStop = v; }
-  if (updates.warmupMs !== undefined) { const v = Number(updates.warmupMs); if (Number.isFinite(v) && v >= 0 && v <= 600000) config.warmupMs = v; }
-  if (updates.indicators !== undefined && typeof updates.indicators === "object") {
-    if (!config.indicators) config.indicators = JSON.parse(JSON.stringify(DEFAULT_CONFIG.indicators));
-    const ui = updates.indicators;
-    if (ui.rsi && typeof ui.rsi === "object") {
-      if (ui.rsi.enabled !== undefined) config.indicators.rsi.enabled = !!ui.rsi.enabled;
-      if (ui.rsi.period !== undefined) { const v = Number(ui.rsi.period); if (Number.isFinite(v) && v >= 2 && v <= 50) config.indicators.rsi.period = Math.floor(v); }
-      if (ui.rsi.overbought !== undefined) { const v = Number(ui.rsi.overbought); if (Number.isFinite(v) && v > 50 && v <= 100) config.indicators.rsi.overbought = v; }
-      if (ui.rsi.oversold !== undefined) { const v = Number(ui.rsi.oversold); if (Number.isFinite(v) && v >= 0 && v < 50) config.indicators.rsi.oversold = v; }
-    }
-    if (ui.ema && typeof ui.ema === "object") {
-      if (ui.ema.enabled !== undefined) config.indicators.ema.enabled = !!ui.ema.enabled;
-      if (ui.ema.shortPeriod !== undefined) { const v = Number(ui.ema.shortPeriod); if (Number.isFinite(v) && v >= 2 && v <= 50) config.indicators.ema.shortPeriod = Math.floor(v); }
-      if (ui.ema.longPeriod !== undefined) { const v = Number(ui.ema.longPeriod); if (Number.isFinite(v) && v >= 5 && v <= 200) config.indicators.ema.longPeriod = Math.floor(v); }
-    }
-    if (ui.macd && typeof ui.macd === "object") {
-      if (ui.macd.enabled !== undefined) config.indicators.macd.enabled = !!ui.macd.enabled;
-      if (ui.macd.fast !== undefined) { const v = Number(ui.macd.fast); if (Number.isFinite(v) && v >= 2 && v <= 50) config.indicators.macd.fast = Math.floor(v); }
-      if (ui.macd.slow !== undefined) { const v = Number(ui.macd.slow); if (Number.isFinite(v) && v >= 5 && v <= 200) config.indicators.macd.slow = Math.floor(v); }
-      if (ui.macd.signal !== undefined) { const v = Number(ui.macd.signal); if (Number.isFinite(v) && v >= 2 && v <= 50) config.indicators.macd.signal = Math.floor(v); }
-    }
-  }
   if (updates.enabled !== undefined) config.enabled = !!updates.enabled;
-  saveConfig();
+  await saveConfig();
   return config;
 }
 
-function addStrategy(body) {
-  loadConfig();
+async function addStrategy(body) {
   if (!body.instrument) return { error: "Missing instrument (epic)" };
   if (!body.size || Number(body.size) <= 0) return { error: "Missing or invalid size" };
-  const strat = {
+
+  const stratData = {
     instrument: String(body.instrument).trim(),
     name: body.name ? String(body.name).trim() : String(body.instrument).trim(),
     direction: (body.direction === "BUY" || body.direction === "SELL") ? body.direction : "BOTH",
     size: Number(body.size),
     enabled: body.enabled !== undefined ? !!body.enabled : false,
+    stopDistance: body.stopDistance ? Number(body.stopDistance) : null,
+    limitDistance: body.limitDistance ? Number(body.limitDistance) : null,
+    minMomentumPct: body.minMomentumPct ? Number(body.minMomentumPct) : 0.03,
+    cooldownMs: body.cooldownMs ? Number(body.cooldownMs) : 6000,
+    tickWindow: body.tickWindow ? Number(body.tickWindow) : 15,
+    maxOpenPositions: body.maxOpenPositions ? Number(body.maxOpenPositions) : 2,
+    minSize: body.minSize ? Number(body.minSize) : 0.5,
+    maxSize: body.maxSize ? Number(body.maxSize) : 10,
+    profitTarget: body.profitTarget ? Number(body.profitTarget) : 0,
+    trailingStop: body.trailingStop ? Number(body.trailingStop) : 0,
+    warmupMs: body.warmupMs ? Number(body.warmupMs) : 60000,
+    rsiEnabled: !!body.rsiEnabled, rsiPeriod: body.rsiPeriod ? Number(body.rsiPeriod) : 14,
+    rsiOverbought: body.rsiOverbought ? Number(body.rsiOverbought) : 70, rsiOversold: body.rsiOversold ? Number(body.rsiOversold) : 30,
+    emaEnabled: !!body.emaEnabled, emaShort: body.emaShort ? Number(body.emaShort) : 9, emaLong: body.emaLong ? Number(body.emaLong) : 21,
+    macdEnabled: !!body.macdEnabled, macdFast: body.macdFast ? Number(body.macdFast) : 12,
+    macdSlow: body.macdSlow ? Number(body.macdSlow) : 26, macdSignal: body.macdSignal ? Number(body.macdSignal) : 9
   };
-  if (body.stopDistance) { const v = Number(body.stopDistance); if (Number.isFinite(v) && v > 0) strat.stopDistance = v; }
-  if (body.limitDistance) { const v = Number(body.limitDistance); if (Number.isFinite(v) && v > 0) strat.limitDistance = v; }
-  if (body.minMomentumPct) { const v = Number(body.minMomentumPct); if (Number.isFinite(v) && v > 0) strat.minMomentumPct = v; }
+
+  if (dbAvailable) {
+    try {
+      const row = await db.addStrategy(stratData);
+      await loadConfig();
+      return { ok: true, id: row.id, strategy: row };
+    } catch (e) {
+      return { error: "DB addStrategy failed: " + e.message };
+    }
+  }
+
+  await loadConfig();
+  const strat = { ...STRATEGY_DEFAULTS, ...stratData, id: config.strategies.length };
   config.strategies.push(strat);
-  saveConfig();
-  return { ok: true, index: config.strategies.length - 1, strategy: strat };
+  await saveConfig();
+  return { ok: true, id: strat.id, strategy: strat };
 }
 
-function updateStrategy(idx, body) {
-  loadConfig();
-  if (idx < 0 || idx >= config.strategies.length) return { error: "Index out of range" };
+async function updateStrategy(id, body) {
+  if (dbAvailable) {
+    try {
+      const updated = await db.updateStrategy(id, body);
+      if (!updated) return { error: "Strategy not found" };
+      await loadConfig();
+      return { ok: true, id, strategy: updated };
+    } catch (e) {
+      return { error: "DB updateStrategy failed: " + e.message };
+    }
+  }
+
+  await loadConfig();
+  const idx = config.strategies.findIndex(s => s.id === id || s.id === parseInt(id));
+  if (idx < 0) return { error: "Strategy not found" };
   const s = config.strategies[idx];
   if (body.name !== undefined) s.name = String(body.name).trim();
   if (body.size !== undefined) { const v = Number(body.size); if (Number.isFinite(v) && v > 0) s.size = v; }
@@ -925,29 +1083,60 @@ function updateStrategy(idx, body) {
   if (body.stopDistance !== undefined) { const v = Number(body.stopDistance); if (Number.isFinite(v) && v > 0) s.stopDistance = v; }
   if (body.limitDistance !== undefined) { const v = Number(body.limitDistance); if (Number.isFinite(v) && v > 0) s.limitDistance = v; }
   if (body.minMomentumPct !== undefined) { const v = Number(body.minMomentumPct); if (Number.isFinite(v) && v > 0) s.minMomentumPct = v; }
+  if (body.cooldownMs !== undefined) s.cooldownMs = Number(body.cooldownMs);
+  if (body.tickWindow !== undefined) s.tickWindow = Number(body.tickWindow);
+  if (body.maxOpenPositions !== undefined) s.maxOpenPositions = Number(body.maxOpenPositions);
+  if (body.minSize !== undefined) s.minSize = Number(body.minSize);
+  if (body.maxSize !== undefined) s.maxSize = Number(body.maxSize);
+  if (body.profitTarget !== undefined) s.profitTarget = Number(body.profitTarget);
+  if (body.trailingStop !== undefined) s.trailingStop = Number(body.trailingStop);
+  if (body.warmupMs !== undefined) s.warmupMs = Number(body.warmupMs);
   if (body.enabled !== undefined) s.enabled = !!body.enabled;
   if (body.instrument !== undefined) s.instrument = String(body.instrument).trim();
-  saveConfig();
-  return { ok: true, index: idx, strategy: s };
+  await saveConfig();
+  return { ok: true, id, strategy: s };
 }
 
-function deleteStrategy(idx) {
-  loadConfig();
-  if (idx < 0 || idx >= config.strategies.length) return { error: "Index out of range" };
+async function deleteStrategy(id) {
+  if (dbAvailable) {
+    try {
+      await db.deleteStrategy(id);
+      await loadConfig();
+      return { ok: true };
+    } catch (e) {
+      return { error: "DB deleteStrategy failed: " + e.message };
+    }
+  }
+
+  await loadConfig();
+  const idx = config.strategies.findIndex(s => s.id === id || s.id === parseInt(id));
+  if (idx < 0) return { error: "Strategy not found" };
   const removed = config.strategies.splice(idx, 1)[0];
-  saveConfig();
+  await saveConfig();
   return { ok: true, removed };
 }
 
-function toggleStrategy(idx) {
-  loadConfig();
-  if (idx < 0 || idx >= config.strategies.length) return { error: "Index out of range" };
+async function toggleStrategy(id) {
+  if (dbAvailable) {
+    try {
+      const updated = await db.toggleStrategy(id);
+      if (!updated) return { error: "Strategy not found" };
+      await loadConfig();
+      return { ok: true, id, enabled: updated.enabled };
+    } catch (e) {
+      return { error: "DB toggleStrategy failed: " + e.message };
+    }
+  }
+
+  await loadConfig();
+  const idx = config.strategies.findIndex(s => s.id === id || s.id === parseInt(id));
+  if (idx < 0) return { error: "Strategy not found" };
   config.strategies[idx].enabled = !config.strategies[idx].enabled;
-  saveConfig();
-  return { ok: true, index: idx, enabled: config.strategies[idx].enabled };
+  await saveConfig();
+  return { ok: true, id, enabled: config.strategies[idx].enabled };
 }
 
-function resetStats() {
+async function resetStats() {
   realizedPnl = 0;
   tradeCount = 0;
   winCount = 0;
@@ -958,9 +1147,12 @@ function resetStats() {
   if (config) {
     config._drawdownTripped = false;
     for (const s of (config.strategies || [])) {
-      if (s.dealId) delete s.dealId;
+      if (s.dealId) {
+        delete s.dealId;
+        await saveStrategyField(s, "dealId", null);
+      }
     }
-    saveConfig();
+    await saveConfig();
   }
   log("INFO", "Stats reset (all strategy dealIds cleared)");
   return { ok: true };
@@ -971,8 +1163,8 @@ module.exports = {
   start,
   stop,
   getStatus,
-  getConfig,
-  updateConfig,
+  getConfig: getConfigExport,
+  updateConfig: updateConfigFromApi,
   addStrategy,
   updateStrategy,
   deleteStrategy,

@@ -436,7 +436,7 @@ async function startLightstreamer() {
     console.log(`[lightstreamer] Connecting via ${streamSource} profile`);
 
     client.addListener({
-      onStatusChange: (status) => {
+      onStatusChange: async (status) => {
         console.log("[lightstreamer] Status:", status);
         if (status.startsWith("CONNECTED")) {
           lsStatus = "connected";
@@ -444,9 +444,10 @@ async function startLightstreamer() {
           if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
           if (!lsConnectedAt) lsConnectedAt = Date.now();
           try {
-            const sc = scalperEngine.getConfig();
-            if (sc && sc.enabled && !scalperEngine.getStatus().running) {
-              scalperEngine.start();
+            const sc = await scalperEngine.getConfig();
+            const st = await scalperEngine.getStatus();
+            if (sc && sc.enabled && !st.running) {
+              await scalperEngine.start();
             }
           } catch(_) {}
         } else if (status === "DISCONNECTED:WILL-RETRY") {
@@ -1867,34 +1868,34 @@ async function handleIgApi(req, res, p) {
     }
 
     if (req.method === "GET" && p === "/api/ig/scalper") {
-      return json(res, 200, scalperEngine.getConfig());
+      return json(res, 200, await scalperEngine.getConfig());
     }
     if (req.method === "PUT" && p === "/api/ig/scalper") {
       let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
-      const cfg = scalperEngine.updateConfig(body);
+      const cfg = await scalperEngine.updateConfig(body);
       return json(res, 200, { ok: true, ...cfg });
     }
     if (req.method === "GET" && p === "/api/ig/scalper/status") {
-      return json(res, 200, scalperEngine.getStatus());
+      return json(res, 200, await scalperEngine.getStatus());
     }
     if (req.method === "POST" && p === "/api/ig/scalper/start") {
-      scalperEngine.start();
+      await scalperEngine.start();
       return json(res, 200, { ok: true, running: true });
     }
     if (req.method === "POST" && p === "/api/ig/scalper/stop") {
-      scalperEngine.stop();
+      await scalperEngine.stop();
       return json(res, 200, { ok: true, running: false });
     }
     if (req.method === "POST" && p === "/api/ig/scalper/reset") {
-      return json(res, 200, scalperEngine.resetStats());
+      return json(res, 200, await scalperEngine.resetStats());
     }
     if (req.method === "GET" && p === "/api/ig/scalper/strategies") {
-      const cfg = scalperEngine.getConfig();
+      const cfg = await scalperEngine.getConfig();
       return json(res, 200, { strategies: cfg.strategies || [] });
     }
     if (req.method === "POST" && p === "/api/ig/scalper/strategies") {
       let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
-      const result = scalperEngine.addStrategy(body);
+      const result = await scalperEngine.addStrategy(body);
       if (result.error) return json(res, 400, result);
       if (body.instrument && lsClient) {
         const currentEpics = new Set(lsConnectedEpics || []);
@@ -1907,18 +1908,18 @@ async function handleIgApi(req, res, p) {
     const scalperStratMatch = p.match(/^\/api\/ig\/scalper\/strategies\/(\d+)$/);
     const scalperToggleMatch = p.match(/^\/api\/ig\/scalper\/strategies\/(\d+)\/toggle$/);
     if (req.method === "POST" && scalperToggleMatch) {
-      const result = scalperEngine.toggleStrategy(parseInt(scalperToggleMatch[1], 10));
+      const result = await scalperEngine.toggleStrategy(parseInt(scalperToggleMatch[1], 10));
       if (result.error) return json(res, 400, result);
       return json(res, 200, result);
     }
     if (req.method === "PUT" && scalperStratMatch) {
       let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
-      const result = scalperEngine.updateStrategy(parseInt(scalperStratMatch[1], 10), body);
+      const result = await scalperEngine.updateStrategy(parseInt(scalperStratMatch[1], 10), body);
       if (result.error) return json(res, 400, result);
       return json(res, 200, result);
     }
     if (req.method === "DELETE" && scalperStratMatch) {
-      const result = scalperEngine.deleteStrategy(parseInt(scalperStratMatch[1], 10));
+      const result = await scalperEngine.deleteStrategy(parseInt(scalperStratMatch[1], 10));
       if (result.error) return json(res, 400, result);
       return json(res, 200, result);
     }
@@ -1929,7 +1930,7 @@ async function handleIgApi(req, res, p) {
   }
 }
 
-function writeConfigSnapshots() {
+async function writeConfigSnapshots() {
   try {
     if (!fs.existsSync(CANVAS_DIR)) fs.mkdirSync(CANVAS_DIR, { recursive: true });
     const filesToCopy = [
@@ -1937,14 +1938,27 @@ function writeConfigSnapshots() {
       ["ig-strategy.json", "ig-strategy-snapshot.json"],
       ["ig-alerts.json", "ig-alerts-snapshot.json"],
       ["ig-bot-log.json", "ig-bot-log-snapshot.json"],
-      ["ig-scalper-trades.json", "all-scalper-trades-data.json"],
-      ["ig-scalper-config.json", "ig-scalper-config-snapshot.json"],
     ];
     for (const [src, dst] of filesToCopy) {
       const srcPath = path.join(DATA_DIR, src);
       if (fs.existsSync(srcPath)) {
         fs.writeFileSync(path.join(CANVAS_DIR, dst), fs.readFileSync(srcPath));
       }
+    }
+    try {
+      const scalperConfig = await scalperEngine.getConfigExport();
+      if (scalperConfig) {
+        fs.writeFileSync(path.join(CANVAS_DIR, "ig-scalper-config-snapshot.json"), JSON.stringify(scalperConfig, null, 2));
+      }
+      const scalperStatus = await scalperEngine.getStatus();
+      if (scalperStatus && scalperStatus.allTrades) {
+        fs.writeFileSync(path.join(CANVAS_DIR, "all-scalper-trades-data.json"), JSON.stringify(scalperStatus.allTrades, null, 2));
+      }
+    } catch (dbErr) {
+      const fallbackConfig = path.join(DATA_DIR, "ig-scalper-config.json");
+      if (fs.existsSync(fallbackConfig)) fs.writeFileSync(path.join(CANVAS_DIR, "ig-scalper-config-snapshot.json"), fs.readFileSync(fallbackConfig));
+      const fallbackTrades = path.join(DATA_DIR, "ig-scalper-trades.json");
+      if (fs.existsSync(fallbackTrades)) fs.writeFileSync(path.join(CANVAS_DIR, "all-scalper-trades-data.json"), fs.readFileSync(fallbackTrades));
     }
     writeDashboardSnapshot();
     console.log("[ceo-proxy] Config snapshots written to canvas");
@@ -2004,7 +2018,7 @@ async function writeDashboardSnapshotAsync() {
     prices[epic] = { bid: data.bid, offer: data.offer, mid: data.mid, status: data.marketState, timestamp: data.timestamp };
   }
   let scalperStatus;
-  try { scalperStatus = scalperEngine.getStatus(); } catch (_) { scalperStatus = {}; }
+  try { scalperStatus = await scalperEngine.getStatus(); } catch (_) { scalperStatus = {}; }
   let activeProfile = "unknown";
   try { const ic = loadIgConfig(); activeProfile = (ic && ic.activeProfile) || "unknown"; } catch (_) {}
 
@@ -2129,7 +2143,7 @@ function autoRegisterBotScripts() {
   const registry = loadBotRegistry();
   const newBots = [];
   try {
-    const SKIP_BOTS = new Set(["ig-scalper-engine"]);
+    const SKIP_BOTS = new Set(["ig-scalper-engine", "ig-scalper-db"]);
     const files = fs.readdirSync(BOTS_DIR).filter(f => f.endsWith(".cjs") && !SKIP_BOTS.has(f.replace(/\.cjs$/, "")));
     for (const file of files) {
       const id = file.replace(/\.cjs$/, "");
@@ -3589,10 +3603,16 @@ async function handleApi(req, res) {
 
   if (p.startsWith("/api/ig/")) {
     if (p === "/api/ig/logs/scalper-trades") {
-      const filePath = path.join(DATA_DIR, "ig-scalper-trades.json");
-      if (!fs.existsSync(filePath)) { res.writeHead(404); return res.end("Not found"), true; }
-      res.writeHead(200, { "Content-Type": "application/json" });
-      return fs.createReadStream(filePath).pipe(res), true;
+      try {
+        const status = await scalperEngine.getStatus();
+        const trades = status.allTrades || [];
+        return json(res, 200, trades), true;
+      } catch (_) {
+        const filePath = path.join(DATA_DIR, "ig-scalper-trades.json");
+        if (!fs.existsSync(filePath)) { res.writeHead(404); return res.end("Not found"), true; }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return fs.createReadStream(filePath).pipe(res), true;
+      }
     }
     if (p === "/api/ig/logs/bot-log") {
       const filePath = path.join(DATA_DIR, "ig-bot-log.json");
@@ -3727,7 +3747,7 @@ function buildCanvasManifest() {
   return manifest;
 }
 
-function handleCanvasApi(req, res) {
+async function handleCanvasApiRoutes(req, res) {
   const url = new URL(req.url, "http://localhost");
   const p = url.pathname;
   if (!p.startsWith("/__openclaw__/canvas/api/")) return false;
@@ -3800,24 +3820,24 @@ function handleCanvasApi(req, res) {
 
   if (route === "scalper/status" && req.method === "GET") {
     try {
-      const status = scalperEngine.getStatus();
+      const status = await scalperEngine.getStatus();
       json(res, 200, status);
     } catch (e) { json(res, 500, { error: e.message }); }
     return true;
   }
 
   if (route === "scalper/start" && req.method === "POST") {
-    try { scalperEngine.start(false); json(res, 200, { ok: true }); } catch (e) { json(res, 500, { error: e.message }); }
+    try { await scalperEngine.start(false); json(res, 200, { ok: true }); } catch (e) { json(res, 500, { error: e.message }); }
     return true;
   }
 
   if (route === "scalper/stop" && req.method === "POST") {
-    try { scalperEngine.stop(); json(res, 200, { ok: true }); } catch (e) { json(res, 500, { error: e.message }); }
+    try { await scalperEngine.stop(); json(res, 200, { ok: true }); } catch (e) { json(res, 500, { error: e.message }); }
     return true;
   }
 
   if (route === "scalper/reset" && req.method === "POST") {
-    try { scalperEngine.resetStats(); json(res, 200, { ok: true }); } catch (e) { json(res, 500, { error: e.message }); }
+    try { await scalperEngine.resetStats(); json(res, 200, { ok: true }); } catch (e) { json(res, 500, { error: e.message }); }
     return true;
   }
 
@@ -3829,7 +3849,7 @@ function serveCanvas(req, res) {
   const url = new URL(req.url, "http://localhost");
   const prefix = "/__openclaw__/canvas/";
   if (!url.pathname.startsWith(prefix)) return false;
-  if (url.pathname.startsWith("/__openclaw__/canvas/api/")) return handleCanvasApi(req, res);
+  if (url.pathname.startsWith("/__openclaw__/canvas/api/")) return handleCanvasApiRoutes(req, res);
   if (req.method !== "GET") return false;
   const relPath = decodeURIComponent(url.pathname.slice(prefix.length)) || "index.html";
   if (relPath === "manifest.json") {
