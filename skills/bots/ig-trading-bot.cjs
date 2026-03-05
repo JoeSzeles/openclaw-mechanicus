@@ -313,7 +313,8 @@ async function proofReadTrade(strategy, marketData) {
   }
 
   if (accountBalance && strategy.stopDistance && strategy.size) {
-    const tradeRisk = strategy.stopDistance * strategy.size;
+    const instContractSize = parseFloat(marketData?.instrument?.contractSize) || 1;
+    const tradeRisk = strategy.stopDistance * strategy.size * instContractSize;
     const riskPct = (tradeRisk / accountBalance) * 100;
     if (riskPct > 2) {
       checks.push({ check: "Risk % of balance", pass: false, detail: `${riskPct.toFixed(2)}% exceeds 2% safety limit (risk: ${tradeRisk.toFixed(2)}, balance: ${accountBalance.toFixed(2)})` });
@@ -464,7 +465,7 @@ function evaluateStrategy(strategy, marketData) {
   return { trigger: false, reason: "No entry condition matched" };
 }
 
-function checkRiskLimits(strategy, config, positions) {
+function checkRiskLimits(strategy, config, positions, marketData) {
   if (positions.length >= (config.maxOpenPositions || 3)) {
     return { allowed: false, reason: `Max open positions reached (${positions.length}/${config.maxOpenPositions || 3})` };
   }
@@ -488,9 +489,10 @@ function checkRiskLimits(strategy, config, positions) {
   }
 
   if (accountBalance && strategy.stopDistance && strategy.size) {
+    const instContractSize = parseFloat(marketData?.instrument?.contractSize) || 1;
     const maxRiskPct = config.maxRiskPercent || 1;
     const maxRiskAmount = accountBalance * (maxRiskPct / 100);
-    const tradeRisk = strategy.stopDistance * strategy.size;
+    const tradeRisk = strategy.stopDistance * strategy.size * instContractSize;
     if (tradeRisk > maxRiskAmount) {
       return { allowed: false, reason: `Trade risk ${tradeRisk} exceeds max ${maxRiskAmount.toFixed(2)} (${maxRiskPct}% of ${accountBalance})` };
     }
@@ -684,7 +686,7 @@ async function runCycle(config) {
 
     if (!eval_.trigger) continue;
 
-    const risk = checkRiskLimits(strategy, config, openPositions);
+    const risk = checkRiskLimits(strategy, config, openPositions, marketData);
     if (!risk.allowed) {
       log("WARN", `${strategy.instrument}: Blocked — ${risk.reason}`);
       continue;

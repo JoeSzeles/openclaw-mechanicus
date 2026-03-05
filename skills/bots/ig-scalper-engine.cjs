@@ -375,7 +375,8 @@ async function evaluateEntry(strat, epic, ticks) {
   const maxSize = config.maxSize || 10;
   if (size < minSize) size = minSize;
   if (size > maxSize) size = maxSize;
-  const riskAmount = stopDist * size;
+  const cs = strat.contractSize || 1;
+  const riskAmount = stopDist * size * cs;
 
   const totalScalperRisk = scalperPositions
     .filter(p => p.status === "open")
@@ -406,9 +407,6 @@ async function evaluateEntry(strat, epic, ticks) {
 async function fetchContractSize(epic) {
   try {
     const data = await proxyGet("/api/ig/markets/" + epic);
-    if (data && data.instrument && data.instrument.valueOfOnePip) {
-      return parseFloat(data.instrument.valueOfOnePip) || 1;
-    }
     if (data && data.instrument && data.instrument.contractSize) {
       return parseFloat(data.instrument.contractSize) || 1;
     }
@@ -563,10 +561,10 @@ async function checkPositions() {
       const currentPrice = sp.direction === "BUY" ? (mkt.bid || 0) : (mkt.offer || 0);
       if (!currentPrice) continue;
 
-      if (!sp.contractSize && mkt.valueOfOnePip) {
-        sp.contractSize = parseFloat(mkt.valueOfOnePip) || 1;
-      } else if (!sp.contractSize && mkt.contractSize) {
+      if (!sp.contractSize && mkt.contractSize) {
         sp.contractSize = parseFloat(mkt.contractSize) || 1;
+      } else if (!sp.contractSize && pos.contractSize) {
+        sp.contractSize = parseFloat(pos.contractSize) || 1;
       }
       const cs = sp.contractSize || 1;
 

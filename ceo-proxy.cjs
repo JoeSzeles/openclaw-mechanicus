@@ -1157,7 +1157,6 @@ async function handleIgApi(req, res, p) {
       if (r.status !== 200) return json(res, r.status, { error: "IG API error", detail: r.body });
       const data = safeParseIgBody(r.body);
       if (data._parseError) return json(res, 502, { error: "IG returned non-JSON", detail: data._raw });
-      // Enrich positions with real valueOfOnePip and contractSize from /markets endpoint
       const positions = data.positions || data;
       if (Array.isArray(positions)) {
         const epics = [...new Set(positions.map(p => p?.market?.epic).filter(Boolean))];
@@ -1168,6 +1167,7 @@ async function handleIgApi(req, res, p) {
           if (epic && detailsMap[epic]) {
             pos.market.valueOfOnePip = detailsMap[epic].valueOfOnePip;
             pos.market.contractSize = detailsMap[epic].contractSize;
+            console.log(`[positions] ${epic}: contractSize=${detailsMap[epic].contractSize}, valueOfOnePip=${detailsMap[epic].valueOfOnePip}`);
           }
         }
       }
