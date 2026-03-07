@@ -251,6 +251,8 @@ function checkIndicators(closePrices, direction, strat) {
 
 function igResolution(tf) {
   if (tf === "TICK") return "SECOND";
+  const secondVariants = { SECOND_2: "SECOND", SECOND_5: "SECOND", SECOND_10: "SECOND", SECOND_20: "SECOND", SECOND_30: "SECOND", SECOND_40: "SECOND" };
+  if (secondVariants[tf]) return secondVariants[tf];
   return tf;
 }
 
