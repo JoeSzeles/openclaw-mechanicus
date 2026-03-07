@@ -1,0 +1,47 @@
+### ClawScript Editor Tab: A Comprehensive Description
+
+The ClawScript Editor Tab is a dedicated interface within your IG Trading Dashboard (extending the existing `ig-dashboard.html` structure) for creating, editing, visualizing, and simulating custom strategies using ClawScript. This tab turns ClawScript from a text-based DSL into a hybrid code/visual workflow tool — perfect for traders who want quick prototyping without deep coding, while still allowing power users (or AI like me) to paste/generate raw script. It syncs seamlessly with your modular Trade Claw engine: edits compile to .cjs strategy files, load into the engine, and can be backtested/simulated right in the tab.
+
+The tab is added as the 2nd in your .dash-tabs (after "Dashboard"): `<button class="dash-tab" data-tab="clawscript-editor">ClawScript Editor</button>`. Content lives in a new `#clawscriptEditorTab` div, styled to match your GitHub-Dark theme (full-width for code/flow split view). JS logic goes in a new `ig-clawscript-ui.js` (loaded in head).
+
+#### Tab Layout Overview
+The tab uses a split-pane design (e.g., via CSS grid: 50% text editor, 50% visual flow). Top bar for tools/actions, bottom for logs/simulation output. Responsive: On mobile, stack vertically.
+
+- **Top Pane: Text Editor (Code View)**  
+  - **Function**: Core Monaco Editor (CDN-loaded for syntax highlighting, auto-complete). Supports full ClawScript grammar — highlights keywords (e.g., `BUY` blue, `AI_QUERY` purple), errors red (real-time parse via your clawscript-parser.cjs). Auto-saves drafts to localStorage/DB.  
+  - **Text Paste Area**: Dedicated "Paste Script" button + modal textarea (for AI-pasted code from me). On paste, auto-parse and render visual flow on right.  
+  - **Features**: 
+    - Line numbers, folding (for loops/IFs).
+    - Auto-complete: Type "BUY" → suggests "AT MARKET IF ... STOP ...".
+    - Error tooltips: Hover red line → "Parse Error: Missing ENDIF".
+    - "Compile & Save" button: Runs parseAndGenerate → writes .cjs, adds to strategies DB (as 'custom-[name]'), shows toast success/error.
+
+- **Bottom Pane: Visual Flow Engine (Drag-Drop View)**  
+  - **Function**: A node-based flow builder (use JointJS or Rete.js via CDN — lightweight for Replit). Represents ClawScript as connected blocks/nodes. Drag-drop to build, auto-generates code on left. Bi-directional sync: Edit code → updates flow; drag flow → updates code.  
+  - **Command/Option Lining**: Left sidebar toolbox with all ClawScript commands/options as draggable icons/blocks (grouped: Trading, AI, Data Fetch, Loops/Control, Risk, etc.). E.g.:  
+    - "BUY" block: Inputs for size/var, condition slot (connect to "IF" node), outputs for "THEN" chain.  
+    - "AI_QUERY" block: Prompt input, TOOL/ARG slots, output var.  
+    - "LOOP" block: Num/condition input, body slot (drop statements inside).  
+    - Visuals: Color-coded (green for trades, blue for AI, red for risk/alerts). Hover shows docs (e.g., "BUY: Generates buy signal if condition true").  
+  - **Connectors**: Arrows for flow (e.g., IF true → BUY, false → ALERT). Data flow: Vars output from one node (e.g., DEF rsi_val) connect to inputs (e.g., IF rsi_val < 30).  
+  - **From ClawScript to Visual**: On load/paste, parse AST → render nodes (e.g., IF stmt → diamond node with branches).  
+  - **Tools in Pane**: "Zoom In/Out", "Auto-Layout" (dagre.js for clean graphs), "Export PNG" (for sharing flows), "Undo/Redo".
+
+- **Top Tools Bar**  
+  - Buttons: "New Script", "Load Existing" (dropdown of custom strategies from DB), "Paste Code", "Compile & Save", "Run Simulation", "Backtest" (links to backtest tab with generated strategy), "Generate with AI" (modal prompt → I generate code via AI_QUERY, paste into editor).  
+  - Search: Filter toolbox commands (e.g., type "AI" → shows AI_QUERY, AI_GENERATE).  
+  - Mode Toggle: "Code Focus" (hide flow), "Flow Focus" (hide code), "Split" (default).  
+  - Var Inspector: Sidebar list of defined vars (hover to see values during sim).
+
+- **Bottom Simulation / Logs Area**  
+  - **Run Simulation**: Button simulates the script on sample/mock data (e.g., 100 random ticks from DB or generated). Outputs: Step-by-step trace (e.g., "Line 5: RSI=28 <30 → BUY signal"), virtual P&L, errors. Visual flow highlights active nodes/arrows during sim (like debug stepper).  
+  - Logs: Console-like output (e.g., "AI_QUERY response: 'Optimize to 12'"). Errors link back to code line/node.  
+  - Export: "Download ClawScript", "Download Flow JSON" (for reload).
+
+#### How It All Works Together
+- **Workflow**: User drags "IF" node → connect "RSI < var" condition → "THEN" to "BUY" block → code auto-updates on left. Or paste AI-generated script → flow renders on right.
+- **AI Integration**: "Generate with AI" button: Prompt me ("Make a nomadic portfolio scanner") → I output ClawScript → auto-paste + render flow.
+- **Simulation**: Uses a mock runtime (in ig-clawscript-ui.js) — executes generated JS with fake ticks/context, steps through AST for highlights.
+- **Engine Link**: On save, compiles to .cjs → engine loads as strategyType='custom', runs live/demo.
+
+This tab makes ClawScript accessible for non-coders (drag-drop) while power users paste wild code. Implement via Monaco + JointJS CDNs (Replit-friendly). Ready for code snippets or plan tweaks? 😈
