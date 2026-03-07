@@ -279,13 +279,37 @@ async function saveStrategyField(strat, field, value) {
   }
 }
 
-function loadTradeLog() {
-  if (dbAvailable) return;
+async function loadTradeLog() {
   const TRADE_LOG_FILE = path.join(DATA_DIR, "ig-scalper-trades.json");
   try {
     if (fs.existsSync(TRADE_LOG_FILE)) {
-      tradeLog = JSON.parse(fs.readFileSync(TRADE_LOG_FILE, "utf8"));
-      if (!Array.isArray(tradeLog)) tradeLog = [];
+      const fileTrades = JSON.parse(fs.readFileSync(TRADE_LOG_FILE, "utf8"));
+      if (!Array.isArray(fileTrades) || fileTrades.length === 0) return;
+      if (dbAvailable) {
+        try {
+          const dbTrades = await db.getTrades(1);
+          if (dbTrades.length === 0 && fileTrades.length > 0) {
+            log("INFO", `Importing ${fileTrades.length} file-based trades into DB`);
+            for (const t of fileTrades) {
+              try {
+                const trade = {
+                  type: (t.type || "").toUpperCase(),
+                  dealId: t.dealId, epic: t.epic, direction: t.direction,
+                  size: t.size, entryPrice: t.entry || t.entryPrice,
+                  exitPrice: t.exit || t.exitPrice, pnl: t.pnl || 0,
+                  strategyName: t.strategyName || t.strategy || null
+                };
+                if (t.timestamp || t.openedAt) trade.openedAt = t.timestamp || t.openedAt;
+                if (t.closedAt) trade.closedAt = t.closedAt;
+                await db.logTrade(trade);
+              } catch (_) {}
+            }
+            log("INFO", "File trade import complete");
+          }
+        } catch (e) { log("WARN", "DB trade import check failed: " + e.message); }
+        return;
+      }
+      tradeLog = fileTrades;
     }
   } catch (_) { tradeLog = []; }
 }
@@ -991,7 +1015,7 @@ async function start() {
     await saveConfig();
     log("INFO", "Scalper auto-enabled via start()");
   }
-  loadTradeLog();
+  await loadTradeLog();
 
   const hadOpenPositions = scalperPositions.filter(p => p.status === "open").length;
   const isRestart = hadOpenPositions > 0;

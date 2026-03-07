@@ -182,6 +182,7 @@ function saveIgConfig(config) {
 function getDefaultIgConfig() {
   return {
     activeProfile: "demo",
+    timezone: "Australia/Brisbane",
     profiles: {
       demo: {
         label: "Demo Account",
@@ -205,6 +206,7 @@ function getDefaultIgConfig() {
 
 function ensureIgConfig() {
   let config = loadIgConfig();
+  if (config && !config.timezone) config.timezone = "Australia/Brisbane";
   if (!config) {
     config = getDefaultIgConfig();
     if (process.env.IG_API_KEY || process.env.IG_USERNAME) {
@@ -1043,6 +1045,9 @@ async function handleIgApi(req, res, p) {
     if (req.method === "POST" && p === "/api/ig/config") {
       const body = JSON.parse((await readBody(req)).toString() || "{}");
       const config = ensureIgConfig();
+      if (body.timezone) {
+        config.timezone = body.timezone;
+      }
       if (body.activeProfile && config.profiles[body.activeProfile]) {
         const oldProfile = config.activeProfile;
         config.activeProfile = body.activeProfile;
@@ -1721,7 +1726,9 @@ async function handleIgApi(req, res, p) {
       const resSec = RESOLUTION_SECONDS[resolution] || 3600;
 
       function igPriceToCandle(p) {
-        const dt = new Date(p.snapshotTimeUTC || p.snapshotTime);
+        let rawTime = p.snapshotTimeUTC || p.snapshotTime || "";
+        if (typeof rawTime === "string") rawTime = rawTime.replace(/\//g, "-");
+        const dt = new Date(rawTime);
         const ts = Math.floor(dt.getTime() / 1000);
         const om = p.openPrice || {}, hm = p.highPrice || {}, lm = p.lowPrice || {}, cm = p.closePrice || {};
         return {
@@ -1839,7 +1846,13 @@ async function handleIgApi(req, res, p) {
         console.log(`[ig-prices] DB store failed: ${storeErr.message}`);
       }
 
-      let finalPrices = allPrices;
+      let finalPrices = allPrices.map(p => {
+        if (!p.snapshotTimeUTC && p.snapshotTime) {
+          const normalized = String(p.snapshotTime).replace(/\//g, "-").replace(" ", "T") + "Z";
+          return { ...p, snapshotTimeUTC: new Date(normalized).toISOString() };
+        }
+        return p;
+      });
       let storedCount = allPrices.length;
       if (!from && !to && source === "mixed") {
         try {

@@ -32,8 +32,10 @@ function parsePrices(prices) {
     const hm = p.highPrice || {};
     const lm = p.lowPrice || {};
     const cm = p.closePrice || {};
+    let rawTime = p.snapshotTimeUTC || p.snapshotTime || "";
+    if (typeof rawTime === "string") rawTime = rawTime.replace(/\//g, "-");
     return {
-      time: Math.floor(new Date(p.snapshotTimeUTC || p.snapshotTime).getTime() / 1000),
+      time: Math.floor(new Date(rawTime).getTime() / 1000),
       open: ((om.bid || 0) + (om.ask || 0)) / 2 || om.mid || 0,
       high: ((hm.bid || 0) + (hm.ask || 0)) / 2 || hm.mid || 0,
       low: ((lm.bid || 0) + (lm.ask || 0)) / 2 || lm.mid || 0,
@@ -66,7 +68,10 @@ async function fetchCandles(epic, resolution, max) {
 
   if (max <= BATCH_SIZE) {
     const data = await proxyFetch(`/api/ig/pricehistory/${epic}?resolution=${resolution}&max=${max}`);
-    if (!data || !data.prices) return [];
+    if (!data || !data.prices || data.prices.length === 0) {
+      console.log(`[backtest] IG API returned no data for ${epic} ${resolution}, trying stream fallback`);
+      return fetchStreamCandles(epic, resolution, max);
+    }
     return parsePrices(data.prices).sort((a, b) => a.time - b.time);
   }
 
@@ -98,6 +103,11 @@ async function fetchCandles(epic, resolution, max) {
     }
   }
 
+  if (allCandles.length === 0) {
+    console.log(`[backtest] No data from IG API batches for ${epic} ${resolution}, trying stream fallback`);
+    return fetchStreamCandles(epic, resolution, max);
+  }
+
   if (allCandles.length < max && batches > 0) {
     console.log(`[backtest] Batch fetch stopped early: got ${allCandles.length}/${max} candles in ${batches} batches for ${epic} ${resolution}`);
   }
@@ -109,6 +119,52 @@ async function fetchCandles(epic, resolution, max) {
   }
   deduped.sort((a, b) => a.time - b.time);
   return deduped.slice(-max);
+}
+
+const RESOLUTION_SECONDS = { SECOND: 1, SECOND_2: 2, SECOND_5: 5, SECOND_10: 10, SECOND_20: 20, SECOND_30: 30, SECOND_40: 40, MINUTE: 60, MINUTE_5: 300, MINUTE_15: 900, HOUR: 3600, HOUR_4: 14400, DAY: 86400, WEEK: 604800 };
+
+function aggregateCandles(candles, targetResSec) {
+  if (!candles || candles.length === 0) return [];
+  const buckets = new Map();
+  for (const c of candles) {
+    const bucketTs = Math.floor(c.time / targetResSec) * targetResSec;
+    if (!buckets.has(bucketTs)) {
+      buckets.set(bucketTs, { time: bucketTs, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume || 0 });
+    } else {
+      const b = buckets.get(bucketTs);
+      b.high = Math.max(b.high, c.high);
+      b.low = Math.min(b.low, c.low);
+      b.close = c.close;
+      b.volume += c.volume || 0;
+    }
+  }
+  return Array.from(buckets.values()).sort((a, b) => a.time - b.time);
+}
+
+async function fetchStreamCandles(epic, resolution, max) {
+  const targetSec = RESOLUTION_SECONDS[resolution] || 60;
+  const streamResolutions = ["SECOND", "SECOND_2", "SECOND_5", "SECOND_10", "SECOND_20", "SECOND_30", "SECOND_40", "MINUTE", "MINUTE_5", "MINUTE_15", "HOUR", "HOUR_4", "DAY"];
+  let bestRes = resolution;
+  const targetIdx = streamResolutions.indexOf(resolution);
+  if (targetIdx < 0) bestRes = "SECOND";
+  for (let i = targetIdx; i >= 0; i--) {
+    bestRes = streamResolutions[i];
+    break;
+  }
+  try {
+    const data = await proxyFetch(`/api/ig/stream/candles?epic=${encodeURIComponent(epic)}&resolution=${encodeURIComponent(bestRes)}&max=${max * 10}`);
+    if (!data || !data.prices || data.prices.length === 0) return [];
+    let candles = parsePrices(data.prices).filter(c => c.time > 0).sort((a, b) => a.time - b.time);
+    const bestSec = RESOLUTION_SECONDS[bestRes] || 1;
+    if (bestSec < targetSec) {
+      candles = aggregateCandles(candles, targetSec);
+    }
+    console.log(`[backtest] Stream fallback: ${candles.length} ${resolution} candles from ${bestRes} stream data for ${epic}`);
+    return candles.slice(-max);
+  } catch (e) {
+    console.log(`[backtest] Stream fallback failed: ${e.message}`);
+    return [];
+  }
 }
 
 function calcEMA(prices, period) {
