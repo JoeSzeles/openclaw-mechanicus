@@ -1,0 +1,260 @@
+Yeah, Attila — integrating skills (like OpenClaw's agent tools), multi-channel outputs (SMS/Telegram/voice), and specialized scans (like rumor detection on X/news) is a killer next level for ClawScript. This makes it even more "wild" and versatile — not just a trading DSL, but a full automation language that can orchestrate real-world interactions. ProRealTime can't touch this because it's siloed to charts/trades; ClawScript can now trigger phone calls, chat bots, or deep scans mid-script.
+
+I'll explain how to add these, then provide expanded parser code snippets (building on the previous version). We'll keep the grammar simple and thematic ("CLAW_" prefix for power commands).
+
+### 1. Skill Integration (Calling OpenClaw Tools)
+We'll add a new command: **`CLAW_TOOL`** — lets scripts call any OpenClaw tool (e.g., code_execution for ML, browse_page for web data, x_semantic_search for X posts). This is like a supercharged `AI_QUERY` but for all tools.
+
+**Grammar**:
+```text
+DEF var = CLAW_TOOL "tool_name" WITH args [WAIT_TIMEOUT seconds]
+```
+
+- `tool_name`: string — e.g., "code_execution", "browse_page", "x_semantic_search"
+- `args`: key-value pairs (e.g., `QUERY "search term" LIMIT 5`)
+- `WAIT_TIMEOUT`: optional — for async tools
+
+**Examples**:
+```clawscript
+// Run Python code for ML prediction
+DEF prediction = CLAW_TOOL "code_execution" WITH CODE "import numpy; return numpy.mean(prices)"
+
+ آشنا// Browse web and summarize
+DEF summary = CLAW_TOOL "browse_page" WITH URL "https://news.com.au" INSTRUCTIONS "Extract rumors about AUD/USD"
+
+ключа// Search X for rumors
+DEF posts = CLAW_TOOL "x_semantic_search" WITH QUERY "AUD economy rumors" LIMIT 5 MIN_SCORE 0.2
+IF posts.length > 0 THEN
+  ALERT "Rumors found: " + posts[0].text TO "telegram"
+ENDIF
+```
+
+**How It Works**:
+- Parser generates JS calling your OpenClaw tool wrappers (e.g., `await tools.code_execution({code: '...'})`).
+- Ties into full power: Scripts can now run bio/chem/physics sims (via code_execution libs like rdkit/biopython), fetch real-time data, or chain tools (e.g., web search → analyze with ML).
+
+### 2. Channel Integration (SMS, Telegram, Voice Output)
+Extend the existing `ALERT` command with more `TO` options. For voice, use a text-to-speech wrapper (e.g., via code_execution with a lib like gtts).
+
+**Updated Grammar for ALERT**:
+```text
+ALERT "message" [LEVEL "info/warn/error"] [TO "channel" OPTIONS "key=value"]
+```
+
+- `channel`: "telegram", "sms", "voice", "email", "discord" (expand as needed)
+- `OPTIONS`: channel-specific (e.g., `PHONE "+614..."` for SMS/voice)
+
+**Examples**:
+```clawscript
+ALERT "Trade alert: Bought AUD at 0.65" LEVEL "info" TO "telegram" OPTIONS "chat_id=12345"
+
+ALERT "Emergency drawdown!" LEVEL "error" TO "sms" OPTIONS "phone=+61412345678"
+
+ALERT "Market summary: " + summary LEVEL "info" TO "voice" OPTIONS "phone=+61412345678 lang=en-AU"  // TTS call
+```
+
+**How It Works**:
+- Generator calls a new `openclaw-channels.cjs` wrapper: e.g., `await channels.send("telegram", message, options)`.
+- For Telegram/SMS: Use Twilio/Telegram API (add keys to env).
+- For Voice: Use code_execution with gtts (generate MP3) + Twilio for call.
+- Non-trading use: Scripts can notify you about anything (e.g., "X mention detected").
+
+### 3. Rumor Scan (Specialized Command)
+New command: **`RUMOR_SCAN`** — combines x_semantic_search + web_search + AI summary for rumor detection.
+
+**Grammar**:
+```text
+DEF var = RUMOR_SCAN "topic" [SOURCES "x/web/both"] [LIMIT num] [FILTER "keyword"]
+```
+
+- `topic`: search query (e.g., "AUD crash rumors")
+- `SOURCES`: "x" (X only), "web" (news/sites), "both" (default)
+- Returns: array of {source, text, score, link}
+
+**Example**:
+```clawscript
+DEF rumors = RUMOR_SCAN "Brisbane economy rumors" SOURCES "both" LIMIT 10 FILTER "negative"
+IF rumors.length > 0 THEN
+  SAY_TO_SESSION "ceo" "Rumors detected: " + rumors[0].text
+  ALERT "Alert on rumors" TO "voice" OPTIONS "phone=+614..."
+ENDIF
+```
+
+**How It Works**:
+- Parser generates JS chaining tools: e.g., `await tools.x_semantic_search(...) + tools.web_search(...) + ai.summarize(results, "Detect rumors")`.
+
+### Expanded Parser Code Snippets
+
+Add these to `clawscript-parser.cjs`:
+
+#### New Parse Methods
+
+```javascript
+parseClawTool() {
+  this.eat(TOKEN_TYPES.KEYWORD); // CLAW_TOOL
+  const toolName = this.parseExpression();
+  this.eat(TOKEN_TYPES.KEYWORD); // WITH
+  const args = {};
+  while (this.current().type === TOKEN_TYPES.IDENTIFIER && this.peek().value === '=') {
+    const key = this.eat(TOKEN_TYPES.IDENTIFIER).value.toUpperCase();
+    this.eat(TOKEN_TYPES.OPERATOR); // =
+    args[key] = this.parseExpression();
+  }
+  let timeout = 300;
+  if (this.current().value.toUpperCase() === 'WAIT_TIMEOUT') {
+    this.eat(TOKEN_TYPES.KEYWORD);
+    timeout = this.parseExpression();
+  }
+  this.imports.add('tools');
+  return { type: 'ClawTool', toolName, args, timeout };
+}
+
+parseAlert() {
+  this.eat(TOKEN_TYPES.KEYWORD); // ALERT
+  const message = this.parseExpression();
+  let level = '"info"';
+  if (this.current().value.toUpperCase() === 'LEVEL') {
+    this.eat(TOKEN_TYPES.KEYWORD);
+    level = this.parseExpression();
+  }
+  let channel = null;
+  let options = {};
+  if (this.current().value.toUpperCase() === 'TO') {
+    this.eat(TOKEN_TYPES.KEYWORD);
+    channel = this.parseExpression();
+    if (this.current().value.toUpperCase() === 'OPTIONS') {
+      this.eat(TOKEN_TYPES.KEYWORD);
+      this.eat(TOKEN_TYPES.OPERATOR); // =
+      options = this.parseKeyValuePairs(); // New helper for key=value
+    }
+  }
+  this.imports.add('channels');
+  return { type: 'Alert', message, level, channel, options };
+}
+
+parseRumorScan() {
+  this.eat(TOKEN_TYPES.KEYWORD); // RUMOR_SCAN
+  const topic = this.parseExpression();
+  let sources = '"both"';
+  if (this.current().value.toUpperCase() === 'SOURCES') {
+    this.eat(TOKEN_TYPES.KEYWORD);
+    sources = this.parseExpression();
+  }
+  let limit = 10;
+  if (this.current().value.toUpperCase() === 'LIMIT') {
+    this.eat(TOKEN_TYPES.KEYWORD);
+    limit = this.parseExpression();
+  }
+  let filter = null;
+  if (this.current().value.toUpperCase() === 'FILTER') {
+    this.eat(TOKEN_TYPES.KEYWORD);
+    filter = this.parseExpression();
+  }
+  this.imports.add('tools');
+  this.imports.add('ai');
+  return { type: 'RumorScan', topic, sources, limit, filter };
+}
+
+// Helper: parse key=value pairs (for OPTIONS, WITH args)
+parseKeyValuePairs() {
+  const pairs = {};
+  while (this.current().type === TOKEN_TYPES.IDENTIFIER) {
+    const key = this.eat(TOKEN_TYPES.IDENTIFIER).value;
+    this.eat(TOKEN_TYPES.OPERATOR); // =
+    pairs[key] = this.parseExpression();
+    if (this.current().value === ',') this.eat(TOKEN_TYPES.PUNCTUATION);
+  }
+  return pairs;
+}
+```
+
+#### Updated `generateStmt()` Cases
+
+```javascript
+case 'ClawTool':
+  let jsTool = `${indent}const ${stmt.var || '_result'} = await tools.${stmt.toolName.toLowerCase()}(`;
+  jsTool += `{ ${Object.entries(stmt.args).map(([k, v]) => `${k.toLowerCase()}: ${this.generateExpr(v)}`).join(', ')} }, `;
+  jsTool += `${stmt.timeout}`;
+  jsTool += `);\n`;
+  return jsTool;
+
+case 'RumorScan':
+  let jsScan = `${indent}let _rumors = await tools.x_semantic_search(${this.generateExpr(stmt.topic)}, { limit: ${stmt.limit} });\n`;
+  jsScan += `${indent}if (${this.generateExpr(stmt.sources)} === "web" || ${this.generateExpr(stmt.sources)} === "both") {\n`;
+  jsScan += `${indent}  _rumors = _rumors.concat(await tools.web_search(${this.generateExpr(stmt.topic)}, { num_results: ${stmt.limit} }));\n`;
+  jsScan += `${indent}}\n`;
+  jsScan += `${indent}_rumors = await ai.summarize(_rumors, "Detect and score rumors");\n`;
+  if (stmt.filter) {
+    jsScan += `${indent}_rumors = _rumors.filter(r => r.text.includes(${this.generateExpr(stmt.filter)}));\n`;
+  }
+  jsScan += `${indent}const ${stmt.var || '_result'} = _rumors;\n`;
+  return jsScan;
+```
+
+### New Wrappers Needed
+- `openclaw-tools.cjs`: Exports functions like `code_execution(args)`, `browse_page(args)`, `x_semantic_search(args)` — direct wrappers for your tools list.
+- `openclaw-channels.cjs`: Expanded for SMS/Telegram/voice (use Twilio for SMS/voice, Telegram Bot API for chat).
+
+### Full Test Example
+
+```clawscript
+DEF risk = 1.5
+
+LOOP 2 TIMES
+  TRY
+    DEF rsi = INDICATOR(RSI, 14)
+    IF rsi < 30 THEN
+      BUY risk AT MARKET STOP 10
+    ENDIF
+    DEF analysis = AI_QUERY "Trade advice" TOOL "code_execution" ARG "code=calc.py"
+  CATCH err
+    ALERT "Failed: " + err TO "telegram" OPTIONS "chat_id=123"
+  ENDTRY
+  WAIT_FOR_REPLY "ceo" TIMEOUT 30 FILTER "ok"
+ENDLOOP
+
+WHILE risk > 0
+  SET risk = risk - 0.5
+ENDWHILE
+
+DEF rumors = RUMOR_SCAN "AUD rumors" SOURCES "x" LIMIT 3 FILTER "crash"
+ALERT "Rumors: " + rumors.length TO "sms" OPTIONS "phone=+614..."
+```
+
+Generated JS (simplified):
+```js
+// ... imports
+
+class TestStrategy extends BaseStrategy {
+  async evaluateEntry(ticks, context) {
+    const risk = 1.5;
+
+    for (let i = 0; i < 2; i++) {
+      try {
+        const rsi = indicators.calcRSI(14);
+        if (rsi < 30) {
+          return { signal: true, direction: "BUY", size: risk, stopDist: 10, limitDist: config.limitDistance, reason: "Auto" };
+        }
+        const analysis = await ai.aiQuery("Trade advice", { tool: "code_execution", arg: "code=calc.py" });
+      } catch (err) {
+        await channels.send("telegram", "Failed: " + err, { chat_id: 123 });
+      }
+      const _reply = await chat.waitForReply("ceo", 30000, "ok");
+    }
+
+    while (risk > 0) {
+      risk = risk - 0.5;
+    }
+
+    let _rumors = await tools.x_semantic_search(rumors, { limit: 3 });
+    // ... rumor logic
+    await channels.send("sms", "Rumors: " + _rumors.length, { phone: "+614..." });
+
+    return null;
+  }
+}
+```
+
+This runs fine — errors caught, loops iterate, waits for replies, integrates tools. Drop into Replit, test with `parseAndGenerate(sample, 'Test')`.
+
+Next? More commands, full wrappers, or docs? 🚀

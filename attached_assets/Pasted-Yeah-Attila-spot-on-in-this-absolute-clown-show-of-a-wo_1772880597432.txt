@@ -1,0 +1,101 @@
+Yeah, Attila — spot on, in this absolute clown-show of a world (wars, elections, AI bubbles popping, crypto meltdowns every other week), a **flash crash scanner** is basically table stakes for any serious trading bot. We're talking about those heart-stopping moments where markets tank 5–10% in minutes (or seconds) due to algo cascades, fat-finger trades, or liquidity vacuums, then snap back like nothing happened. Or the opposite: insane pumps from FOMO or short squeezes. Your Lightstreamer connection (real-time tick data from IG) is perfect for this — it's already pumping updates every 200ms or so in your dashboard setup.
+
+Let's break it down: what flash crashes are, how to detect them (drawdowns down or swings up), and how to weave this into your ClawScript / OpenClaw bot for proactive defense/offense. I'll go wild with ideas, including ClawScript examples that use variables, AI tools, channels (SMS/Telegram/voice), and the new WAIT_FOR_REPLY for human/AI intervention. This scanner could save your ass (or make bank buying dips) — and since OpenClaw is multi-agent, it can even alert non-traders (e.g., scan for "Brisbane real estate crash rumors" and voice-call you).
+
+### Quick Primer on Flash Crashes (From Chaos World History)
+- **What they are**: Extreme, temporary price dislocations. Classic example: 2010 US stock flash crash (Dow dropped 9% in minutes, recovered fast) — blamed on HFT algos chasing each other into a spiral. Recent ones: Crypto in 2022/2024 (e.g., LUNA/FTX wipeouts), or 2025 Treasury flash crash from AI trading bots overreacting to rate hints.
+- **Causes**: Algo feedback loops (one sells → triggers stops → more sells), low liquidity (weekends, holidays), news bombs, or manipulation.
+- **Detection challenges**: Fast (sub-second to minutes), so need real-time data. False positives suck (normal vol vs. crash).
+- **Why important now**: With AI everywhere (like your bot), markets are more fragile — one glitchy model can cascade. Per search results, bots like HaasOnline's Flash Crash Bot detect dips and auto-buy, while research emphasizes real-time monitoring to avoid "selling spirals."
+
+### How to Build a Flash Crash Scanner in Your System
+Use your Lightstreamer for ticks (bid/offer/mid updates), ClawScript for logic (run per tick or on thresholds), and OpenClaw agents/AI for analysis/alerts. Focus on two modes:
+- **Downside: Unusual Drawdown Detection** (flash crash / black swan drop)
+- **Upside: Extreme Swing Up** (pump / squeeze — opportunity or trap)
+
+#### Core Detection Logic (Math/Thresholds)
+- **Metrics to Watch** (use your indicators.cjs):
+  - **Price Drop %**: (current_mid - recent_high) / recent_high * 100 > threshold (e.g., -5% in 1 min).
+  - **Vol Surge**: ATR(14) > 3x average ATR over last hour, or spread widens 2x.
+  - **Drawdown from Peak**: Realized + unrealized P&L < -X% from session high-water mark.
+  - **Speed**: Rate of change (ROC) < -Y% per tick window (e.g., 15 ticks).
+  - **Upside Equivalent**: ROC > Z% (e.g., +5% in 1 min) for pumps.
+- **Windows**: Short (1–5 min for flash), medium (hour for trends).
+- **Filters**: Ignore if market closed, or vol expected (e.g., news time).
+
+Implement as a standalone ClawScript script, or embed in strategies (e.g., pause trading if detected).
+
+#### ClawScript Example: Full Flash Crash Scanner Script
+This script runs per tick (in your engine), detects crashes/pumps, alerts multi-channel, queries me for analysis, waits for your reply in CEO session, and auto-pauses/mutates config. Uses variables for thresholds.
+
+```clawscript
+// FlashCrashScanner.cs (compile to custom-flashcrash-strategy.cjs)
+
+// Define tunable vars
+DEF crash_threshold_pct = -5  // % drop in 1 min
+DEF pump_threshold_pct = 5    // % up in 1 min
+DEF vol_surge_mult = 3        // ATR multiplier for surge
+DEF window_ticks = 60         // ~1 min at 1 tick/sec
+DEF session_id = "ceo"        // Where to report/wait
+
+LOOP FOREVER  // Run continuously
+  DEF current_mid = TICK.mid
+  DEF recent_high = MAX(MID OVER window_ticks)
+  DEF recent_low = MIN(MID OVER window_ticks)
+  DEF price_change_pct = (current_mid - recent_low) / recent_low * 100  // For up/down
+
+  DEF atr_now = INDICATOR(ATR, 14)
+  DEF atr_avg = AVERAGE(ATR(14) OVER 60)  // Last hour avg
+
+  IF price_change_pct < crash_threshold_pct OR atr_now > vol_surge_mult * atr_avg THEN
+    SAY_TO_SESSION session_id "FLASH CRASH DETECTED: " + price_change_pct + "% drop, vol x" + (atr_now / atr_avg)
+    ALERT "Crash alert!" LEVEL "error" TO "telegram" OPTIONS "chat_id=your_id"
+    ALERT "Potential flash crash" LEVEL "error" TO "sms" OPTIONS "phone=+614..."
+    ALERT "Warning: Market crash detected" LEVEL "error" TO "voice" OPTIONS "phone=+614..."  // TTS call
+
+    // AI analyze
+    DEF analysis = AI_QUERY "Analyze this crash: price " + current_mid + ", change " + price_change_pct TOOL "web_search" ARG "query=latest AUD flash crash news"
+
+    SAY_TO_SESSION session_id "Grok analysis: " + analysis
+
+    // Wait for your reply in CEO session
+    DEF your_reply = WAIT_FOR_REPLY session_id TIMEOUT 120 FILTER "proceed|pause|ignore"
+
+    IF your_reply CONTAINS "pause" THEN
+      MUTATE_CONFIG "enabled" = false
+      SAY_TO_SESSION session_id "Bot paused due to crash."
+    ELSE IF your_reply CONTAINS "proceed" THEN
+      SAY_TO_SESSION session_id "Continuing despite crash."
+    ELSE
+      ALERT "No reply — auto-pausing" TO "voice"
+      MUTATE_CONFIG "enabled" = false
+    ENDIF
+
+    // Rumor scan for context
+    DEF rumors = RUMOR_SCAN "AUD flash crash rumors" SOURCES "both" LIMIT 5 FILTER "negative"
+    IF rumors.length > 0 THEN
+      SAY_TO_SESSION session_id "Related rumors: " + rumors[0].text
+    ENDIF
+
+  ELSE IF price_change_pct > pump_threshold_pct THEN
+    SAY_TO_SESSION session_id "EXTREME PUMP: " + price_change_pct + "% up!"
+    ALERT "Pump detected — opportunity?" TO "telegram"
+    // Optional: auto-buy if aggressive
+    BUY 0.5 AT MARKET IF analysis CONTAINS "bullish"
+  ENDIF
+
+  WAIT 1000  // Throttle to ~1/sec
+ENDLOOP
+```
+
+- **Variables**: Used everywhere (thresholds, calcs, messages).
+- **Channels**: Alerts to Telegram/SMS/voice for immediate notification.
+- **AI/Tools**: Queries me with web_search for news, rumor scan with x/web.
+- **WAIT_FOR_REPLY**: Pauses for your input in CEO session (e.g., type "pause" in chat).
+
+### Implementation Notes
+- **In Engine**: Compile this script to a strategy .cjs, run as a "monitor" strategy (always on, no trades unless triggered).
+- **Lightstreamer Tie-In**: Your dashboard already has it — feed ticks to the script's `processTick`.
+- **Chaos World Edge**: Add geo-filter (e.g., Brisbane-specific news via `CLAW_WEB "brisbane.com.au" INSTRUCT "Local market rumors"`).
+
+This scanner could prevent wipeouts or spot opportunities. Want to test this script in parser, or add more features like auto-recovery? 🚀

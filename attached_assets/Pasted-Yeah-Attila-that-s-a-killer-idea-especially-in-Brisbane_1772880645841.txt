@@ -1,0 +1,133 @@
+Yeah, Attila — that's a killer idea, especially in Brisbane's timezone where you're catching Asian opens and US closes. Making the bot "instrument-independent" means it doesn't hardcode stuff like gold or silver — instead, it **scans the market dynamically**, picks hot opportunities (based on vol, momentum, sentiment, or chaos signals), and builds a mini-portfolio (3–5 instruments) to spread risk and average losses. This is like a "nomadic trader" strategy: roam across IG's CFDs (forex, commodities, indices, shares), allocate smartly, and rebalance to avoid single-instrument blowups.
+
+We'll build this right into ClawScript as a new command set: **`MARKET_NOMAD`** (cool name — nomadic market hunter). It scans, selects, and manages a portfolio automatically. Genius part: Uses your OpenClaw tools (web/X search for real-time vibes, code_execution for quick stats), variables for thresholds, and channels for alerts. Averages losses via diversification (e.g., cap 20–30% per instrument), correlation checks (drop if >0.8 corr), and auto-rebalance on signals.
+
+### How It Works (High-Level)
+- **Scan Phase**: Bot queries markets for "interesting" instruments (high vol for scalping, trends for following, oversold for reversion).
+- **Selection**: Rank by score (momentum % + sentiment + vol surge), pick top N (e.g., 3–5).
+- **Portfolio Management**: Allocate budget (e.g., equal-weight or Kelly), monitor DD per instrument, rebalance/swap if one lags.
+- **Loss Averaging**: If one tanks (e.g., silver flash crash), the others (e.g., gold hedge) balance it. Auto-hedge inverses if corr negative.
+- **Independent**: No fixed epics — bot varies based on conditions. Runs per tick or timer.
+
+Realistic in your setup: Uses Lightstreamer for live data, DB for history, AI_QUERY for sentiment, code_execution for ranking math (numpy for corr/vol calcs).
+
+### ClawScript Implementation (New Commands)
+Add these to the parser (similar to before — parse as keywords, generate JS calling wrappers).
+
+1. **MARKET_NOMAD ON / OFF**  
+   Grammar: `MARKET_NOMAD ON / OFF [MAX_INSTRUMENTS num] [SCAN_INTERVAL min]`  
+   Description: Toggle nomadic mode. Scans every X min, builds/rebalances portfolio.  
+   Example: `MARKET_NOMAD ON MAX_INSTRUMENTS 4 SCAN_INTERVAL 15`
+
+2. **SET NOMAD_*** (Variables for Tuning)  
+   Grammar: `SET NOMAD_CRITERIA "momentum + vol + sentiment" [WEIGHTS "0.4,0.3,0.3"]`  
+   - Other vars: `NOMAD_MIN_VOL_MULT = 1.5`, `NOMAD_MAX_CORR = 0.7`, `NOMAD_BUDGET_PCT = 25` (per instrument), `NOMAD_HEDGE_RATIO = 0.5` (for inverses).  
+   Description: Customize scan/ranking.  
+
+3. **NOMAD_SCAN**  
+   Grammar: `DEF results = NOMAD_SCAN "category" [LIMIT num]` (category: "commodities", "forex", "indices", "all")  
+   Description: Manual scan — returns ranked list [{epic, score, reason}].  
+   Example: `DEF top_comms = NOMAD_SCAN "commodities" LIMIT 3`
+
+4. **NOMAD_ALLOCATE**  
+   Grammar: `NOMAD_ALLOCATE TO "epic_list" [SIZING "equal/kelly/vol_parity"]`  
+   Description: Manually assign portfolio.  
+   Example: `NOMAD_ALLOCATE TO top_comms SIZING "kelly"`
+
+### Full Example ClawScript: Nomadic Portfolio Strategy
+This script turns your bot into a market-roaming beast — scans for gold/silver-like plays, builds a 4-instrument portfolio, averages losses via rebalance, alerts on swaps.
+
+```clawscript
+// NomadicPortfolio.cs
+
+// Tune vars (change live)
+SET NOMAD_CRITERIA "momentum + vol + sentiment" WEIGHTS "0.4,0.3,0.3"
+SET NOMAD_MIN_VOL_MULT = 2.0  // Only high-vol plays
+SET NOMAD_MAX_CORR = 0.75     // Diversify
+SET NOMAD_BUDGET_PCT = 25     // 25% per instrument
+SET NOMAD_HEDGE_RATIO = 0.5   // 50% inverse if possible
+SET NOMAD_SCAN_INTERVAL = 30  // Min between scans
+
+// Turn on nomadic mode
+MARKET_NOMAD ON MAX_INSTRUMENTS 4
+
+LOOP FOREVER  // Main loop
+  // Manual scan if needed
+  DEF candidates = NOMAD_SCAN "all" LIMIT 10
+
+  // AI refine (optional)
+  DEF refined = AI_QUERY "Rank these candidates for Brisbane trader: " + candidates TOOL "code_execution" ARG "code=rank_numpy.py"
+
+  // Allocate if good
+  IF refined.length >= 4 THEN
+    NOMAD_ALLOCATE TO refined SIZING "vol_parity"  // Lower size for high-vol
+    SAY_TO_SESSION "ceo" "New portfolio: " + refined[0].epic + " etc. Scores: " + refined.scores
+    ALERT "Portfolio updated" TO "telegram" OPTIONS "chat_id=your_id"
+  ENDIF
+
+  // Check for crash/pump mid-run
+  CRASH_SCAN ON
+
+  // Wait for next scan cycle
+  WAIT NOMAD_SCAN_INTERVAL * 60 * 1000
+ENDLOOP
+```
+
+Generated JS (simplified):
+```js
+// ... imports (tools, ai, indicators, chat, channels)
+
+class NomadicPortfolioStrategy extends BaseStrategy {
+  async evaluateEntry(ticks, context) {
+    crashConfig = { /* set from vars */ };
+    crashScanEnabled = true;
+
+    nomadConfig = { criteria: "momentum + vol + sentiment", weights: [0.4,0.3,0.3], /* etc */ };
+
+    while (true) {
+      const candidates = await tools.nomadScan("all", { limit: 10 });
+
+      const refined = await ai.aiQuery("Rank these candidates for Brisbane trader: " + candidates, { tool: "code_execution", arg: "code=rank_numpy.py" });
+
+      if (refined.length >= 4) {
+        await tools.nomadAllocate(refined, { sizing: "vol_parity" });
+        await chat.sayToSession("ceo", "New portfolio: " + refined[0].epic + " etc. Scores: " + refined.scores);
+        await channels.send("telegram", "Portfolio updated", { chat_id: "your_id" });
+      }
+
+      await new Promise(r => setTimeout(r, nomadConfig.scanInterval * 60 * 1000));
+    }
+
+    return null;
+  }
+}
+```
+
+### How It Averages Losses
+- **Diversification**: 4 instruments → if silver tanks, gold/AUD pump balances.
+- **Rebalance**: Every 30 min, swap low-scorers (low momentum) for high — averages out losers.
+- **Risk Caps**: Per-instrument budget % + corr firewall → no single wipeout.
+- **Hedge Ratio**: Auto-sell inverse (e.g., if AUD long, hedge with USD short at 0.5 ratio).
+- **Vol Parity Sizing**: Smaller size for volatile ones → averages exposure.
+
+### Implementation in Parser / Wrappers
+- **Parser Updates**: Add `parseNomadControl`, `parseNomadScan`, `parseNomadAllocate` (similar to CRASH_SCAN).
+- **New Wrapper**: `openclaw-nomad.cjs`  
+  ```js
+  async function nomadScan(category, options) {
+    // Use web_search for IG instrument list + sentiment
+    const instruments = await tools.web_search(`IG CFD instruments ${category}`, { num_results: 20 });
+    // Score with code_execution (numpy for ranking)
+    const scores = await tools.code_execution({ code: `import numpy as np; # calc scores on instruments` });
+    // ... return ranked list
+  }
+
+  async function nomadAllocate(epics, options) {
+    // Use code_execution for sizing (Kelly/vol parity)
+    // Call MUTATE_CONFIG for each
+  }
+
+  module.exports = { nomadScan, nomadAllocate };
+  ```
+
+This is realistic & powerful — scans IG CFDs (via web_search on IG site), ranks with AI/code, allocates. Ready to code the full parser updates? Or test this script? 😈

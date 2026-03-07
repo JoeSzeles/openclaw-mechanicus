@@ -1,0 +1,202 @@
+### Introducing ClawScript: The OpenClaw-Powered DSL
+
+Attila, let's go wild with this — ClawScript is gonna be a beast. Since OpenClaw is your overarching AI agent swarm system (CEO managing workers, canvas dashboard, DB/logs/backtests, real-time updates), we'll make ClawScript a **general-purpose scripting language** that taps into **all of OpenClaw's power**. It's not just for trading bots; it's for automating anything in your ecosystem: analyzing data mid-run, spawning AI sessions with me (Grok) for dynamic decisions, fetching web data with AI summarization, modifying configs on the fly, orchestrating agents, and even non-trading stuff like processing PDFs/images/X posts or running simulations.
+
+**Why ClawScript Stands Out (Beyond ProRealTime)**:
+- ProRealTime is trading-only, bar/tick-focused, and locked-in (no external APIs, no AI, no general scripting). ClawScript is **OpenClaw-native**: It calls OpenClaw tools/functions directly (e.g., web fetch via browse_page, AI sessions via code_execution or x_semantic_search, DB queries, agent spawning).
+- **Deep AI Integration**: Scripts can pause, query me (Grok) for analysis/optimization, then resume — e.g., mid-bot: "Hey Grok, analyze this trade log and suggest new RSI period" → auto-update settings.
+- **Dynamic & Adaptive**: Runs in real-time (every tick/update), changes itself (self-modifying code via AI), handles non-trading tasks (e.g., "fetch X posts about Brisbane weather, analyze sentiment, alert if rainy").
+- **Lingo/Grammar**: Cool, intuitive syntax — mix of ProBuilder-like trading commands with modern AI/agent ops. "Claw" theme: Commands like `CLAW_WEB` (fetch + AI summarize), `SPAWN_AGENT` (start sub-session), `MUTATE_CONFIG` (change settings live).
+- **Execution Model**: Interpreted in your Trade Claw engine — parse to JS, run in a sandboxed REPL (using your code_execution tool for safety). Supports loops, conditionals, variables, error handling. Compiles to custom strategy .cjs files for bots, but can run standalone for general scripts.
+- **Power from OpenClaw**: Full access to tools (code_execution for ML/sims, web_search/browse for data, x_* for X ecosystem, pdf/image viewers). Non-trading use: E.g., a script that monitors X for "@hung_attila" mentions, analyzes with AI, auto-replies via agent.
+
+**Implementation High-Level** (Before Command List):
+- **Parser**: Hand-rolled in `clawscript-parser.cjs` (regex + AST builder) — translates to JS functions calling OpenClaw APIs/tools.
+- **Runtime**: Embed in Trade Claw — scripts run per tick/event, or as standalone agents. Use your DB for state (e.g., `STORE_VAR key value`).
+- **AI Write/Access**: API endpoint `/api/clawscript/generate {prompt}` — I generate code, parser validates/compiles. Scripts can call `AI_QUERY "prompt"` → uses code_execution to simulate me responding.
+- **Grammar Basics**: Case-insensitive keywords, ; or newline terminated. Variables: `DEF var = value`. Conditions: `IF cond THEN ... ELSE ... ENDIF`. Loops: `LOOP count TIMES ... ENDLOOP` or `WHILE cond ... ENDWHILE`. Comments: `// comment`.
+
+Now, the **extensive list of commands**. I've grouped them (Trading, AI/Analysis, Data Fetch, Agent/Orchestration, Config/Runtime, General Control, Non-Trading Utils). For each: **Grammar/Syntax**, **Description**, **Examples**, **OpenClaw Tie-In** (how it uses full power).
+
+### ClawScript Command List
+
+#### 1. Trading-Focused Commands (Core for Bots, Like ProRealTime)
+These extend your strategies — run per tick/bar.
+
+- **BUY / SELL / SELLSHORT**  
+  Grammar: `BUY [size] AT MARKET/LIMIT(price) IF condition [STOP distance] [LIMIT distance] [REASON "text"]`  
+  Description: Generate buy/sell signal (long/short). Size optional (default from config). Condition uses indicators/vars.  
+  Example: `BUY 1 AT MARKET IF RSI(14) < 30 AND ATR(14) > 1.5 STOP 2*ATR(14) REASON "Oversold bounce"`  
+  OpenClaw Tie-In: Calls engine's openTrade, updates DB logs, can trigger AI analysis post-entry.
+
+- **EXIT / CLOSE**  
+  Grammar: `EXIT [ALL/PART(size)] IF condition [REASON "text"]`  
+  Description: Close position(s). Partial closes supported.  
+  Example: `EXIT ALL IF PROFIT > 50 OR DRAW DOWN > 20 REASON "Take profit"`  
+  OpenClaw Tie-In: Calls checkPositions/evaluateExit, logs to tradeLog/DB.
+
+- **TRAILSTOP**  
+  Grammar: `TRAILSTOP distance [ACCEL factor] [MAX factor]`  
+  Description: Set trailing stop (like your existing). Accel/max for parabolic-style.  
+  Example: `TRAILSTOP 10 ACCEL 0.02 MAX 0.2`  
+  OpenClaw Tie-In: Integrates with your trailingStop logic, updates live per tick.
+
+- **INDICATOR**  
+  Grammar: `DEF var = INDICATOR(name, params...)`  
+  Description: Call any from indicators.cjs (RSI, EMA, ATR, etc.).  
+  Example: `DEF bb_upper = INDICATOR(BOLLINGER, 20, 2).upper`  
+  OpenClaw Tie-In: Direct call to calc* functions; can chain with AI (e.g., `IF bb_upper INVALID THEN AI_QUERY "Fix Bollinger calc"`).
+
+- **OPTIMIZE**  
+  Grammar: `OPTIMIZE var FROM min TO max STEP step [USING backtestDays]`  
+  Description: Run param optimization (grid search).  
+  Example: `OPTIMIZE rsiPeriod FROM 10 TO 20 STEP 2 USING 30`  
+  OpenClaw Tie-In: Calls your backtest engine, stores results in DB, auto-applies best (via MUTATE_CONFIG).
+
+#### 2. AI/Analysis Commands (Deep Integration, Beyond ProRealTime)
+Leverage me (Grok) + OpenClaw tools for dynamic smarts.
+
+- **AI_QUERY**  
+  Grammar: `DEF var = AI_QUERY "prompt" [TOOL "tool_name"] [ARG "key=value"]`  
+  Description: Call me with prompt, optional tool (e.g., code_execution for ML). Returns result to var.  
+  Example: `DEF new_period = AI_QUERY "Optimize RSI period from my last 50 trades" TOOL "code_execution" ARG "code=analyze_trades.py"`  
+  OpenClaw Tie-In: Uses your API to call xAI (me), parses response, can mid-run (e.g., if losing streak, query for adjustment).
+
+- **AI_GENERATE_SCRIPT**  
+  Grammar: `AI_GENERATE_SCRIPT "prompt" TO "strategy_name"`  
+  Description: Generate new ClawScript code via AI, compile/save as custom strategy.  
+  Example: `AI_GENERATE_SCRIPT "Mean reversion with Bollinger" TO "mean_rev_v1"`  
+  OpenClaw Tie-In: Calls /api/clawscript/generate, auto-loads into engine.
+
+- **ANALYZE_LOG**  
+  Grammar: `DEF var = ANALYZE_LOG "query" [LIMIT num]`  
+  Description: Semantic search your DB logs/trades.  
+  Example: `DEF dd_reason = ANALYZE_LOG "Why max drawdown last week?" LIMIT 10`  
+  OpenClaw Tie-In: Uses conversation_search tool, or direct DB query.
+
+- **RUN_ML**  
+  Grammar: `DEF var = RUN_ML "model_code" ON "data_var"`  
+  Description: Execute ML via code_execution (e.g., LSTM predict).  
+  Example: `DEF prediction = RUN_ML "lstm_predict.py" ON last_ticks`  
+  OpenClaw Tie-In: Leverages code_execution for Torch/NetworkX, stores models in DB.
+
+#### 3. Data Fetch Commands (Web/X/PDF Access)
+Go beyond trading — fetch/analyze external data.
+
+- **CLAW_WEB**  
+  Grammar: `DEF var = CLAW_WEB "url" INSTRUCT "prompt"`  
+  Description: Browse page + AI summarize.  
+  Example: `DEF news_sentiment = CLAW_WEB "https://news.com.au" INSTRUCT "Summarize Brisbane market news"`  
+  OpenClaw Tie-In: Calls browse_page tool, integrates with sentiment trader strategies.
+
+- **CLAW_X**  
+  Grammar: `DEF var = CLAW_X "query" [LIMIT num] [MODE "Top/Latest"]`  
+  Description: Search X posts semantically/keywords.  
+  Example: `DEF attila_mentions = CLAW_X "@hung_attila sentiment" LIMIT 5 MODE "Latest"`  
+  OpenClaw Tie-In: Calls x_semantic_search or x_keyword_search; non-trading use: Monitor your handle.
+
+- **CLAW_PDF**  
+  Grammar: `DEF var = CLAW_PDF "file_name" QUERY "search" [PAGES "1-5"]`  
+  Description: Search/browse attached PDFs.  
+  Example: `DEF report_summary = CLAW_PDF "strategy.pdf" QUERY "risk rules" PAGES "1,3-7"`  
+  OpenClaw Tie-In: Calls search_pdf_attachment/browse_pdf_attachment; great for analyzing backtest reports.
+
+- **CLAW_IMAGE**  
+  Grammar: `DEF var = CLAW_IMAGE "description" [NUM num]`  
+  Description: Search/render images.  
+  Example: `DEF chart_img = CLAW_IMAGE "AUD/USD chart" NUM 1`  
+  OpenClaw Tie-In: Calls search_images + render_searched_image; for visualizing strategies.
+
+#### 4. Agent/Orchestration Commands (Full OpenClaw Power)
+Spawn/manage sub-processes, sessions.
+
+- **SPAWN_AGENT**  
+  Grammar: `SPAWN_AGENT "name" WITH "prompt" [WAIT result_var]`  
+  Description: Start sub-agent session (with me or another). Wait for result if needed.  
+  Example: `SPAWN_AGENT "analyzer" WITH "Review my last trade" WAIT analysis_result`  
+  OpenClaw Tie-In: Calls your CEO to spawn worker, integrates with agent TOOLS.md.
+
+- **CALL_SESSION**  
+  Grammar: `DEF var = CALL_SESSION "agent_name" "command"`  
+  Description: Interact with running agents/sessions.  
+  Example: `DEF update = CALL_SESSION "optimizer" "Re-optimize RSI now"`  
+  OpenClaw Tie-In: Uses OpenClaw's process management (your processesPanel).
+
+- **MUTATE_CONFIG**  
+  Grammar: `MUTATE_CONFIG "key" = value [STRATEGY "name"]`  
+  Description: Change settings live (per tick).  
+  Example: `MUTATE_CONFIG rsiOverbought = 75 STRATEGY "scalper"`  
+  OpenClaw Tie-In: Calls updateConfigFromApi/saveStrategyField; already works every tick.
+
+- **ALERT**  
+  Grammar: `ALERT "message" [LEVEL "warn/error/info"] [TO "telegram/email"]`  
+  Description: Send notifications.  
+  Example: `ALERT "Drawdown > 10%" LEVEL "error" TO "telegram"`  
+  OpenClaw Tie-In: Integrates with your toast/showToast or external alerts.
+
+#### 5. Config/Runtime Commands (Dynamic Control)
+- **DEF / SET**  
+  Grammar: `DEF var = expression` | `SET var = value`  
+  Description: Define/set variables (local or DB-stored).  
+  Example: `DEF risk_pct = 2` | `SET maxDrawdown = 500`  
+  OpenClaw Tie-In: Stores in DB for persistence.
+
+- **STORE_VAR / LOAD_VAR**  
+  Grammar: `STORE_VAR "key" value [GLOBAL]` | `DEF var = LOAD_VAR "key"`  
+  Description: Persistent storage in DB.  
+  Example: `STORE_VAR "last_analysis" analysis_result GLOBAL`  
+  OpenClaw Tie-In: Calls your DB functions.
+
+- **LOOP / WHILE**  
+  Grammar: `LOOP num TIMES ... ENDLOOP` | `WHILE cond ... ENDWHILE`  
+  Description: Iteration for analysis/loops.  
+  Example: `LOOP 5 TIMES CLAW_WEB "url" + i ENDLOOP`  
+  OpenClaw Tie-In: Runs in REPL, limits to prevent infinite loops.
+
+- **IF / ELSE**  
+  Grammar: `IF cond THEN ... ELSE ... ENDIF`  
+  Description: Conditionals with operators (>, <, AND, OR, CROSSES).  
+  Example: `IF PRICE CROSSES OVER EMA(20) THEN BUY ENDIF`  
+  OpenClaw Tie-In: Standard, can nest with AI_QUERY.
+
+#### 6. General Control Commands (Script Flow)
+- **WAIT**  
+  Grammar: `WAIT ms/time`  
+  Description: Pause script (e.g., for async AI response).  
+  Example: `WAIT 5000`  
+  OpenClaw Tie-In: Uses setTimeout in runtime.
+
+- **ERROR / TRY**  
+  Grammar: `TRY ... CATCH var ... ENDTRY` | `ERROR "message"`  
+  Description: Error handling.  
+  Example: `TRY CLAW_WEB "bad_url" CATCH err ALERT err ENDTRY`  
+  OpenClaw Tie-In: Wraps in try-catch, logs to botLog.
+
+- **INCLUDE**  
+  Grammar: `INCLUDE "script_name"`  
+  Description: Reuse code from other ClawScripts.  
+  Example: `INCLUDE "common_indicators"`  
+  OpenClaw Tie-In: Loads/parses another file.
+
+#### 7. Non-Trading Utils (For All OpenClaw Users)
+- **CLAW_CODE**  
+  Grammar: `DEF var = CLAW_CODE "python_code"`  
+  Description: Run arbitrary code via code_execution.  
+  Example: `DEF sim = CLAW_CODE "import numpy; return numpy.mean([1,2,3])"`  
+  OpenClaw Tie-In: Direct call to code_execution tool; for ML, physics, bio/chem sims.
+
+- **CLAW_VIDEO / CLAW_IMAGE_VIEW**  
+  Grammar: `DEF var = CLAW_VIDEO "url"` | `CLAW_IMAGE_VIEW "id/url"`  
+  Description: Analyze/view media.  
+  Example: `CLAW_VIDEO "x_video_url"`  
+  OpenClaw Tie-In: Calls view_x_video/view_image tools; for non-trading (e.g., analyze news video).
+
+- **CLAW_CONVERSATION**  
+  Grammar: `DEF var = CLAW_CONVERSATION "query"`  
+  Description: Search past chats.  
+  Example: `DEF old_strategy = CLAW_CONVERSATION "Previous RSI ideas"`  
+  OpenClaw Tie-In: Calls conversation_search; useful for recalling ideas.
+
+This list is extensive (~30 commands) but extensible — start with 10–15 core ones. Grammar is flexible: Optional params in [], expressions in vars.
+
+Next: We can develop the parser (code snippets), then full docs (PDF-like guide with examples). What's first — parser plan/code, or refine commands? 🚀
