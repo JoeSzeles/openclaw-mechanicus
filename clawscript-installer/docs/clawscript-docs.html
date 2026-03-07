@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ClawScript Documentation</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0d1117; color: #c9d1d9; line-height: 1.6; }
+a { color: #58a6ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: "Fira Code", "SFMono-Regular", Consolas, monospace; background: #161b22; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #e6edf3; }
+pre { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; overflow-x: auto; font: 13px/1.6 "Fira Code", Consolas, monospace; color: #e6edf3; margin: 12px 0; }
+pre code { background: none; padding: 0; }
+.top-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: #161b22; border-bottom: 1px solid #30363d; padding: 10px 24px; display: flex; align-items: center; gap: 16px; }
+.top-bar h1 { font-size: 18px; color: #58a6ff; white-space: nowrap; }
+.top-bar .back { color: #8b949e; font-size: 13px; }
+.top-bar .back:hover { color: #58a6ff; }
+.top-bar .search-box { flex: 1; max-width: 400px; margin-left: auto; }
+.top-bar .search-box input { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 12px; border-radius: 6px; font-size: 13px; outline: none; }
+.top-bar .search-box input:focus { border-color: #58a6ff; }
+.layout { display: flex; margin-top: 50px; }
+.sidebar { position: fixed; top: 50px; left: 0; bottom: 0; width: 260px; background: #161b22; border-right: 1px solid #30363d; overflow-y: auto; padding: 16px 0; font-size: 13px; }
+.sidebar .nav-group { margin-bottom: 8px; }
+.sidebar .nav-group-title { padding: 6px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #8b949e; }
+.sidebar a { display: block; padding: 4px 16px 4px 24px; color: #8b949e; border-left: 2px solid transparent; }
+.sidebar a:hover { color: #c9d1d9; background: rgba(88,166,255,0.05); text-decoration: none; }
+.sidebar a.active { color: #58a6ff; border-left-color: #58a6ff; background: rgba(88,166,255,0.08); }
+.main { margin-left: 260px; padding: 32px 40px; max-width: 960px; flex: 1; }
+.main h2 { font-size: 28px; color: #e6edf3; margin: 40px 0 16px; padding-bottom: 8px; border-bottom: 1px solid #21262d; }
+.main h2:first-child { margin-top: 0; }
+.main h3 { font-size: 20px; color: #e6edf3; margin: 28px 0 12px; }
+.main h4 { font-size: 16px; color: #c9d1d9; margin: 20px 0 8px; }
+.main p { margin: 8px 0; }
+.main ul, .main ol { margin: 8px 0 8px 24px; }
+.main li { margin: 4px 0; }
+.cmd-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; margin: 16px 0; overflow: hidden; }
+.cmd-card-header { padding: 10px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #21262d; }
+.cmd-card-header .cmd-name { font-size: 15px; font-weight: 700; font-family: "Fira Code", monospace; }
+.cmd-card-header .cmd-cat { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; }
+.cat-trading { background: #1b4332; color: #2dc653; }
+.cat-variables { background: #21262d; color: #8b949e; }
+.cat-control { background: #3d1a1a; color: #ff7b72; }
+.cat-ai { background: #2d1b4e; color: #bc8cff; }
+.cat-data { background: #0c2d48; color: #79c0ff; }
+.cat-agent { background: #3d2200; color: #f0883e; }
+.cat-advanced { background: #2d1b00; color: #ffa657; }
+.cat-functions { background: #1c1437; color: #a371f7; }
+.cmd-card-body { padding: 12px 16px; }
+.cmd-card-body .cmd-desc { color: #8b949e; margin-bottom: 8px; }
+.cmd-card-body .cmd-syntax { margin-bottom: 8px; }
+.cmd-card-body .cmd-syntax strong { color: #8b949e; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; }
+.param-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+.param-table th { text-align: left; padding: 6px 10px; background: #0d1117; color: #8b949e; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #21262d; }
+.param-table td { padding: 6px 10px; border-bottom: 1px solid #21262d; }
+.param-table td:first-child { font-family: "Fira Code", monospace; color: #79c0ff; font-weight: 600; white-space: nowrap; }
+.note { background: #0c2d48; border: 1px solid #1f6feb; border-radius: 6px; padding: 12px 16px; margin: 12px 0; font-size: 13px; }
+.note strong { color: #58a6ff; }
+.warning { background: #3d1f00; border: 1px solid #f0883e; border-radius: 6px; padding: 12px 16px; margin: 12px 0; font-size: 13px; }
+.warning strong { color: #f0883e; }
+.tip { background: #1b4332; border: 1px solid #2dc653; border-radius: 6px; padding: 12px 16px; margin: 12px 0; font-size: 13px; }
+.tip strong { color: #2dc653; }
+.toc { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px 24px; margin: 16px 0; }
+.toc h4 { margin: 0 0 8px; color: #8b949e; font-size: 12px; text-transform: uppercase; }
+.toc ul { list-style: none; margin: 0; padding: 0; columns: 2; }
+.toc li { margin: 3px 0; }
+.toc a { font-size: 13px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+@media (max-width: 900px) { .sidebar { display: none; } .main { margin-left: 0; padding: 20px; } .grid-2 { grid-template-columns: 1fr; } }
+.kw { color: #ff7b72; font-weight: 600; }
+.str { color: #a5d6ff; }
+.num { color: #79c0ff; }
+.cmt { color: #484f58; font-style: italic; }
+.trade { color: #2dc653; font-weight: 600; }
+.ai-kw { color: #bc8cff; font-weight: 600; }
+.data-kw { color: #79c0ff; }
+.agent-kw { color: #f0883e; }
+.adv-kw { color: #ffa657; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="/__openclaw__/canvas/" class="back">&larr; Canvas</a>
+  <h1>ClawScript Documentation</h1>
+  <div class="search-box"><input type="text" id="searchInput" placeholder="Search commands, keywords..." oninput="filterDocs(this.value)"></div>
+</div>
+
+<div class="layout">
+<nav class="sidebar" id="sidebar">
+  <div class="nav-group">
+    <div class="nav-group-title">Getting Started</div>
+    <a href="#introduction">Introduction</a>
+    <a href="#quickstart">Quick Start</a>
+    <a href="#setup">Setup & Integration</a>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">Language Reference</div>
+    <a href="#grammar">Grammar Overview</a>
+    <a href="#tokens">Tokens & Operators</a>
+    <a href="#expressions">Expressions</a>
+    <a href="#indicators">Indicators</a>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">Commands</div>
+    <a href="#cmd-trading">Trading</a>
+    <a href="#cmd-variables">Variables</a>
+    <a href="#cmd-control">Control Flow</a>
+    <a href="#cmd-ai">AI / Analysis</a>
+    <a href="#cmd-data">Data Fetch</a>
+    <a href="#cmd-agent">Agent / Orchestration</a>
+    <a href="#cmd-advanced">Advanced</a>
+    <a href="#cmd-functions">Functions</a>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">Editor & Tools</div>
+    <a href="#editor-ui">ClawScript Editor UI</a>
+    <a href="#flow-builder">Visual Flow Builder</a>
+    <a href="#simulation">Simulation & Testing</a>
+    <a href="#export">Export & Compile</a>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">Strategies</div>
+    <a href="#sample-rsi">RSI Buy/Sell</a>
+    <a href="#sample-ema">EMA Crossover</a>
+    <a href="#sample-multi">Multi-Indicator</a>
+    <a href="#sample-sentiment">AI Sentiment</a>
+    <a href="#integration">Engine Integration</a>
+  </div>
+</nav>
+
+<main class="main" id="mainContent">
+
+<h2 id="introduction">Introduction</h2>
+<p>ClawScript is a domain-specific language (DSL) designed for writing automated trading strategies, AI-powered analysis, and agent orchestration workflows. It compiles to JavaScript strategy classes that integrate with the Trade Claw Engine.</p>
+
+<div class="grid-2">
+<div>
+<h4>Key Features</h4>
+<ul>
+  <li>Human-readable trading commands (<code>BUY</code>, <code>SELL</code>, <code>EXIT</code>)</li>
+  <li>Built-in technical indicators (RSI, EMA, MACD, Bollinger, etc.)</li>
+  <li>AI integration (<code>AI_QUERY</code>, <code>RUN_ML</code>)</li>
+  <li>Data fetching from web, social media, PDFs</li>
+  <li>Agent orchestration and multi-session communication</li>
+  <li>Error handling with <code>TRY</code>/<code>CATCH</code></li>
+  <li>Visual flow builder with drag-and-drop</li>
+  <li>Compiles to executable JavaScript strategy classes</li>
+</ul>
+</div>
+<div>
+<h4>Architecture</h4>
+<ul>
+  <li><strong>Parser:</strong> <code>clawscript-parser.cjs</code> &mdash; Lexer + recursive-descent parser</li>
+  <li><strong>AST:</strong> Typed node tree (Program &rarr; Statements)</li>
+  <li><strong>Code Generator:</strong> AST &rarr; JavaScript strategy class</li>
+  <li><strong>Editor UI:</strong> <code>ig-clawscript-ui.js</code> &mdash; Code editor with syntax highlighting</li>
+  <li><strong>Flow Engine:</strong> <code>ig-clawscript-flow.js</code> &mdash; Visual node editor</li>
+  <li><strong>Runtime:</strong> Strategy classes extend <code>BaseStrategy</code></li>
+</ul>
+</div>
+</div>
+
+<h2 id="quickstart">Quick Start</h2>
+<p>Here is a minimal ClawScript strategy that buys when RSI drops below 30:</p>
+<pre><code><span class="cmt">// My first ClawScript strategy</span>
+<span class="kw">DEF</span> rsi = RSI(<span class="num">14</span>)
+
+<span class="kw">IF</span> rsi &lt; <span class="num">30</span> <span class="kw">THEN</span>
+  <span class="trade">BUY</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">STOP</span> <span class="num">20</span> <span class="kw">REASON</span> <span class="str">"RSI oversold"</span>
+<span class="kw">ENDIF</span></code></pre>
+
+<p>This script:</p>
+<ol>
+  <li>Defines an RSI indicator with period 14</li>
+  <li>Checks if RSI is below 30 (oversold)</li>
+  <li>Generates a BUY signal with size 1, market order, 20-point stop</li>
+</ol>
+
+<h2 id="setup">Setup & Integration</h2>
+<h3>Using the Editor</h3>
+<p>The ClawScript Editor is available in the IG Trading Dashboard under the <strong>ClawScript Editor</strong> tab. It provides:</p>
+<ul>
+  <li>A code editor with syntax highlighting and line numbers</li>
+  <li>A visual flow builder for drag-and-drop strategy creation</li>
+  <li>Real-time parsing and error feedback</li>
+  <li>Compile &amp; Save to generate JavaScript strategy files</li>
+</ul>
+
+<h3>Using the Parser Programmatically</h3>
+<pre><code>const { parseAndGenerate } = require('./clawscript-parser.cjs');
+
+const code = 'DEF rsi = RSI(14)\nIF rsi &lt; 30 THEN\n  BUY 1 AT MARKET\nENDIF';
+const result = parseAndGenerate(code, 'MyStrategy');
+
+console.log(result.ast);       // AST tree
+console.log(result.js);        // Generated JavaScript
+console.log(result.imports);   // ['indicators', 'trade']
+console.log(result.variables); // ['rsi']</code></pre>
+
+<h3>Strategy Integration</h3>
+<p>Compiled strategies are saved as <code>.cjs</code> files in the <code>skills/bots/strategies/</code> directory. They extend <code>BaseStrategy</code> and are automatically discovered by the strategy loader.</p>
+
+<h2 id="grammar">Grammar Overview</h2>
+<p>ClawScript uses a line-oriented, keyword-driven grammar. Statements begin with a command keyword and are terminated by newlines or the start of the next command.</p>
+
+<h4>Program Structure</h4>
+<pre><code>Program       ::= Statement*
+Statement     ::= VarDecl | Trade | Exit | TrailStop | IfStatement
+                | Loop | TryCatch | AICommand | DataCommand
+                | AgentCommand | AdvancedCommand | FunctionDecl
+                | FunctionCall | Chain | Assignment</code></pre>
+
+<h4>Comments</h4>
+<pre><code><span class="cmt">// Single-line comment</span>
+<span class="cmt">/* Multi-line
+   comment */</span></code></pre>
+
+<h4>Literals</h4>
+<ul>
+  <li><strong>Numbers:</strong> <code>42</code>, <code>3.14</code>, <code>0.02</code></li>
+  <li><strong>Strings:</strong> <code>"hello"</code> or <code>'hello'</code></li>
+  <li><strong>Booleans:</strong> <code>true</code>, <code>false</code></li>
+  <li><strong>Null:</strong> <code>null</code>, <code>nil</code></li>
+</ul>
+
+<h2 id="tokens">Tokens & Operators</h2>
+
+<h4>Arithmetic Operators</h4>
+<table class="param-table">
+<tr><th>Operator</th><th>Description</th><th>Example</th></tr>
+<tr><td><code>+</code></td><td>Addition</td><td><code>price + 10</code></td></tr>
+<tr><td><code>-</code></td><td>Subtraction / Negation</td><td><code>price - stop</code></td></tr>
+<tr><td><code>*</code></td><td>Multiplication</td><td><code>size * 2</code></td></tr>
+<tr><td><code>/</code></td><td>Division</td><td><code>total / count</code></td></tr>
+<tr><td><code>%</code></td><td>Modulo</td><td><code>i % 3</code></td></tr>
+</table>
+
+<h4>Comparison Operators</h4>
+<table class="param-table">
+<tr><th>Operator</th><th>Description</th><th>Example</th></tr>
+<tr><td><code>&gt;</code></td><td>Greater than</td><td><code>rsi &gt; 70</code></td></tr>
+<tr><td><code>&lt;</code></td><td>Less than</td><td><code>rsi &lt; 30</code></td></tr>
+<tr><td><code>&gt;=</code></td><td>Greater or equal</td><td><code>price &gt;= target</code></td></tr>
+<tr><td><code>&lt;=</code></td><td>Less or equal</td><td><code>atr &lt;= 5</code></td></tr>
+<tr><td><code>==</code></td><td>Equal</td><td><code>status == "open"</code></td></tr>
+<tr><td><code>!=</code></td><td>Not equal</td><td><code>count != 0</code></td></tr>
+</table>
+
+<h4>Logical Operators</h4>
+<table class="param-table">
+<tr><th>Operator</th><th>Description</th><th>Example</th></tr>
+<tr><td><code>AND</code> / <code>&&</code></td><td>Logical AND</td><td><code>rsi &lt; 30 AND macd &gt; 0</code></td></tr>
+<tr><td><code>OR</code> / <code>||</code></td><td>Logical OR</td><td><code>rsi &lt; 20 OR rsi &gt; 80</code></td></tr>
+<tr><td><code>NOT</code> / <code>!</code></td><td>Logical NOT</td><td><code>NOT is_open</code></td></tr>
+</table>
+
+<h4>Special Operators</h4>
+<table class="param-table">
+<tr><th>Operator</th><th>Description</th><th>Example</th></tr>
+<tr><td><code>CONTAINS</code></td><td>String contains check</td><td><code>result CONTAINS "bullish"</code></td></tr>
+<tr><td><code>CROSSES OVER</code></td><td>Value crosses above</td><td><code>ema_fast CROSSES OVER ema_slow</code></td></tr>
+<tr><td><code>CROSSES UNDER</code></td><td>Value crosses below</td><td><code>ema_fast CROSSES UNDER ema_slow</code></td></tr>
+</table>
+
+<h4>Operator Precedence (highest to lowest)</h4>
+<ol>
+  <li>Postfix: <code>.</code> (member access), <code>[]</code> (index)</li>
+  <li>Unary: <code>-</code>, <code>NOT</code> / <code>!</code></li>
+  <li>Multiplicative: <code>*</code>, <code>/</code>, <code>%</code></li>
+  <li>Additive: <code>+</code>, <code>-</code></li>
+  <li>Crossover: <code>CROSSES OVER</code>, <code>CROSSES UNDER</code></li>
+  <li>Contains: <code>CONTAINS</code></li>
+  <li>Comparison: <code>&gt;</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code>, <code>==</code>, <code>!=</code></li>
+  <li>Logical AND: <code>AND</code> / <code>&&</code></li>
+  <li>Logical OR: <code>OR</code> / <code>||</code></li>
+</ol>
+
+<h2 id="expressions">Expressions</h2>
+<p>Expressions can be used anywhere a value is expected: variable assignments, conditions, command parameters.</p>
+
+<h4>Function Calls</h4>
+<pre><code><span class="kw">DEF</span> rsi = RSI(<span class="num">14</span>)
+<span class="kw">DEF</span> ema = EMA(<span class="num">21</span>)
+<span class="kw">DEF</span> result = myFunc(a, b, c)</code></pre>
+
+<h4>Member Access & Indexing</h4>
+<pre><code><span class="kw">DEF</span> high = candle.high
+<span class="kw">DEF</span> first = results[<span class="num">0</span>]</code></pre>
+
+<h4>Parenthesized Expressions</h4>
+<pre><code><span class="kw">DEF</span> avg = (high + low) / <span class="num">2</span></code></pre>
+
+<h2 id="indicators">Built-in Indicators</h2>
+<p>The following technical indicators are recognized as built-in function calls and automatically compiled to the indicators module:</p>
+<table class="param-table">
+<tr><th>Indicator</th><th>Usage</th><th>Description</th></tr>
+<tr><td><code>RSI</code></td><td><code>RSI(14)</code></td><td>Relative Strength Index</td></tr>
+<tr><td><code>EMA</code></td><td><code>EMA(21)</code></td><td>Exponential Moving Average</td></tr>
+<tr><td><code>SMA</code></td><td><code>SMA(50)</code></td><td>Simple Moving Average</td></tr>
+<tr><td><code>ATR</code></td><td><code>ATR(14)</code></td><td>Average True Range</td></tr>
+<tr><td><code>MACD</code></td><td><code>MACD(12, 26, 9)</code></td><td>Moving Average Convergence Divergence</td></tr>
+<tr><td><code>BOLLINGER</code></td><td><code>BOLLINGER(20, 2)</code></td><td>Bollinger Bands</td></tr>
+<tr><td><code>ADX</code></td><td><code>ADX(14)</code></td><td>Average Directional Index</td></tr>
+<tr><td><code>STOCH</code></td><td><code>STOCH(14, 3)</code></td><td>Stochastic Oscillator</td></tr>
+<tr><td><code>CCI</code></td><td><code>CCI(20)</code></td><td>Commodity Channel Index</td></tr>
+<tr><td><code>OBV</code></td><td><code>OBV()</code></td><td>On-Balance Volume</td></tr>
+<tr><td><code>VWAP</code></td><td><code>VWAP()</code></td><td>Volume-Weighted Average Price</td></tr>
+<tr><td><code>ROC</code></td><td><code>ROC(12)</code></td><td>Rate of Change</td></tr>
+</table>
+
+<hr style="border-color:#21262d;margin:32px 0">
+
+<h2 id="cmd-trading">Trading Commands</h2>
+
+<div class="cmd-card" data-cmd="BUY">
+<div class="cmd-card-header">
+  <span class="cmd-name">BUY</span>
+  <span class="cmd-cat cat-trading">Trading</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Generate a BUY signal at market, limit, or stop price.</p>
+  <div class="cmd-syntax"><strong>Syntax:</strong>
+  <pre><code><span class="trade">BUY</span> &lt;size&gt; <span class="kw">AT</span> <span class="kw">MARKET</span>|<span class="kw">LIMIT</span>(&lt;price&gt;)|<span class="kw">STOP</span> [<span class="kw">IF</span> &lt;condition&gt;] [<span class="kw">STOP</span> &lt;dist&gt;] [<span class="kw">LIMIT</span> &lt;dist&gt;] [<span class="kw">REASON</span> &lt;string&gt;]</code></pre>
+  </div>
+  <table class="param-table">
+  <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+  <tr><td>size</td><td>number/expr</td><td>No</td><td>Position size (defaults to config size)</td></tr>
+  <tr><td>AT</td><td>keyword</td><td>No</td><td>Order type: MARKET, LIMIT(price), STOP</td></tr>
+  <tr><td>IF</td><td>condition</td><td>No</td><td>Conditional execution</td></tr>
+  <tr><td>STOP</td><td>number</td><td>No</td><td>Stop distance in points</td></tr>
+  <tr><td>LIMIT</td><td>number</td><td>No</td><td>Limit (take profit) distance</td></tr>
+  <tr><td>REASON</td><td>string</td><td>No</td><td>Trade reason for logging</td></tr>
+  </table>
+  <pre><code><span class="trade">BUY</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">STOP</span> <span class="num">20</span> <span class="kw">LIMIT</span> <span class="num">40</span> <span class="kw">REASON</span> <span class="str">"RSI oversold entry"</span>
+<span class="trade">BUY</span> <span class="num">2</span> <span class="kw">AT</span> <span class="kw">LIMIT</span>(<span class="num">1850.50</span>) <span class="kw">STOP</span> <span class="num">15</span>
+<span class="trade">BUY</span> size <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">IF</span> rsi &lt; <span class="num">30</span> <span class="kw">STOP</span> <span class="num">25</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="SELL">
+<div class="cmd-card-header">
+  <span class="cmd-name">SELL</span>
+  <span class="cmd-cat cat-trading">Trading</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Generate a SELL signal. Syntax identical to BUY.</p>
+  <pre><code><span class="trade">SELL</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">STOP</span> <span class="num">20</span> <span class="kw">LIMIT</span> <span class="num">40</span> <span class="kw">REASON</span> <span class="str">"RSI overbought"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="SELLSHORT">
+<div class="cmd-card-header">
+  <span class="cmd-name">SELLSHORT</span>
+  <span class="cmd-cat cat-trading">Trading</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Open a short position. Same parameter structure as BUY/SELL.</p>
+  <pre><code><span class="trade">SELLSHORT</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">STOP</span> <span class="num">30</span> <span class="kw">REASON</span> <span class="str">"Bearish divergence"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="EXIT">
+<div class="cmd-card-header">
+  <span class="cmd-name">EXIT</span>
+  <span class="cmd-cat cat-trading">Trading</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Close a position (all or partial).</p>
+  <div class="cmd-syntax"><strong>Syntax:</strong>
+  <pre><code><span class="trade">EXIT</span> [<span class="kw">ALL</span>|<span class="kw">PART</span>(&lt;size&gt;)] [<span class="kw">IF</span> &lt;condition&gt;] [<span class="kw">REASON</span> &lt;string&gt;]</code></pre>
+  </div>
+  <pre><code><span class="trade">EXIT</span> <span class="kw">ALL</span> <span class="kw">REASON</span> <span class="str">"Take profit hit"</span>
+<span class="trade">EXIT</span> <span class="kw">PART</span>(<span class="num">0.5</span>) <span class="kw">IF</span> profit &gt; <span class="num">100</span> <span class="kw">REASON</span> <span class="str">"Partial close"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="CLOSE">
+<div class="cmd-card-header">
+  <span class="cmd-name">CLOSE</span>
+  <span class="cmd-cat cat-trading">Trading</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Close the current position. Alias for <code>EXIT ALL</code>.</p>
+  <pre><code><span class="trade">CLOSE</span> <span class="kw">REASON</span> <span class="str">"End of day"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="TRAILSTOP">
+<div class="cmd-card-header">
+  <span class="cmd-name">TRAILSTOP</span>
+  <span class="cmd-cat cat-trading">Trading</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Set a trailing stop with optional acceleration parameters.</p>
+  <div class="cmd-syntax"><strong>Syntax:</strong>
+  <pre><code><span class="trade">TRAILSTOP</span> &lt;distance&gt; [<span class="kw">ACCEL</span> &lt;rate&gt;] [<span class="kw">MAX</span> &lt;max_rate&gt;]</code></pre>
+  </div>
+  <table class="param-table">
+  <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+  <tr><td>distance</td><td>number</td><td>Initial trailing stop distance in points</td></tr>
+  <tr><td>ACCEL</td><td>number</td><td>Acceleration factor (e.g., 0.02)</td></tr>
+  <tr><td>MAX</td><td>number</td><td>Maximum acceleration (e.g., 0.2)</td></tr>
+  </table>
+  <pre><code><span class="trade">TRAILSTOP</span> <span class="num">15</span> <span class="kw">ACCEL</span> <span class="num">0.02</span> <span class="kw">MAX</span> <span class="num">0.2</span></code></pre>
+</div>
+</div>
+
+<h2 id="cmd-variables">Variable Commands</h2>
+
+<div class="cmd-card" data-cmd="DEF">
+<div class="cmd-card-header">
+  <span class="cmd-name">DEF</span>
+  <span class="cmd-cat cat-variables">Variables</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Define a constant variable. The value is computed once and cannot be reassigned.</p>
+  <pre><code><span class="kw">DEF</span> rsi_period = <span class="num">14</span>
+<span class="kw">DEF</span> rsi = RSI(rsi_period)
+<span class="kw">DEF</span> label = <span class="str">"my strategy"</span>
+<span class="kw">DEF</span> result = <span class="ai-kw">AI_QUERY</span> <span class="str">"analyze this"</span></code></pre>
+  <div class="note"><strong>Note:</strong> DEF compiles to <code>const</code> in JavaScript. Use <code>SET</code> for mutable variables.</div>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="SET">
+<div class="cmd-card-header">
+  <span class="cmd-name">SET</span>
+  <span class="cmd-cat cat-variables">Variables</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Set or update a mutable variable.</p>
+  <pre><code><span class="kw">SET</span> counter = <span class="num">0</span>
+<span class="kw">SET</span> counter = counter + <span class="num">1</span>
+<span class="kw">SET</span> sentiment = <span class="ai-kw">AI_QUERY</span> <span class="str">"market mood?"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="STORE_VAR">
+<div class="cmd-card-header">
+  <span class="cmd-name">STORE_VAR</span>
+  <span class="cmd-cat cat-variables">Variables</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Persist a variable to persistent storage. Survives restarts.</p>
+  <div class="cmd-syntax"><strong>Syntax:</strong>
+  <pre><code><span class="kw">STORE_VAR</span> &lt;key&gt; &lt;value&gt; [<span class="kw">GLOBAL</span>]</code></pre>
+  </div>
+  <pre><code><span class="kw">STORE_VAR</span> <span class="str">"last_trade_time"</span> timestamp
+<span class="kw">STORE_VAR</span> <span class="str">"total_trades"</span> count <span class="kw">GLOBAL</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="LOAD_VAR">
+<div class="cmd-card-header">
+  <span class="cmd-name">LOAD_VAR</span>
+  <span class="cmd-cat cat-variables">Variables</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Load a variable from persistent storage.</p>
+  <div class="cmd-syntax"><strong>Syntax:</strong>
+  <pre><code><span class="kw">LOAD_VAR</span> &lt;key&gt; [<span class="kw">DEFAULT</span> &lt;value&gt;]</code></pre>
+  </div>
+  <pre><code><span class="kw">DEF</span> lastTime = <span class="kw">LOAD_VAR</span> <span class="str">"last_trade_time"</span> <span class="kw">DEFAULT</span> <span class="num">0</span></code></pre>
+</div>
+</div>
+
+<h2 id="cmd-control">Control Flow Commands</h2>
+
+<div class="cmd-card" data-cmd="IF">
+<div class="cmd-card-header">
+  <span class="cmd-name">IF / THEN / ELSE / ENDIF</span>
+  <span class="cmd-cat cat-control">Control Flow</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Conditional branching with optional ELSE clause. Supports ELSE IF chaining.</p>
+  <pre><code><span class="kw">IF</span> rsi &lt; <span class="num">30</span> <span class="kw">THEN</span>
+  <span class="trade">BUY</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span>
+<span class="kw">ELSE</span> <span class="kw">IF</span> rsi &gt; <span class="num">70</span> <span class="kw">THEN</span>
+  <span class="trade">SELL</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span>
+<span class="kw">ELSE</span>
+  <span class="agent-kw">ALERT</span> <span class="str">"RSI neutral"</span> <span class="kw">LEVEL</span> <span class="str">"info"</span>
+<span class="kw">ENDIF</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="LOOP">
+<div class="cmd-card-header">
+  <span class="cmd-name">LOOP / ENDLOOP</span>
+  <span class="cmd-cat cat-control">Control Flow</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Repeat a block N times or forever.</p>
+  <pre><code><span class="kw">LOOP</span> <span class="num">5</span> <span class="kw">TIMES</span>
+  <span class="agent-kw">ALERT</span> <span class="str">"checking..."</span>
+  <span class="kw">WAIT</span> <span class="num">1000</span>
+<span class="kw">ENDLOOP</span>
+
+<span class="kw">LOOP</span> <span class="kw">FOREVER</span>
+  <span class="cmt">// infinite loop</span>
+  <span class="kw">WAIT</span> <span class="num">5000</span>
+<span class="kw">ENDLOOP</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="WHILE">
+<div class="cmd-card-header">
+  <span class="cmd-name">WHILE / ENDWHILE</span>
+  <span class="cmd-cat cat-control">Control Flow</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Loop while a condition is true.</p>
+  <pre><code><span class="kw">WHILE</span> running == true
+  <span class="kw">WAIT</span> <span class="num">1000</span>
+  <span class="kw">SET</span> running = checkStatus()
+<span class="kw">ENDWHILE</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="TRY">
+<div class="cmd-card-header">
+  <span class="cmd-name">TRY / CATCH / ENDTRY</span>
+  <span class="cmd-cat cat-control">Control Flow</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Error handling. Catch exceptions and handle gracefully.</p>
+  <pre><code><span class="kw">TRY</span>
+  <span class="kw">DEF</span> data = <span class="data-kw">CLAW_WEB</span> <span class="str">"https://api.example.com/price"</span>
+  <span class="trade">BUY</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span>
+<span class="kw">CATCH</span> err
+  <span class="agent-kw">ALERT</span> <span class="str">"Error occurred"</span> <span class="kw">LEVEL</span> <span class="str">"error"</span>
+<span class="kw">ENDTRY</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="WAIT">
+<div class="cmd-card-header">
+  <span class="cmd-name">WAIT</span>
+  <span class="cmd-cat cat-control">Control Flow</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Pause execution for a specified number of milliseconds.</p>
+  <pre><code><span class="kw">WAIT</span> <span class="num">5000</span>  <span class="cmt">// wait 5 seconds</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="ERROR">
+<div class="cmd-card-header">
+  <span class="cmd-name">ERROR</span>
+  <span class="cmd-cat cat-control">Control Flow</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Throw an error, stopping execution (can be caught by TRY/CATCH).</p>
+  <pre><code><span class="kw">ERROR</span> <span class="str">"Invalid configuration detected"</span></code></pre>
+</div>
+</div>
+
+<h2 id="cmd-ai">AI / Analysis Commands</h2>
+
+<div class="cmd-card" data-cmd="AI_QUERY">
+<div class="cmd-card-header">
+  <span class="cmd-name">AI_QUERY</span>
+  <span class="cmd-cat cat-ai">AI</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Query an AI model with a prompt. Optionally specify a tool and argument.</p>
+  <div class="cmd-syntax"><strong>Syntax:</strong>
+  <pre><code><span class="ai-kw">AI_QUERY</span> &lt;prompt&gt; [<span class="kw">TOOL</span> &lt;tool_name&gt;] [<span class="kw">ARG</span> &lt;argument&gt;]</code></pre>
+  </div>
+  <pre><code><span class="ai-kw">AI_QUERY</span> <span class="str">"What is the current market trend for gold?"</span>
+<span class="ai-kw">AI_QUERY</span> <span class="str">"Analyze sentiment"</span> <span class="kw">TOOL</span> <span class="str">"web_search"</span> <span class="kw">ARG</span> <span class="str">"bitcoin news today"</span>
+<span class="kw">DEF</span> analysis = <span class="ai-kw">AI_QUERY</span> <span class="str">"Summarize recent trades"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="AI_GENERATE_SCRIPT">
+<div class="cmd-card-header">
+  <span class="cmd-name">AI_GENERATE_SCRIPT</span>
+  <span class="cmd-cat cat-ai">AI</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Auto-generate a ClawScript from a natural language prompt.</p>
+  <pre><code><span class="ai-kw">AI_GENERATE_SCRIPT</span> <span class="str">"Create a momentum strategy using RSI and MACD"</span> <span class="kw">TO</span> <span class="str">"momentum_v1"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="ANALYZE_LOG">
+<div class="cmd-card-header">
+  <span class="cmd-name">ANALYZE_LOG</span>
+  <span class="cmd-cat cat-ai">AI</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Analyze trade or bot logs with AI.</p>
+  <pre><code><span class="ai-kw">ANALYZE_LOG</span> <span class="str">"What were my best trades this week?"</span> <span class="kw">LIMIT</span> <span class="num">50</span>
+<span class="kw">DEF</span> insights = <span class="ai-kw">ANALYZE_LOG</span> <span class="str">"Show win rate by strategy"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="RUN_ML">
+<div class="cmd-card-header">
+  <span class="cmd-name">RUN_ML</span>
+  <span class="cmd-cat cat-ai">AI</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Run a machine learning model on data.</p>
+  <pre><code><span class="ai-kw">RUN_ML</span> <span class="str">"price_predictor"</span> <span class="kw">ON</span> price_data
+<span class="kw">DEF</span> prediction = <span class="ai-kw">RUN_ML</span> <span class="str">"sentiment_model"</span> <span class="kw">ON</span> news_feed</code></pre>
+</div>
+</div>
+
+<h2 id="cmd-data">Data Fetch Commands</h2>
+
+<div class="cmd-card" data-cmd="CLAW_WEB">
+<div class="cmd-card-header">
+  <span class="cmd-name">CLAW_WEB</span>
+  <span class="cmd-cat cat-data">Data</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Fetch web page content with optional extraction instructions.</p>
+  <pre><code><span class="data-kw">CLAW_WEB</span> <span class="str">"https://example.com/data"</span> <span class="kw">INSTRUCT</span> <span class="str">"Extract the price table"</span>
+<span class="kw">DEF</span> page = <span class="data-kw">CLAW_WEB</span> <span class="str">"https://news.example.com"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="CLAW_X">
+<div class="cmd-card-header">
+  <span class="cmd-name">CLAW_X</span>
+  <span class="cmd-cat cat-data">Data</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Search X/Twitter posts.</p>
+  <pre><code><span class="data-kw">CLAW_X</span> <span class="str">"bitcoin price prediction"</span> <span class="kw">LIMIT</span> <span class="num">20</span> <span class="kw">MODE</span> <span class="str">"Top"</span>
+<span class="kw">DEF</span> tweets = <span class="data-kw">CLAW_X</span> <span class="str">"$AAPL earnings"</span> <span class="kw">LIMIT</span> <span class="num">10</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="CLAW_PDF">
+<div class="cmd-card-header">
+  <span class="cmd-name">CLAW_PDF</span>
+  <span class="cmd-cat cat-data">Data</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Extract content from a PDF file.</p>
+  <pre><code><span class="data-kw">CLAW_PDF</span> <span class="str">"report.pdf"</span> <span class="kw">QUERY</span> <span class="str">"What are the key findings?"</span> <span class="kw">PAGES</span> <span class="num">5</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="CLAW_IMAGE">
+<div class="cmd-card-header">
+  <span class="cmd-name">CLAW_IMAGE</span>
+  <span class="cmd-cat cat-data">Data</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Generate an AI image from a description.</p>
+  <pre><code><span class="data-kw">CLAW_IMAGE</span> <span class="str">"A bullish candlestick chart with green arrows"</span> <span class="kw">NUM</span> <span class="num">2</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="CLAW_VIDEO">
+<div class="cmd-card-header">
+  <span class="cmd-name">CLAW_VIDEO</span>
+  <span class="cmd-cat cat-data">Data</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Analyze video content from a URL.</p>
+  <pre><code><span class="data-kw">CLAW_VIDEO</span> <span class="str">"https://example.com/market-analysis.mp4"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="CLAW_CONVERSATION">
+<div class="cmd-card-header">
+  <span class="cmd-name">CLAW_CONVERSATION</span>
+  <span class="cmd-cat cat-data">Data</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Retrieve conversation history matching a query.</p>
+  <pre><code><span class="kw">DEF</span> history = <span class="data-kw">CLAW_CONVERSATION</span> <span class="str">"previous trade decisions"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="CLAW_TOOL">
+<div class="cmd-card-header">
+  <span class="cmd-name">CLAW_TOOL</span>
+  <span class="cmd-cat cat-data">Data</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Execute an external tool with optional arguments.</p>
+  <pre><code><span class="data-kw">CLAW_TOOL</span> <span class="str">"weather"</span> <span class="kw">WITH</span> city = <span class="str">"London"</span>
+<span class="kw">DEF</span> result = <span class="data-kw">CLAW_TOOL</span> <span class="str">"calculator"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="CLAW_CODE">
+<div class="cmd-card-header">
+  <span class="cmd-name">CLAW_CODE</span>
+  <span class="cmd-cat cat-data">Data</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Execute a code snippet.</p>
+  <pre><code><span class="data-kw">CLAW_CODE</span> <span class="str">"console.log(Date.now())"</span>
+<span class="kw">DEF</span> output = <span class="data-kw">CLAW_CODE</span> <span class="str">"return prices.slice(-5)"</span></code></pre>
+</div>
+</div>
+
+<h2 id="cmd-agent">Agent / Orchestration Commands</h2>
+
+<div class="cmd-card" data-cmd="SPAWN_AGENT">
+<div class="cmd-card-header">
+  <span class="cmd-name">SPAWN_AGENT</span>
+  <span class="cmd-cat cat-agent">Agent</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Create a new agent instance with an optional prompt.</p>
+  <pre><code><span class="agent-kw">SPAWN_AGENT</span> <span class="str">"analyst"</span> <span class="kw">WITH</span> <span class="str">"You analyze market data and provide trade signals"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="CALL_SESSION">
+<div class="cmd-card-header">
+  <span class="cmd-name">CALL_SESSION</span>
+  <span class="cmd-cat cat-agent">Agent</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Call an agent session and get a response.</p>
+  <pre><code><span class="kw">DEF</span> response = <span class="agent-kw">CALL_SESSION</span> <span class="str">"analyst"</span> <span class="str">"What is the trend for EURUSD?"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="MUTATE_CONFIG">
+<div class="cmd-card-header">
+  <span class="cmd-name">MUTATE_CONFIG</span>
+  <span class="cmd-cat cat-agent">Agent</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Change bot configuration at runtime.</p>
+  <pre><code><span class="agent-kw">MUTATE_CONFIG</span> <span class="str">"stopDistance"</span> = <span class="num">30</span>
+<span class="agent-kw">MUTATE_CONFIG</span> <span class="str">"enabled"</span> = false</code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="ALERT">
+<div class="cmd-card-header">
+  <span class="cmd-name">ALERT</span>
+  <span class="cmd-cat cat-agent">Agent</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Send an alert notification to a channel.</p>
+  <div class="cmd-syntax"><strong>Syntax:</strong>
+  <pre><code><span class="agent-kw">ALERT</span> &lt;message&gt; [<span class="kw">LEVEL</span> &lt;level&gt;] [<span class="kw">TO</span> &lt;channel&gt;] [<span class="kw">OPTIONS</span> &lt;opts&gt;]</code></pre>
+  </div>
+  <pre><code><span class="agent-kw">ALERT</span> <span class="str">"BUY signal on GOLD"</span> <span class="kw">LEVEL</span> <span class="str">"info"</span>
+<span class="agent-kw">ALERT</span> <span class="str">"Stop loss hit!"</span> <span class="kw">LEVEL</span> <span class="str">"error"</span> <span class="kw">TO</span> <span class="str">"telegram"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="SAY_TO_SESSION">
+<div class="cmd-card-header">
+  <span class="cmd-name">SAY_TO_SESSION</span>
+  <span class="cmd-cat cat-agent">Agent</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Send a message to a specific agent session.</p>
+  <pre><code><span class="agent-kw">SAY_TO_SESSION</span> <span class="str">"session_123"</span> <span class="str">"Please re-analyze the position"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="WAIT_FOR_REPLY">
+<div class="cmd-card-header">
+  <span class="cmd-name">WAIT_FOR_REPLY</span>
+  <span class="cmd-cat cat-agent">Agent</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Wait for a reply from an agent session.</p>
+  <pre><code><span class="kw">DEF</span> reply = <span class="agent-kw">WAIT_FOR_REPLY</span> <span class="str">"session_123"</span> <span class="kw">TIMEOUT</span> <span class="num">30</span> <span class="kw">FILTER</span> <span class="str">"signal"</span></code></pre>
+</div>
+</div>
+
+<h2 id="cmd-advanced">Advanced Commands</h2>
+
+<div class="cmd-card" data-cmd="CRASH_SCAN">
+<div class="cmd-card-header">
+  <span class="cmd-name">CRASH_SCAN</span>
+  <span class="cmd-cat cat-advanced">Advanced</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Enable or disable the crash/flash crash scanner.</p>
+  <pre><code><span class="adv-kw">CRASH_SCAN</span> <span class="kw">ON</span>
+<span class="adv-kw">CRASH_SCAN</span> <span class="kw">OFF</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="MARKET_NOMAD">
+<div class="cmd-card-header">
+  <span class="cmd-name">MARKET_NOMAD</span>
+  <span class="cmd-cat cat-advanced">Advanced</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Enable nomadic market scanning &mdash; automatically discovers and rotates instruments.</p>
+  <pre><code><span class="adv-kw">MARKET_NOMAD</span> <span class="kw">ON</span> MAX_INSTRUMENTS <span class="num">4</span> SCAN_INTERVAL <span class="num">15</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="NOMAD_SCAN">
+<div class="cmd-card-header">
+  <span class="cmd-name">NOMAD_SCAN</span>
+  <span class="cmd-cat cat-advanced">Advanced</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Scan for instruments by category.</p>
+  <pre><code><span class="kw">DEF</span> instruments = <span class="adv-kw">NOMAD_SCAN</span> <span class="str">"forex"</span> <span class="kw">LIMIT</span> <span class="num">10</span>
+<span class="kw">DEF</span> movers = <span class="adv-kw">NOMAD_SCAN</span> <span class="str">"indices"</span> <span class="kw">LIMIT</span> <span class="num">5</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="NOMAD_ALLOCATE">
+<div class="cmd-card-header">
+  <span class="cmd-name">NOMAD_ALLOCATE</span>
+  <span class="cmd-cat cat-advanced">Advanced</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Allocate capital to scanned instruments.</p>
+  <pre><code><span class="adv-kw">NOMAD_ALLOCATE</span> <span class="kw">TO</span> instruments <span class="kw">SIZING</span> <span class="str">"equal"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="RUMOR_SCAN">
+<div class="cmd-card-header">
+  <span class="cmd-name">RUMOR_SCAN</span>
+  <span class="cmd-cat cat-advanced">Advanced</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Scan for market rumors from various sources.</p>
+  <pre><code><span class="kw">DEF</span> rumors = <span class="adv-kw">RUMOR_SCAN</span> <span class="str">"AAPL"</span> <span class="kw">SOURCES</span> <span class="str">"both"</span> <span class="kw">LIMIT</span> <span class="num">20</span> <span class="kw">FILTER</span> <span class="str">"earnings"</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="OPTIMIZE">
+<div class="cmd-card-header">
+  <span class="cmd-name">OPTIMIZE</span>
+  <span class="cmd-cat cat-advanced">Advanced</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Optimize a parameter over a range of values.</p>
+  <pre><code><span class="adv-kw">OPTIMIZE</span> rsi_period <span class="kw">FROM</span> <span class="num">7</span> <span class="kw">TO</span> <span class="num">28</span> <span class="kw">STEP</span> <span class="num">7</span> <span class="kw">USING</span> <span class="num">90</span></code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="INDICATOR">
+<div class="cmd-card-header">
+  <span class="cmd-name">INDICATOR</span>
+  <span class="cmd-cat cat-advanced">Advanced</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Calculate a technical indicator by name. Alternative to direct function calls.</p>
+  <pre><code><span class="adv-kw">INDICATOR</span> RSI
+<span class="kw">DEF</span> val = <span class="adv-kw">INDICATOR</span>(RSI, <span class="num">14</span>)</code></pre>
+</div>
+</div>
+
+<h2 id="cmd-functions">Functions Commands</h2>
+
+<div class="cmd-card" data-cmd="DEF_FUNC">
+<div class="cmd-card-header">
+  <span class="cmd-name">DEF_FUNC / ENDFUNC</span>
+  <span class="cmd-cat cat-functions">Functions</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Define a reusable function with parameters.</p>
+  <pre><code><span class="kw">DEF_FUNC</span> checkEntry(rsi, macd)
+  <span class="kw">IF</span> rsi &lt; <span class="num">30</span> <span class="kw">AND</span> macd &gt; <span class="num">0</span> <span class="kw">THEN</span>
+    <span class="trade">BUY</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span>
+  <span class="kw">ENDIF</span>
+<span class="kw">ENDFUNC</span>
+
+<span class="cmt">// Call it</span>
+checkEntry(rsiValue, macdValue)</code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="CHAIN">
+<div class="cmd-card-header">
+  <span class="cmd-name">CHAIN</span>
+  <span class="cmd-cat cat-functions">Functions</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Chain sequential operations, passing results through.</p>
+  <pre><code><span class="kw">CHAIN</span> fetchData() <span class="kw">THEN</span> processData() <span class="kw">THEN</span> analyzeResults()</code></pre>
+</div>
+</div>
+
+<div class="cmd-card" data-cmd="INCLUDE">
+<div class="cmd-card-header">
+  <span class="cmd-name">INCLUDE</span>
+  <span class="cmd-cat cat-functions">Functions</span>
+</div>
+<div class="cmd-card-body">
+  <p class="cmd-desc">Include an external ClawScript file.</p>
+  <pre><code><span class="kw">INCLUDE</span> <span class="str">"common-indicators.cs"</span></code></pre>
+</div>
+</div>
+
+<hr style="border-color:#21262d;margin:32px 0">
+
+<h2 id="editor-ui">ClawScript Editor UI</h2>
+<p>The ClawScript Editor is accessed from the IG Trading Dashboard &rarr; <strong>ClawScript Editor</strong> tab.</p>
+
+<h3>Toolbar</h3>
+<table class="param-table">
+<tr><th>Button</th><th>Action</th></tr>
+<tr><td>New Script</td><td>Clear editor and start a new script</td></tr>
+<tr><td>Paste Code</td><td>Open modal to paste ClawScript code</td></tr>
+<tr><td>Compile &amp; Save</td><td>Parse, generate JS, and save the strategy</td></tr>
+<tr><td>Run Simulation</td><td>Execute a simulation with sample data</td></tr>
+<tr><td>Load Existing</td><td>Load a previously saved script</td></tr>
+<tr><td>Code / Split / Flow</td><td>Switch between code-only, split, or flow-only view</td></tr>
+<tr><td>Export .cs</td><td>Download the raw ClawScript code</td></tr>
+<tr><td>Export JSON</td><td>Download the flow graph as JSON</td></tr>
+<tr><td>Export .js</td><td>Download the compiled JavaScript strategy</td></tr>
+</table>
+
+<h3>Code Pane</h3>
+<ul>
+  <li>Syntax-highlighted editor with line numbers</li>
+  <li>Real-time parsing with status indicator (green = OK, red = error)</li>
+  <li>Tab key inserts 2-space indent</li>
+  <li>Auto-saves drafts to localStorage</li>
+  <li>Synchronizes with the Flow pane in real-time</li>
+</ul>
+
+<h3>Output / Logs</h3>
+<p>The bottom panel shows compilation output, parse results, generated JavaScript, and simulation logs. Log levels: <span style="color:#8b949e">info</span>, <span style="color:#2dc653">success</span>, <span style="color:#f0883e">warn</span>, <span style="color:#f85149">error</span>, <span style="color:#79c0ff">trace</span>.</p>
+
+<h2 id="flow-builder">Visual Flow Builder</h2>
+<p>The Visual Flow Builder allows creating strategies by dragging and dropping command nodes onto a canvas and connecting them with wires.</p>
+
+<h3>Flow Builder Toolbar</h3>
+<table class="param-table">
+<tr><th>Button</th><th>Action</th></tr>
+<tr><td>+ / &minus;</td><td>Zoom in / out (step: 0.06)</td></tr>
+<tr><td>Fit</td><td>Auto-fit all nodes into view</td></tr>
+<tr><td>Auto-Layout</td><td>Automatically arrange nodes in a grid</td></tr>
+<tr><td>Export PNG</td><td>Export the flow diagram as a PNG image</td></tr>
+<tr><td>Undo / Redo</td><td>Undo/redo changes (also Ctrl+Z / Ctrl+Y)</td></tr>
+<tr><td>Delete</td><td>Delete the selected node (also Delete/Backspace key)</td></tr>
+</table>
+
+<h3>Toolbox (Left Panel)</h3>
+<p>The collapsible toolbox on the left contains all available commands organized by category:</p>
+<ul>
+  <li><span style="color:#2dc653">Trading</span> &mdash; BUY, SELL, SELLSHORT, EXIT, CLOSE, TRAILSTOP</li>
+  <li><span style="color:#8b949e">Variables</span> &mdash; DEF, SET, STORE_VAR, LOAD_VAR</li>
+  <li><span style="color:#ff7b72">Control Flow</span> &mdash; IF, LOOP, WHILE, TRY, WAIT, ERROR</li>
+  <li><span style="color:#bc8cff">AI / Analysis</span> &mdash; AI_QUERY, AI_GENERATE_SCRIPT, ANALYZE_LOG, RUN_ML</li>
+  <li><span style="color:#79c0ff">Data Fetch</span> &mdash; CLAW_WEB, CLAW_X, CLAW_PDF, CLAW_IMAGE, CLAW_VIDEO, CLAW_CONVERSATION, CLAW_TOOL, CLAW_CODE</li>
+  <li><span style="color:#f0883e">Agent</span> &mdash; SPAWN_AGENT, CALL_SESSION, MUTATE_CONFIG, ALERT, SAY_TO_SESSION, WAIT_FOR_REPLY</li>
+  <li><span style="color:#ffa657">Advanced</span> &mdash; CRASH_SCAN, MARKET_NOMAD, NOMAD_SCAN, NOMAD_ALLOCATE, RUMOR_SCAN, OPTIMIZE, INDICATOR</li>
+  <li><span style="color:#a371f7">Functions</span> &mdash; DEF_FUNC, CHAIN, INCLUDE</li>
+</ul>
+
+<h3>Working with Nodes</h3>
+<ul>
+  <li><strong>Adding nodes:</strong> Drag a command from the toolbox onto the canvas</li>
+  <li><strong>Selecting:</strong> Click a node to select it (blue highlight)</li>
+  <li><strong>Moving:</strong> Drag the node header to reposition (snaps to 10px grid)</li>
+  <li><strong>Editing parameters:</strong> Type directly into the parameter fields on each node</li>
+  <li><strong>Connecting:</strong> Drag from an output port (bottom) to an input port (top) of another node</li>
+  <li><strong>Deleting:</strong> Select a node and press Delete or click the Delete button</li>
+  <li><strong>Auto-connect:</strong> When dropping a new node while another is selected, they auto-connect</li>
+</ul>
+
+<h3>Canvas Navigation</h3>
+<ul>
+  <li><strong>Pan:</strong> Click and drag on empty canvas area</li>
+  <li><strong>Zoom:</strong> Scroll wheel (zooms toward cursor position)</li>
+  <li><strong>Zoom range:</strong> 25% to 250%</li>
+  <li><strong>Fit view:</strong> Click "Fit" to auto-zoom to show all nodes</li>
+</ul>
+
+<h3>Connection Types</h3>
+<p>Control flow nodes (IF, LOOP, WHILE, TRY, DEF_FUNC) have multiple output ports:</p>
+<table class="param-table">
+<tr><th>Node</th><th>Output Ports</th></tr>
+<tr><td>IF</td><td><span style="color:#2dc653">true</span>, <span style="color:#f85149">false</span></td></tr>
+<tr><td>LOOP / WHILE</td><td><span style="color:#f0883e">body</span>, next</td></tr>
+<tr><td>TRY</td><td><span style="color:#f0883e">body</span>, <span style="color:#bc8cff">catch</span>, next</td></tr>
+<tr><td>DEF_FUNC</td><td><span style="color:#f0883e">body</span>, next</td></tr>
+</table>
+
+<h2 id="simulation">Simulation & Testing</h2>
+<p>The <strong>Run Simulation</strong> button executes a lightweight simulation using sample price data. It:</p>
+<ol>
+  <li>Parses the current ClawScript code</li>
+  <li>Generates JavaScript</li>
+  <li>Simulates execution with mock market data</li>
+  <li>Logs trade signals, alerts, and variable values to the Output panel</li>
+</ol>
+<div class="warning"><strong>Warning:</strong> Simulation uses synthetic data and does not connect to real markets. Use it for logic validation only.</div>
+
+<h2 id="export">Export & Compile</h2>
+
+<h3>Export Formats</h3>
+<table class="param-table">
+<tr><th>Format</th><th>Extension</th><th>Description</th></tr>
+<tr><td>ClawScript</td><td>.cs</td><td>Raw source code</td></tr>
+<tr><td>Flow JSON</td><td>.json</td><td>Node graph with positions and connections</td></tr>
+<tr><td>JavaScript</td><td>.js</td><td>Compiled strategy class</td></tr>
+<tr><td>Flow PNG</td><td>.png</td><td>Visual screenshot of the flow diagram</td></tr>
+</table>
+
+<h3>Compiled Strategy Structure</h3>
+<p>When you compile a ClawScript, the generated JavaScript follows this structure:</p>
+<pre><code>'use strict';
+const BaseStrategy = require('./base-strategy.cjs');
+const indicators = require('../indicators.cjs');
+const trade = require('../openclaw-trade.cjs');
+
+class MyStrategyStrategy extends BaseStrategy {
+  constructor(config) {
+    super(config);
+    this._vars = {};
+  }
+
+  async evaluateEntry(ticks, context) {
+    const config = this.config;
+    const prices = ticks.map(t => t.mid || t.close || t.price || 0);
+    // ... compiled strategy logic ...
+    return null;
+  }
+
+  async evaluateExit(position, ticks, context) {
+    return { close: false, reason: '' };
+  }
+
+  getRequiredBufferSize() { return 100; }
+  getDescription() { return 'Custom ClawScript strategy: MyStrategy'; }
+
+  getConfigSchema() {
+    return [
+      { key: 'enabled', type: 'boolean', default: true, label: 'Enabled' },
+      { key: 'size', type: 'number', default: 1, label: 'Position Size' },
+      { key: 'stopDistance', type: 'number', default: 20, label: 'Stop Distance' },
+      { key: 'limitDistance', type: 'number', default: 40, label: 'Limit Distance' }
+    ];
+  }
+
+  static get STRATEGY_TYPE() { return 'custom-mystrategy'; }
+}
+
+module.exports = MyStrategyStrategy;</code></pre>
+
+<hr style="border-color:#21262d;margin:32px 0">
+
+<h2 id="sample-rsi">Sample: Simple RSI Buy/Sell</h2>
+<p>A basic strategy that buys when RSI is oversold and sells when overbought.</p>
+<pre><code><span class="cmt">// Simple RSI Buy/Sell Strategy</span>
+<span class="cmt">// Buys when RSI is oversold, sells when overbought</span>
+
+<span class="kw">DEF</span> rsi_period = <span class="num">14</span>
+<span class="kw">DEF</span> rsi_oversold = <span class="num">30</span>
+<span class="kw">DEF</span> rsi_overbought = <span class="num">70</span>
+
+<span class="kw">DEF</span> rsi = RSI(rsi_period)
+
+<span class="kw">IF</span> rsi &lt; rsi_oversold <span class="kw">THEN</span>
+  <span class="trade">BUY</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">STOP</span> <span class="num">20</span> <span class="kw">LIMIT</span> <span class="num">40</span> <span class="kw">REASON</span> <span class="str">"RSI oversold entry"</span>
+<span class="kw">ENDIF</span>
+
+<span class="kw">IF</span> rsi &gt; rsi_overbought <span class="kw">THEN</span>
+  <span class="trade">SELL</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">STOP</span> <span class="num">20</span> <span class="kw">LIMIT</span> <span class="num">40</span> <span class="kw">REASON</span> <span class="str">"RSI overbought entry"</span>
+<span class="kw">ENDIF</span></code></pre>
+<p><strong>How it works:</strong> Defines RSI with period 14, then uses two IF blocks to check oversold (&lt; 30) and overbought (&gt; 70) conditions, placing market orders with 20-point stops and 40-point limits.</p>
+
+<h2 id="sample-ema">Sample: EMA Crossover with Trailing Stop</h2>
+<p>Uses fast/slow EMA crossover for entries with trailing stop protection.</p>
+<pre><code><span class="cmt">// EMA Crossover with Trailing Stop</span>
+
+<span class="kw">DEF</span> ema_fast = EMA(<span class="num">9</span>)
+<span class="kw">DEF</span> ema_slow = EMA(<span class="num">21</span>)
+<span class="kw">DEF</span> atr = ATR(<span class="num">14</span>)
+
+<span class="kw">IF</span> ema_fast <span class="kw">CROSSES OVER</span> ema_slow <span class="kw">THEN</span>
+  <span class="trade">BUY</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">STOP</span> <span class="num">25</span> <span class="kw">REASON</span> <span class="str">"EMA bullish crossover"</span>
+  <span class="trade">TRAILSTOP</span> <span class="num">15</span> <span class="kw">ACCEL</span> <span class="num">0.02</span> <span class="kw">MAX</span> <span class="num">0.2</span>
+<span class="kw">ENDIF</span>
+
+<span class="kw">IF</span> ema_fast <span class="kw">CROSSES UNDER</span> ema_slow <span class="kw">THEN</span>
+  <span class="trade">SELL</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">STOP</span> <span class="num">25</span> <span class="kw">REASON</span> <span class="str">"EMA bearish crossover"</span>
+  <span class="trade">TRAILSTOP</span> <span class="num">15</span> <span class="kw">ACCEL</span> <span class="num">0.02</span> <span class="kw">MAX</span> <span class="num">0.2</span>
+<span class="kw">ENDIF</span></code></pre>
+<p><strong>How it works:</strong> The <code>CROSSES OVER</code> / <code>CROSSES UNDER</code> operators detect when the 9-period EMA crosses the 21-period EMA. On crossover, a trade is placed with a trailing stop that accelerates as the price moves in the trade's favor.</p>
+
+<h2 id="sample-multi">Sample: Multi-Indicator with Error Handling</h2>
+<p>Combines RSI + MACD + Bollinger Bands with try/catch safety.</p>
+<pre><code><span class="cmt">// Multi-Indicator Strategy with Error Handling</span>
+
+<span class="kw">DEF</span> rsi = RSI(<span class="num">14</span>)
+<span class="kw">DEF</span> macd_hist = MACD(<span class="num">12</span>, <span class="num">26</span>, <span class="num">9</span>)
+<span class="kw">DEF</span> bb_upper = BOLLINGER_UPPER(<span class="num">20</span>, <span class="num">2</span>)
+<span class="kw">DEF</span> bb_lower = BOLLINGER_LOWER(<span class="num">20</span>, <span class="num">2</span>)
+<span class="kw">DEF</span> price = LAST_PRICE()
+
+<span class="kw">TRY</span>
+  <span class="kw">IF</span> rsi &lt; <span class="num">30</span> <span class="kw">AND</span> macd_hist &gt; <span class="num">0</span> <span class="kw">AND</span> price &lt; bb_lower <span class="kw">THEN</span>
+    <span class="trade">BUY</span> <span class="num">2</span> <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">STOP</span> <span class="num">30</span> <span class="kw">LIMIT</span> <span class="num">60</span> <span class="kw">REASON</span> <span class="str">"Triple confirmation buy"</span>
+    <span class="agent-kw">ALERT</span> <span class="str">"BUY signal triggered"</span> <span class="kw">LEVEL</span> <span class="str">"info"</span>
+  <span class="kw">ENDIF</span>
+
+  <span class="kw">IF</span> rsi &gt; <span class="num">70</span> <span class="kw">AND</span> macd_hist &lt; <span class="num">0</span> <span class="kw">AND</span> price &gt; bb_upper <span class="kw">THEN</span>
+    <span class="trade">SELL</span> <span class="num">2</span> <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">STOP</span> <span class="num">30</span> <span class="kw">LIMIT</span> <span class="num">60</span> <span class="kw">REASON</span> <span class="str">"Triple confirmation sell"</span>
+    <span class="agent-kw">ALERT</span> <span class="str">"SELL signal triggered"</span> <span class="kw">LEVEL</span> <span class="str">"info"</span>
+  <span class="kw">ENDIF</span>
+<span class="kw">CATCH</span> err
+  <span class="agent-kw">ALERT</span> <span class="str">"Strategy error"</span> <span class="kw">LEVEL</span> <span class="str">"error"</span>
+<span class="kw">ENDTRY</span></code></pre>
+<p><strong>How it works:</strong> Requires all three indicators to confirm before entering. RSI below 30, positive MACD histogram, and price below lower Bollinger Band must all be true for a buy. The TRY/CATCH block ensures errors (e.g., data unavailable) don't crash the strategy.</p>
+
+<h2 id="sample-sentiment">Sample: AI Sentiment + Market Scanner</h2>
+<p>Fetches AI-driven sentiment analysis and combines with technical indicators.</p>
+<pre><code><span class="cmt">// AI Sentiment + Market Scanner Strategy</span>
+
+<span class="kw">DEF</span> rsi = RSI(<span class="num">14</span>)
+<span class="kw">DEF</span> sentiment = <span class="num">0</span>
+
+<span class="ai-kw">AI_QUERY</span> <span class="str">"Analyze current BTC market sentiment from recent news"</span> <span class="kw">TOOL</span> <span class="str">"web_search"</span> <span class="kw">ARG</span> <span class="str">"bitcoin sentiment today"</span>
+<span class="kw">SET</span> sentiment = AI_RESULT
+
+<span class="kw">IF</span> sentiment &gt; <span class="num">0.6</span> <span class="kw">AND</span> rsi &lt; <span class="num">40</span> <span class="kw">THEN</span>
+  <span class="trade">BUY</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">STOP</span> <span class="num">50</span> <span class="kw">LIMIT</span> <span class="num">100</span> <span class="kw">REASON</span> <span class="str">"Bullish sentiment + RSI dip"</span>
+  <span class="agent-kw">ALERT</span> <span class="str">"Sentiment BUY entry"</span> <span class="kw">LEVEL</span> <span class="str">"info"</span>
+<span class="kw">ENDIF</span>
+
+<span class="kw">IF</span> sentiment &lt; <span class="num">0.3</span> <span class="kw">AND</span> rsi &gt; <span class="num">60</span> <span class="kw">THEN</span>
+  <span class="trade">SELL</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span> <span class="kw">STOP</span> <span class="num">50</span> <span class="kw">REASON</span> <span class="str">"Bearish sentiment + RSI high"</span>
+  <span class="agent-kw">ALERT</span> <span class="str">"Sentiment SELL entry"</span> <span class="kw">LEVEL</span> <span class="str">"warning"</span>
+<span class="kw">ENDIF</span>
+
+<span class="adv-kw">CRASH_SCAN</span> <span class="kw">ON</span>
+<span class="kw">WAIT</span> <span class="num">5000</span></code></pre>
+<p><strong>How it works:</strong> Uses <code>AI_QUERY</code> with the <code>web_search</code> tool to analyze real-time BTC sentiment. Combines the sentiment score (0-1) with RSI to find high-conviction entries. Enables crash scanning and adds a 5-second delay between evaluations.</p>
+
+<h2 id="integration">Trade Claw Engine Integration</h2>
+<p>Compiled ClawScript strategies integrate with the Trade Claw Engine through the strategy loader system:</p>
+
+<h4>Strategy Lifecycle</h4>
+<ol>
+  <li><strong>Write:</strong> Create ClawScript in the editor</li>
+  <li><strong>Compile:</strong> Click "Compile &amp; Save" to generate JavaScript</li>
+  <li><strong>Deploy:</strong> The .cjs file is saved to <code>skills/bots/strategies/</code></li>
+  <li><strong>Load:</strong> The strategy loader discovers and registers the strategy</li>
+  <li><strong>Run:</strong> The bot engine calls <code>evaluateEntry()</code> on each tick</li>
+  <li><strong>Signal:</strong> When conditions are met, the strategy returns a trade signal</li>
+  <li><strong>Execute:</strong> The engine places the trade via the IG API</li>
+</ol>
+
+<h4>Module Imports</h4>
+<p>The compiler automatically adds required imports based on commands used:</p>
+<table class="param-table">
+<tr><th>Module</th><th>Triggered By</th></tr>
+<tr><td><code>indicators</code></td><td>Always included (RSI, EMA, SMA, etc.)</td></tr>
+<tr><td><code>trade</code></td><td>BUY, SELL, SELLSHORT, EXIT, CLOSE, TRAILSTOP</td></tr>
+<tr><td><code>ai</code></td><td>AI_QUERY, AI_GENERATE_SCRIPT, ANALYZE_LOG, RUN_ML, RUMOR_SCAN</td></tr>
+<tr><td><code>data</code></td><td>CLAW_WEB, CLAW_X, CLAW_PDF, CLAW_IMAGE, CLAW_VIDEO, CLAW_CONVERSATION</td></tr>
+<tr><td><code>tools</code></td><td>CLAW_TOOL, CLAW_CODE, STORE_VAR, LOAD_VAR, RUMOR_SCAN</td></tr>
+<tr><td><code>channels</code></td><td>ALERT</td></tr>
+<tr><td><code>chat</code></td><td>SPAWN_AGENT, CALL_SESSION, SAY_TO_SESSION, WAIT_FOR_REPLY</td></tr>
+<tr><td><code>nomad</code></td><td>MARKET_NOMAD, NOMAD_SCAN, NOMAD_ALLOCATE</td></tr>
+</table>
+
+<div class="tip"><strong>Tip:</strong> Use the Split view in the editor to see both your ClawScript code and the visual flow simultaneously. Changes in one pane automatically sync to the other.</div>
+
+</main>
+</div>
+
+<script>
+function filterDocs(query) {
+  var cards = document.querySelectorAll('.cmd-card');
+  var q = query.toLowerCase().trim();
+  for (var i = 0; i < cards.length; i++) {
+    var card = cards[i];
+    var text = card.textContent.toLowerCase();
+    var cmd = (card.getAttribute('data-cmd') || '').toLowerCase();
+    if (!q || text.indexOf(q) >= 0 || cmd.indexOf(q) >= 0) {
+      card.style.display = '';
+    } else {
+      card.style.display = 'none';
+    }
+  }
+}
+
+var sideLinks = document.querySelectorAll('.sidebar a');
+for (var i = 0; i < sideLinks.length; i++) {
+  sideLinks[i].addEventListener('click', function(e) {
+    for (var j = 0; j < sideLinks.length; j++) sideLinks[j].classList.remove('active');
+    this.classList.add('active');
+  });
+}
+
+window.addEventListener('scroll', function() {
+  var sections = document.querySelectorAll('h2[id], h3[id]');
+  var scrollY = window.scrollY + 80;
+  var current = '';
+  for (var i = 0; i < sections.length; i++) {
+    if (sections[i].offsetTop <= scrollY) current = sections[i].id;
+  }
+  for (var i = 0; i < sideLinks.length; i++) {
+    sideLinks[i].classList.toggle('active', sideLinks[i].getAttribute('href') === '#' + current);
+  }
+});
+</script>
+</body>
+</html>
