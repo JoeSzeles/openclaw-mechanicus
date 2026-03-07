@@ -21,7 +21,7 @@ const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
 const CANVAS_DIR = path.join(DATA_DIR, "canvas");
 const BOT_REGISTRY_FILE = path.join(DATA_DIR, "bot-registry.json");
 const https = require("https");
-const scalperEngine = require("./skills/bots/ig-scalper-engine.cjs");
+const scalperEngine = require("./skills/bots/trade-claw-engine.cjs");
 
 const LOGIN_USER = process.env.OPENCLAW_LOGIN_USER || "Josef_Szeles";
 const LOGIN_PASS = process.env.OPENCLAW_LOGIN_PASSWORD || "NiDhRlT9xVeWoE32c3sSacA15Vq9pQKE";
@@ -2215,6 +2215,15 @@ async function handleIgApi(req, res, p) {
       const list = await scalperDb.getBacktests(parseInt(backtestListMatch[1], 10));
       return json(res, 200, { backtests: list });
     }
+    if (req.method === "DELETE" && backtestListMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const result = await scalperDb.deleteBacktests(parseInt(backtestListMatch[1], 10));
+      return json(res, 200, result);
+    }
+    if (req.method === "GET" && p === "/api/ig/scalper/strategy-schemas") {
+      const sl = require("./skills/bots/strategies/index.cjs");
+      return json(res, 200, sl.getStrategySchemas());
+    }
     const backtestDetailMatch = p.match(/^\/api\/ig\/scalper\/backtests\/(\d+)$/);
     if (req.method === "GET" && backtestDetailMatch) {
       const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
@@ -2516,7 +2525,7 @@ function autoRegisterBotScripts() {
   const registry = loadBotRegistry();
   const newBots = [];
   try {
-    const SKIP_BOTS = new Set(["ig-scalper-engine", "ig-scalper-db", "ig-scalper-backtest"]);
+    const SKIP_BOTS = new Set(["ig-scalper-engine", "ig-scalper-db", "ig-scalper-backtest", "trade-claw-engine", "indicators"]);
     const files = fs.readdirSync(BOTS_DIR).filter(f => f.endsWith(".cjs") && !SKIP_BOTS.has(f.replace(/\.cjs$/, "")));
     for (const file of files) {
       const id = file.replace(/\.cjs$/, "");

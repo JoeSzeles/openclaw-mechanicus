@@ -1,0 +1,32 @@
+this is a big one my friend!
+You are now an expert modular trading bot architect for IG CFD/margin trading on Replit.
+
+-first, backup the scalper bot and it's files.
+
+read carfully my attatchment and break it down in manageable tasks
+I already have this base engine: ig-scalper-engine.cjs (Node.js/CommonJS, uses tick buffers, candles, IG proxy API for positions/balance, DB + JSON config fallback, RSI/EMA/MACD implemented).
+
+Goal: new modular bot, called Trade Claw
+-Refactor it into a fully modular strategy engine where I can plug in different bot types (scalper, mean reversion, trend following, etc.) as separate strategy classes/files in a folder that gets scanned for plugins.
+-make sure all P&L calculations remaine THE SAME .
+
+Here is the COMPLETE list of 20 strategy types I want supported, from short-term to long-term.
+
+For EACH strategy in the list, generate:
+
+A new file suggestion: strategies/<kebab-case-name>-strategy.cjs
+Base class extension pattern (inherits from BaseStrategy)
+Key evaluateEntry() logic (return {signal: true/false, direction, size, stopDist, limitDist, reason})
+Any new indicator calcs needed (add to global calc functions if shared)
+Config params to add to strategy object (with defaults)
+Risk/exit logic specific to that style
+-Also add support for these NEW signals/indicators I don't have yet
+-And add these NEW config variables to the strategy schema / DB
+-config variabls need a hover text desscription, and unused variabls need t be grey when unused and labeled unused , dpending aon selected strategy plugin
+history section need to allow to group arrange after insruments, and have a button in list to show Eqitty curve in pop up window, or eqquity curve for all trades combined
+-Backtesting also need equity curve, a "use settings " button for each backtest to use values on real strategy, download settings
+-backtest list to see all backtests, and a clead butto to clear them.
+-use DB to save variables, logs , backtests, trades, settings
+-make sure AI agent can access it
+-update agent files with new functions
+-test all functions

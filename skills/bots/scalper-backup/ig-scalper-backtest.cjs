@@ -1,7 +1,5 @@
 const http = require("http");
 const db = require("./ig-scalper-db.cjs");
-const strategyLoader = require("./strategies/index.cjs");
-const ind = require("./indicators.cjs");
 
 const PROXY_PORT = process.env.PORT || 5000;
 const TOKEN = process.env.CEO_TOKEN || "";
@@ -265,8 +263,6 @@ async function runBacktest(strategyId, options = {}) {
   const candles = await fetchCandles(strat.instrument, fetchResolution, candleCount);
   if (candles.length < 20) throw new Error("Insufficient candle data: " + candles.length + " (resolution=" + fetchResolution + ")");
 
-  const strategyType = strat.strategyType || "scalper";
-  const stratInstance = strategyLoader.createInstance(strategyType, strat);
   const minMom = strat.minMomentumPct || 0.03;
   const tickWindow = strat.tickWindow || 15;
   const cooldownBars = Math.max(1, Math.round((strat.cooldownMs || 6000) / resolutionMs(timeframe)));
@@ -281,13 +277,8 @@ async function runBacktest(strategyId, options = {}) {
   let openTrade = null;
   let lastEntryBar = -cooldownBars;
   let peakPnl = 0;
-  const equityCurve = [];
 
-  const warmupBars = stratInstance
-    ? Math.max(stratInstance.getRequiredBufferSize(), 10)
-    : Math.max(tickWindow, strat.macdEnabled ? ((strat.macdSlow || 26) + (strat.macdSignal || 9) + 5) : 0, strat.emaEnabled ? ((strat.emaLong || 21) + 5) : 0, strat.rsiEnabled ? ((strat.rsiPeriod || 14) + 5) : 0);
-
-  console.log(`[backtest] Running with strategy="${strategyType}" warmup=${warmupBars} candles=${candles.length}`);
+  const warmupBars = Math.max(tickWindow, strat.macdEnabled ? ((strat.macdSlow || 26) + (strat.macdSignal || 9) + 5) : 0, strat.emaEnabled ? ((strat.emaLong || 21) + 5) : 0, strat.rsiEnabled ? ((strat.rsiPeriod || 14) + 5) : 0);
 
   for (let i = warmupBars; i < candles.length; i++) {
     const c = candles[i];
@@ -295,20 +286,18 @@ async function runBacktest(strategyId, options = {}) {
     if (openTrade) {
       const dir = openTrade.direction;
       const entryPrice = openTrade.entryPrice;
-      const eStopDist = openTrade.stopDist || stopDist;
-      const eLimitDist = openTrade.limitDist || limitDist;
 
       let exitPrice = null;
       let reason = null;
 
-      if (eStopDist > 0) {
-        const sl = dir === "BUY" ? entryPrice - eStopDist : entryPrice + eStopDist;
+      if (stopDist > 0) {
+        const sl = dir === "BUY" ? entryPrice - stopDist : entryPrice + stopDist;
         if (dir === "BUY" && c.low <= sl) { exitPrice = sl; reason = "SL"; }
         if (dir === "SELL" && c.high >= sl) { exitPrice = sl; reason = "SL"; }
       }
 
-      if (!reason && eLimitDist > 0) {
-        const tp = dir === "BUY" ? entryPrice + eLimitDist : entryPrice - eLimitDist;
+      if (!reason && limitDist > 0) {
+        const tp = dir === "BUY" ? entryPrice + limitDist : entryPrice - limitDist;
         if (dir === "BUY" && c.high >= tp) { exitPrice = tp; reason = "TP"; }
         if (dir === "SELL" && c.low <= tp) { exitPrice = tp; reason = "TP"; }
       }
@@ -329,7 +318,6 @@ async function runBacktest(strategyId, options = {}) {
 
       if (exitPrice !== null) {
         const pnl = dir === "BUY" ? (exitPrice - entryPrice) * size * cs : (entryPrice - exitPrice) * size * cs;
-        const roundedPnl = Math.round(pnl * 100) / 100;
         trades.push({
           entryTime: openTrade.entryTime,
           entryBar: openTrade.entryBar,
@@ -338,11 +326,9 @@ async function runBacktest(strategyId, options = {}) {
           exitBar: i,
           exitPrice,
           direction: dir,
-          pnl: roundedPnl,
+          pnl: Math.round(pnl * 100) / 100,
           reason
         });
-        const cumPnl = trades.reduce((s, t) => s + t.pnl, 0);
-        equityCurve.push({ time: c.time, pnl: roundedPnl, cumPnl: Math.round(cumPnl * 100) / 100, bar: i });
         openTrade = null;
         peakPnl = 0;
         lastEntryBar = i;
@@ -352,54 +338,31 @@ async function runBacktest(strategyId, options = {}) {
 
     if (i - lastEntryBar < cooldownBars) continue;
 
+    const windowStart = Math.max(0, i - tickWindow);
+    const firstClose = candles[windowStart].close;
+    const lastClose = c.close;
+    const momentumPct = ((lastClose - firstClose) / firstClose) * 100;
+    const absMomentum = Math.abs(momentumPct);
+
+    if (absMomentum < minMom) continue;
+
     let direction = null;
-    let signalStopDist = stopDist;
-    let signalLimitDist = limitDist;
-    let signalSize = size;
-
-    if (stratInstance) {
-      const pseudoTicks = candles.slice(Math.max(0, i - warmupBars), i + 1).map(x => ({
-        bid: x.close, offer: x.close, mid: x.close,
-        spread: x.high - x.low, ts: x.time * 1000
-      }));
-      const spread = c.high - c.low;
-      const context = { htfBias: null, accountBalance: 0, accountMargin: 0, spread, epic: strat.instrument, config: strat, breakEvenBuffer: 1.5 };
-      const signal = stratInstance.safeEvaluateEntry(pseudoTicks, context);
-      if (signal && signal.signal && signal.direction) {
-        direction = signal.direction;
-        if (signal.stopDist) signalStopDist = signal.stopDist;
-        if (signal.limitDist) signalLimitDist = signal.limitDist;
-        if (signal.size) signalSize = signal.size;
-      }
+    if (strat.direction === "BUY") {
+      if (momentumPct > 0) direction = "BUY";
+    } else if (strat.direction === "SELL") {
+      if (momentumPct < 0) direction = "SELL";
     } else {
-      const windowStart = Math.max(0, i - tickWindow);
-      const firstClose = candles[windowStart].close;
-      const lastClose = c.close;
-      const momentumPct = ((lastClose - firstClose) / firstClose) * 100;
-      const absMomentum = Math.abs(momentumPct);
-
-      if (absMomentum < minMom) continue;
-
-      if (strat.direction === "BUY") {
-        if (momentumPct > 0) direction = "BUY";
-      } else if (strat.direction === "SELL") {
-        if (momentumPct < 0) direction = "SELL";
-      } else {
-        if (momentumPct > minMom) direction = "BUY";
-        else if (momentumPct < -minMom) direction = "SELL";
-      }
-
-      if (direction) {
-        const closePrices = candles.slice(Math.max(0, i - 60), i + 1).map(x => x.close);
-        if (!checkIndicators(closePrices, direction, strat)) direction = null;
-      }
+      if (momentumPct > minMom) direction = "BUY";
+      else if (momentumPct < -minMom) direction = "SELL";
     }
-
     if (!direction) continue;
 
-    if (signalStopDist <= 0 && signalLimitDist <= 0 && trailingStop <= 0 && profitTarget <= 0) continue;
+    const closePrices = candles.slice(Math.max(0, i - 60), i + 1).map(x => x.close);
+    if (!checkIndicators(closePrices, direction, strat)) continue;
 
-    openTrade = { direction, entryPrice: c.close, entryTime: c.time, entryBar: i, stopDist: signalStopDist, limitDist: signalLimitDist };
+    if (stopDist <= 0 && limitDist <= 0 && trailingStop <= 0 && profitTarget <= 0) continue;
+
+    openTrade = { direction, entryPrice: c.close, entryTime: c.time, entryBar: i };
     peakPnl = 0;
   }
 
@@ -408,7 +371,6 @@ async function runBacktest(strategyId, options = {}) {
     const pnl = openTrade.direction === "BUY"
       ? (lastCandle.close - openTrade.entryPrice) * size * cs
       : (openTrade.entryPrice - lastCandle.close) * size * cs;
-    const roundedPnl = Math.round(pnl * 100) / 100;
     trades.push({
       entryTime: openTrade.entryTime,
       entryBar: openTrade.entryBar,
@@ -417,11 +379,9 @@ async function runBacktest(strategyId, options = {}) {
       exitBar: candles.length - 1,
       exitPrice: lastCandle.close,
       direction: openTrade.direction,
-      pnl: roundedPnl,
+      pnl: Math.round(pnl * 100) / 100,
       reason: "OPEN"
     });
-    const cumPnl = trades.reduce((s, t) => s + t.pnl, 0);
-    equityCurve.push({ time: lastCandle.time, pnl: roundedPnl, cumPnl: Math.round(cumPnl * 100) / 100, bar: candles.length - 1 });
   }
 
   const wins = trades.filter(t => t.pnl > 0);
@@ -461,11 +421,10 @@ async function runBacktest(strategyId, options = {}) {
     avgWin: Math.round(avgWin * 100) / 100,
     avgLoss: Math.round(avgLoss * 100) / 100,
     candleCount: candles.length,
-    timeframe,
-    strategyType
+    timeframe
   };
 
-  return { trades, summary, equityCurve, candleData: candles, strategy: strat };
+  return { trades, summary, candleData: candles, strategy: strat };
 }
 
 function resolutionMs(tf) {
@@ -499,7 +458,6 @@ async function runAndSave(strategyId, options = {}) {
     configSnapshot: {
       instrument: strat.instrument,
       direction: strat.direction,
-      strategyType: strat.strategyType || "scalper",
       size: strat.size,
       stopDistance: strat.stopDistance,
       limitDistance: strat.limitDistance,

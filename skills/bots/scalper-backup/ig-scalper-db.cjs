@@ -33,13 +33,11 @@ async function getConfig() {
 }
 
 async function updateConfig(updates) {
-  const allowed = ["enabled", "budget", "max_drawdown", "max_margin_pct", "break_even_buffer", "drawdown_tripped", "demo_mode", "demo_reject_pct", "demo_slippage_min", "demo_slippage_max"];
+  const allowed = ["enabled", "budget", "max_drawdown", "max_margin_pct", "break_even_buffer", "drawdown_tripped"];
   const camelToSnake = {
     enabled: "enabled", budget: "budget", maxDrawdown: "max_drawdown",
     maxMarginPct: "max_margin_pct", breakEvenBuffer: "break_even_buffer",
-    drawdownTripped: "drawdown_tripped", _drawdownTripped: "drawdown_tripped",
-    demoMode: "demo_mode", demoRejectPct: "demo_reject_pct",
-    demoSlippageMin: "demo_slippage_min", demoSlippageMax: "demo_slippage_max"
+    drawdownTripped: "drawdown_tripped", _drawdownTripped: "drawdown_tripped"
   };
   const sets = [];
   const vals = [];
@@ -75,24 +73,7 @@ const STRATEGY_COLS = [
   "rsi_enabled", "rsi_period", "rsi_overbought", "rsi_oversold",
   "ema_enabled", "ema_short", "ema_long",
   "macd_enabled", "macd_fast", "macd_slow", "macd_signal",
-  "contract_size", "deal_id", "timeframe",
-  "strategy_type",
-  "adx_enabled", "adx_period", "adx_threshold",
-  "bollinger_enabled", "bollinger_period", "bollinger_sd",
-  "stochastic_enabled", "stochastic_k", "stochastic_d", "stochastic_ob", "stochastic_os",
-  "atr_enabled", "atr_period", "atr_multiplier",
-  "roc_enabled", "roc_period", "roc_threshold",
-  "cci_enabled", "cci_period", "cci_threshold",
-  "williams_enabled", "williams_period",
-  "keltner_enabled", "keltner_period", "keltner_atr_mult",
-  "ichimoku_enabled", "ichimoku_tenkan", "ichimoku_kijun", "ichimoku_senkou",
-  "parabolic_sar_enabled", "sar_accel", "sar_max",
-  "aroon_enabled", "aroon_period",
-  "obv_enabled", "vwap_enabled",
-  "zscore_enabled", "zscore_period", "zscore_threshold",
-  "fib_enabled", "fib_lookback",
-  "grid_levels", "grid_spacing",
-  "kelly_enabled", "sentiment_enabled"
+  "contract_size", "deal_id", "timeframe"
 ];
 
 const CAMEL_TO_SNAKE = {};
@@ -589,84 +570,6 @@ async function reflectSubconscious(agentId) {
   return lines.join("\n");
 }
 
-async function ensureNewColumns() {
-  const newCols = [
-    ["strategy_type", "VARCHAR(40) DEFAULT 'scalper'"],
-    ["adx_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["adx_period", "INTEGER DEFAULT 14"],
-    ["adx_threshold", "NUMERIC DEFAULT 25"],
-    ["bollinger_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["bollinger_period", "INTEGER DEFAULT 20"],
-    ["bollinger_sd", "NUMERIC DEFAULT 2"],
-    ["stochastic_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["stochastic_k", "INTEGER DEFAULT 14"],
-    ["stochastic_d", "INTEGER DEFAULT 3"],
-    ["stochastic_ob", "INTEGER DEFAULT 80"],
-    ["stochastic_os", "INTEGER DEFAULT 20"],
-    ["atr_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["atr_period", "INTEGER DEFAULT 14"],
-    ["atr_multiplier", "NUMERIC DEFAULT 2"],
-    ["roc_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["roc_period", "INTEGER DEFAULT 12"],
-    ["roc_threshold", "NUMERIC DEFAULT 5"],
-    ["cci_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["cci_period", "INTEGER DEFAULT 20"],
-    ["cci_threshold", "NUMERIC DEFAULT 100"],
-    ["williams_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["williams_period", "INTEGER DEFAULT 14"],
-    ["keltner_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["keltner_period", "INTEGER DEFAULT 20"],
-    ["keltner_atr_mult", "NUMERIC DEFAULT 1.5"],
-    ["ichimoku_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["ichimoku_tenkan", "INTEGER DEFAULT 9"],
-    ["ichimoku_kijun", "INTEGER DEFAULT 26"],
-    ["ichimoku_senkou", "INTEGER DEFAULT 52"],
-    ["parabolic_sar_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["sar_accel", "NUMERIC DEFAULT 0.02"],
-    ["sar_max", "NUMERIC DEFAULT 0.2"],
-    ["aroon_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["aroon_period", "INTEGER DEFAULT 25"],
-    ["obv_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["vwap_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["zscore_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["zscore_period", "INTEGER DEFAULT 20"],
-    ["zscore_threshold", "NUMERIC DEFAULT 2"],
-    ["fib_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["fib_lookback", "INTEGER DEFAULT 50"],
-    ["grid_levels", "INTEGER DEFAULT 5"],
-    ["grid_spacing", "NUMERIC DEFAULT 0"],
-    ["kelly_enabled", "BOOLEAN DEFAULT FALSE"],
-    ["sentiment_enabled", "BOOLEAN DEFAULT FALSE"]
-  ];
-  let added = 0;
-  for (const [col, def] of newCols) {
-    try {
-      await query(`ALTER TABLE scalper_strategies ADD COLUMN IF NOT EXISTS ${col} ${def}`);
-      added++;
-    } catch (e) {
-      console.log(`[db-migrate] WARN: column ${col}: ${e.message}`);
-    }
-  }
-  console.log(`[db-migrate] ensureNewColumns: ${added}/${newCols.length} columns verified`);
-
-  const configCols = [
-    ["demo_mode", "BOOLEAN DEFAULT TRUE"],
-    ["demo_reject_pct", "NUMERIC DEFAULT 5"],
-    ["demo_slippage_min", "NUMERIC DEFAULT 0.1"],
-    ["demo_slippage_max", "NUMERIC DEFAULT 0.5"]
-  ];
-  for (const [col, def] of configCols) {
-    try {
-      await query(`ALTER TABLE scalper_config ADD COLUMN IF NOT EXISTS ${col} ${def}`);
-    } catch (_) {}
-  }
-}
-
-async function deleteBacktests(strategyId) {
-  const res = await query("DELETE FROM scalper_backtests WHERE strategy_id = $1", [strategyId]);
-  return { ok: true, deleted: res.rowCount };
-}
-
 async function close() {
   await pool.end();
 }
@@ -675,9 +578,8 @@ module.exports = {
   getConfig, updateConfig,
   getStrategies, getStrategy, addStrategy, updateStrategy, deleteStrategy, toggleStrategy,
   logTrade, getTrades, getTradeStats, clearTrades,
-  saveBacktest, getBacktests, getBacktest, deleteBacktests,
+  saveBacktest, getBacktests, getBacktest,
   ensurePriceCandlesTable, getStoredCandles, getLatestCandleTs, getCandleCount, storeCandles, getStoredCandlesRange,
-  ensureNewColumns,
   backupAgent, listAgentBackups, restoreAgentBackup, deleteAgentBackup,
   getAgentMemory, setAgentMemory, getDailyMemory, setDailyMemory, listDailyMemories, searchMemory,
   setSubconscious, getSubconscious, getSubconsciousEntry, deleteSubconscious, getAllSubconscious, reflectSubconscious,
