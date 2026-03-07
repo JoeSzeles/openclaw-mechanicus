@@ -550,16 +550,51 @@ async function evaluateEntry(strat, epic, ticks) {
   }
 }
 
-async function fetchPlMultiplier(epic) {
+const marketDetailsCache = {};
+
+async function fetchMarketDetails(epic) {
+  if (marketDetailsCache[epic] && (Date.now() - marketDetailsCache[epic]._ts < 300000)) {
+    return marketDetailsCache[epic];
+  }
   try {
     const data = await proxyGet("/api/ig/markets/" + epic);
     if (data && data.instrument) {
       const vop = parseFloat(data.instrument.valueOfOnePip) || 1;
       const sf = parseFloat(data.snapshot?.scalingFactor) || parseFloat(data.instrument?.scalingFactor) || 1;
-      return vop * sf;
+      const spread = data.snapshot ? (data.snapshot.offer - data.snapshot.bid) : 0;
+      const controlledRiskExtra = data.snapshot?.controlledRiskExtraSpread || 0;
+      const minNormal = data.dealingRules?.minNormalStopOrLimitDistance?.value || null;
+      const minControlled = data.dealingRules?.minControlledRiskStopDistance?.value || null;
+      const price = data.snapshot ? ((data.snapshot.bid + data.snapshot.offer) / 2) : 0;
+      const details = {
+        plMultiplier: vop * sf,
+        spread,
+        controlledRiskExtra,
+        minNormalStop: minNormal,
+        minControlledStop: minControlled,
+        price,
+        _ts: Date.now()
+      };
+      marketDetailsCache[epic] = details;
+      return details;
     }
   } catch (_) {}
-  return 1;
+  return { plMultiplier: 1, spread: 0, controlledRiskExtra: 0, minNormalStop: null, minControlledStop: null, price: 0, _ts: Date.now() };
+}
+
+async function fetchPlMultiplier(epic) {
+  const details = await fetchMarketDetails(epic);
+  return details.plMultiplier;
+}
+
+function computeMinStopDistance(details) {
+  const candidates = [];
+  if (details.minNormalStop) candidates.push(details.minNormalStop);
+  if (details.controlledRiskExtra > 0) candidates.push(details.controlledRiskExtra + details.spread + 10);
+  if (details.spread > 0) candidates.push(details.spread * 8);
+  if (details.price > 10000) candidates.push(details.price * 0.01);
+  if (candidates.length === 0) return 0;
+  return Math.max(...candidates);
 }
 
 async function openTrade(strat, epic, direction, size, stopDist, limitDist, tick, reason, htfBias) {
@@ -568,6 +603,19 @@ async function openTrade(strat, epic, direction, size, stopDist, limitDist, tick
     if (Math.random() * 100 < rejectChance) {
       log("DEMO", `Simulated rejection for ${direction} ${epic} (${rejectChance}% chance)`);
       return;
+    }
+  }
+
+  const mktDetails = await fetchMarketDetails(epic);
+  const minStop = computeMinStopDistance(mktDetails);
+  if (minStop > 0) {
+    if (stopDist < minStop) {
+      log("INFO", `Auto-adjusting stopDistance ${stopDist.toFixed(1)} -> ${Math.ceil(minStop)} for ${epic} (minRequired=${minStop.toFixed(1)}, spread=${mktDetails.spread}, crExtra=${mktDetails.controlledRiskExtra})`);
+      stopDist = Math.ceil(minStop);
+    }
+    if (limitDist < minStop) {
+      log("INFO", `Auto-adjusting limitDistance ${limitDist.toFixed(1)} -> ${Math.ceil(minStop)} for ${epic}`);
+      limitDist = Math.ceil(minStop);
     }
   }
 
