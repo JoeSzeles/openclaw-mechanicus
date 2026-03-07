@@ -34,7 +34,7 @@ ENDIF
 ### Into an existing OpenClaw instance
 
 ```bash
-git clone https://github.com/user/clawscript.git
+git clone https://github.com/JoeSzeles/clawscript.git
 cd clawscript
 bash install.sh
 ```
