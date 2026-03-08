@@ -195,9 +195,13 @@ function buildEditorUI() {
   root.innerHTML = '' +
   '<style>' +
   '#csEditorRoot { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding:0 8px; }' +
-  '#csEditorRoot.cs-standalone { display:flex; flex-direction:column; overflow:hidden; }' +
-  '#csEditorRoot.cs-standalone .cs-main { flex:1; min-height:0; }' +
-  '#csEditorRoot.cs-standalone .cs-bottom-panels { flex-shrink:0; }' +
+  '#csEditorRoot.cs-standalone { display:flex; flex-direction:column; overflow:hidden; height:100%; }' +
+  '#csEditorRoot.cs-standalone .cs-toolbar { flex-shrink:0; }' +
+  '#csEditorRoot.cs-standalone .cs-main { flex:1 1 0; min-height:0 !important; overflow:hidden; }' +
+  '#csEditorRoot.cs-standalone .cs-main .cs-code-pane { min-height:0; }' +
+  '#csEditorRoot.cs-standalone .cs-main .cs-flow-pane { min-height:0; }' +
+  '#csEditorRoot.cs-standalone .cs-main .cs-flow-canvas { min-height:0 !important; }' +
+  '#csEditorRoot.cs-standalone .cs-bottom-panels { flex-shrink:0; height:200px; margin-top:8px; }' +
   '.cs-toolbar { display:flex; gap:6px; padding:8px 0; flex-wrap:wrap; align-items:center; border-bottom:1px solid #30363d; margin-bottom:8px; flex-shrink:0; }' +
   '.cs-toolbar button, .cs-toolbar select { padding:4px 10px; border-radius:4px; font-size:12px; cursor:pointer; border:1px solid #30363d; background:#21262d; color:#c9d1d9; white-space:nowrap; }' +
   '.cs-toolbar button:hover { border-color:#58a6ff; }' +
@@ -494,8 +498,7 @@ function buildEditorUI() {
     '</div>' +
   '</div>';
 
-  if (root.style.height && root.style.height.indexOf('vh') >= 0 ||
-      root.parentElement === document.body && getComputedStyle(root).height !== 'auto') {
+  if (root.parentElement === document.body || root.classList.contains('cs-standalone')) {
     root.classList.add('cs-standalone');
   }
 
