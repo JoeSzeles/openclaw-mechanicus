@@ -201,7 +201,9 @@ function buildEditorUI() {
   '#csEditorRoot.cs-standalone .cs-main .cs-code-pane { min-height:0; }' +
   '#csEditorRoot.cs-standalone .cs-main .cs-flow-pane { min-height:0; }' +
   '#csEditorRoot.cs-standalone .cs-main .cs-flow-canvas { min-height:0 !important; }' +
-  '#csEditorRoot.cs-standalone .cs-bottom-panels { flex-shrink:0; height:200px; margin-top:8px; }' +
+  '#csEditorRoot.cs-standalone .cs-bottom-panels { flex-shrink:0; height:220px; margin-top:4px; }' +
+  '#csEditorRoot.cs-standalone .cs-bottom-panels .cs-logs-pane { height:100%; }' +
+  '#csEditorRoot.cs-standalone .cs-bottom-panels .cs-ai-pane { height:100%; }' +
   '.cs-toolbar { display:flex; gap:6px; padding:8px 0; flex-wrap:wrap; align-items:center; border-bottom:1px solid #30363d; margin-bottom:8px; flex-shrink:0; }' +
   '.cs-toolbar button, .cs-toolbar select { padding:4px 10px; border-radius:4px; font-size:12px; cursor:pointer; border:1px solid #30363d; background:#21262d; color:#c9d1d9; white-space:nowrap; }' +
   '.cs-toolbar button:hover { border-color:#58a6ff; }' +
