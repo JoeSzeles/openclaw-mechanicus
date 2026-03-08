@@ -1609,6 +1609,141 @@ async function handleClawScriptApi(req, res, p) {
     return json(res, 200, { ok: true, entry });
   }
 
+  const CS_SCRIPTS_DIR = path.join(DATA_DIR, "clawscript-scripts");
+  const CS_LOGS_DIR = path.join(DATA_DIR, "clawscript-logs");
+  try { fs.mkdirSync(CS_SCRIPTS_DIR, { recursive: true }); } catch (_) {}
+  try { fs.mkdirSync(CS_LOGS_DIR, { recursive: true }); } catch (_) {}
+
+  if (req.method === "POST" && p === "/api/clawscript/run") {
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    const { code, name, file } = body;
+    if (!code && !file) return json(res, 400, { error: "Missing code or file" });
+    const scriptName = (name || "script-" + Date.now()).replace(/[^a-zA-Z0-9_-]/g, "-").toLowerCase();
+    const scriptId = "cs-script-" + scriptName;
+    const scriptFile = path.join(CS_SCRIPTS_DIR, scriptName + ".cs");
+    if (code) {
+      fs.writeFileSync(scriptFile, code, "utf8");
+    } else if (file) {
+      const resolvedFile = path.resolve(process.cwd(), file);
+      const allowedDirs = [path.resolve(process.cwd(), ".openclaw"), path.resolve(process.cwd(), "skills")];
+      if (!allowedDirs.some(d => resolvedFile.startsWith(d + path.sep))) {
+        return json(res, 400, { error: "File path must be within .openclaw/ or skills/" });
+      }
+      if (!fs.existsSync(resolvedFile)) return json(res, 400, { error: "File not found: " + file });
+      fs.copyFileSync(resolvedFile, scriptFile);
+    } else {
+      return json(res, 400, { error: "Missing code or file" });
+    }
+    const relPath = path.relative(process.cwd(), scriptFile);
+    const botCmd = `node skills/bots/clawscript-runner.cjs ${relPath}`;
+    const registry = loadBotRegistry();
+    let existing = registry.find(b => b.id === scriptId);
+    if (existing) {
+      stopBot(scriptId);
+      existing.cmd = botCmd;
+      existing.enabled = true;
+    } else {
+      existing = { id: scriptId, cmd: botCmd, enabled: true, addedBy: "clawscript-editor", addedAt: new Date().toISOString(), scriptFile: relPath, isClawScript: true };
+      registry.push(existing);
+    }
+    existing.env = { CS_SCRIPT_ID: scriptName };
+    saveBotRegistry(registry);
+    spawnBot(existing);
+    const entry = botProcesses.get(scriptId);
+    const pid = entry && entry.proc ? entry.proc.pid : null;
+    console.log(`[cs-runner] Started script: ${scriptId} (PID ${pid})`);
+    return json(res, 200, { ok: true, scriptId, pid, name: scriptName });
+  }
+
+  if (req.method === "GET" && p === "/api/clawscript/scripts") {
+    const registry = loadBotRegistry();
+    const scripts = registry.filter(b => b.id.startsWith("cs-script-") || b.isClawScript).map(b => {
+      const entry = botProcesses.get(b.id);
+      const running = !!(entry && entry.proc && !entry.proc.killed);
+      return {
+        id: b.id,
+        name: b.id.replace(/^cs-script-/, ""),
+        cmd: b.cmd,
+        enabled: b.enabled,
+        running,
+        pid: running ? entry.proc.pid : null,
+        restarts: entry ? entry.restarts : 0,
+        scriptFile: b.scriptFile || null,
+        addedAt: b.addedAt,
+      };
+    });
+    return json(res, 200, { scripts });
+  }
+
+  const csScriptMatch = p.match(/^\/api\/clawscript\/scripts\/([^/]+)\/(stop|start|restart|pause|resume|logs)$/);
+  if (csScriptMatch) {
+    const scriptId = decodeURIComponent(csScriptMatch[1]);
+    const fullId = scriptId.startsWith("cs-script-") ? scriptId : "cs-script-" + scriptId;
+    const action = csScriptMatch[2];
+
+    if (req.method === "GET" && action === "logs") {
+      const logName = fullId.replace(/^cs-script-/, "");
+      const logFile = path.join(CS_LOGS_DIR, logName + ".log");
+      try {
+        const content = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : "";
+        const lines = content.split("\n").filter(Boolean);
+        const tail = lines.slice(-200);
+        return json(res, 200, { scriptId: fullId, lines: tail, total: lines.length });
+      } catch (e) {
+        return json(res, 200, { scriptId: fullId, lines: [], total: 0 });
+      }
+    }
+
+    if (req.method === "POST" && action === "stop") {
+      stopBot(fullId);
+      const registry = loadBotRegistry();
+      const bot = registry.find(b => b.id === fullId);
+      if (bot) { bot.enabled = false; saveBotRegistry(registry); }
+      return json(res, 200, { ok: true, stopped: fullId });
+    }
+
+    if (req.method === "POST" && action === "start") {
+      const registry = loadBotRegistry();
+      const bot = registry.find(b => b.id === fullId);
+      if (!bot) return json(res, 404, { error: "Script not found" });
+      bot.enabled = true;
+      saveBotRegistry(registry);
+      spawnBot(bot);
+      return json(res, 200, { ok: true, started: fullId });
+    }
+
+    if (req.method === "POST" && action === "restart") {
+      stopBot(fullId);
+      await new Promise(r => setTimeout(r, 500));
+      const registry = loadBotRegistry();
+      const bot = registry.find(b => b.id === fullId);
+      if (!bot) return json(res, 404, { error: "Script not found" });
+      bot.enabled = true;
+      saveBotRegistry(registry);
+      spawnBot(bot);
+      return json(res, 200, { ok: true, restarted: fullId });
+    }
+
+    if (req.method === "POST" && action === "pause") {
+      const entry = botProcesses.get(fullId);
+      if (entry && entry.proc && !entry.proc.killed) {
+        try { entry.proc.kill("SIGUSR1"); } catch (_) {}
+        return json(res, 200, { ok: true, paused: fullId });
+      }
+      return json(res, 404, { error: "Script not running" });
+    }
+
+    if (req.method === "POST" && action === "resume") {
+      const entry = botProcesses.get(fullId);
+      if (entry && entry.proc && !entry.proc.killed) {
+        try { entry.proc.kill("SIGUSR2"); } catch (_) {}
+        return json(res, 200, { ok: true, resumed: fullId });
+      }
+      return json(res, 404, { error: "Script not running" });
+    }
+  }
+
   return json(res, 404, { error: "Unknown ClawScript API endpoint" });
 }
 
@@ -3057,7 +3192,7 @@ function spawnBot(bot) {
   const proc = spawn(cmd, args, {
     cwd: OPENCLAW_HOME,
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env },
+    env: { ...process.env, ...(bot.env || {}) },
     detached: false,
   });
   const entry = { proc, bot, restarts: 0, lastStart: Date.now(), backoff: 5000 };
@@ -3114,7 +3249,7 @@ function autoRegisterBotScripts() {
   const registry = loadBotRegistry();
   const newBots = [];
   try {
-    const SKIP_BOTS = new Set(["ig-scalper-engine", "ig-scalper-db", "ig-scalper-backtest", "trade-claw-engine", "indicators"]);
+    const SKIP_BOTS = new Set(["ig-scalper-engine", "ig-scalper-db", "ig-scalper-backtest", "trade-claw-engine", "indicators", "clawscript-runner"]);
     const files = fs.readdirSync(BOTS_DIR).filter(f => f.endsWith(".cjs") && !SKIP_BOTS.has(f.replace(/\.cjs$/, "")));
     for (const file of files) {
       const id = file.replace(/\.cjs$/, "");

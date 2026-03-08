@@ -17,6 +17,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .btn-primary:hover{background:#388bfd}
 .btn-success{background:#238636;border-color:#238636;color:#fff}
 .btn-success:hover{background:#2ea043}
+.btn-warn{background:#9e6a03;border-color:#9e6a03;color:#fff}
+.btn-warn:hover{background:#bb8009}
+.btn-danger{background:#da3633;border-color:#da3633;color:#fff}
+.btn-danger:hover{background:#f85149}
 .btn-toggle{font-size:10px;padding:3px 8px}
 .btn-toggle.active{background:#1f6feb;border-color:#58a6ff;color:#fff}
 .btn:disabled{opacity:.5;cursor:not-allowed}
@@ -63,6 +67,22 @@ pre.error-output{white-space:pre-wrap;word-break:break-all;color:#f85149;font-si
 .flow-arrow{color:#484f58;font-size:10px;vertical-align:middle}
 .spinner{display:inline-block;width:12px;height:12px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:4px}
 @keyframes spin{to{transform:rotate(360deg)}}
+.runner-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center}
+.runner-popup{background:#161b22;border:1px solid #30363d;border-radius:8px;width:min(90vw,520px);max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.runner-popup__header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #21262d;background:#0d1117;flex-shrink:0}
+.runner-popup__title{font-size:13px;font-weight:700;color:#c9d1d9;display:flex;align-items:center;gap:8px}
+.runner-popup__badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;text-transform:uppercase}
+.badge-running{background:#238636;color:#fff}
+.badge-stopped{background:#da3633;color:#fff}
+.badge-paused{background:#9e6a03;color:#fff}
+.badge-starting{background:#1f6feb;color:#fff}
+.runner-popup__actions{display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid #21262d;flex-shrink:0;flex-wrap:wrap}
+.runner-popup__actions .btn{font-size:10px;padding:3px 10px}
+.runner-popup__logs{flex:1;overflow-y:auto;padding:8px 14px;font:10px/1.6 "Fira Code",Consolas,monospace;color:#8b949e;min-height:150px;max-height:400px;background:#0d1117}
+.runner-popup__logs .log-info{color:#58a6ff}
+.runner-popup__logs .log-warn{color:#f0883e}
+.runner-popup__logs .log-error{color:#f85149}
+.runner-popup__logs .log-trade{color:#2dc653;font-weight:700}
 </style>
 </head>
 <body>
@@ -70,7 +90,8 @@ pre.error-output{white-space:pre-wrap;word-break:break-all;color:#f85149;font-si
   <h1>&#x1F980; ClawScript</h1>
   <input class="instrument" id="instrumentInput" placeholder="Instrument (epic)" title="Set instrument/epic for backtest">
   <button class="btn btn-primary" id="compileBtn" title="Compile ClawScript to AST + JS">&#x2699; Compile</button>
-  <button class="btn btn-success" id="backtestBtn" title="Run backtest with compiled strategy">&#x25B6; Backtest</button>
+  <button class="btn btn-warn" id="backtestBtn" title="Run backtest with compiled strategy">&#x25B6; Backtest</button>
+  <button class="btn btn-success" id="runLiveBtn" title="Run script live as a persistent process">&#x1F680; Run Live</button>
   <button class="btn btn-toggle" id="flowToggle" title="Toggle flow visualization">Flow</button>
 </div>
 <div class="main">
@@ -131,9 +152,13 @@ var tradesContent = document.getElementById('tradesContent');
 var flowContent = document.getElementById('flowContent');
 var collapseIcon = document.getElementById('resultsCollapseIcon');
 
+var runLiveBtn = document.getElementById('runLiveBtn');
 var lastAST = null;
 var lastJS = '';
 var lastResults = null;
+var activeScriptId = null;
+var logPollTimer = null;
+var statusPollTimer = null;
 
 var params = new URLSearchParams(window.location.search);
 if (params.get('code')) {
@@ -204,6 +229,7 @@ function setOutput(html, cls) {
 function setBusy(busy) {
   compileBtn.disabled = busy;
   backtestBtn.disabled = busy;
+  runLiveBtn.disabled = busy;
 }
 
 async function apiPost(url, body) {
@@ -366,6 +392,134 @@ function renderFlow(ast) {
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+runLiveBtn.addEventListener('click', async function() {
+  var code = codeInput.value.trim();
+  if (!code) { setOutput('No code to run.', 'error-output'); return; }
+  setBusy(true);
+  setStatus('<span class="spinner"></span> Starting live script...', 'status-busy');
+  try {
+    var ts = Date.now().toString(36);
+    var data = await apiPost('/api/clawscript/run', { code: code, name: 'editor-' + ts });
+    if (data.error) {
+      setOutput('Run Error:\n' + data.error, 'error-output');
+      setStatus('\u2718 Run failed', 'status-err');
+    } else {
+      activeScriptId = data.scriptId || data.name;
+      setStatus('\u2714 Script started: ' + (data.name || activeScriptId), 'status-ok');
+      openRunnerPopup(data.name || activeScriptId, data.scriptId);
+    }
+  } catch (err) {
+    setOutput('Network error: ' + err.message, 'error-output');
+    setStatus('\u2718 Error', 'status-err');
+  }
+  setBusy(false);
+});
+
+function openRunnerPopup(name, scriptId) {
+  closeRunnerPopup();
+  var fullId = scriptId || name;
+  var shortId = fullId.replace(/^cs-script-/, '');
+  var overlay = document.createElement('div');
+  overlay.className = 'runner-overlay';
+  overlay.id = 'runnerOverlay';
+  overlay.innerHTML =
+    '<div class="runner-popup">' +
+      '<div class="runner-popup__header">' +
+        '<div class="runner-popup__title">' +
+          '<span>\uD83E\uDD80 ' + esc(shortId) + '</span>' +
+          '<span class="runner-popup__badge badge-starting" id="rpBadge">STARTING</span>' +
+        '</div>' +
+        '<button class="btn" id="rpClose" title="Close" style="padding:2px 8px;font-size:14px">\u2715</button>' +
+      '</div>' +
+      '<div class="runner-popup__actions">' +
+        '<button class="btn btn-danger" id="rpStop">\u25A0 Stop</button>' +
+        '<button class="btn btn-primary" id="rpRestart">\u21BB Restart</button>' +
+        '<button class="btn btn-warn" id="rpPause">\u23F8 Pause</button>' +
+        '<button class="btn btn-success" id="rpResume" style="display:none">\u25B6 Resume</button>' +
+      '</div>' +
+      '<div class="runner-popup__logs" id="rpLogs">Waiting for logs...</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) closeRunnerPopup(); });
+  document.getElementById('rpClose').addEventListener('click', closeRunnerPopup);
+  document.getElementById('rpStop').addEventListener('click', function() {
+    apiPost('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/stop', {});
+  });
+  document.getElementById('rpRestart').addEventListener('click', function() {
+    apiPost('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/restart', {});
+  });
+  document.getElementById('rpPause').addEventListener('click', function() {
+    apiPost('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/pause', {});
+    document.getElementById('rpPause').style.display = 'none';
+    document.getElementById('rpResume').style.display = '';
+  });
+  document.getElementById('rpResume').addEventListener('click', function() {
+    apiPost('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/resume', {});
+    document.getElementById('rpResume').style.display = 'none';
+    document.getElementById('rpPause').style.display = '';
+  });
+
+  pollLogs(shortId);
+  pollStatus(fullId);
+}
+
+function pollLogs(shortId) {
+  if (logPollTimer) clearInterval(logPollTimer);
+  var logsEl = document.getElementById('rpLogs');
+  async function fetch_() {
+    try {
+      var data = await apiGet('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/logs');
+      if (data.lines && logsEl) {
+        var html = data.lines.map(function(l) {
+          var cls = '';
+          if (l.indexOf('[ERROR]') > -1) cls = 'log-error';
+          else if (l.indexOf('[WARN]') > -1) cls = 'log-warn';
+          else if (l.indexOf('[TRADE]') > -1) cls = 'log-trade';
+          else if (l.indexOf('[INFO]') > -1) cls = 'log-info';
+          return '<div class="' + cls + '">' + esc(l) + '</div>';
+        }).join('');
+        logsEl.innerHTML = html || '<div style="color:#484f58">No logs yet</div>';
+        logsEl.scrollTop = logsEl.scrollHeight;
+      }
+    } catch (_) {}
+  }
+  fetch_();
+  logPollTimer = setInterval(fetch_, 2000);
+}
+
+function pollStatus(fullId) {
+  if (statusPollTimer) clearInterval(statusPollTimer);
+  async function fetch_() {
+    try {
+      var data = await apiGet('/api/clawscript/scripts');
+      var scripts = data.scripts || [];
+      var s = scripts.find(function(x) { return x.id === fullId; });
+      var badge = document.getElementById('rpBadge');
+      if (!badge) return;
+      if (!s) {
+        badge.className = 'runner-popup__badge badge-stopped';
+        badge.textContent = 'NOT FOUND';
+      } else if (s.running) {
+        badge.className = 'runner-popup__badge badge-running';
+        badge.textContent = 'RUNNING';
+      } else {
+        badge.className = 'runner-popup__badge badge-stopped';
+        badge.textContent = 'STOPPED';
+      }
+    } catch (_) {}
+  }
+  fetch_();
+  statusPollTimer = setInterval(fetch_, 3000);
+}
+
+function closeRunnerPopup() {
+  if (logPollTimer) { clearInterval(logPollTimer); logPollTimer = null; }
+  if (statusPollTimer) { clearInterval(statusPollTimer); statusPollTimer = null; }
+  var overlay = document.getElementById('runnerOverlay');
+  if (overlay) overlay.remove();
 }
 
 if (codeInput.value) updateLineNumbers();
