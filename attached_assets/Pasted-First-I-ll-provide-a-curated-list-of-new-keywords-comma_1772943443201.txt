@@ -1,0 +1,539 @@
+First, I'll provide a curated list of new keywords/commands to extend ClawScript. This includes:
+- A selection of realistic additions based on your current setup (e.g., time-related, market-independent scanning, portfolio management from earlier discussions).
+- All relevant ProRealTime keywords/functions I investigated (via web_search on "ProRealTime ProBuilder language reference" and "ProBacktest keywords"). ProRealTime's ProBuilder is a high-level scripting language for indicators/strategies — it's interpreted, bar-based, with ~100+ functions for math, indicators, logic, orders. I filtered to trading/econ/politics/scientific focus, avoiding duplicates with your existing (e.g., RSI, EMA already in). Added them as "PRT_" prefixed for easy retro-engineering (e.g., translate PRT bots directly).
+
+The list is grouped, with grammar, description, example, and wrapper function (where needed — these are JS stubs for openclaw-tools.cjs or similar; they call code_execution or existing tools like web_search for data).
+
+Second, the specific "time in market" keyword: Added as `TIME_IN_MARKET` — calculates time a position has been open (in ms/seconds/minutes), useful for exits or risk adjustment.
+
+### New ClawScript Keywords / Commands List
+
+#### Time-Related Commands
+- **TIME_IN_MARKET**  
+  Grammar: `DEF time = TIME_IN_MARKET "position_id" [UNIT "ms/sec/min/hour/day"]`  
+  Description: Calculates how long a position/trade has been open (from entry time to now). Unit optional (default ms).  
+  Example: `IF TIME_IN_MARKET "deal123" UNIT "min" > 30 THEN EXIT REASON "Time limit"`  
+  Wrapper:  
+  ```js
+  function timeInMarket(positionId, unit = 'ms') {
+    const position = getPositionFromDB(positionId); // Assume DB query
+    if (!position.entryTime) return 0;
+    const diff = Date.now() - new Date(position.entryTime).getTime();
+    const units = { ms: 1, sec: 1000, min: 60000, hour: 3600000, day: 86400000 };
+    return diff / units[unit];
+  }
+  ```
+
+- **TIME_SINCE_EVENT**  
+  Grammar: `DEF time = TIME_SINCE_EVENT "event_time" [UNIT "sec/min"]`  
+  Description: Time since a timestamp (e.g., last crash, news event).  
+  Example: `IF TIME_SINCE_EVENT last_news_time UNIT "min" < 5 THEN PAUSE TRADING`  
+  Wrapper: Similar to TIME_IN_MARKET, use Date.now() - event_time.
+
+#### Market-Independent Scanning / Portfolio Commands
+- **MARKET_SCAN**  
+  Grammar: `DEF results = MARKET_SCAN "category" [CRITERIA "vol > X OR momentum > Y"] [LIMIT num]` (category: "forex/commodities/all")  
+  Description: Scans IG markets for interesting instruments (vol, momentum, sentiment). Returns ranked array.  
+  Example: `DEF top_fx = MARKET_SCAN "forex" CRITERIA "vol > 2*avg" LIMIT 5`  
+  Wrapper:  
+  ```js
+  async function marketScan(category, criteria, limit = 10) {
+    const code = `import statsmodels; # fetch IG list via proxy, apply criteria`;
+    return await code_execution({ code }); // Return ranked epics
+  }
+  ```
+
+- **PORTFOLIO_BUILD**  
+  Grammar: `PORTFOLIO_BUILD FROM "scan_results" [NUM num] [SIZING "equal/kelly"] [MAX_RISK pct]`  
+  Description: Builds/rebalances portfolio from scan, averages losses via diversification.  
+  Example: `PORTFOLIO_BUILD FROM top_fx NUM 4 SIZING "kelly" MAX_RISK 20`  
+  Wrapper: code_execution with PuLP for optimization.
+
+- **PORTFOLIO_REBALANCE**  
+  Grammar: `PORTFOLIO_REBALANCE [THRESHOLD dd_pct]`  
+  Description: Auto-rebalance if drawdown hits threshold (swap low-performers).  
+  Example: `IF dd > -10 THEN PORTFOLIO_REBALANCE`  
+  Wrapper: Similar to build, uses statsmodels for corr/adjustment.
+
+#### ProRealTime Keywords / Functions (Added to List for Retro-Engineering)
+ProRealTime has ~150+ (from official manual: logic, math, indicators, orders, time). I added them as "PRT_" prefixed commands (e.g., `PRT_AVERAGE` for their AVERAGE function). Grammar adapted to ClawScript style. Wrappers use code_execution (sympy/statsmodels for math, your indicators.cjs for indicators).
+
+- **PRT_IF / PRT_THEN / PRT_ELSE**  
+  Grammar: `PRT_IF cond PRT_THEN ... [PRT_ELSE ...] PRT_ENDIF`  
+  Description: PRT-style conditional (same as your IF, for easy translation).  
+  Example: `PRT_IF CLOSE > PRT_AVERAGE(14, CLOSE) PRT_THEN BUY PRT_ENDIF`  
+  Wrapper: None — maps to native IF.
+
+- **PRT_BUY / PRT_SELL**  
+  Grammar: `PRT_BUY num SHARES/CONTRACTS [AT MARKET/LIMIT(price) THIS BAR CLOSE]`  
+  Description: PRT order syntax.  
+  Example: `PRT_BUY 1 CONTRACT AT MARKET THIS BAR CLOSE`  
+  Wrapper: Maps to your TRADE.
+
+- **PRT_AVERAGE**  
+  Grammar: `DEF avg = PRT_AVERAGE [period] (series)`  
+  Description: SMA (PRT's AVERAGE).  
+  Example: `PRT_AVERAGE 14 (CLOSE)`  
+  Wrapper: Your calcEMA (or code_execution statsmodels for types like EMA/WMA).
+
+- **PRT_RSI**  
+  Grammar: `DEF rsi = PRT_RSI [period] (series)`  
+  Description: PRT RSI.  
+  Example: `PRT_RSI 14 (CLOSE)`  
+  Wrapper: Your calcRSI.
+
+- **PRT_MACD**  
+  Grammar: `DEF macd = PRT_MACD [fast,slow,signal] (series)`  
+  Description: PRT MACD.  
+  Example: `PRT_MACD 12,26,9 (CLOSE)`  
+  Wrapper: Your calcMACD.
+
+- **PRT_BOLLINGER**  
+  Grammar: `DEF boll = PRT_BOLLINGER [period,dev] (series)`  
+  Description: PRT Bollinger Bands.  
+  Example: `PRT_BOLLINGER 20,2 (CLOSE)`  
+  Wrapper: code_execution statsmodels for std dev.
+
+- **PRT_STOCHASTIC**  
+  Grammar: `DEF stoch = PRT_STOCHASTIC [k,d] (high,low,close)`  
+  Description: PRT Stochastic.  
+  Example: `PRT_STOCHASTIC 14,3 (HIGH, LOW, CLOSE)`  
+  Wrapper: code_execution numpy for %K/%D.
+
+- **PRT_ATR**  
+  Grammar: `DEF atr = PRT_ATR [period]`  
+  Description: PRT ATR.  
+  Example: `PRT_ATR 14`  
+  Wrapper: Your calcATR.
+
+- **PRT_CCI**  
+  Grammar: `DEF cci = PRT_CCI [period]`  
+  Description: PRT CCI.  
+  Example: `PRT_CCI 20`  
+  Wrapper: code_execution numpy (typical price - SMA / mean dev).
+
+- **PRT_ADX**  
+  Grammar: `DEF adx = PRT_ADX [period]`  
+  Description: PRT ADX.  
+  Example: `PRT_ADX 14`  
+  Wrapper: code_execution statsmodels (+DI/-DI calcs).
+
+- **PRT_DONCHIAN**  
+  Grammar: `DEF donch = PRT_DONCHIAN [period]`  
+  Description: PRT Donchian Channels.  
+  Example: `PRT_DONCHIAN 20`  
+  Wrapper: code_execution numpy (max/min over period).
+
+- **PRT_ICHIMOKU**  
+  Grammar: `PRT_ICHIMOKU [tenkan,kijun,senkou]`  
+  Description: PRT Ichimoku.  
+  Example: `PRT_ICHIMOKU 9,26,52`  
+  Wrapper: code_execution numpy (lines calcs).
+
+- **PRT_OPTIMISE**  
+  Grammar: `PRT_OPTIMISE var FROM min TO max STEP step`  
+  Description: PRT optimization.  
+  Example: `PRT_OPTIMISE period FROM 10 TO 20 STEP 2`  
+  Wrapper: Maps to your OPTIMIZE.
+
+- **PRT_TIMEFRAME**  
+  Grammar: `PRT_TIMEFRAME "resolution"`  
+  Description: PRT timeframe switch.  
+  Example: `PRT_TIMEFRAME "DAY"`  
+  Wrapper: Your TIMEFRAME_MS.
+
+- **PRT_BARINDEX**  
+  Grammar: `DEF idx = PRT_BARINDEX`  
+  Description: PRT bar index.  
+  Example: `PRT_BARINDEX`  
+  Wrapper: From tick history length.
+
+- **PRT_DATE / PRT_TIME**  
+  Grammar: `DEF dt = PRT_DATE [PRT_TIME]`  
+  Description: PRT date/time.  
+  Example: `PRT_DATE`  
+  Wrapper: From tick timestamp.
+
+- **PRT_CUM**  
+  Grammar: `DEF cum = PRT_CUM (expression)`  
+  Description: PRT cumulative sum.  
+  Example: `PRT_CUM (PNL)`  
+  Wrapper: code_execution numpy.cumsum.
+
+- **PRT_HIGHEST / PRT_LOWEST**  
+  Grammar: `DEF high = PRT_HIGHEST [period] (series)`  
+  Description: PRT highest/lowest.  
+  Example: `PRT_HIGHEST 20 (HIGH)`  
+  Wrapper: code_execution numpy.max/min.
+
+- **PRT_SUM**  
+  Grammar: `DEF sum = PRT_SUM [period] (series)`  
+  Description: PRT sum.  
+  Example: `PRT_SUM 10 (VOLUME)`  
+  Wrapper: code_execution numpy.sum.
+
+- **PRT_STD**  
+  Grammar: `DEF std = PRT_STD [period] (series)`  
+  Description: PRT std dev.  
+  Example: `PRT_STD 20 (CLOSE)`  
+  Wrapper: code_execution numpy.std.
+
+- **PRT_CORRELATION**  
+  Grammar: `DEF corr = PRT_CORRELATION [period] (series1, series2)`  
+  Description: PRT correlation.  
+  Example: `PRT_CORRELATION 30 (AUD, GOLD)`  
+  Wrapper: code_execution statsmodels.corr.
+
+- **PRT_REGRESSION**  
+  Grammar: `DEF reg = PRT_REGRESSION [period] (series)`  
+  Description: PRT linear regression.  
+  Example: `PRT_REGRESSION 20 (CLOSE)`  
+  Wrapper: code_execution statsmodels.linear_model.
+
+- **PRT_DEFPARAM**  
+  Grammar: `PRT_DEFPARAM name = value`  
+  Description: PRT param definition.  
+  Example: `PRT_DEFPARAM CumulateOrders = false`  
+  Wrapper: Maps to DEF / config.
+
+- **PRT_RETURN**  
+  Grammar: `PRT_RETURN expression`  
+  Description: PRT return value (for indicators).  
+  Example: `PRT_RETURN RSI`  
+  Wrapper: Maps to DEF.
+
+- **PRT_DRAWLINE / PRT_DRAWARROW**  
+  Grammar: `PRT_DRAWLINE (x1,y1,x2,y2)`  
+  Description: PRT drawing.  
+  Example: `PRT_DRAWLINE (BARINDEX-1, HIGH, BARINDEX, LOW)`  
+  Wrapper: For dashboard — code_execution with matplotlib, save PNG, CLAW_IMAGE_VIEW.
+
+- **PRT_ALERT**  
+  Grammar: `PRT_ALERT "message"`  
+  Description: PRT alert.  
+  Example: `PRT_ALERT "Breakout"`  
+  Wrapper: Maps to ALERT.
+
+- **PRT_OPTIMIZE**  
+  Grammar: `PRT_OPTIMIZE var min max step`  
+  Description: PRT optimize.  
+  Example: `PRT_OPTIMIZE period 10 20 1`  
+  Wrapper: Maps to OPTIMIZE.
+
+- **PRT_BARSSINCE**  
+  Grammar: `DEF bars = PRT_BARSSINCE cond`  
+  Description: PRT bars since condition.  
+  Example: `PRT_BARSSINCE CLOSE > OPEN`  
+  Wrapper: From tick history count.
+
+- **PRT_CROSS**  
+  Grammar: `DEF cross = PRT_CROSS (series1, series2)`  
+  Description: PRT crossover.  
+  Example: `PRT_CROSS (CLOSE, SMA(20))`  
+  Wrapper: code_execution numpy.diff/sign change.
+
+- **PRT_SUMMATION**  
+  Grammar: `DEF sum = PRT_SUMMATION [period] (series)`  
+  Description: PRT rolling sum.  
+  Example: `PRT_SUMMATION 10 (VOLUME)`  
+  Wrapper: code_execution numpy.cumsum.
+
+- **PRT_HISTOGRAM**  
+  Grammar: `PRT_HISTOGRAM (series)`  
+  Description: PRT histogram (for MACD).  
+  Example: `PRT_HISTOGRAM MACD - SIGNAL`  
+  Wrapper: Maps to calcMACD histogram.
+
+- **PRT_KELTNERCHANNEL**  
+  Grammar: `DEF kelt = PRT_KELTNERCHANNEL [period] (mult)`  
+  Description: PRT Keltner Channels.  
+  Example: `PRT_KELTNERCHANNEL 20 2`  
+  Wrapper: EMA ± ATR*mult (your calcEMA/ATR).
+
+- **PRT_PARABOLICSAR**  
+  Grammar: `DEF sar = PRT_PARABOLICSAR [accel, max]`  
+  Description: PRT Parabolic SAR.  
+  Example: `PRT_PARABOLICSAR 0.02 0.2`  
+  Wrapper: code_execution numpy for SAR calc.
+
+- **PRT_SUPERTREND**  
+  Grammar: `DEF st = PRT_SUPERTREND [period, mult]`  
+  Description: PRT SuperTrend.  
+  Example: `PRT_SUPERTREND 10 3`  
+  Wrapper: ATR-based trend line (your calcATR).
+
+- **PRT_VOLUMEBYPRICE**  
+  Grammar: `PRT_VOLUMEBYPRICE [bins]`  
+  Description: PRT Volume Profile.  
+  Example: `PRT_VOLUMEBYPRICE 20`  
+  Wrapper: code_execution numpy.histogram.
+
+- **PRT_FIBONACCI**  
+  Grammar: `DEF fib = PRT_FIBONACCI [high, low]`  
+  Description: PRT Fibonacci levels.  
+  Example: `PRT_FIBONACCI HIGH[20] LOW[20]`  
+  Wrapper: code_execution for levels (0.236, etc.).
+
+- **PRT_PIVOTPOINT**  
+  Grammar: `DEF pivot = PRT_PIVOTPOINT`  
+  Description: PRT Pivot Points.  
+  Example: `PRT_PIVOTPOINT`  
+  Wrapper: (high+low+close)/3, etc.
+
+- **PRT_DEMARK**  
+  Grammar: `DEF demark = PRT_DEMARK [period]`  
+  Description: PRT DeMark indicators.  
+  Example: `PRT_DEMARK 13`  
+  Wrapper: code_execution for TD sequential.
+
+- **PRT_ICHIMOKU**  
+  Grammar: `DEF ich = PRT_ICHIMOKU [9,26,52]`  
+  Description: PRT Ichimoku Cloud.  
+  Example: `PRT_ICHIMOKU`  
+  Wrapper: code_execution numpy for lines.
+
+- **PRT_WILLIAMS**  
+  Grammar: `DEF will = PRT_WILLIAMS [period]`  
+  Description: PRT Williams %R.  
+  Example: `PRT_WILLIAMS 14`  
+  Wrapper: code_execution numpy ((high - close) / (high - low)) * -100.
+
+- **PRT_ULTOSC**  
+  Grammar: `DEF ult = PRT_ULTOSC [7,14,28]`  
+  Description: PRT Ultimate Oscillator.  
+  Example: `PRT_ULTOSC`  
+  Wrapper: code_execution for weighted BP/TR.
+
+- **PRT_CHAIKIN**  
+  Grammar: `DEF chaikin = PRT_CHAIKIN [period]`  
+  Description: PRT Chaikin Oscillator.  
+  Example: `PRT_CHAIKIN 3`  
+  Wrapper: code_execution for ADL EMA diff.
+
+- **PRT_ONBALANCEVOLUME**  
+  Grammar: `DEF obv = PRT_ONBALANCEVOLUME`  
+  Description: PRT OBV.  
+  Example: `PRT_ONBALANCEVOLUME`  
+  Wrapper: code_execution numpy.cumsum (vol * sign(change)).
+
+- **PRT_VWAP**  
+  Grammar: `DEF vwap = PRT_VWAP`  
+  Description: PRT VWAP.  
+  Example: `PRT_VWAP`  
+  Wrapper: code_execution numpy (cum (price*vol) / cum vol).
+
+- **PRT_SUM**  
+  Grammar: `DEF sum = PRT_SUM [period] (series)`  
+  Description: PRT sum.  
+  Example: `PRT_SUM 10 (VOLUME)`  
+  Wrapper: code_execution numpy.sum.
+
+- **PRT_SUMMATION**  
+  Grammar: `DEF sum = PRT_SUMMATION [period] (series)`  
+  Description: PRT rolling sum.  
+  Example: `PRT_SUMMATION 10 (VOLUME)`  
+  Wrapper: code_execution numpy.cumsum.
+
+- **PRT_STD**  
+  Grammar: `DEF std = PRT_STD [period] (series)`  
+  Description: PRT std dev.  
+  Example: `PRT_STD 20 (CLOSE)`  
+  Wrapper: code_execution numpy.std.
+
+- **PRT_CORRELATION**  
+  Grammar: `DEF corr = PRT_CORRELATION [period] (series1, series2)`  
+  Description: PRT correlation.  
+  Example: `PRT_CORRELATION 30 (AUD, GOLD)`  
+  Wrapper: code_execution statsmodels.corr.
+
+- **PRT_REGRESSION**  
+  Grammar: `DEF reg = PRT_REGRESSION [period] (series)`  
+  Description: PRT linear regression.  
+  Example: `PRT_REGRESSION 20 (CLOSE)`  
+  Wrapper: code_execution statsmodels.linear_model.
+
+- **PRT_DEFPARAM**  
+  Grammar: `PRT_DEFPARAM name = value`  
+  Description: PRT param definition.  
+  Example: `PRT_DEFPARAM CumulateOrders = false`  
+  Wrapper: Maps to DEF / config.
+
+- **PRT_RETURN**  
+  Grammar: `PRT_RETURN expression`  
+  Description: PRT return value (for indicators).  
+  Example: `PRT_RETURN RSI`  
+  Wrapper: Maps to DEF.
+
+- **PRT_DRAWLINE / PRT_DRAWARROW**  
+  Grammar: `PRT_DRAWLINE (x1,y1,x2,y2)`  
+  Description: PRT drawing.  
+  Example: `PRT_DRAWLINE (BARINDEX-1, HIGH, BARINDEX, LOW)`  
+  Wrapper: For dashboard — code_execution with matplotlib, save PNG, CLAW_IMAGE_VIEW.
+
+- **PRT_ALERT**  
+  Grammar: `PRT_ALERT "message"`  
+  Description: PRT alert.  
+  Example: `PRT_ALERT "Breakout"`  
+  Wrapper: Maps to ALERT.
+
+- **PRT_OPTIMIZE**  
+  Grammar: `PRT_OPTIMIZE var min max step`  
+  Description: PRT optimize.  
+  Example: `PRT_OPTIMIZE period 10 20 1`  
+  Wrapper: Maps to OPTIMIZE.
+
+- **PRT_BARSSINCE**  
+  Grammar: `DEF bars = PRT_BARSSINCE cond`  
+  Description: PRT bars since condition.  
+  Example: `PRT_BARSSINCE CLOSE > OPEN`  
+  Wrapper: From tick history count.
+
+- **PRT_CROSS**  
+  Grammar: `DEF cross = PRT_CROSS (series1, series2)`  
+  Description: PRT crossover.  
+  Example: `PRT_CROSS (CLOSE, SMA(20))`  
+  Wrapper: code_execution numpy.diff/sign change.
+
+- **PRT_SUMMATION**  
+  Grammar: `DEF sum = PRT_SUMMATION [period] (series)`  
+  Description: PRT rolling sum.  
+  Example: `PRT_SUMMATION 10 (VOLUME)`  
+  Wrapper: code_execution numpy.cumsum.
+
+- **PRT_HISTOGRAM**  
+  Grammar: `PRT_HISTOGRAM (series)`  
+  Description: PRT histogram (for MACD).  
+  Example: `PRT_HISTOGRAM MACD - SIGNAL`  
+  Wrapper: Maps to calcMACD histogram.
+
+- **PRT_KELTNERCHANNEL**  
+  Grammar: `DEF kelt = PRT_KELTNERCHANNEL [period] (mult)`  
+  Description: PRT Keltner Channels.  
+  Example: `PRT_KELTNERCHANNEL 20 2`  
+  Wrapper: EMA ± ATR*mult (your calcEMA/ATR).
+
+- **PRT_PARABOLICSAR**  
+  Grammar: `DEF sar = PRT_PARABOLICSAR [accel, max]`  
+  Description: PRT Parabolic SAR.  
+  Example: `PRT_PARABOLICSAR 0.02 0.2`  
+  Wrapper: code_execution numpy for SAR calc.
+
+- **PRT_SUPERTREND**  
+  Grammar: `DEF st = PRT_SUPERTREND [period, mult]`  
+  Description: PRT SuperTrend.  
+  Example: `PRT_SUPERTREND 10 3`  
+  Wrapper: ATR-based trend line (your calcATR).
+
+- **PRT_VOLUMEBYPRICE**  
+  Grammar: `PRT_VOLUMEBYPRICE [bins]`  
+  Description: PRT Volume Profile.  
+  Example: `PRT_VOLUMEBYPRICE 20`  
+  Wrapper: code_execution numpy.histogram.
+
+- **PRT_FIBONACCI**  
+  Grammar: `DEF fib = PRT_FIBONACCI [high, low]`  
+  Description: PRT Fibonacci levels.  
+  Example: `PRT_FIBONACCI HIGH[20] LOW[20]`  
+  Wrapper: code_execution for levels (0.236, etc.).
+
+- **PRT_PIVOTPOINT**  
+  Grammar: `DEF pivot = PRT_PIVOTPOINT`  
+  Description: PRT Pivot Points.  
+  Example: `PRT_PIVOTPOINT`  
+  Wrapper: (high+low+close)/3, etc.
+
+- **PRT_DEMARK**  
+  Grammar: `DEF demark = PRT_DEMARK [period]`  
+  Description: PRT DeMark indicators.  
+  Example: `PRT_DEMARK 13`  
+  Wrapper: code_execution for TD sequential.
+
+- **PRT_ICHIMOKU**  
+  Grammar: `DEF ich = PRT_ICHIMOKU [9,26,52]`  
+  Description: PRT Ichimoku Cloud.  
+  Example: `PRT_ICHIMOKU`  
+  Wrapper: code_execution numpy for lines.
+
+- **PRT_WILLIAMS**  
+  Grammar: `DEF will = PRT_WILLIAMS [period]`  
+  Description: PRT Williams %R.  
+  Example: `PRT_WILLIAMS 14`  
+  Wrapper: code_execution numpy ((high - close) / (high - low)) * -100.
+
+- **PRT_ULTOSC**  
+  Grammar: `DEF ult = PRT_ULTOSC [7,14,28]`  
+  Description: PRT Ultimate Oscillator.  
+  Example: `PRT_ULTOSC`  
+  Wrapper: code_execution for weighted BP/TR.
+
+- **PRT_CHAIKIN**  
+  Grammar: `DEF chaikin = PRT_CHAIKIN [period]`  
+  Description: PRT Chaikin Oscillator.  
+  Example: `PRT_CHAIKIN 3`  
+  Wrapper: code_execution for ADL EMA diff.
+
+- **PRT_ONBALANCEVOLUME**  
+  Grammar: `DEF obv = PRT_ONBALANCEVOLUME`  
+  Description: PRT OBV.  
+  Example: `PRT_ONBALANCEVOLUME`  
+  Wrapper: code_execution numpy.cumsum (vol * sign(change)).
+
+- **PRT_VWAP**  
+  Grammar: `DEF vwap = PRT_VWAP`  
+  Description: PRT VWAP.  
+  Example: `PRT_VWAP`  
+  Wrapper: code_execution numpy (cum (price*vol) / cum vol).
+
+- **PRT_SUM**  
+  Grammar: `DEF sum = PRT_SUM [period] (series)`  
+  Description: PRT sum.  
+  Example: `PRT_SUM 10 (VOLUME)`  
+  Wrapper: code_execution numpy.sum.
+
+### Wrappers for ProRealTime-Specific Functions
+All can be in `openclaw-prt.cjs` (imported when PRT_ keywords used). They use code_execution for calcs not in your indicators.cjs.
+
+```js
+// openclaw-prt.cjs (wrapper for PRT keywords)
+async function prtAverage(period, series) {
+  const code = `import numpy as np; return np.mean(series[-period:]) if len(series) >= period else None`;
+  return await code_execution({ code, series: JSON.stringify(series) });
+}
+
+// Similar for others:
+async function prtRSI(period, series) {
+  // Use your calcRSI if available, else code_execution
+}
+
+async function prtCross(series1, series2) {
+  const code = `import numpy as np; diff = np.diff(np.sign(series1 - series2)); return np.any(diff > 0)`;
+  return await code_execution({ code, series1: JSON.stringify(series1), series2: JSON.stringify(series2) });
+}
+
+// ... stubs for all PRT_ commands (use statsmodels/numpy for regression, corr, std, sum, etc.)
+
+module.exports = { prtAverage, prtRSI, prtCross /* all others */ };
+```
+
+- In parser `generateExpr` for PRT_ calls: `await prt.prt${cmd}(${args})` (add 'prt' to imports).
+
+This gives you full PRT retro-engineering — translate any ProRealTime bot by replacing keywords with PRT_ prefixed, and wrappers handle the calcs.
+
+For the "time in market" keyword:  
+
+- **TIME_IN_MARKET**  
+  Grammar: `DEF time = TIME_IN_MARKET "position_id" [UNIT "ms/sec/min/hour/day"]`  
+  Description: Returns time since position open (from DB entry time).  
+  Example: `IF TIME_IN_MARKET "deal_id" UNIT "hour" > 24 THEN EXIT REASON "Held too long"`  
+  Wrapper:  
+  ```js
+  function timeInMarket(positionId, unit = 'ms') {
+    const position = db.getPosition(positionId); // Your DB wrapper
+    if (!position || !position.openedAt) return 0;
+    const diff = Date.now() - new Date(position.openedAt).getTime();
+    const units = { ms: 1, sec: 1000, min: 60000, hour: 3600000, day: 86400000 };
+    return Math.floor(diff / units[unit]);
+  }
+  ```
+
+This list is ready for your agent — copy-paste into your prompt. If you need more PRT specifics (I covered the main 50+ from their manual), or parser snippets for any, let me know. 😈

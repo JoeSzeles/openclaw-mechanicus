@@ -45,6 +45,13 @@ pre code { background: none; padding: 0; }
 .cat-agent { background: #3d2200; color: #f0883e; }
 .cat-advanced { background: #2d1b00; color: #ffa657; }
 .cat-functions { background: #1c1437; color: #a371f7; }
+.cat-tradingview { background: #3d2200; color: #f78166; }
+.cat-time { background: #2d1b4e; color: #d2a8ff; }
+.cat-portfolio { background: #1b4332; color: #7ee787; }
+.cat-econpol { background: #3d2d00; color: #e3b341; }
+.cat-science { background: #0a3d42; color: #56d4dd; }
+.cat-utility { background: #21262d; color: #8b949e; }
+.cat-prt { background: #3d1a2e; color: #db61a2; }
 .cmd-card-body { padding: 12px 16px; }
 .cmd-card-body .cmd-desc { color: #8b949e; margin-bottom: 8px; }
 .cmd-card-body .cmd-syntax { margin-bottom: 8px; }
@@ -110,6 +117,14 @@ pre code { background: none; padding: 0; }
     <a href="#cmd-agent">Agent / Orchestration</a>
     <a href="#cmd-advanced">Advanced</a>
     <a href="#cmd-functions">Functions</a>
+    <a href="#cmd-tradingview">TradingView</a>
+    <a href="#cmd-bloomberg">Bloomberg / Data</a>
+    <a href="#cmd-time">Time / Schedule</a>
+    <a href="#cmd-portfolio">Portfolio</a>
+    <a href="#cmd-econpol">Econ / Political</a>
+    <a href="#cmd-science">Scientific</a>
+    <a href="#cmd-utility">Utility</a>
+    <a href="#cmd-prt">PRT Compatibility</a>
   </div>
   <div class="nav-group">
     <div class="nav-group-title">Editor & Tools</div>
@@ -898,6 +913,116 @@ checkEntry(rsiValue, macdValue)</code></pre>
 </div>
 </div>
 
+<h2 id="cmd-tradingview">TradingView Commands</h2>
+<p>Pine Script v6-inspired commands for strategy entries, exits, input parameters, timeframes, and array/matrix operations.</p>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">STRATEGY_ENTRY</span><span class="cmd-cat" style="background:#3d2200;color:#f78166">TradingView</span></div><div class="cmd-card-body"><p class="cmd-desc">Open a strategy position (Pine Script strategy.entry style).</p><pre><code><span class="kw">STRATEGY_ENTRY</span> <span class="str">"long_rsi"</span> <span class="kw">DIRECTION</span> <span class="str">"long"</span> <span class="kw">SIZING</span> <span class="str">"equal"</span> <span class="kw">STOP</span> <span class="num">25</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">STRATEGY_EXIT</span><span class="cmd-cat" style="background:#3d2200;color:#f78166">TradingView</span></div><div class="cmd-card-body"><p class="cmd-desc">Exit a named strategy position.</p><pre><code><span class="kw">STRATEGY_EXIT</span> <span class="str">"long_rsi"</span> <span class="kw">REASON</span> <span class="str">"RSI overbought"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">STRATEGY_CLOSE</span><span class="cmd-cat" style="background:#3d2200;color:#f78166">TradingView</span></div><div class="cmd-card-body"><p class="cmd-desc">Close all strategy positions.</p><pre><code><span class="kw">STRATEGY_CLOSE</span> <span class="kw">REASON</span> <span class="str">"End of day"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">INPUT_INT / INPUT_FLOAT / INPUT_BOOL / INPUT_SYMBOL</span><span class="cmd-cat" style="background:#3d2200;color:#f78166">TradingView</span></div><div class="cmd-card-body"><p class="cmd-desc">Declare input parameters for the strategy (like Pine Script input.*).</p><pre><code><span class="kw">DEF</span> period = <span class="kw">INPUT_INT</span> <span class="str">"RSI Period"</span> <span class="kw">DEFAULT</span> <span class="num">14</span>
+<span class="kw">DEF</span> threshold = <span class="kw">INPUT_FLOAT</span> <span class="str">"Threshold"</span> <span class="kw">DEFAULT</span> <span class="num">0.5</span>
+<span class="kw">DEF</span> useFilter = <span class="kw">INPUT_BOOL</span> <span class="str">"Use Filter"</span> <span class="kw">DEFAULT</span> true
+<span class="kw">DEF</span> sym = <span class="kw">INPUT_SYMBOL</span> <span class="str">"Symbol"</span> <span class="kw">DEFAULT</span> <span class="str">"EURUSD"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">TIMEFRAME_PERIOD / TIMEFRAME_IS_DAILY</span><span class="cmd-cat" style="background:#3d2200;color:#f78166">TradingView</span></div><div class="cmd-card-body"><p class="cmd-desc">Access current timeframe information.</p><pre><code><span class="kw">DEF</span> tf = <span class="kw">TIMEFRAME_PERIOD</span>
+<span class="kw">DEF</span> isDaily = <span class="kw">TIMEFRAME_IS_DAILY</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">ARRAY_NEW / ARRAY_PUSH / MATRIX_NEW / MATRIX_SET</span><span class="cmd-cat" style="background:#3d2200;color:#f78166">TradingView</span></div><div class="cmd-card-body"><p class="cmd-desc">Array and matrix operations (Pine Script array.* / matrix.*).</p><pre><code><span class="kw">DEF</span> arr = <span class="kw">ARRAY_NEW</span>
+<span class="kw">ARRAY_PUSH</span> arr <span class="num">42</span>
+<span class="kw">DEF</span> m = <span class="kw">MATRIX_NEW</span> <span class="num">3</span> <span class="num">3</span>
+<span class="kw">MATRIX_SET</span> m <span class="num">0</span> <span class="num">0</span> <span class="num">1.5</span></code></pre></div></div>
+
+<h2 id="cmd-bloomberg">Bloomberg / Data Access Commands</h2>
+<p>Institutional data access commands inspired by Bloomberg BDH/BDS and Refinitiv/FactSet APIs.</p>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">FETCH_HISTORICAL</span><span class="cmd-cat cat-data">Data</span></div><div class="cmd-card-body"><p class="cmd-desc">Fetch historical data for a metric (Bloomberg BDH-style).</p><pre><code><span class="kw">DEF</span> hist = <span class="kw">FETCH_HISTORICAL</span> <span class="str">"close"</span> <span class="kw">FROM</span> <span class="str">"2024-01-01"</span> <span class="kw">TO</span> <span class="str">"2024-12-31"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">FETCH_MEMBERS</span><span class="cmd-cat cat-data">Data</span></div><div class="cmd-card-body"><p class="cmd-desc">Fetch index members (Bloomberg BDS-style).</p><pre><code><span class="kw">DEF</span> members = <span class="kw">FETCH_MEMBERS</span> <span class="str">"SP500"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">GROUP_MEMBERS</span><span class="cmd-cat cat-data">Data</span></div><div class="cmd-card-body"><p class="cmd-desc">Get group or index constituents.</p><pre><code><span class="kw">DEF</span> grp = <span class="kw">GROUP_MEMBERS</span> <span class="str">"FTSE100"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">ECON_DATA</span><span class="cmd-cat cat-data">Data</span></div><div class="cmd-card-body"><p class="cmd-desc">Fetch economic data point (GDP, CPI, employment).</p><pre><code><span class="kw">DEF</span> gdp = <span class="kw">ECON_DATA</span> <span class="str">"GDP"</span> <span class="kw">COUNTRY</span> <span class="str">"AU"</span> <span class="kw">DATE</span> <span class="str">"latest"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">ESTIMATE</span><span class="cmd-cat cat-data">Data</span></div><div class="cmd-card-body"><p class="cmd-desc">Get consensus estimate for a field and ticker.</p><pre><code><span class="kw">DEF</span> eps = <span class="kw">ESTIMATE</span> <span class="str">"EPS"</span> <span class="str">"AAPL"</span></code></pre></div></div>
+
+<h2 id="cmd-time">Time / Schedule Commands</h2>
+<p>Time-aware commands for tracking position duration, scheduling tasks, and waiting for conditions.</p>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">TIME_IN_MARKET</span><span class="cmd-cat" style="background:#2d1b4e;color:#d2a8ff">Time</span></div><div class="cmd-card-body"><p class="cmd-desc">Calculate how long a position has been open.</p><pre><code><span class="kw">DEF</span> duration = <span class="kw">TIME_IN_MARKET</span> <span class="str">"deal123"</span> <span class="kw">UNIT</span> <span class="str">"min"</span>
+<span class="kw">IF</span> duration > <span class="num">30</span> <span class="kw">THEN</span> <span class="trade">EXIT</span> <span class="kw">REASON</span> <span class="str">"Time limit"</span> <span class="kw">ENDIF</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">TIME_SINCE_EVENT</span><span class="cmd-cat" style="background:#2d1b4e;color:#d2a8ff">Time</span></div><div class="cmd-card-body"><p class="cmd-desc">Time since a timestamp event.</p><pre><code><span class="kw">DEF</span> ts = <span class="kw">TIME_SINCE_EVENT</span> <span class="str">"2024-01-01"</span> <span class="kw">UNIT</span> <span class="str">"day"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">SCHEDULE</span><span class="cmd-cat" style="background:#2d1b4e;color:#d2a8ff">Time</span></div><div class="cmd-card-body"><p class="cmd-desc">Schedule a task at a specific time.</p><pre><code><span class="kw">SCHEDULE</span> <span class="str">"rebalance"</span> <span class="kw">AT</span> <span class="str">"09:00"</span> <span class="kw">REPEAT</span> <span class="str">"daily"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">WAIT_UNTIL</span><span class="cmd-cat" style="background:#2d1b4e;color:#d2a8ff">Time</span></div><div class="cmd-card-body"><p class="cmd-desc">Wait until a condition is met or timeout.</p><pre><code><span class="kw">WAIT_UNTIL</span> <span class="str">"price > 100"</span> <span class="kw">TIMEOUT</span> <span class="num">60</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">TASK_SCHEDULE</span><span class="cmd-cat" style="background:#2d1b4e;color:#d2a8ff">Time</span></div><div class="cmd-card-body"><p class="cmd-desc">Schedule a recurring task.</p><pre><code><span class="kw">TASK_SCHEDULE</span> <span class="str">"daily_scan"</span> <span class="kw">EVERY</span> <span class="str">"24h"</span> <span class="kw">RUN</span> <span class="str">"MARKET_SCAN"</span></code></pre></div></div>
+
+<h2 id="cmd-portfolio">Portfolio Commands</h2>
+<p>Market scanning and portfolio management commands.</p>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">MARKET_SCAN</span><span class="cmd-cat" style="background:#1b4332;color:#7ee787">Portfolio</span></div><div class="cmd-card-body"><p class="cmd-desc">Scan markets for instruments matching criteria.</p><pre><code><span class="kw">DEF</span> top_fx = <span class="kw">MARKET_SCAN</span> <span class="str">"forex"</span> <span class="kw">CRITERIA</span> <span class="str">"vol > 2"</span> <span class="kw">LIMIT</span> <span class="num">5</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">PORTFOLIO_BUILD</span><span class="cmd-cat" style="background:#1b4332;color:#7ee787">Portfolio</span></div><div class="cmd-card-body"><p class="cmd-desc">Build a portfolio from scan results.</p><pre><code><span class="kw">PORTFOLIO_BUILD</span> <span class="kw">FROM</span> <span class="str">"scan"</span> <span class="kw">NUM</span> <span class="num">4</span> <span class="kw">SIZING</span> <span class="str">"kelly"</span> <span class="kw">MAX_RISK</span> <span class="num">20</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">PORTFOLIO_REBALANCE</span><span class="cmd-cat" style="background:#1b4332;color:#7ee787">Portfolio</span></div><div class="cmd-card-body"><p class="cmd-desc">Rebalance portfolio on drawdown threshold.</p><pre><code><span class="kw">PORTFOLIO_REBALANCE</span> <span class="kw">THRESHOLD</span> <span class="num">10</span></code></pre></div></div>
+
+<h2 id="cmd-econpol">Economic / Political Commands</h2>
+<p>Commands for economic indicators, political events, and geopolitical analysis.</p>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">ECON_INDICATOR</span><span class="cmd-cat" style="background:#3d2d00;color:#e3b341">Econ/Political</span></div><div class="cmd-card-body"><p class="cmd-desc">Fetch economic indicators (GDP, CPI, unemployment, rates).</p><pre><code><span class="kw">DEF</span> cpi = <span class="kw">ECON_INDICATOR</span> <span class="str">"CPI"</span> <span class="kw">COUNTRY</span> <span class="str">"AU"</span> <span class="kw">DATE</span> <span class="str">"latest"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">FISCAL_FLOW</span><span class="cmd-cat" style="background:#3d2d00;color:#e3b341">Econ/Political</span></div><div class="cmd-card-body"><p class="cmd-desc">Track capital flows (ETF inflows, COT reports).</p><pre><code><span class="kw">DEF</span> flow = <span class="kw">FISCAL_FLOW</span> <span class="str">"ETF"</span> <span class="kw">WINDOW</span> <span class="str">"30d"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">ELECTION_IMPACT</span><span class="cmd-cat" style="background:#3d2d00;color:#e3b341">Econ/Political</span></div><div class="cmd-card-body"><p class="cmd-desc">Score potential market impact of elections/political events.</p><pre><code><span class="kw">DEF</span> impact = <span class="kw">ELECTION_IMPACT</span> <span class="str">"QLD_election"</span> <span class="kw">REGION</span> <span class="str">"AU"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">CURRENCY_CARRY</span><span class="cmd-cat" style="background:#3d2d00;color:#e3b341">Econ/Political</span></div><div class="cmd-card-body"><p class="cmd-desc">Calculate swap/interest differential for carry trades.</p><pre><code><span class="kw">DEF</span> carry = <span class="kw">CURRENCY_CARRY</span> <span class="str">"AUDJPY"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">POLICY_SENTIMENT</span><span class="cmd-cat" style="background:#3d2d00;color:#e3b341">Econ/Political</span></div><div class="cmd-card-body"><p class="cmd-desc">Score sentiment on policy changes.</p><pre><code><span class="kw">DEF</span> score = <span class="kw">POLICY_SENTIMENT</span> <span class="str">"RBA_rate"</span> <span class="kw">COUNTRY</span> <span class="str">"AU"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">SANCTION_IMPACT</span><span class="cmd-cat" style="background:#3d2d00;color:#e3b341">Econ/Political</span></div><div class="cmd-card-body"><p class="cmd-desc">Estimate price impact of sanctions.</p><pre><code><span class="kw">DEF</span> impact = <span class="kw">SANCTION_IMPACT</span> <span class="str">"Russia"</span> <span class="kw">COMMODITY</span> <span class="str">"oil"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">VOTE_PREDICT</span><span class="cmd-cat" style="background:#3d2d00;color:#e3b341">Econ/Political</span></div><div class="cmd-card-body"><p class="cmd-desc">Aggregate election polls for prediction.</p><pre><code><span class="kw">DEF</span> prob = <span class="kw">VOTE_PREDICT</span> <span class="str">"fed_election"</span> <span class="kw">POLL_SOURCE</span> <span class="str">"YouGov"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">WEATHER_IMPACT</span><span class="cmd-cat" style="background:#3d2d00;color:#e3b341">Econ/Political</span></div><div class="cmd-card-body"><p class="cmd-desc">Weather forecast impact on local economy.</p><pre><code><span class="kw">DEF</span> wx = <span class="kw">WEATHER_IMPACT</span> <span class="str">"Brisbane"</span> <span class="kw">DAYS</span> <span class="num">7</span></code></pre></div></div>
+
+<h2 id="cmd-science">Scientific / Quantitative Commands</h2>
+<p>Quantitative finance, risk modeling, and Monte Carlo simulation commands.</p>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">MATH_MODEL</span><span class="cmd-cat" style="background:#0a3d42;color:#56d4dd">Scientific</span></div><div class="cmd-card-body"><p class="cmd-desc">Solve equations and symbolic math (Black-Scholes, yield curves).</p><pre><code><span class="kw">DEF</span> result = <span class="kw">MATH_MODEL</span> <span class="str">"black_scholes"</span> <span class="kw">SOLVE</span> <span class="str">"price"</span> <span class="kw">PARAMS</span> <span class="str">"vol=0.2"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">RISK_MODEL</span><span class="cmd-cat" style="background:#0a3d42;color:#56d4dd">Scientific</span></div><div class="cmd-card-body"><p class="cmd-desc">VaR / Expected Shortfall risk calculation.</p><pre><code><span class="kw">DEF</span> var = <span class="kw">RISK_MODEL</span> <span class="str">"var"</span> <span class="kw">CONFIDENCE</span> <span class="num">0.95</span> <span class="kw">WINDOW</span> <span class="str">"252d"</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">MONTE_CARLO</span><span class="cmd-cat" style="background:#0a3d42;color:#56d4dd">Scientific</span></div><div class="cmd-card-body"><p class="cmd-desc">Run Monte Carlo simulation for stress testing.</p><pre><code><span class="kw">DEF</span> outcomes = <span class="kw">MONTE_CARLO</span> <span class="str">"price_paths"</span> <span class="kw">RUNS</span> <span class="num">10000</span></code></pre></div></div>
+
+<h2 id="cmd-utility">Utility Commands</h2>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">FILE_PARSE</span><span class="cmd-cat" style="background:#21262d;color:#8b949e">Utility</span></div><div class="cmd-card-body"><p class="cmd-desc">Parse local files (CSV, JSON, PDF).</p><pre><code><span class="kw">DEF</span> data = <span class="kw">FILE_PARSE</span> <span class="str">"report.csv"</span> <span class="kw">FORMAT</span> <span class="str">"csv"</span></code></pre></div></div>
+
+<h2 id="cmd-prt">PRT Compatibility Commands</h2>
+<p>ProRealTime ProBuilder compatibility layer. Use <code>PRT_</code> prefixed commands to translate ProRealTime strategies into ClawScript. All PRT indicator commands accept optional period and series parameters.</p>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">PRT Trading Aliases</span><span class="cmd-cat" style="background:#3d1a2e;color:#db61a2">PRT</span></div><div class="cmd-card-body"><p class="cmd-desc">PRT_BUY, PRT_SELL, PRT_IF, PRT_THEN, PRT_ELSE, PRT_ENDIF, PRT_ALERT, PRT_OPTIMIZE map directly to their ClawScript equivalents.</p><pre><code><span class="kw">PRT_BUY</span> <span class="num">1</span> <span class="kw">AT</span> <span class="kw">MARKET</span>
+<span class="kw">PRT_IF</span> rsi < <span class="num">30</span> <span class="kw">PRT_THEN</span> <span class="trade">BUY</span> <span class="num">1</span> <span class="kw">PRT_ENDIF</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">PRT Indicators</span><span class="cmd-cat" style="background:#3d1a2e;color:#db61a2">PRT</span></div><div class="cmd-card-body"><p class="cmd-desc">Full ProRealTime indicator set: PRT_AVERAGE, PRT_RSI, PRT_MACD, PRT_BOLLINGER, PRT_STOCHASTIC, PRT_ATR, PRT_CCI, PRT_ADX, PRT_DONCHIAN, PRT_ICHIMOKU, PRT_KELTNERCHANNEL, PRT_PARABOLICSAR, PRT_SUPERTREND, PRT_FIBONACCI, PRT_PIVOTPOINT, PRT_DEMARK, PRT_WILLIAMS, PRT_ULTOSC, PRT_CHAIKIN, PRT_ONBALANCEVOLUME, PRT_VWAP, PRT_VOLUMEBYPRICE.</p><pre><code><span class="kw">DEF</span> rsi = <span class="kw">PRT_RSI</span> <span class="num">14</span> (CLOSE)
+<span class="kw">DEF</span> avg = <span class="kw">PRT_AVERAGE</span> <span class="num">20</span> (CLOSE)
+<span class="kw">DEF</span> bb = <span class="kw">PRT_BOLLINGER</span> <span class="num">20</span> <span class="num">2</span> (CLOSE)
+<span class="kw">DEF</span> ich = <span class="kw">PRT_ICHIMOKU</span> <span class="num">9</span> <span class="num">26</span> <span class="num">52</span>
+<span class="kw">DEF</span> vwap = <span class="kw">PRT_VWAP</span></code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">PRT Math / Stats</span><span class="cmd-cat" style="background:#3d1a2e;color:#db61a2">PRT</span></div><div class="cmd-card-body"><p class="cmd-desc">PRT_CUM, PRT_HIGHEST, PRT_LOWEST, PRT_SUM, PRT_STD, PRT_CORRELATION, PRT_REGRESSION, PRT_SUMMATION, PRT_CROSS, PRT_BARSSINCE, PRT_HISTOGRAM.</p><pre><code><span class="kw">DEF</span> high = <span class="kw">PRT_HIGHEST</span> <span class="num">20</span> (HIGH)
+<span class="kw">DEF</span> corr = <span class="kw">PRT_CORRELATION</span> <span class="num">30</span> (AUD, GOLD)
+<span class="kw">DEF</span> std = <span class="kw">PRT_STD</span> <span class="num">20</span> (CLOSE)</code></pre></div></div>
+
+<div class="cmd-card"><div class="cmd-card-header"><span class="cmd-name">PRT Utility</span><span class="cmd-cat" style="background:#3d1a2e;color:#db61a2">PRT</span></div><div class="cmd-card-body"><p class="cmd-desc">PRT_BARINDEX, PRT_DATE, PRT_TIME (no-arg values), PRT_DEFPARAM (parameter definition), PRT_RETURN (return value), PRT_DRAWLINE, PRT_DRAWARROW (chart drawing), PRT_TIMEFRAME (resolution switch).</p><pre><code><span class="kw">DEF</span> idx = <span class="kw">PRT_BARINDEX</span>
+<span class="kw">PRT_DEFPARAM</span> CumulateOrders = false
+<span class="kw">PRT_DRAWLINE</span> (<span class="num">1</span>, <span class="num">100</span>, <span class="num">5</span>, <span class="num">200</span>)</code></pre></div></div>
+
 <hr style="border-color:#21262d;margin:32px 0">
 
 <h2 id="editor-ui">ClawScript Editor UI</h2>
@@ -954,6 +1079,14 @@ checkEntry(rsiValue, macdValue)</code></pre>
   <li><span style="color:#f0883e">Agent</span> &mdash; SPAWN_AGENT, CALL_SESSION, MUTATE_CONFIG, ALERT, SAY_TO_SESSION, WAIT_FOR_REPLY</li>
   <li><span style="color:#ffa657">Advanced</span> &mdash; CRASH_SCAN, MARKET_NOMAD, NOMAD_SCAN, NOMAD_ALLOCATE, RUMOR_SCAN, OPTIMIZE, INDICATOR</li>
   <li><span style="color:#a371f7">Functions</span> &mdash; DEF_FUNC, CHAIN, INCLUDE</li>
+  <li><span style="color:#f78166">TradingView</span> &mdash; STRATEGY_ENTRY, STRATEGY_EXIT, STRATEGY_CLOSE, INPUT_*, TIMEFRAME_*, ARRAY_*, MATRIX_*</li>
+  <li><span style="color:#79c0ff">Bloomberg / Data</span> &mdash; FETCH_HISTORICAL, FETCH_MEMBERS, GROUP_MEMBERS, ECON_DATA, ESTIMATE</li>
+  <li><span style="color:#d2a8ff">Time / Schedule</span> &mdash; TIME_IN_MARKET, TIME_SINCE_EVENT, SCHEDULE, WAIT_UNTIL, TASK_SCHEDULE</li>
+  <li><span style="color:#7ee787">Portfolio</span> &mdash; MARKET_SCAN, PORTFOLIO_BUILD, PORTFOLIO_REBALANCE</li>
+  <li><span style="color:#e3b341">Econ / Political</span> &mdash; ECON_INDICATOR, FISCAL_FLOW, ELECTION_IMPACT, CURRENCY_CARRY, POLICY_SENTIMENT, SANCTION_IMPACT, VOTE_PREDICT, WEATHER_IMPACT</li>
+  <li><span style="color:#56d4dd">Scientific</span> &mdash; MATH_MODEL, RISK_MODEL, MONTE_CARLO</li>
+  <li><span style="color:#8b949e">Utility</span> &mdash; FILE_PARSE</li>
+  <li><span style="color:#db61a2">PRT Compatibility</span> &mdash; 40+ ProRealTime commands (PRT_RSI, PRT_MACD, PRT_BOLLINGER, PRT_ICHIMOKU, etc.)</li>
 </ul>
 
 <h3>Working with Nodes</h3>

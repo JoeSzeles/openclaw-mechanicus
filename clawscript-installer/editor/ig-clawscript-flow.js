@@ -86,6 +86,93 @@ var NODE_CATS = [
       { cmd: 'CHAIN', doc: 'Chain sequential operations', params: [] },
       { cmd: 'INCLUDE', doc: 'Include external script', params: [{k:'scriptName',l:'Script',d:''}] }
     ]
+  },
+  { id: 'tradingview', label: 'TradingView', color: '#f78166', bg: '#3d2200',
+    items: [
+      { cmd: 'STRATEGY_ENTRY', doc: 'TradingView-style strategy entry', params: [{k:'name',l:'Name',d:''},{k:'direction',l:'Direction',d:'long'},{k:'sizing',l:'Sizing',d:''},{k:'stop',l:'Stop',d:''}] },
+      { cmd: 'STRATEGY_EXIT', doc: 'TradingView-style strategy exit', params: [{k:'name',l:'Name',d:''},{k:'reason',l:'Reason',d:''}] },
+      { cmd: 'STRATEGY_CLOSE', doc: 'Close all strategy positions', params: [{k:'reason',l:'Reason',d:''}] },
+      { cmd: 'INPUT_INT', doc: 'Declare integer input parameter', params: [{k:'name',l:'Name',d:''},{k:'default',l:'Default',d:'14'}] },
+      { cmd: 'INPUT_FLOAT', doc: 'Declare float input parameter', params: [{k:'name',l:'Name',d:''},{k:'default',l:'Default',d:'0.5'}] },
+      { cmd: 'INPUT_BOOL', doc: 'Declare boolean input parameter', params: [{k:'name',l:'Name',d:''},{k:'default',l:'Default',d:'true'}] },
+      { cmd: 'INPUT_SYMBOL', doc: 'Declare symbol input parameter', params: [{k:'name',l:'Name',d:''},{k:'default',l:'Default',d:''}] },
+      { cmd: 'TIMEFRAME_PERIOD', doc: 'Get current timeframe period', params: [] },
+      { cmd: 'TIMEFRAME_IS_DAILY', doc: 'Check if current timeframe is daily', params: [] },
+      { cmd: 'ARRAY_NEW', doc: 'Create a new array', params: [] },
+      { cmd: 'ARRAY_PUSH', doc: 'Push value to array', params: [{k:'array',l:'Array',d:''},{k:'value',l:'Value',d:''}] },
+      { cmd: 'MATRIX_NEW', doc: 'Create a new matrix', params: [{k:'rows',l:'Rows',d:'3'},{k:'cols',l:'Cols',d:'3'}] },
+      { cmd: 'MATRIX_SET', doc: 'Set matrix value', params: [{k:'matrix',l:'Matrix',d:''},{k:'row',l:'Row',d:'0'},{k:'col',l:'Col',d:'0'},{k:'value',l:'Value',d:''}] }
+    ]
+  },
+  { id: 'bloomberg', label: 'Bloomberg / Data', color: '#79c0ff', bg: '#0c2d48',
+    items: [
+      { cmd: 'FETCH_HISTORICAL', doc: 'Fetch historical data (BDH-style)', params: [{k:'metric',l:'Metric',d:''},{k:'from',l:'From',d:''},{k:'to',l:'To',d:''}] },
+      { cmd: 'FETCH_MEMBERS', doc: 'Fetch index members (BDS-style)', params: [{k:'index',l:'Index',d:''}] },
+      { cmd: 'GROUP_MEMBERS', doc: 'Get group/index members', params: [{k:'index',l:'Index',d:''}] },
+      { cmd: 'ECON_DATA', doc: 'Fetch economic data point', params: [{k:'metric',l:'Metric',d:''},{k:'country',l:'Country',d:''},{k:'date',l:'Date',d:''}] },
+      { cmd: 'ESTIMATE', doc: 'Get consensus estimate', params: [{k:'field',l:'Field',d:''},{k:'ticker',l:'Ticker',d:''}] }
+    ]
+  },
+  { id: 'time_schedule', label: 'Time / Schedule', color: '#d2a8ff', bg: '#2d1b4e',
+    items: [
+      { cmd: 'TIME_IN_MARKET', doc: 'Time since position opened', params: [{k:'positionId',l:'Position',d:''},{k:'unit',l:'Unit',d:'min'}] },
+      { cmd: 'TIME_SINCE_EVENT', doc: 'Time since an event', params: [{k:'event',l:'Event',d:''},{k:'unit',l:'Unit',d:'min'}] },
+      { cmd: 'SCHEDULE', doc: 'Schedule a task at a time', params: [{k:'task',l:'Task',d:''},{k:'at',l:'At',d:''},{k:'repeat',l:'Repeat',d:''}] },
+      { cmd: 'WAIT_UNTIL', doc: 'Wait until condition met', params: [{k:'condition',l:'Condition',d:''},{k:'timeout',l:'Timeout',d:'60'}] },
+      { cmd: 'TASK_SCHEDULE', doc: 'Schedule recurring task', params: [{k:'name',l:'Name',d:''},{k:'every',l:'Every',d:''},{k:'run',l:'Run',d:''}] }
+    ]
+  },
+  { id: 'portfolio', label: 'Portfolio', color: '#7ee787', bg: '#1b4332',
+    items: [
+      { cmd: 'MARKET_SCAN', doc: 'Scan markets by criteria', params: [{k:'category',l:'Category',d:''},{k:'criteria',l:'Criteria',d:''},{k:'limit',l:'Limit',d:'10'}] },
+      { cmd: 'PORTFOLIO_BUILD', doc: 'Build portfolio from scan results', params: [{k:'from',l:'From',d:''},{k:'num',l:'Num',d:'4'},{k:'sizing',l:'Sizing',d:'equal'},{k:'maxRisk',l:'Max Risk',d:'20'}] },
+      { cmd: 'PORTFOLIO_REBALANCE', doc: 'Rebalance portfolio on drawdown', params: [{k:'threshold',l:'Threshold',d:'10'}] }
+    ]
+  },
+  { id: 'econpol', label: 'Econ / Political', color: '#e3b341', bg: '#3d2d00',
+    items: [
+      { cmd: 'ECON_INDICATOR', doc: 'Fetch economic indicator (GDP, CPI, etc.)', params: [{k:'metric',l:'Metric',d:''},{k:'country',l:'Country',d:''},{k:'date',l:'Date',d:''}] },
+      { cmd: 'FISCAL_FLOW', doc: 'Track capital flows (ETF, COT)', params: [{k:'asset',l:'Asset',d:''},{k:'window',l:'Window',d:'30d'}] },
+      { cmd: 'ELECTION_IMPACT', doc: 'Score election market impact', params: [{k:'event',l:'Event',d:''},{k:'region',l:'Region',d:''}] },
+      { cmd: 'CURRENCY_CARRY', doc: 'Calculate currency carry trade', params: [{k:'pair',l:'Pair',d:''}] },
+      { cmd: 'POLICY_SENTIMENT', doc: 'Policy sentiment score', params: [{k:'policy',l:'Policy',d:''},{k:'country',l:'Country',d:''}] },
+      { cmd: 'SANCTION_IMPACT', doc: 'Estimate sanction price impact', params: [{k:'country',l:'Country',d:''},{k:'commodity',l:'Commodity',d:''}] },
+      { cmd: 'VOTE_PREDICT', doc: 'Aggregate election polls', params: [{k:'election',l:'Election',d:''},{k:'pollSource',l:'Source',d:''}] },
+      { cmd: 'WEATHER_IMPACT', doc: 'Weather impact on local economy', params: [{k:'location',l:'Location',d:''},{k:'days',l:'Days',d:'7'}] }
+    ]
+  },
+  { id: 'scientific', label: 'Scientific', color: '#56d4dd', bg: '#0a3d42',
+    items: [
+      { cmd: 'MATH_MODEL', doc: 'Solve equation / symbolic math', params: [{k:'equation',l:'Equation',d:''},{k:'solve',l:'Solve',d:''},{k:'params',l:'Params',d:''}] },
+      { cmd: 'RISK_MODEL', doc: 'VaR / ES risk calculation', params: [{k:'type',l:'Type',d:'var'},{k:'confidence',l:'Confidence',d:'0.95'},{k:'window',l:'Window',d:'252d'}] },
+      { cmd: 'MONTE_CARLO', doc: 'Monte Carlo simulation', params: [{k:'scenario',l:'Scenario',d:''},{k:'runs',l:'Runs',d:'10000'}] }
+    ]
+  },
+  { id: 'utility', label: 'Utility', color: '#8b949e', bg: '#21262d',
+    items: [
+      { cmd: 'FILE_PARSE', doc: 'Parse file (CSV/JSON/PDF)', params: [{k:'filename',l:'File',d:''},{k:'format',l:'Format',d:'csv'}] }
+    ]
+  },
+  { id: 'prt', label: 'PRT Compatibility', color: '#db61a2', bg: '#3d1a2e',
+    items: [
+      { cmd: 'PRT_BUY', doc: 'ProRealTime buy order', params: [{k:'size',l:'Size',d:'1'},{k:'orderType',l:'Order',d:'MARKET'}] },
+      { cmd: 'PRT_SELL', doc: 'ProRealTime sell order', params: [{k:'size',l:'Size',d:'1'},{k:'orderType',l:'Order',d:'MARKET'}] },
+      { cmd: 'PRT_AVERAGE', doc: 'PRT SMA (average)', params: [{k:'period',l:'Period',d:'14'}] },
+      { cmd: 'PRT_RSI', doc: 'PRT RSI', params: [{k:'period',l:'Period',d:'14'}] },
+      { cmd: 'PRT_MACD', doc: 'PRT MACD', params: [{k:'fast',l:'Fast',d:'12'},{k:'slow',l:'Slow',d:'26'},{k:'signal',l:'Signal',d:'9'}] },
+      { cmd: 'PRT_BOLLINGER', doc: 'PRT Bollinger Bands', params: [{k:'period',l:'Period',d:'20'},{k:'dev',l:'Dev',d:'2'}] },
+      { cmd: 'PRT_ATR', doc: 'PRT ATR', params: [{k:'period',l:'Period',d:'14'}] },
+      { cmd: 'PRT_STOCHASTIC', doc: 'PRT Stochastic', params: [{k:'k',l:'%K',d:'14'},{k:'d',l:'%D',d:'3'}] },
+      { cmd: 'PRT_ADX', doc: 'PRT ADX', params: [{k:'period',l:'Period',d:'14'}] },
+      { cmd: 'PRT_CCI', doc: 'PRT CCI', params: [{k:'period',l:'Period',d:'20'}] },
+      { cmd: 'PRT_ICHIMOKU', doc: 'PRT Ichimoku Cloud', params: [{k:'tenkan',l:'Tenkan',d:'9'},{k:'kijun',l:'Kijun',d:'26'},{k:'senkou',l:'Senkou',d:'52'}] },
+      { cmd: 'PRT_FIBONACCI', doc: 'PRT Fibonacci levels', params: [{k:'high',l:'High',d:''},{k:'low',l:'Low',d:''}] },
+      { cmd: 'PRT_VWAP', doc: 'PRT VWAP', params: [] },
+      { cmd: 'PRT_SUPERTREND', doc: 'PRT SuperTrend', params: [{k:'period',l:'Period',d:'10'},{k:'mult',l:'Mult',d:'3'}] },
+      { cmd: 'PRT_BARINDEX', doc: 'PRT bar index', params: [] },
+      { cmd: 'PRT_OPTIMIZE', doc: 'PRT optimization', params: [{k:'varName',l:'Variable',d:''},{k:'from',l:'From',d:''},{k:'to',l:'To',d:''},{k:'step',l:'Step',d:''}] },
+      { cmd: 'PRT_DEFPARAM', doc: 'PRT parameter definition', params: [{k:'name',l:'Name',d:''},{k:'value',l:'Value',d:''}] }
+    ]
   }
 ];
 

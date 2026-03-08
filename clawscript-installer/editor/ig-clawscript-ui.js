@@ -23,15 +23,54 @@ var CS_KEYWORDS = [
   'TOOL','ARG','INSTRUCT','MODE','QUERY','PAGES','NUM',
   'WITH','TO','LEVEL','OPTIONS','TIMEOUT','FILTER',
   'SOURCES','ON','OFF','GLOBAL','DEFAULT','PART','ALL',
-  'ACCEL','MAX','FROM','STEP','USING','SIZING'
+  'ACCEL','MAX','FROM','STEP','USING','SIZING',
+  'STRATEGY_ENTRY','STRATEGY_EXIT','STRATEGY_CLOSE',
+  'INPUT_INT','INPUT_FLOAT','INPUT_BOOL','INPUT_SYMBOL',
+  'TIMEFRAME_PERIOD','TIMEFRAME_IS_DAILY',
+  'ARRAY_NEW','ARRAY_PUSH','MATRIX_NEW','MATRIX_SET',
+  'FETCH_HISTORICAL','FETCH_MEMBERS','GROUP_MEMBERS',
+  'ECON_DATA','ESTIMATE',
+  'TIME_IN_MARKET','TIME_SINCE_EVENT','SCHEDULE','WAIT_UNTIL',
+  'MARKET_SCAN','PORTFOLIO_BUILD','PORTFOLIO_REBALANCE',
+  'ECON_INDICATOR','FISCAL_FLOW','ELECTION_IMPACT',
+  'CURRENCY_CARRY','POLICY_SENTIMENT','SANCTION_IMPACT','VOTE_PREDICT',
+  'MATH_MODEL','RISK_MODEL','MONTE_CARLO',
+  'TASK_SCHEDULE','FILE_PARSE','WEATHER_IMPACT',
+  'UNIT','REPEAT','COUNTRY','DATE','WINDOW','REGION',
+  'COMMODITY','POLL_SOURCE','SOLVE','PARAMS','CONFIDENCE',
+  'RUNS','EVERY','RUN','FORMAT','DAYS','DIRECTION',
+  'MAX_RISK','THRESHOLD',
+  'PRT_IF','PRT_THEN','PRT_ELSE','PRT_ENDIF',
+  'PRT_BUY','PRT_SELL',
+  'PRT_AVERAGE','PRT_RSI','PRT_MACD','PRT_BOLLINGER',
+  'PRT_STOCHASTIC','PRT_ATR','PRT_CCI','PRT_ADX',
+  'PRT_DONCHIAN','PRT_ICHIMOKU','PRT_KELTNERCHANNEL',
+  'PRT_PARABOLICSAR','PRT_SUPERTREND',
+  'PRT_VOLUMEBYPRICE','PRT_FIBONACCI','PRT_PIVOTPOINT','PRT_DEMARK',
+  'PRT_WILLIAMS','PRT_ULTOSC','PRT_CHAIKIN','PRT_ONBALANCEVOLUME','PRT_VWAP',
+  'PRT_ALERT','PRT_OPTIMIZE','PRT_OPTIMISE','PRT_TIMEFRAME',
+  'PRT_BARINDEX','PRT_DATE','PRT_TIME',
+  'PRT_CUM','PRT_HIGHEST','PRT_LOWEST','PRT_SUM','PRT_STD',
+  'PRT_CORRELATION','PRT_REGRESSION',
+  'PRT_DEFPARAM','PRT_RETURN',
+  'PRT_DRAWLINE','PRT_DRAWARROW','PRT_HISTOGRAM',
+  'PRT_CROSS','PRT_BARSSINCE','PRT_SUMMATION'
 ];
 
-var TRADE_CMDS = ['BUY','SELL','SELLSHORT','EXIT','CLOSE','TRAILSTOP'];
+var TRADE_CMDS = ['BUY','SELL','SELLSHORT','EXIT','CLOSE','TRAILSTOP','STRATEGY_ENTRY','STRATEGY_EXIT','STRATEGY_CLOSE','PRT_BUY','PRT_SELL'];
 var AI_CMDS = ['AI_QUERY','AI_GENERATE_SCRIPT','ANALYZE_LOG','RUN_ML'];
-var DATA_CMDS = ['CLAW_WEB','CLAW_X','CLAW_PDF','CLAW_IMAGE','CLAW_VIDEO','CLAW_IMAGE_VIEW','CLAW_CONVERSATION','CLAW_TOOL','CLAW_CODE'];
-var AGENT_CMDS = ['SPAWN_AGENT','CALL_SESSION','MUTATE_CONFIG','ALERT','SAY_TO_SESSION','WAIT_FOR_REPLY'];
-var CONTROL_CMDS = ['IF','THEN','ELSE','ENDIF','LOOP','WHILE','ENDLOOP','ENDWHILE','TRY','CATCH','ENDTRY','DEF_FUNC','ENDFUNC','CHAIN'];
-var ADVANCED_CMDS = ['CRASH_SCAN','MARKET_NOMAD','NOMAD_SCAN','NOMAD_ALLOCATE','RUMOR_SCAN','OPTIMIZE','INDICATOR'];
+var DATA_CMDS = ['CLAW_WEB','CLAW_X','CLAW_PDF','CLAW_IMAGE','CLAW_VIDEO','CLAW_IMAGE_VIEW','CLAW_CONVERSATION','CLAW_TOOL','CLAW_CODE','FETCH_HISTORICAL','FETCH_MEMBERS','GROUP_MEMBERS','ECON_DATA','ESTIMATE'];
+var AGENT_CMDS = ['SPAWN_AGENT','CALL_SESSION','MUTATE_CONFIG','ALERT','SAY_TO_SESSION','WAIT_FOR_REPLY','PRT_ALERT'];
+var CONTROL_CMDS = ['IF','THEN','ELSE','ENDIF','LOOP','WHILE','ENDLOOP','ENDWHILE','TRY','CATCH','ENDTRY','DEF_FUNC','ENDFUNC','CHAIN','PRT_IF','PRT_THEN','PRT_ELSE','PRT_ENDIF'];
+var ADVANCED_CMDS = ['CRASH_SCAN','MARKET_NOMAD','NOMAD_SCAN','NOMAD_ALLOCATE','RUMOR_SCAN','OPTIMIZE','INDICATOR','PRT_OPTIMIZE','PRT_OPTIMISE'];
+var OPERATOR_CMDS = ['AND','OR','NOT','CROSSES','OVER','UNDER','CONTAINS'];
+var ECONPOL_CMDS = ['ECON_INDICATOR','FISCAL_FLOW','ELECTION_IMPACT','CURRENCY_CARRY','POLICY_SENTIMENT','SANCTION_IMPACT','VOTE_PREDICT','WEATHER_IMPACT'];
+var SCIENCE_CMDS = ['MATH_MODEL','RISK_MODEL','MONTE_CARLO'];
+var TIME_CMDS = ['TIME_IN_MARKET','TIME_SINCE_EVENT','SCHEDULE','WAIT_UNTIL','TASK_SCHEDULE'];
+var PORTFOLIO_CMDS = ['MARKET_SCAN','PORTFOLIO_BUILD','PORTFOLIO_REBALANCE'];
+var PRT_CMDS = ['PRT_AVERAGE','PRT_RSI','PRT_MACD','PRT_BOLLINGER','PRT_STOCHASTIC','PRT_ATR','PRT_CCI','PRT_ADX','PRT_DONCHIAN','PRT_ICHIMOKU','PRT_KELTNERCHANNEL','PRT_PARABOLICSAR','PRT_SUPERTREND','PRT_VOLUMEBYPRICE','PRT_FIBONACCI','PRT_PIVOTPOINT','PRT_DEMARK','PRT_WILLIAMS','PRT_ULTOSC','PRT_CHAIKIN','PRT_ONBALANCEVOLUME','PRT_VWAP','PRT_TIMEFRAME','PRT_BARINDEX','PRT_DATE','PRT_TIME','PRT_CUM','PRT_HIGHEST','PRT_LOWEST','PRT_SUM','PRT_STD','PRT_CORRELATION','PRT_REGRESSION','PRT_DEFPARAM','PRT_RETURN','PRT_DRAWLINE','PRT_DRAWARROW','PRT_HISTOGRAM','PRT_CROSS','PRT_BARSSINCE','PRT_SUMMATION'];
+var TV_CMDS = ['INPUT_INT','INPUT_FLOAT','INPUT_BOOL','INPUT_SYMBOL','TIMEFRAME_PERIOD','TIMEFRAME_IS_DAILY','ARRAY_NEW','ARRAY_PUSH','MATRIX_NEW','MATRIX_SET'];
+var UTILITY_CMDS = ['FILE_PARSE'];
 
 var currentAST = null;
 var currentJS = '';
@@ -113,12 +152,20 @@ function syntaxHighlight(code) {
     else if (t.type === TOKEN_TYPES.STRING) cls = 'cs-tok-string';
     else if (t.type === TOKEN_TYPES.NUMBER) cls = 'cs-tok-number';
     else if (t.type === TOKEN_TYPES.OPERATOR) cls = 'cs-tok-operator';
+    else if (OPERATOR_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-logic-op';
     else if (TRADE_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-trade';
     else if (AI_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-ai';
     else if (DATA_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-data';
     else if (AGENT_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-agent';
     else if (CONTROL_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-control';
     else if (ADVANCED_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-advanced';
+    else if (ECONPOL_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-econpol';
+    else if (SCIENCE_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-science';
+    else if (TIME_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-time';
+    else if (PORTFOLIO_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-portfolio';
+    else if (PRT_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-prt';
+    else if (TV_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-tv';
+    else if (UTILITY_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-utility';
     else if (t.type === TOKEN_TYPES.KEYWORD) cls = 'cs-tok-keyword';
     else if (t.type === TOKEN_TYPES.IDENTIFIER) cls = 'cs-tok-ident';
     result += '<span class="' + cls + '">' + escapeHtml(originalText) + '</span>';
@@ -217,6 +264,14 @@ function buildEditorUI() {
   '.cs-tok-agent { color:#f0883e; }' +
   '.cs-tok-control { color:#ff7b72; font-weight:600; }' +
   '.cs-tok-advanced { color:#ffa657; font-weight:600; }' +
+  '.cs-tok-logic-op { color:#f778ba; font-weight:700; font-style:italic; }' +
+  '.cs-tok-econpol { color:#e3b341; font-weight:600; }' +
+  '.cs-tok-science { color:#56d4dd; font-weight:600; }' +
+  '.cs-tok-time { color:#d2a8ff; font-weight:600; }' +
+  '.cs-tok-portfolio { color:#7ee787; font-weight:600; }' +
+  '.cs-tok-prt { color:#db61a2; font-weight:600; }' +
+  '.cs-tok-tv { color:#f78166; font-weight:600; }' +
+  '.cs-tok-utility { color:#8b949e; font-weight:600; }' +
   '.cs-tok-keyword { color:#ff7b72; }' +
   '.cs-tok-string { color:#a5d6ff; }' +
   '.cs-tok-number { color:#79c0ff; }' +

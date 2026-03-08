@@ -1,0 +1,138 @@
+Here are some practical, realistic additions to ClawScript that would meaningfully expand what you can do — especially for non-trading projects, scientific/economic/political analysis, personal automation, and research workflows. I grouped them by category and prioritized ones that are **feasible right now** with your current stack (code_execution libs, web/X tools, channels, DB, parser extensibility).
+
+All suggestions include:
+- Suggested keyword/command name
+- Grammar example
+- Brief description + why it's useful
+- Which OpenClaw tool or wrapper it would call
+
+### Time & Scheduling Commands
+Already useful for bots that run continuously or need to wait/react to time events.
+
+- **TIME_IN_MARKET** (already discussed)  
+  → `DEF duration = TIME_IN_MARKET "position_id" UNIT "min"`  
+  → Tracks time since entry (DB lookup). Useful for "max hold time" exits or logging.
+
+- **SCHEDULE**  
+  → `SCHEDULE "task_name" AT "HH:MM" [REPEAT "daily/weekly"]`  
+  → Schedules a block of code or command to run at specific time/day.  
+  → Why: Run daily econ reports, weekly portfolio rebalance, or Brisbane market open alerts.  
+  → Wrapper: setTimeout / cron-like logic in JS runtime + DB for persistence.
+
+- **WAIT_UNTIL**  
+  → `WAIT_UNTIL "condition" TIMEOUT seconds`  
+  → Pauses until condition true (e.g. price > level, time > 09:00, news published).  
+  → Why: Wait for market open, RBA announcement, or X post from specific user.  
+  → Wrapper: Poll loop + timeout (safe in Replit).
+
+### Economic & Financial Analysis Commands
+Very strong fit for your interest in money/econ/politics.
+
+- **ECON_INDICATOR**  
+  → `DEF value = ECON_INDICATOR "metric" [COUNTRY "AU" DATE "latest"]`  
+  → Fetches GDP, CPI, unemployment, RBA rate, etc.  
+  → Why: Forecast AUD impact, correlate with IG prices.  
+  → Wrapper: browse_page on tradingeconomics.com or rba.gov.au + parse.
+
+- **FISCAL_FLOW**  
+  → `DEF flow = FISCAL_FLOW "asset" [WINDOW "30d"]`  
+  → Tracks capital flows (ETF inflows, COT reports, foreign investment data).  
+  → Why: Spot institutional buying/selling before price moves.  
+  → Wrapper: web_search "COT report latest" + code_execution to parse PDF tables.
+
+- **ELECTION_IMPACT**  
+  → `DEF score = ELECTION_IMPACT "event" [REGION "AU"]`  
+  → Scores potential market effect of upcoming elections/political events.  
+  → Why: Brisbane/QLD state politics → commodity/AUD moves.  
+  → Wrapper: CLAW_X + web_search for polls + AI_QUERY "market impact score".
+
+- **CURRENCY_CARRY**  
+  → `DEF carry = CURRENCY_CARRY "pair"`  
+  → Calculates swap/interest differential (AUD/JPY carry trade classic).  
+  → Why: Passive income strategy outside active trading.  
+  → Wrapper: web_search broker swap rates + code_execution.
+
+### Scientific & Quantitative Commands
+For deeper econ/math/physics/chem/bio sims tied to money.
+
+- **MATH_MODEL**  
+  → `DEF result = MATH_MODEL "equation" SOLVE "x" [PARAMS "a=1,b=2"]`  
+  → Solves equations/symbolic math (Black-Scholes, option pricing, yield curves).  
+  → Wrapper: sympy in code_execution.
+
+- **RISK_MODEL**  
+  → `DEF var = RISK_MODEL "var" CONFIDENCE 0.95 WINDOW "252d"`  
+  → VaR/ES calculation on portfolio or single asset.  
+  → Why: Quant risk management for personal holdings.  
+  → Wrapper: code_execution statsmodels/numpy.
+
+- **MONTE_CARLO**  
+  → `DEF outcomes = MONTE_CARLO "scenario" RUNS 10000`  
+  → Monte Carlo sim (price paths, portfolio outcomes).  
+  → Why: Stress test money plans under random walks.  
+  → Wrapper: numpy.random + geometric Brownian motion.
+
+- **CHEM_MATERIAL**  
+  → `DEF prop = CHEM_MATERIAL "formula" PROPERTY "bandgap/energy"`  
+  → Quantum chem properties for material investments (batteries, solar).  
+  → Wrapper: pyscf in code_execution.
+
+- **BIO_PATENT_SCAN**  
+  → `DEF patents = BIO_PATENT_SCAN "keyword" [DATE_RANGE "2020-2025"]`  
+  → Scans patent databases for biotech/pharma trends.  
+  → Why: Spot upcoming money-makers in health stocks.  
+  → Wrapper: web_search pubchem/patents.google.com + parse.
+
+### Politics & Geo-Risk Commands
+Direct tie to money (currency, commodities, markets).
+
+- **POLICY_SENTIMENT**  
+  → `DEF score = POLICY_SENTIMENT "policy" [COUNTRY "AU"]`  
+  → Sentiment on RBA policy, tax changes, mining laws.  
+  → Why: Brisbane mining exposure to QLD politics.  
+  → Wrapper: CLAW_X + AI_QUERY "policy sentiment score".
+
+- **SANCTION_IMPACT**  
+  → `DEF impact = SANCTION_IMPACT "country" [COMMODITY "oil/metal"]`  
+  → Estimates price impact of sanctions.  
+  → Why: Geopolitical money flows (e.g., Russia/Ukraine → oil/AUD).  
+  → Wrapper: web_search news + code_execution regression on past events.
+
+- **VOTE_PREDICT**  
+  → `DEF prob = VOTE_PREDICT "election" [POLL_SOURCE "YouGov"]`  
+  → Aggregates polls for upcoming votes.  
+  → Why: Election outcomes → market regimes.  
+  → Wrapper: browse_page poll aggregators + AI_QUERY "average probability".
+
+### General / Utility Commands
+Useful across all projects.
+
+- **TASK_SCHEDULE**  
+  → `TASK_SCHEDULE "name" EVERY "1h" RUN "command block"`  
+  → Schedules recurring tasks (e.g., daily econ scan).  
+  → Wrapper: setInterval in runtime.
+
+- **FILE_PARSE**  
+  → `DEF data = FILE_PARSE "filename" FORMAT "csv/json/pdf"`  
+  → Parse local files (e.g., bank statements, research PDFs).  
+  → Wrapper: code_execution pandas/openpyxl/pypdf2.
+
+- **WEATHER_IMPACT**  
+  → `DEF impact = WEATHER_IMPACT "location" [DAYS 7]`  
+  → Weather forecast impact on local economy (Brisbane floods → construction/commodities).  
+  → Wrapper: CLAW_WEB bom.gov.au + AI_QUERY "econ impact".
+
+### Summary – Which to Prioritize
+Top 5 realistic & high-value additions right now:
+
+1. **TIME_IN_MARKET** (already discussed – very easy)
+2. **ECON_FORECAST** + **POLICY_SENTIMENT** (econ/politics core)
+3. **MATH_MODEL** + **RISK_MODEL** (quant backbone)
+4. **TASK_SCHEDULE** (automation glue)
+5. **FILE_PARSE** (personal finance/research)
+
+All can be added with minimal parser changes (new case in switch + simple generateStmt).
+
+If you want the full parser snippet for any 1–2 of these (e.g. ECON_FORECAST + TIME_IN_MARKET), just name them and I'll give the exact code blocks to paste into clawscript-parser.cjs.
+
+Which ones excite you most? 😈

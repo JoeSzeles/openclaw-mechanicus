@@ -32,7 +32,104 @@ const KEYWORDS = new Set([
   'WAIT_TIMEOUT', 'WEIGHTS', 'CRITERIA', 'REBALANCE',
   'GENERATIONS', 'MUTATE', 'FITNESS', 'HORIZON',
   'MAX_INSTRUMENTS', 'SCAN_INTERVAL', 'DRAW', 'DOWN', 'PROFIT',
-  'CODE', 'URL', 'INSTRUCTIONS'
+  'CODE', 'URL', 'INSTRUCTIONS',
+  'STRATEGY_ENTRY', 'STRATEGY_EXIT', 'STRATEGY_CLOSE',
+  'INPUT_INT', 'INPUT_FLOAT', 'INPUT_BOOL', 'INPUT_SYMBOL',
+  'TIMEFRAME_PERIOD', 'TIMEFRAME_IS_DAILY',
+  'ARRAY_NEW', 'ARRAY_PUSH', 'MATRIX_NEW', 'MATRIX_SET',
+  'FETCH_HISTORICAL', 'FETCH_MEMBERS', 'GROUP_MEMBERS',
+  'ECON_DATA', 'ESTIMATE',
+  'TIME_IN_MARKET', 'TIME_SINCE_EVENT', 'SCHEDULE', 'WAIT_UNTIL',
+  'MARKET_SCAN', 'PORTFOLIO_BUILD', 'PORTFOLIO_REBALANCE',
+  'ECON_INDICATOR', 'FISCAL_FLOW', 'ELECTION_IMPACT',
+  'CURRENCY_CARRY', 'POLICY_SENTIMENT', 'SANCTION_IMPACT', 'VOTE_PREDICT',
+  'MATH_MODEL', 'RISK_MODEL', 'MONTE_CARLO',
+  'TASK_SCHEDULE', 'FILE_PARSE', 'WEATHER_IMPACT',
+  'UNIT', 'REPEAT', 'COUNTRY', 'DATE', 'WINDOW', 'REGION',
+  'COMMODITY', 'POLL_SOURCE', 'SOLVE', 'PARAMS', 'CONFIDENCE',
+  'RUNS', 'EVERY', 'RUN', 'FORMAT', 'DAYS', 'DIRECTION',
+  'MAX_RISK', 'THRESHOLD', 'ROWS', 'COLS',
+  'PRT_IF', 'PRT_THEN', 'PRT_ELSE', 'PRT_ENDIF',
+  'PRT_BUY', 'PRT_SELL',
+  'PRT_AVERAGE', 'PRT_RSI', 'PRT_MACD', 'PRT_BOLLINGER',
+  'PRT_STOCHASTIC', 'PRT_ATR', 'PRT_CCI', 'PRT_ADX',
+  'PRT_DONCHIAN', 'PRT_ICHIMOKU', 'PRT_KELTNERCHANNEL',
+  'PRT_PARABOLICSAR', 'PRT_SUPERTREND',
+  'PRT_VOLUMEBYPRICE', 'PRT_FIBONACCI', 'PRT_PIVOTPOINT', 'PRT_DEMARK',
+  'PRT_WILLIAMS', 'PRT_ULTOSC', 'PRT_CHAIKIN', 'PRT_ONBALANCEVOLUME', 'PRT_VWAP',
+  'PRT_ALERT', 'PRT_OPTIMIZE', 'PRT_OPTIMISE', 'PRT_TIMEFRAME',
+  'PRT_BARINDEX', 'PRT_DATE', 'PRT_TIME',
+  'PRT_CUM', 'PRT_HIGHEST', 'PRT_LOWEST', 'PRT_SUM', 'PRT_STD',
+  'PRT_CORRELATION', 'PRT_REGRESSION',
+  'PRT_DEFPARAM', 'PRT_RETURN',
+  'PRT_DRAWLINE', 'PRT_DRAWARROW', 'PRT_HISTOGRAM',
+  'PRT_CROSS', 'PRT_BARSSINCE', 'PRT_SUMMATION',
+  'PRT_KELTNERCHANNEL', 'PRT_PARABOLICSAR',
+  'SHARES', 'CONTRACTS', 'BAR'
+]);
+
+const GENERIC_CMD_DEFS = {
+  'TIME_IN_MARKET':       { type: 'GenericCmd', args: 1, optKw: ['UNIT'], imp: 'ext' },
+  'TIME_SINCE_EVENT':     { type: 'GenericCmd', args: 1, optKw: ['UNIT'], imp: 'ext' },
+  'SCHEDULE':             { type: 'GenericCmd', args: 1, optKw: ['AT', 'REPEAT'], imp: 'ext' },
+  'WAIT_UNTIL':           { type: 'GenericCmd', args: 1, optKw: ['TIMEOUT'], imp: 'ext' },
+  'MARKET_SCAN':          { type: 'GenericCmd', args: 1, optKw: ['CRITERIA', 'LIMIT'], imp: 'ext' },
+  'PORTFOLIO_BUILD':      { type: 'GenericCmd', args: 0, optKw: ['FROM', 'NUM', 'SIZING', 'MAX_RISK'], imp: 'ext' },
+  'PORTFOLIO_REBALANCE':  { type: 'GenericCmd', args: 0, optKw: ['THRESHOLD'], imp: 'ext' },
+  'ECON_DATA':            { type: 'GenericCmd', args: 1, optKw: ['COUNTRY', 'DATE'], imp: 'ext' },
+  'ECON_INDICATOR':       { type: 'GenericCmd', args: 1, optKw: ['COUNTRY', 'DATE'], imp: 'ext' },
+  'ESTIMATE':             { type: 'GenericCmd', args: 2, optKw: [], imp: 'ext' },
+  'FETCH_HISTORICAL':     { type: 'GenericCmd', args: 1, optKw: ['FROM', 'TO'], imp: 'ext' },
+  'FETCH_MEMBERS':        { type: 'GenericCmd', args: 1, optKw: [], imp: 'ext' },
+  'GROUP_MEMBERS':        { type: 'GenericCmd', args: 1, optKw: [], imp: 'ext' },
+  'FISCAL_FLOW':          { type: 'GenericCmd', args: 1, optKw: ['WINDOW'], imp: 'ext' },
+  'ELECTION_IMPACT':      { type: 'GenericCmd', args: 1, optKw: ['REGION'], imp: 'ext' },
+  'CURRENCY_CARRY':       { type: 'GenericCmd', args: 1, optKw: [], imp: 'ext' },
+  'POLICY_SENTIMENT':     { type: 'GenericCmd', args: 1, optKw: ['COUNTRY'], imp: 'ext' },
+  'SANCTION_IMPACT':      { type: 'GenericCmd', args: 1, optKw: ['COMMODITY'], imp: 'ext' },
+  'VOTE_PREDICT':         { type: 'GenericCmd', args: 1, optKw: ['POLL_SOURCE'], imp: 'ext' },
+  'MATH_MODEL':           { type: 'GenericCmd', args: 1, optKw: ['SOLVE', 'PARAMS'], imp: 'ext' },
+  'RISK_MODEL':           { type: 'GenericCmd', args: 1, optKw: ['CONFIDENCE', 'WINDOW'], imp: 'ext' },
+  'MONTE_CARLO':          { type: 'GenericCmd', args: 1, optKw: ['RUNS'], imp: 'ext' },
+  'TASK_SCHEDULE':        { type: 'GenericCmd', args: 1, optKw: ['EVERY', 'RUN'], imp: 'ext' },
+  'FILE_PARSE':           { type: 'GenericCmd', args: 1, optKw: ['FORMAT'], imp: 'ext' },
+  'WEATHER_IMPACT':       { type: 'GenericCmd', args: 1, optKw: ['DAYS'], imp: 'ext' },
+  'STRATEGY_ENTRY':       { type: 'GenericCmd', args: 1, optKw: ['DIRECTION', 'SIZING', 'STOP', 'LIMIT'], imp: 'ext' },
+  'STRATEGY_EXIT':        { type: 'GenericCmd', args: 1, optKw: ['REASON'], imp: 'ext' },
+  'STRATEGY_CLOSE':       { type: 'GenericCmd', args: 0, optKw: ['REASON'], imp: 'ext' },
+  'INPUT_INT':            { type: 'GenericCmd', args: 1, optKw: ['DEFAULT'], imp: 'ext' },
+  'INPUT_FLOAT':          { type: 'GenericCmd', args: 1, optKw: ['DEFAULT'], imp: 'ext' },
+  'INPUT_BOOL':           { type: 'GenericCmd', args: 1, optKw: ['DEFAULT'], imp: 'ext' },
+  'INPUT_SYMBOL':         { type: 'GenericCmd', args: 1, optKw: ['DEFAULT'], imp: 'ext' },
+  'TIMEFRAME_PERIOD':     { type: 'GenericCmd', args: 0, optKw: [], imp: 'ext' },
+  'TIMEFRAME_IS_DAILY':   { type: 'GenericCmd', args: 0, optKw: [], imp: 'ext' },
+  'ARRAY_NEW':            { type: 'GenericCmd', args: 0, optKw: [], imp: 'ext' },
+  'ARRAY_PUSH':           { type: 'GenericCmd', args: 2, optKw: [], imp: 'ext' },
+  'MATRIX_NEW':           { type: 'GenericCmd', args: 2, optKw: [], imp: 'ext' },
+  'MATRIX_SET':           { type: 'GenericCmd', args: 4, optKw: [], imp: 'ext' },
+};
+
+const PRT_STMT_ALIASES = {
+  'PRT_IF': 'IF', 'PRT_THEN': 'THEN', 'PRT_ELSE': 'ELSE', 'PRT_ENDIF': 'ENDIF',
+  'PRT_BUY': 'BUY', 'PRT_SELL': 'SELL',
+  'PRT_ALERT': 'ALERT',
+  'PRT_OPTIMIZE': 'OPTIMIZE', 'PRT_OPTIMISE': 'OPTIMIZE',
+};
+
+const PRT_INDICATOR_CMDS = new Set([
+  'PRT_AVERAGE', 'PRT_RSI', 'PRT_MACD', 'PRT_BOLLINGER',
+  'PRT_STOCHASTIC', 'PRT_ATR', 'PRT_CCI', 'PRT_ADX',
+  'PRT_DONCHIAN', 'PRT_ICHIMOKU', 'PRT_KELTNERCHANNEL',
+  'PRT_PARABOLICSAR', 'PRT_SUPERTREND',
+  'PRT_VOLUMEBYPRICE', 'PRT_FIBONACCI', 'PRT_PIVOTPOINT', 'PRT_DEMARK',
+  'PRT_WILLIAMS', 'PRT_ULTOSC', 'PRT_CHAIKIN', 'PRT_ONBALANCEVOLUME', 'PRT_VWAP',
+  'PRT_CUM', 'PRT_HIGHEST', 'PRT_LOWEST', 'PRT_SUM', 'PRT_STD',
+  'PRT_CORRELATION', 'PRT_REGRESSION', 'PRT_SUMMATION', 'PRT_HISTOGRAM',
+  'PRT_CROSS', 'PRT_BARSSINCE',
+]);
+
+const PRT_NOARG_CMDS = new Set([
+  'PRT_BARINDEX', 'PRT_DATE', 'PRT_TIME',
 ]);
 
 function lexer(code) {
@@ -232,7 +329,21 @@ class ClawScriptParser {
         return this.parseRumorScan(false);
       case 'CHAIN':
         return this.parseChain();
+      case 'PRT_DEFPARAM':
+        return this.parsePrtDefparam();
+      case 'PRT_RETURN':
+        return this.parsePrtReturn();
+      case 'PRT_DRAWLINE':
+      case 'PRT_DRAWARROW':
+        return this.parsePrtDraw(val);
       default:
+        if (GENERIC_CMD_DEFS[val]) return this.parseGenericCmd(val);
+        if (PRT_STMT_ALIASES[val]) {
+          token.value = PRT_STMT_ALIASES[val];
+          return this.parseStatement();
+        }
+        if (PRT_INDICATOR_CMDS.has(val)) return this.parsePrtIndicator(val);
+        if (PRT_NOARG_CMDS.has(val)) return this.parsePrtNoarg(val);
         if (token.type === TOKEN_TYPES.IDENTIFIER) {
           if (this.functions.has(token.value)) {
             return this.parseFunctionCall();
@@ -265,12 +376,12 @@ class ClawScriptParser {
 
     let value;
     const cur = this.current();
-    if (cur && ['AI_QUERY', 'ANALYZE_LOG', 'RUN_ML', 'CLAW_WEB', 'CLAW_X', 'CLAW_PDF',
+    const curCmd = cur ? (cur.value || '').toString().toUpperCase() : '';
+    if (['AI_QUERY', 'ANALYZE_LOG', 'RUN_ML', 'CLAW_WEB', 'CLAW_X', 'CLAW_PDF',
       'CLAW_IMAGE', 'CLAW_VIDEO', 'CLAW_CONVERSATION', 'CLAW_TOOL', 'CLAW_CODE',
       'CALL_SESSION', 'WAIT_FOR_REPLY', 'LOAD_VAR', 'NOMAD_SCAN', 'RUMOR_SCAN',
-      'INDICATOR'].includes((cur.value || '').toString().toUpperCase())) {
-      const cmd = cur.value.toString().toUpperCase();
-      switch (cmd) {
+      'INDICATOR'].includes(curCmd)) {
+      switch (curCmd) {
         case 'AI_QUERY': value = this.parseAIQuery(true); break;
         case 'ANALYZE_LOG': value = this.parseAnalyzeLog(true); break;
         case 'RUN_ML': value = this.parseRunML(true); break;
@@ -290,6 +401,12 @@ class ClawScriptParser {
         case 'INDICATOR': value = this.parseIndicatorCmd(true); break;
         default: value = this.parseExpression(); break;
       }
+    } else if (GENERIC_CMD_DEFS[curCmd]) {
+      value = this.parseGenericCmd(curCmd);
+    } else if (PRT_INDICATOR_CMDS.has(curCmd)) {
+      value = this.parsePrtIndicator(curCmd);
+    } else if (PRT_NOARG_CMDS.has(curCmd)) {
+      value = this.parsePrtNoarg(curCmd);
     } else {
       value = this.parseExpression();
     }
@@ -1183,6 +1300,83 @@ class ClawScriptParser {
     return args;
   }
 
+  parseGenericCmd(cmdName) {
+    this.pos++;
+    const def = GENERIC_CMD_DEFS[cmdName];
+    const posArgs = [];
+    for (let i = 0; i < def.args; i++) {
+      if (this.current() && !def.optKw.includes((this.current().value || '').toString().toUpperCase())) {
+        posArgs.push(this.parseExpression());
+      }
+    }
+    const kwargs = {};
+    for (const kw of def.optKw) {
+      if (this.current() && this.isCurrentKeyword(kw)) {
+        this.pos++;
+        kwargs[kw] = this.parseExpression();
+      }
+    }
+    if (def.imp) this.imports.add(def.imp);
+    return { type: 'GenericCmd', cmd: cmdName, posArgs, kwargs };
+  }
+
+  parsePrtIndicator(cmdName) {
+    this.pos++;
+    const indName = cmdName.replace('PRT_', '');
+    const params = [];
+    while (this.current() && this.current().type === TOKEN_TYPES.NUMBER) {
+      params.push(this.parseExpression());
+      if (this.current() && this.current().value === ',') this.pos++;
+    }
+    if (this.current() && this.current().value === '(') {
+      this.pos++;
+      while (this.current() && this.current().value !== ')') {
+        params.push(this.parseExpression());
+        if (this.current() && this.current().value === ',') this.pos++;
+      }
+      if (this.current() && this.current().value === ')') this.pos++;
+    }
+    this.imports.add('ext');
+    return { type: 'PrtIndicator', name: indName, params };
+  }
+
+  parsePrtNoarg(cmdName) {
+    this.pos++;
+    const name = cmdName.replace('PRT_', '');
+    this.imports.add('ext');
+    return { type: 'PrtNoarg', name };
+  }
+
+  parsePrtDefparam() {
+    this.pos++;
+    const name = this.current() ? this.current().value : 'param';
+    this.pos++;
+    if (this.current() && this.current().value === '=') this.pos++;
+    const value = this.parseExpression();
+    return { type: 'VarDecl', name, value, isDef: true };
+  }
+
+  parsePrtReturn() {
+    this.pos++;
+    const value = this.parseExpression();
+    return { type: 'PrtReturn', value };
+  }
+
+  parsePrtDraw(cmdName) {
+    this.pos++;
+    const params = [];
+    if (this.current() && this.current().value === '(') {
+      this.pos++;
+      while (this.current() && this.current().value !== ')') {
+        params.push(this.parseExpression());
+        if (this.current() && this.current().value === ',') this.pos++;
+      }
+      if (this.current() && this.current().value === ')') this.pos++;
+    }
+    this.imports.add('ext');
+    return { type: 'PrtDraw', cmd: cmdName, params };
+  }
+
   generateJS(ast, strategyName) {
     const safeName = strategyName.replace(/[^a-zA-Z0-9]/g, '');
     let js = `'use strict';\n`;
@@ -1197,6 +1391,7 @@ class ClawScriptParser {
       channels: `const channels = require('../openclaw-channels.cjs');`,
       trade: `const trade = require('../openclaw-trade.cjs');`,
       nomad: `const nomad = require('../openclaw-nomad.cjs');`,
+      ext: `const ext = require('../openclaw-ext.cjs');`,
     };
 
     this.imports.forEach(imp => {
@@ -1340,6 +1535,21 @@ class ClawScriptParser {
         }
         return chainJs;
       }
+      case 'GenericCmd': {
+        const fn = stmt.cmd.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+        const allArgs = (stmt.posArgs || []).map(a => this.generateExpr(a));
+        const kwEntries = Object.entries(stmt.kwargs || {}).map(([k, v]) => `${k.toLowerCase()}: ${this.generateExpr(v)}`);
+        if (kwEntries.length) allArgs.push(`{ ${kwEntries.join(', ')} }`);
+        return `${indent}const _${fn}Result = await ext.${fn}(${allArgs.join(', ')});\n`;
+      }
+      case 'PrtIndicator':
+        return `${indent}const _prt${stmt.name} = await ext.prt${stmt.name}(${stmt.params.map(p => this.generateExpr(p)).join(', ')});\n`;
+      case 'PrtNoarg':
+        return `${indent}const _prt${stmt.name} = ext.prt${stmt.name}();\n`;
+      case 'PrtReturn':
+        return `${indent}return ${this.generateExpr(stmt.value)};\n`;
+      case 'PrtDraw':
+        return `${indent}await ext.prtDraw("${stmt.cmd}", [${stmt.params.map(p => this.generateExpr(p)).join(', ')}]);\n`;
       case 'ExpressionStatement':
         return `${indent}${this.generateExpr(stmt.expr)};\n`;
       default:
@@ -1499,6 +1709,17 @@ class ClawScriptParser {
         return `await tools.rumorScan(${this.generateExpr(expr.topic)}, { sources: ${expr.sources ? this.generateExpr(expr.sources) : '"both"'}, limit: ${expr.limit ? this.generateExpr(expr.limit) : '10'} })`;
       case 'IndicatorCall':
         return `indicators.calc${expr.name}(prices${expr.params.map(p => ', ' + this.generateExpr(p)).join('')})`;
+      case 'GenericCmd': {
+        const fn = expr.cmd.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+        const allArgs = (expr.posArgs || []).map(a => this.generateExpr(a));
+        const kwEntries = Object.entries(expr.kwargs || {}).map(([k, v]) => `${k.toLowerCase()}: ${this.generateExpr(v)}`);
+        if (kwEntries.length) allArgs.push(`{ ${kwEntries.join(', ')} }`);
+        return `await ext.${fn}(${allArgs.join(', ')})`;
+      }
+      case 'PrtIndicator':
+        return `await ext.prt${expr.name}(${expr.params.map(p => this.generateExpr(p)).join(', ')})`;
+      case 'PrtNoarg':
+        return `ext.prt${expr.name}()`;
       default:
         if (typeof expr === 'string') return JSON.stringify(expr);
         if (typeof expr === 'number') return String(expr);
