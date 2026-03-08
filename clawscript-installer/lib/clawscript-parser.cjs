@@ -278,6 +278,7 @@ class ClawScriptParser {
     this.variables = new Map();
     this.imports = new Set(['indicators']);
     this.functions = new Map();
+    this._gcIdx = 0;
   }
 
   current() {
@@ -1711,7 +1712,8 @@ class ClawScriptParser {
         const allArgs = (stmt.posArgs || []).map(a => this.generateExpr(a));
         const kwEntries = Object.entries(stmt.kwargs || {}).map(([k, v]) => `${k.toLowerCase()}: ${this.generateExpr(v)}`);
         if (kwEntries.length) allArgs.push(`{ ${kwEntries.join(', ')} }`);
-        return `${indent}const _${fn}Result = await ${mod}.${fn}(${allArgs.join(', ')});\n`;
+        const varSuffix = this._gcIdx++ || '';
+        return `${indent}const _${fn}Result${varSuffix} = await ${mod}.${fn}(${allArgs.join(', ')});\n`;
       }
       case 'PrtIndicator':
         return `${indent}const _prt${stmt.name} = await ext.prt${stmt.name}(${stmt.params.map(p => this.generateExpr(p)).join(', ')});\n`;

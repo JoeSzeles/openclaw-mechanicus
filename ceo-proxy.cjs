@@ -1025,6 +1025,14 @@ function igJsonResponse(res, statusCode, body) {
 
 const CLAWSCRIPT_STRATEGIES_DIR = path.join(__dirname, "skills", "bots", "strategies");
 const CLAWSCRIPT_META_FILE = path.join(DATA_DIR, "clawscript-strategies.json");
+const CLAWSCRIPT_LOGBOOK_FILE = path.join(DATA_DIR, "clawscript-logbook.json");
+
+function loadClawScriptLogbook() {
+  try { return JSON.parse(fs.readFileSync(CLAWSCRIPT_LOGBOOK_FILE, "utf8")); } catch (_) { return { entries: [] }; }
+}
+function saveClawScriptLogbook(lb) {
+  fs.writeFileSync(CLAWSCRIPT_LOGBOOK_FILE, JSON.stringify(lb, null, 2));
+}
 
 function loadClawScriptMeta() {
   try { return JSON.parse(fs.readFileSync(CLAWSCRIPT_META_FILE, "utf8")); } catch (_) { return { strategies: [] }; }
@@ -1532,6 +1540,73 @@ async function handleClawScriptApi(req, res, p) {
     } catch (e) {
       return json(res, 400, { error: "Invalid JSON" });
     }
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/compile") {
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    const { code } = body;
+    if (!code) return json(res, 400, { error: "Missing code (ClawScript source)" });
+    try {
+      const parser = require("./skills/bots/clawscript-parser.cjs");
+      let parsed;
+      try { parsed = parser.parseAndGenerate(code); }
+      catch (parseErr) {
+        const lb = loadClawScriptLogbook();
+        lb.entries.push({ id: "log-" + Date.now(), timestamp: new Date().toISOString(), type: "error", message: "Parse error: " + parseErr.message, details: { code: code.slice(0, 500) }, resolved: false });
+        saveClawScriptLogbook(lb);
+        return json(res, 400, { error: "Parse error: " + parseErr.message });
+      }
+      if (!parsed || !parsed.ast) {
+        return json(res, 400, { error: "Parse error: " + (parsed ? parsed.error : "unknown") });
+      }
+      return json(res, 200, { ok: true, ast: parsed.ast, js: parsed.js, variables: parsed.variables || [], imports: parsed.imports || [] });
+    } catch (e) {
+      return json(res, 500, { error: "Compile failed: " + e.message });
+    }
+  }
+
+  if (req.method === "GET" && p === "/api/clawscript/logbook") {
+    const lb = loadClawScriptLogbook();
+    return json(res, 200, lb);
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/logbook") {
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    const { type, epic, strategy, message, details } = body;
+    if (!message) return json(res, 400, { error: "Missing message" });
+    const lb = loadClawScriptLogbook();
+    const entry = {
+      id: "log-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+      timestamp: new Date().toISOString(),
+      type: type || "error",
+      epic: epic || null,
+      strategy: strategy || null,
+      message,
+      details: details || null,
+      resolved: false
+    };
+    lb.entries.push(entry);
+    saveClawScriptLogbook(lb);
+    console.log(`[clawscript-logbook] Added ${entry.type}: ${message.slice(0, 80)}`);
+    return json(res, 200, { ok: true, entry });
+  }
+
+  const logbookPatchMatch = p.match(/^\/api\/clawscript\/logbook\/([^/]+)$/);
+  if (req.method === "PATCH" && logbookPatchMatch) {
+    const targetId = decodeURIComponent(logbookPatchMatch[1]);
+    const lb = loadClawScriptLogbook();
+    const entry = lb.entries.find(e => e.id === targetId);
+    if (!entry) return json(res, 404, { error: "Logbook entry not found" });
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    if (body.resolved !== undefined) entry.resolved = !!body.resolved;
+    if (body.message) entry.message = body.message;
+    if (body.details) entry.details = body.details;
+    entry.updatedAt = new Date().toISOString();
+    saveClawScriptLogbook(lb);
+    return json(res, 200, { ok: true, entry });
   }
 
   return json(res, 404, { error: "Unknown ClawScript API endpoint" });

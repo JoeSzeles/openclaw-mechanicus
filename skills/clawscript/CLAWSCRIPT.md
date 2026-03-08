@@ -589,9 +589,32 @@ AGENT_TERMINATE "news_bot"
 AGENT_TERMINATE "market_bot"
 ```
 
+## Automation Templates
+
+Five ready-to-use templates in `.openclaw/canvas/clawscript-templates/` exercise all 22 automation commands:
+
+| Template | File | Commands Covered |
+|----------|------|-----------------|
+| Self-Improving Trade Loop | `trade-self-improve.cs` | TASK_DEFINE, WEB_FETCH, BUY, FILE_READ, DATA_TRANSFORM, FILE_WRITE, TASK_LOG |
+| Multi-Agent Orchestration | `multi-agent-ops.cs` | AGENT_SPAWN, AGENT_CALL, AGENT_PASS, SKILL_CALL, AGENT_TERMINATE |
+| Scheduled Monitoring | `cron-monitor.cs` | CRON_CREATE, TASK_DEFINE, WEB_FETCH, DATA_TRANSFORM, CHANNEL_SEND, EMAIL_SEND, TASK_LOG |
+| Data Pipeline | `data-pipeline.cs` | FILE_READ, DATA_TRANSFORM, FILE_WRITE, FILE_EXECUTE, WEB_SERIAL, PUBLISH_CANVAS |
+| Full Operations Suite | `full-operations.cs` | TASK_DEFINE, TASK_ASSIGN, TASK_CHAIN, TASK_PARALLEL, TASK_SHOW_FLOW, CRON_CALL + remaining |
+
+## Chat Integration
+
+Agents can write and display ClawScript inline in chat:
+
+- **Fenced blocks**: ` ```clawscript ` code blocks render with an "Open in ClawScript Editor" button
+- **Embedded editor**: `![Editor](/__openclaw__/canvas/chat-clawscript-editor.html?code=...)`
+- **Trade results**: `![Results](/__openclaw__/canvas/trade-results.html)`
+- **Logbook viewer**: `![Logbook](/__openclaw__/canvas/clawscript-logbook.html)`
+- **Compile API**: `POST /api/clawscript/compile` — returns AST + JS without backtest
+- **Logbook API**: `GET/POST /api/clawscript/logbook`, `PATCH /api/clawscript/logbook/:id`
+
 ## Test Suite
 
-- **169 pipeline tests**: End-to-end parse → compile → save → load across 26 categories
-- **100% pass rate** including real BTC data integration tests and all automation commands
+- **191 pipeline tests**: End-to-end parse → compile → save → load across 27 categories including automation templates
+- **100% pass rate** including real BTC data integration tests and all 22 automation commands
 - Test runner: `skills/bots/tests/test-clawscript-parser.cjs` and `test-clawscript-pipeline.cjs`
 - Report saved to: `.openclaw/clawscript-pipeline-report.json`

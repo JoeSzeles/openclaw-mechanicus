@@ -172,6 +172,33 @@
 }
 
 /* =============================================
+   CLAWSCRIPT EMBED ACTIONS
+   ============================================= */
+
+.chat-text .clawscript-embed-action {
+  margin: 4px 0 8px 0;
+}
+
+.chat-text .clawscript-open-editor {
+  display: inline-block;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.1);
+  border: 1px solid rgba(63, 185, 80, 0.3);
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.chat-text .clawscript-open-editor:hover {
+  background: rgba(63, 185, 80, 0.2);
+  border-color: rgba(63, 185, 80, 0.5);
+}
+
+/* =============================================
    ENHANCED TABLES
    ============================================= */
 

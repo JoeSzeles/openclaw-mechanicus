@@ -65,6 +65,21 @@ Test trading strategies against historical data before deploying live.
 - Performance metrics: P&L, win rate, Sharpe ratio, max drawdown, profit factor
 - Results published as interactive HTML on the Canvas hub
 
+**ClawScript DSL & Chat Integration**
+
+ClawScript is a domain-specific language for defining trading strategies and general automation. Agents can write, compile, backtest, and display ClawScript directly in the chat.
+
+- 100+ commands across 21 categories: trading, AI, data fetch, agent orchestration, task planning, and more
+- 22 automation commands with server-side execution via `openclaw-automation.cjs`
+- Chat-embedded editor: agents output `clawscript` fenced blocks → "Open in ClawScript Editor" button
+- Inline embeds: `![Editor](/__openclaw__/canvas/chat-clawscript-editor.html)`, trade results, logbook
+- Compile API: `POST /api/clawscript/compile` — validates and returns AST + JS
+- Error logbook: persistent tracking of errors, fixes, iterations, and trades
+- 5 automation templates: self-improving trades, multi-agent ops, cron monitoring, data pipelines, full operations
+- 191 tests at 100% pass rate (82 parser + 109 pipeline including 22 automation command tests)
+- Visual flow builder with drag-drop nodes and bidirectional code sync
+- See `skills/clawscript/CLAWSCRIPT.md` for the full language reference
+
 **Process Manager & Bot Registry**
 
 ![Processes & Bots](docs/images/processes-bots.png)

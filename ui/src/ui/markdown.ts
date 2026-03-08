@@ -169,6 +169,15 @@ htmlEscapeRenderer.html = ({ text }: { text: string }) => {
   }
   return escapeHtml(text);
 };
+htmlEscapeRenderer.code = ({ text, lang }: { text: string; lang?: string | null }) => {
+  if (lang && lang.toLowerCase() === "clawscript") {
+    const encoded = encodeURIComponent(text);
+    const editorUrl = `${CANVAS_URL_PREFIX}chat-clawscript-editor.html?code=${encoded}`;
+    return `<pre class="code-block"><code class="language-clawscript">${escapeHtml(text)}</code></pre><div class="clawscript-embed-action"><a class="clawscript-open-editor" href="${escapeHtml(editorUrl)}" target="_blank" rel="noreferrer noopener">▶ Open in ClawScript Editor</a></div>`;
+  }
+  const langClass = lang ? ` class="language-${escapeHtml(lang)}"` : "";
+  return `<pre class="code-block"><code${langClass}>${escapeHtml(text)}</code></pre>`;
+};
 htmlEscapeRenderer.image = ({ href, title, text }: { href: string; title: string | null; text: string }) => {
   if (href && href.startsWith(CANVAS_URL_PREFIX)) {
     const label = text || title || "Canvas Page";
