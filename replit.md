@@ -86,7 +86,7 @@ OpenClaw Cloud employs a "CEO Proxy + Gateway" architecture, where two component
 -   **Installer directory**: `clawscript-installer/` — curated standalone version, synced via `sync-clawscript.sh`
 -   **Sync workflow**: Edit canonical files → run `bash .openclaw/canvas/sync-clawscript.sh` to sync to installer → run `bash clawscript-installer/sync-and-push.sh` to bump version and push to GitHub
 -   **Version tracker**: `clawscript-installer/VERSION` file tracks current version; auto-bumped on each push. GitHub repo also has `VERSION` for remote comparison.
--   **Current version**: 1.1.1 (pushed 2026-03-09)
+-   **Current version**: 1.1.2 (pushed 2026-03-09)
 
 ## External Dependencies
 -   **xAI/Grok API**: Primary AI model provider (e.g., `grok-4-1-fast-reasoning`, `grok-4`, `grok-2`). Used for `web_search` tool.

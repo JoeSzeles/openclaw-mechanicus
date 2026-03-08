@@ -435,8 +435,7 @@ function buildEditorUI() {
     '</div>' +
     '<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#8b949e;cursor:pointer;"><input type="checkbox" id="csRealDataCheck" style="cursor:pointer;"> Real Data</label>' +
     '<input id="csInstrumentInput" type="text" placeholder="Epic (e.g. CS.D.BITCOIN.CFD.IP)" value="CS.D.BITCOIN.CFD.IP" style="width:200px;padding:3px 8px;font-size:11px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;" title="Instrument epic for simulation/backtest">' +
-    '<button id="csBtnBacktest" title="Run Backtest with Real Data" style="background:#3d2800;border-color:#d29922;color:#d29922;">&#9654; Backtest</button>' +
-    '<button id="csBtnRunLive" title="Run Script Live" style="background:#0a2e0a;border-color:#238636;color:#2dc653;font-weight:700;">&#128640; Run Live</button>' +
+    '<button id="csBtnBacktest" title="Run Backtest with Real Data" style="background:#0c2d48;border-color:#58a6ff;color:#58a6ff;">&#9654; Backtest</button>' +
     '<div class="cs-sep"></div>' +
     '<select id="csTemplateSelect"><option value="">Templates...</option></select>' +
     '<div class="cs-sep"></div>' +
@@ -475,10 +474,11 @@ function buildEditorUI() {
       '<div class="cs-ai-header">' +
         '<span>AI Assistant</span>' +
         '<select id="csAiModelSelect">' +
-          '<option value="grok-4-1-fast-reasoning">ClawScript AI (default)</option>' +
-          '<option value="grok-4">Grok 4</option>' +
-          '<option value="grok-2">Grok 2</option>' +
+          '<option value="auto">ClawScript AI (default)</option>' +
+          '<option value="ceo-agent">CEO Agent</option>' +
+          '<option value="grok">Grok</option>' +
         '</select>' +
+        '<button id="csAiSettingsBtn" title="AI Settings" style="padding:2px 6px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid #30363d;background:#21262d;color:#c9d1d9;">⚙</button>' +
         '<button id="csAiClearBtn" style="padding:2px 8px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid #30363d;background:#21262d;color:#c9d1d9;">Clear</button>' +
       '</div>' +
       '<div class="cs-ai-messages" id="csAiMessages">' +
@@ -546,7 +546,6 @@ function attachEditorEvents() {
   document.getElementById('csBtnCompile').addEventListener('click', compileAndSave);
   document.getElementById('csBtnSimulate').addEventListener('click', runSimulation);
   document.getElementById('csBtnBacktest').addEventListener('click', runBacktest);
-  document.getElementById('csBtnRunLive').addEventListener('click', csRunLive);
   document.getElementById('csBtnClearLog').addEventListener('click', clearLog);
   initSpeedControls();
   initAiAssistant();
@@ -3211,6 +3210,10 @@ function initAiAssistant() {
       if (msgs) msgs.innerHTML = '<div class="cs-ai-msg cs-ai-msg-system">Chat cleared. Ask me anything about your ClawScript code.</div>';
     });
   }
+  var settingsBtn = document.getElementById('csAiSettingsBtn');
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', function() { _showAiSettings(); });
+  }
 
   var resizeHandle = document.getElementById('csAiResizeHandle');
   var aiPane = document.getElementById('csAiPane');
@@ -3396,40 +3399,160 @@ function requestImplementFix(callback) {
   });
 }
 
-function _sendAiRequest(messages, callback) {
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', '/api/clawscript/ai', true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  var _csToken = null;
+var _csAiConfig = null;
+function _getAiConfig() {
+  if (_csAiConfig) return _csAiConfig;
+  try {
+    var stored = localStorage.getItem('clawscript.ai.config');
+    if (stored) { _csAiConfig = JSON.parse(stored); return _csAiConfig; }
+  } catch(_e) {}
+  return null;
+}
+function _saveAiConfig(cfg) {
+  _csAiConfig = cfg;
+  try { localStorage.setItem('clawscript.ai.config', JSON.stringify(cfg)); } catch(_e) {}
+}
+function _showAiSettings() {
+  var cfg = _getAiConfig() || {};
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML =
+    '<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;width:400px;color:#c9d1d9;font-family:system-ui;">' +
+      '<h3 style="margin:0 0 12px 0;color:#58a6ff;">AI Assistant Settings</h3>' +
+      '<p style="font-size:12px;color:#8b949e;margin:0 0 12px 0;">Configure a direct AI endpoint for local installations. Leave blank to auto-detect. Supports Groq, OpenAI, xAI, Ollama (no key needed), and any OpenAI-compatible API.</p>' +
+      '<label style="font-size:12px;color:#8b949e;">API Base URL (OpenAI-compatible)</label>' +
+      '<input id="csAiCfgUrl" type="text" placeholder="https://api.groq.com/openai/v1 or http://localhost:11434/v1" value="' + (cfg.apiUrl || '') + '" style="width:100%;box-sizing:border-box;padding:6px 8px;margin:4px 0 10px 0;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;">' +
+      '<label style="font-size:12px;color:#8b949e;">API Key</label>' +
+      '<input id="csAiCfgKey" type="password" placeholder="sk-... or gsk_..." value="' + (cfg.apiKey || '') + '" style="width:100%;box-sizing:border-box;padding:6px 8px;margin:4px 0 10px 0;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;">' +
+      '<label style="font-size:12px;color:#8b949e;">Model</label>' +
+      '<input id="csAiCfgModel" type="text" placeholder="llama-3.3-70b-versatile" value="' + (cfg.model || '') + '" style="width:100%;box-sizing:border-box;padding:6px 8px;margin:4px 0 16px 0;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;">' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button id="csAiCfgClear" style="padding:6px 14px;border-radius:4px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;cursor:pointer;">Clear</button>' +
+        '<button id="csAiCfgCancel" style="padding:6px 14px;border-radius:4px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;cursor:pointer;">Cancel</button>' +
+        '<button id="csAiCfgSave" style="padding:6px 14px;border-radius:4px;border:none;background:#238636;color:#fff;cursor:pointer;">Save</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('csAiCfgCancel').onclick = function() { overlay.remove(); };
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  document.getElementById('csAiCfgClear').onclick = function() {
+    _csAiConfig = null;
+    try { localStorage.removeItem('clawscript.ai.config'); } catch(_e) {}
+    overlay.remove();
+    csLog('AI settings cleared. Will auto-detect endpoint.', 'success');
+  };
+  document.getElementById('csAiCfgSave').onclick = function() {
+    var url = document.getElementById('csAiCfgUrl').value.trim();
+    var key = document.getElementById('csAiCfgKey').value.trim();
+    var model = document.getElementById('csAiCfgModel').value.trim();
+    _saveAiConfig({ apiUrl: url, apiKey: key, model: model });
+    overlay.remove();
+    csLog('AI settings saved.' + (url ? ' Using: ' + url : ' Auto-detect mode.'), 'success');
+  };
+}
+
+function _getAuthToken() {
+  var token = null;
   try {
     var stored = localStorage.getItem('openclaw.control.settings.v1');
-    if (stored) { var s = JSON.parse(stored); _csToken = s.token || null; }
+    if (stored) { var s = JSON.parse(stored); token = s.token || null; }
   } catch(_e) {}
-  if (!_csToken) {
+  if (!token) {
     var cm = document.cookie.match(/openclaw_token=([^;]+)/);
-    if (cm) _csToken = cm[1];
+    if (cm) token = cm[1];
   }
-  if (_csToken) xhr.setRequestHeader('Authorization', 'Bearer ' + _csToken);
-  var modelSelect = document.getElementById('csAiModelSelect');
-  var selectedModel = modelSelect ? modelSelect.value : 'grok-4-1-fast-reasoning';
+  return token;
+}
+
+function _xhrPost(url, headers, body, onSuccess, onError) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', url, true);
+  for (var k in headers) { xhr.setRequestHeader(k, headers[k]); }
   xhr.onload = function() {
-    try {
-      var data = JSON.parse(xhr.responseText);
-      var reply = '';
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        reply = data.choices[0].message.content;
-      } else if (data.error) {
-        reply = 'Error: ' + data.error;
-      } else {
-        reply = xhr.responseText.substring(0, 500);
-      }
-      callback(reply);
-    } catch (e) {
-      callback(null);
+    if (xhr.status >= 200 && xhr.status < 300) {
+      onSuccess(xhr.responseText);
+    } else {
+      onError(xhr.status, xhr.responseText);
     }
   };
-  xhr.onerror = function() { callback(null); };
-  xhr.send(JSON.stringify({ messages: messages, model: selectedModel }));
+  xhr.onerror = function() { onError(0, ''); };
+  xhr.timeout = 120000;
+  xhr.ontimeout = function() { onError(0, 'timeout'); };
+  xhr.send(typeof body === 'string' ? body : JSON.stringify(body));
+}
+
+function _parseAiResponse(text) {
+  try {
+    var data = JSON.parse(text);
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      return data.choices[0].message.content;
+    }
+    if (data.error) return 'Error: ' + (data.error.message || data.error);
+    return text.substring(0, 500);
+  } catch(e) {
+    return null;
+  }
+}
+
+function _sendAiRequest(messages, callback) {
+  var modelSel = document.getElementById('csAiModelSelect');
+  var mode = modelSel ? modelSel.value : 'auto';
+  var cfg = _getAiConfig();
+  var token = _getAuthToken();
+
+  if (mode === 'ceo-agent') {
+    _sendToServerEndpoint('/api/agent/chat', token, messages, callback);
+    return;
+  }
+
+  if (cfg && cfg.apiUrl && cfg.apiKey) {
+    _sendToDirectApi(cfg, messages, callback);
+    return;
+  }
+
+  var endpoints = ['/api/clawscript/ai', '/api/clawscript/ai/chat', '/api/agent/chat'];
+  function tryNext(idx) {
+    if (idx >= endpoints.length) { callback(null); return; }
+    _sendToServerEndpoint(endpoints[idx], token, messages, function(reply) {
+      if (reply !== null) { callback(reply); return; }
+      tryNext(idx + 1);
+    });
+  }
+  tryNext(0);
+}
+
+function _sendToServerEndpoint(url, token, messages, callback) {
+  var headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  _xhrPost(url, headers, { messages: messages }, function(text) {
+    var reply = _parseAiResponse(text);
+    callback(reply);
+  }, function() {
+    callback(null);
+  });
+}
+
+function _sendToDirectApi(cfg, messages, callback) {
+  var url = cfg.apiUrl.replace(/\/+$/, '') + '/chat/completions';
+  var headers = { 'Content-Type': 'application/json' };
+  if (cfg.apiKey) headers['Authorization'] = 'Bearer ' + cfg.apiKey;
+  var body = {
+    model: cfg.model || 'llama-3.3-70b-versatile',
+    messages: messages,
+    max_tokens: 4096,
+    temperature: 0.3
+  };
+  _xhrPost(url, headers, body, function(text) {
+    var reply = _parseAiResponse(text);
+    callback(reply);
+  }, function(status, text) {
+    var errMsg = 'AI API error';
+    try {
+      var d = JSON.parse(text);
+      errMsg = d.error && d.error.message ? d.error.message : 'HTTP ' + status;
+    } catch(_e) { errMsg = status ? 'HTTP ' + status : 'Network error'; }
+    callback('Error: ' + errMsg + '. Check AI Settings (⚙).');
+  });
 }
 
 function applyAiFix(code) {
@@ -3498,137 +3621,9 @@ function sendAiMessage() {
       _aiChatHistory.push({ role: 'assistant', content: reply });
       appendAiMessage('assistant', reply);
     } else {
-      appendAiMessage('assistant', 'Network error. Make sure the agent is running.');
+      appendAiMessage('assistant', 'Could not reach AI endpoint. Click ⚙ to configure a direct API (Groq, OpenAI, or local), or ensure your server has /api/clawscript/ai available.');
     }
   });
-}
-
-var _csRunnerLogTimer = null;
-var _csRunnerStatusTimer = null;
-
-function csRunLive() {
-  var code = '';
-  var editor = document.getElementById('csCodeEditor');
-  if (editor) code = editor.value.trim();
-  if (!code) { csLog('No code to run live.', 'error'); return; }
-  var btn = document.getElementById('csBtnRunLive');
-  if (btn) { btn.disabled = true; btn.textContent = 'Starting...'; }
-  var ts = Date.now().toString(36);
-  fetch('/api/clawscript/run', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code: code, name: 'ig-' + ts })
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (btn) { btn.disabled = false; btn.textContent = '\uD83D\uDE80 Run Live'; }
-    if (data.error) {
-      csLog('Run Error: ' + data.error, 'error');
-    } else {
-      csLog('Script started: ' + (data.name || data.scriptId), 'info');
-      csOpenRunnerPopup(data.name || data.scriptId, data.scriptId);
-    }
-  }).catch(function(err) {
-    if (btn) { btn.disabled = false; btn.textContent = '\uD83D\uDE80 Run Live'; }
-    csLog('Network error: ' + err.message, 'error');
-  });
-}
-
-function csOpenRunnerPopup(name, scriptId) {
-  csCloseRunnerPopup();
-  var fullId = scriptId || name;
-  var shortId = fullId.replace(/^cs-script-/, '');
-  var overlay = document.createElement('div');
-  overlay.id = 'csRunnerOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;display:flex;align-items:center;justify-content:center;';
-  overlay.innerHTML =
-    '<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;width:min(90vw,520px);max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5);">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #21262d;background:#0d1117;">' +
-        '<div style="font-size:13px;font-weight:700;color:#c9d1d9;display:flex;align-items:center;gap:8px;">' +
-          '<span>\uD83E\uDD80 ' + _csEsc(shortId) + '</span>' +
-          '<span id="csRpBadge" style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;text-transform:uppercase;background:#1f6feb;color:#fff;">STARTING</span>' +
-        '</div>' +
-        '<button id="csRpClose" style="padding:2px 8px;font-size:14px;background:#21262d;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;cursor:pointer;">\u2715</button>' +
-      '</div>' +
-      '<div style="display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid #21262d;flex-wrap:wrap;">' +
-        '<button id="csRpStop" style="padding:3px 10px;font-size:10px;background:#da3633;border:1px solid #da3633;color:#fff;border-radius:4px;cursor:pointer;">\u25A0 Stop</button>' +
-        '<button id="csRpRestart" style="padding:3px 10px;font-size:10px;background:#1f6feb;border:1px solid #1f6feb;color:#fff;border-radius:4px;cursor:pointer;">\u21BB Restart</button>' +
-        '<button id="csRpPause" style="padding:3px 10px;font-size:10px;background:#9e6a03;border:1px solid #9e6a03;color:#fff;border-radius:4px;cursor:pointer;">\u23F8 Pause</button>' +
-        '<button id="csRpResume" style="display:none;padding:3px 10px;font-size:10px;background:#238636;border:1px solid #238636;color:#fff;border-radius:4px;cursor:pointer;">\u25B6 Resume</button>' +
-      '</div>' +
-      '<div id="csRpLogs" style="flex:1;overflow-y:auto;padding:8px 14px;font:10px/1.6 monospace;color:#8b949e;min-height:150px;max-height:400px;background:#0d1117;">Waiting for logs...</div>' +
-    '</div>';
-  document.body.appendChild(overlay);
-
-  overlay.addEventListener('click', function(e) { if (e.target === overlay) csCloseRunnerPopup(); });
-  document.getElementById('csRpClose').addEventListener('click', csCloseRunnerPopup);
-  document.getElementById('csRpStop').addEventListener('click', function() {
-    fetch('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-  });
-  document.getElementById('csRpRestart').addEventListener('click', function() {
-    fetch('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/restart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-  });
-  document.getElementById('csRpPause').addEventListener('click', function() {
-    fetch('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/pause', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-    document.getElementById('csRpPause').style.display = 'none';
-    document.getElementById('csRpResume').style.display = '';
-  });
-  document.getElementById('csRpResume').addEventListener('click', function() {
-    fetch('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/resume', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-    document.getElementById('csRpResume').style.display = 'none';
-    document.getElementById('csRpPause').style.display = '';
-  });
-
-  function pollLogs() {
-    fetch('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/logs')
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        var el = document.getElementById('csRpLogs');
-        if (!el || !data.lines) return;
-        var html = data.lines.map(function(l) {
-          var style = '';
-          if (l.indexOf('[ERROR]') > -1) style = 'color:#f85149';
-          else if (l.indexOf('[WARN]') > -1) style = 'color:#f0883e';
-          else if (l.indexOf('[TRADE]') > -1) style = 'color:#2dc653;font-weight:700';
-          else if (l.indexOf('[INFO]') > -1) style = 'color:#58a6ff';
-          return '<div' + (style ? ' style="' + style + '"' : '') + '>' + _csEsc(l) + '</div>';
-        }).join('');
-        el.innerHTML = html || '<div style="color:#484f58">No logs yet</div>';
-        el.scrollTop = el.scrollHeight;
-      }).catch(function() {});
-  }
-
-  function pollStatus() {
-    fetch('/api/clawscript/scripts')
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        var badge = document.getElementById('csRpBadge');
-        if (!badge) return;
-        var scripts = data.scripts || [];
-        var s = scripts.find(function(x) { return x.id === fullId; });
-        if (!s) {
-          badge.style.background = '#da3633'; badge.textContent = 'NOT FOUND';
-        } else if (s.running) {
-          badge.style.background = '#238636'; badge.textContent = 'RUNNING';
-        } else {
-          badge.style.background = '#da3633'; badge.textContent = 'STOPPED';
-        }
-      }).catch(function() {});
-  }
-
-  pollLogs();
-  pollStatus();
-  _csRunnerLogTimer = setInterval(pollLogs, 2000);
-  _csRunnerStatusTimer = setInterval(pollStatus, 3000);
-}
-
-function csCloseRunnerPopup() {
-  if (_csRunnerLogTimer) { clearInterval(_csRunnerLogTimer); _csRunnerLogTimer = null; }
-  if (_csRunnerStatusTimer) { clearInterval(_csRunnerStatusTimer); _csRunnerStatusTimer = null; }
-  var el = document.getElementById('csRunnerOverlay');
-  if (el) el.remove();
-}
-
-function _csEsc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 if (document.getElementById('csEditorRoot')) {

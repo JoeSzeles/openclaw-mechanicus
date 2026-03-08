@@ -474,9 +474,11 @@ function buildEditorUI() {
       '<div class="cs-ai-header">' +
         '<span>AI Assistant</span>' +
         '<select id="csAiModelSelect">' +
-          '<option value="ceo-agent">CEO Agent (default)</option>' +
+          '<option value="auto">ClawScript AI (default)</option>' +
+          '<option value="ceo-agent">CEO Agent</option>' +
           '<option value="grok">Grok</option>' +
         '</select>' +
+        '<button id="csAiSettingsBtn" title="AI Settings" style="padding:2px 6px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid #30363d;background:#21262d;color:#c9d1d9;">⚙</button>' +
         '<button id="csAiClearBtn" style="padding:2px 8px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid #30363d;background:#21262d;color:#c9d1d9;">Clear</button>' +
       '</div>' +
       '<div class="cs-ai-messages" id="csAiMessages">' +
@@ -3208,6 +3210,10 @@ function initAiAssistant() {
       if (msgs) msgs.innerHTML = '<div class="cs-ai-msg cs-ai-msg-system">Chat cleared. Ask me anything about your ClawScript code.</div>';
     });
   }
+  var settingsBtn = document.getElementById('csAiSettingsBtn');
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', function() { _showAiSettings(); });
+  }
 
   var resizeHandle = document.getElementById('csAiResizeHandle');
   var aiPane = document.getElementById('csAiPane');
@@ -3393,38 +3399,160 @@ function requestImplementFix(callback) {
   });
 }
 
-function _sendAiRequest(messages, callback) {
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', '/api/agent/chat', true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  var _csToken = null;
+var _csAiConfig = null;
+function _getAiConfig() {
+  if (_csAiConfig) return _csAiConfig;
+  try {
+    var stored = localStorage.getItem('clawscript.ai.config');
+    if (stored) { _csAiConfig = JSON.parse(stored); return _csAiConfig; }
+  } catch(_e) {}
+  return null;
+}
+function _saveAiConfig(cfg) {
+  _csAiConfig = cfg;
+  try { localStorage.setItem('clawscript.ai.config', JSON.stringify(cfg)); } catch(_e) {}
+}
+function _showAiSettings() {
+  var cfg = _getAiConfig() || {};
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML =
+    '<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;width:400px;color:#c9d1d9;font-family:system-ui;">' +
+      '<h3 style="margin:0 0 12px 0;color:#58a6ff;">AI Assistant Settings</h3>' +
+      '<p style="font-size:12px;color:#8b949e;margin:0 0 12px 0;">Configure a direct AI endpoint for local installations. Leave blank to auto-detect. Supports Groq, OpenAI, xAI, Ollama (no key needed), and any OpenAI-compatible API.</p>' +
+      '<label style="font-size:12px;color:#8b949e;">API Base URL (OpenAI-compatible)</label>' +
+      '<input id="csAiCfgUrl" type="text" placeholder="https://api.groq.com/openai/v1 or http://localhost:11434/v1" value="' + (cfg.apiUrl || '') + '" style="width:100%;box-sizing:border-box;padding:6px 8px;margin:4px 0 10px 0;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;">' +
+      '<label style="font-size:12px;color:#8b949e;">API Key</label>' +
+      '<input id="csAiCfgKey" type="password" placeholder="sk-... or gsk_..." value="' + (cfg.apiKey || '') + '" style="width:100%;box-sizing:border-box;padding:6px 8px;margin:4px 0 10px 0;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;">' +
+      '<label style="font-size:12px;color:#8b949e;">Model</label>' +
+      '<input id="csAiCfgModel" type="text" placeholder="llama-3.3-70b-versatile" value="' + (cfg.model || '') + '" style="width:100%;box-sizing:border-box;padding:6px 8px;margin:4px 0 16px 0;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;">' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button id="csAiCfgClear" style="padding:6px 14px;border-radius:4px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;cursor:pointer;">Clear</button>' +
+        '<button id="csAiCfgCancel" style="padding:6px 14px;border-radius:4px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;cursor:pointer;">Cancel</button>' +
+        '<button id="csAiCfgSave" style="padding:6px 14px;border-radius:4px;border:none;background:#238636;color:#fff;cursor:pointer;">Save</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('csAiCfgCancel').onclick = function() { overlay.remove(); };
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  document.getElementById('csAiCfgClear').onclick = function() {
+    _csAiConfig = null;
+    try { localStorage.removeItem('clawscript.ai.config'); } catch(_e) {}
+    overlay.remove();
+    csLog('AI settings cleared. Will auto-detect endpoint.', 'success');
+  };
+  document.getElementById('csAiCfgSave').onclick = function() {
+    var url = document.getElementById('csAiCfgUrl').value.trim();
+    var key = document.getElementById('csAiCfgKey').value.trim();
+    var model = document.getElementById('csAiCfgModel').value.trim();
+    _saveAiConfig({ apiUrl: url, apiKey: key, model: model });
+    overlay.remove();
+    csLog('AI settings saved.' + (url ? ' Using: ' + url : ' Auto-detect mode.'), 'success');
+  };
+}
+
+function _getAuthToken() {
+  var token = null;
   try {
     var stored = localStorage.getItem('openclaw.control.settings.v1');
-    if (stored) { var s = JSON.parse(stored); _csToken = s.token || null; }
+    if (stored) { var s = JSON.parse(stored); token = s.token || null; }
   } catch(_e) {}
-  if (!_csToken) {
+  if (!token) {
     var cm = document.cookie.match(/openclaw_token=([^;]+)/);
-    if (cm) _csToken = cm[1];
+    if (cm) token = cm[1];
   }
-  if (_csToken) xhr.setRequestHeader('Authorization', 'Bearer ' + _csToken);
+  return token;
+}
+
+function _xhrPost(url, headers, body, onSuccess, onError) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', url, true);
+  for (var k in headers) { xhr.setRequestHeader(k, headers[k]); }
   xhr.onload = function() {
-    try {
-      var data = JSON.parse(xhr.responseText);
-      var reply = '';
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        reply = data.choices[0].message.content;
-      } else if (data.error) {
-        reply = 'Error: ' + data.error;
-      } else {
-        reply = xhr.responseText.substring(0, 500);
-      }
-      callback(reply);
-    } catch (e) {
-      callback(null);
+    if (xhr.status >= 200 && xhr.status < 300) {
+      onSuccess(xhr.responseText);
+    } else {
+      onError(xhr.status, xhr.responseText);
     }
   };
-  xhr.onerror = function() { callback(null); };
-  xhr.send(JSON.stringify({ messages: messages }));
+  xhr.onerror = function() { onError(0, ''); };
+  xhr.timeout = 120000;
+  xhr.ontimeout = function() { onError(0, 'timeout'); };
+  xhr.send(typeof body === 'string' ? body : JSON.stringify(body));
+}
+
+function _parseAiResponse(text) {
+  try {
+    var data = JSON.parse(text);
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      return data.choices[0].message.content;
+    }
+    if (data.error) return 'Error: ' + (data.error.message || data.error);
+    return text.substring(0, 500);
+  } catch(e) {
+    return null;
+  }
+}
+
+function _sendAiRequest(messages, callback) {
+  var modelSel = document.getElementById('csAiModelSelect');
+  var mode = modelSel ? modelSel.value : 'auto';
+  var cfg = _getAiConfig();
+  var token = _getAuthToken();
+
+  if (mode === 'ceo-agent') {
+    _sendToServerEndpoint('/api/agent/chat', token, messages, callback);
+    return;
+  }
+
+  if (cfg && cfg.apiUrl && cfg.apiKey) {
+    _sendToDirectApi(cfg, messages, callback);
+    return;
+  }
+
+  var endpoints = ['/api/clawscript/ai', '/api/clawscript/ai/chat', '/api/agent/chat'];
+  function tryNext(idx) {
+    if (idx >= endpoints.length) { callback(null); return; }
+    _sendToServerEndpoint(endpoints[idx], token, messages, function(reply) {
+      if (reply !== null) { callback(reply); return; }
+      tryNext(idx + 1);
+    });
+  }
+  tryNext(0);
+}
+
+function _sendToServerEndpoint(url, token, messages, callback) {
+  var headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  _xhrPost(url, headers, { messages: messages }, function(text) {
+    var reply = _parseAiResponse(text);
+    callback(reply);
+  }, function() {
+    callback(null);
+  });
+}
+
+function _sendToDirectApi(cfg, messages, callback) {
+  var url = cfg.apiUrl.replace(/\/+$/, '') + '/chat/completions';
+  var headers = { 'Content-Type': 'application/json' };
+  if (cfg.apiKey) headers['Authorization'] = 'Bearer ' + cfg.apiKey;
+  var body = {
+    model: cfg.model || 'llama-3.3-70b-versatile',
+    messages: messages,
+    max_tokens: 4096,
+    temperature: 0.3
+  };
+  _xhrPost(url, headers, body, function(text) {
+    var reply = _parseAiResponse(text);
+    callback(reply);
+  }, function(status, text) {
+    var errMsg = 'AI API error';
+    try {
+      var d = JSON.parse(text);
+      errMsg = d.error && d.error.message ? d.error.message : 'HTTP ' + status;
+    } catch(_e) { errMsg = status ? 'HTTP ' + status : 'Network error'; }
+    callback('Error: ' + errMsg + '. Check AI Settings (⚙).');
+  });
 }
 
 function applyAiFix(code) {
@@ -3493,7 +3621,7 @@ function sendAiMessage() {
       _aiChatHistory.push({ role: 'assistant', content: reply });
       appendAiMessage('assistant', reply);
     } else {
-      appendAiMessage('assistant', 'Network error. Make sure the agent is running.');
+      appendAiMessage('assistant', 'Could not reach AI endpoint. Click ⚙ to configure a direct API (Groq, OpenAI, or local), or ensure your server has /api/clawscript/ai available.');
     }
   });
 }
