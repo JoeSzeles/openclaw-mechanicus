@@ -612,6 +612,41 @@ Agents can write and display ClawScript inline in chat:
 - **Compile API**: `POST /api/clawscript/compile` — returns AST + JS without backtest
 - **Logbook API**: `GET/POST /api/clawscript/logbook`, `PATCH /api/clawscript/logbook/:id`
 
+## Live Script Runner
+
+Scripts can be started as persistent bot processes that run continuously (like trading bots):
+
+### Running Scripts
+- **Run Live button** (green) in both the chat editor and IG dashboard editor
+- Click Run Live to compile and start the script as a persistent process
+- A popup window opens showing live logs, status badge, and lifecycle controls
+- Scripts register as bots (`cs-script-<name>`) and appear in the Processes page
+
+### Runner API Endpoints
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/clawscript/run` | POST | Start a script: `{code, name}` or `{file}` |
+| `/api/clawscript/scripts` | GET | List all scripts with running status |
+| `/api/clawscript/scripts/:id/stop` | POST | Stop a running script |
+| `/api/clawscript/scripts/:id/start` | POST | Start a stopped script |
+| `/api/clawscript/scripts/:id/restart` | POST | Restart a script |
+| `/api/clawscript/scripts/:id/pause` | POST | Pause (SIGUSR1) |
+| `/api/clawscript/scripts/:id/resume` | POST | Resume (SIGUSR2) |
+| `/api/clawscript/scripts/:id/logs` | GET | Tail log output (last 200 lines) |
+
+### Script Runner (`skills/bots/clawscript-runner.cjs`)
+- Compiles ClawScript source to JS, executes in sandboxed context
+- Supports lifecycle signals: SIGUSR1=pause, SIGUSR2=resume, SIGTERM=graceful stop
+- Logs to `.openclaw/clawscript-logs/<id>.log` with [INFO], [WARN], [ERROR], [TRADE] levels
+- Scripts saved to `.openclaw/clawscript-scripts/<id>.cs`
+- Auto-restarts with exponential backoff on crash
+
+### AI Assistant
+- **Endpoint**: `POST /api/clawscript/ai` — direct model call with ClawScript-optimized system prompt
+- Model selector: Grok 4.1 Fast Reasoning (default), Grok 4, Grok 2
+- Returns code corrections in ` ```clawscript ` blocks with line-specific error references
+- Used by the editor's built-in AI chat panel
+
 ## Test Suite
 
 - **191 pipeline tests**: End-to-end parse → compile → save → load across 27 categories including automation templates

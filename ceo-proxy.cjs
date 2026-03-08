@@ -1542,6 +1542,77 @@ async function handleClawScriptApi(req, res, p) {
     }
   }
 
+  if (req.method === "POST" && p === "/api/clawscript/ai") {
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    const { messages, model } = body;
+    if (!messages || !Array.isArray(messages) || messages.length === 0) return json(res, 400, { error: "Missing messages array" });
+    const xaiKey = process.env.XAI_API_KEY;
+    if (!xaiKey) return json(res, 500, { error: "XAI_API_KEY not configured" });
+    const modelId = model || "grok-4-1-fast-reasoning";
+    const systemPrompt = `You are an expert ClawScript coding assistant for IG trading strategies. ClawScript is a domain-specific language (DSL) that compiles to JavaScript for automated trading.
+
+CORE RULES:
+1. When fixing code, ALWAYS return the COMPLETE corrected code inside a \`\`\`clawscript code block
+2. Reference specific line numbers when pointing out errors (e.g. "Line 5: invalid syntax")
+3. NEVER say "paste this" or "compile & save" — just provide the code block directly
+4. The code block must contain the FULL corrected script, not just changed lines
+5. Remove invalid lines (random text, unknown commands)
+6. Fix spelling errors in command names
+7. Preserve all valid logic and intent
+
+CLAWSCRIPT COMMANDS (key subset):
+- Variables: DEF varName = value, SET varName = expression
+- Trading: BUY size AT MARKET [STOP dist] [LIMIT dist], SELL, SELLSHORT, EXIT, CLOSE, TRAILSTOP
+- Control: IF condition THEN ... [ELSE ...] ENDIF, LOOP n TIMES ... ENDLOOP, WHILE condition ... ENDWHILE
+- Indicators: SET x = INDICATOR RSI period, EMA, SMA, MACD, BOLLINGER, ATR, ADX, STOCHASTIC
+- Functions: RSI(period), EMA(period), SMA(period), MACD(fast,slow,signal), BOLLINGER(period)
+- AI: AI_QUERY "prompt", AI_GENERATE_SCRIPT "desc", ANALYZE_LOG "path", RUN_ML "model"
+- Data: CLAW_WEB "url", CLAW_X "query", FETCH_HISTORICAL "epic"
+- Agents: AGENT_SPAWN "name", AGENT_CALL "name" "task", SKILL_CALL "skill"
+- Automation: TASK_DEFINE "name" BODY ... ENDTASK, TASK_ASSIGN, TASK_CHAIN, CRON_CREATE
+- Files: FILE_READ "path", FILE_WRITE "path", WEB_FETCH "url"
+- Communication: CHANNEL_SEND "target", EMAIL_SEND "to" SUBJECT "subj"
+- Operators: AND, OR, NOT, CROSSES OVER, CROSSES UNDER, CONTAINS
+- Comments: // single line, /* multi-line */
+
+EXPRESSION SYNTAX: Use standard comparison (<, >, <=, >=, ==, !=) and arithmetic (+, -, *, /)`;
+    const apiMessages = [{ role: "system", content: systemPrompt }, ...messages];
+    try {
+      const https = require("https");
+      const postData = JSON.stringify({ model: modelId, messages: apiMessages, max_tokens: 4096, temperature: 0.3 });
+      const result = await new Promise((resolve, reject) => {
+        const req2 = https.request({
+          hostname: "api.x.ai", port: 443, path: "/v1/chat/completions",
+          method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + xaiKey, "Content-Length": Buffer.byteLength(postData) },
+          timeout: 120000,
+        }, (resp) => {
+          const chunks = [];
+          resp.on("data", (c) => chunks.push(c));
+          resp.on("end", () => {
+            try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+            catch (e) { reject(new Error("Invalid API response")); }
+          });
+        });
+        req2.on("error", reject);
+        req2.on("timeout", () => { req2.destroy(); reject(new Error("API timeout")); });
+        req2.write(postData);
+        req2.end();
+      });
+      if (result.error) return json(res, 502, { error: result.error.message || "API error" });
+      const reply = result.choices?.[0]?.message?.content || "";
+      return json(res, 200, {
+        id: result.id || "cs-ai-" + Date.now(),
+        object: "chat.completion",
+        choices: [{ index: 0, message: { role: "assistant", content: reply }, finish_reason: "stop" }],
+        model: modelId,
+      });
+    } catch (e) {
+      console.error("[clawscript-ai] Error:", e.message);
+      return json(res, 502, { error: "AI request failed: " + e.message });
+    }
+  }
+
   if (req.method === "POST" && p === "/api/clawscript/compile") {
     let body;
     try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
