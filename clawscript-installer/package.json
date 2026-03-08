@@ -1,7 +1,7 @@
 {
   "name": "clawscript",
-  "version": "1.0.0",
-  "description": "ClawScript DSL for OpenClaw — a domain-specific language for writing automated trading strategies with a visual flow builder, 38 commands, AI integration, and compilation to runnable JavaScript strategies.",
+  "version": "1.1.0",
+  "description": "ClawScript DSL for OpenClaw — a domain-specific language for writing automated trading strategies with a visual flow builder, 80+ commands, AI integration, automation, and compilation to runnable JavaScript strategies.",
   "main": "lib/clawscript-parser.cjs",
   "scripts": {
     "test": "node test/test-clawscript-parser.cjs",

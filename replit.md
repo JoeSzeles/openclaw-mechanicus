@@ -80,6 +80,14 @@ OpenClaw Cloud employs a "CEO Proxy + Gateway" architecture, where two component
 -   Injected navigation bar for improved user experience.
 -   Real-time updates via WebSockets.
 
+### ClawScript Standalone Repo:
+-   **GitHub**: https://github.com/JoeSzeles/clawscript (standalone ClawScript DSL package)
+-   **Canonical sources**: Parser in `skills/bots/clawscript-parser.cjs`, editor in `.openclaw/canvas/ig-clawscript-*.js`
+-   **Installer directory**: `clawscript-installer/` — curated standalone version, synced via `sync-clawscript.sh`
+-   **Sync workflow**: Edit canonical files → run `bash .openclaw/canvas/sync-clawscript.sh` to sync to installer → run `bash clawscript-installer/sync-and-push.sh` to bump version and push to GitHub
+-   **Version tracker**: `clawscript-installer/VERSION` file tracks current version; auto-bumped on each push. GitHub repo also has `VERSION` for remote comparison.
+-   **Current version**: 1.1.0 (pushed 2026-03-08)
+
 ## External Dependencies
 -   **xAI/Grok API**: Primary AI model provider (e.g., `grok-4-1-fast-reasoning`, `grok-4`, `grok-2`). Used for `web_search` tool.
 -   **OpenAI API**: Secondary AI model provider via Replit AI Integrations (e.g., `gpt-4o`, `gpt-4o-mini`).
