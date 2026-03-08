@@ -185,6 +185,48 @@ var NODE_CATS = [
       { cmd: 'OP_CONTAINS', doc: 'String contains — check if text contains substring', params: [], isOperator: true, opSymbol: 'HAS', opInputs: 2 }
     ]
   },
+  { id: 'task_planning', label: 'Task Planning', color: '#e3b341', bg: '#3d2e00',
+    items: [
+      { cmd: 'TASK_DEFINE', doc: 'Define a named task with body', params: [{k:'name',l:'Name',d:''},{k:'description',l:'Description',d:''}], ports: {out:['body','next']} },
+      { cmd: 'TASK_ASSIGN', doc: 'Assign task to an agent', params: [{k:'task',l:'Task',d:''},{k:'to',l:'To',d:''}] },
+      { cmd: 'TASK_CHAIN', doc: 'Chain tasks sequentially', params: [{k:'tasks',l:'Tasks',d:''}] },
+      { cmd: 'TASK_PARALLEL', doc: 'Run tasks in parallel', params: [{k:'tasks',l:'Tasks',d:''}] },
+      { cmd: 'TASK_SHOW_FLOW', doc: 'Visualise task dependency flow', params: [{k:'task',l:'Task',d:''}] },
+      { cmd: 'TASK_LOG', doc: 'Log task progress or result', params: [{k:'task',l:'Task',d:''},{k:'message',l:'Message',d:''}] }
+    ]
+  },
+  { id: 'agent_mgmt', label: 'Agent Management', color: '#f0883e', bg: '#3d2200',
+    items: [
+      { cmd: 'AGENT_SPAWN', doc: 'Spawn a new agent with instructions', params: [{k:'name',l:'Name',d:''},{k:'prompt',l:'Prompt',d:''}] },
+      { cmd: 'AGENT_CALL', doc: 'Call an agent and get result', params: [{k:'agent',l:'Agent',d:''},{k:'command',l:'Command',d:''}] },
+      { cmd: 'AGENT_PASS', doc: 'Pass data to another agent', params: [{k:'from',l:'Data Var',d:''},{k:'to',l:'Agent',d:''}] },
+      { cmd: 'AGENT_TERMINATE', doc: 'Terminate a running agent', params: [{k:'agent',l:'Agent',d:''}] }
+    ]
+  },
+  { id: 'skills_tools', label: 'Skills & Tools', color: '#3fb950', bg: '#0d3117',
+    items: [
+      { cmd: 'SKILL_CALL', doc: 'Invoke a registered skill', params: [{k:'skill',l:'Skill',d:''},{k:'args',l:'Args',d:''}] },
+      { cmd: 'CRON_CREATE', doc: 'Create a cron schedule', params: [{k:'name',l:'Name',d:''},{k:'schedule',l:'Schedule',d:''},{k:'run',l:'Run',d:''}] },
+      { cmd: 'CRON_CALL', doc: 'Trigger a cron job manually', params: [{k:'name',l:'Name',d:''}] },
+      { cmd: 'WEB_FETCH', doc: 'HTTP fetch from URL', params: [{k:'url',l:'URL',d:''},{k:'method',l:'Method',d:'GET'},{k:'timeout',l:'Timeout',d:''}] },
+      { cmd: 'WEB_SERIAL', doc: 'Serial port I/O', params: [{k:'urls',l:'Port',d:'/dev/ttyUSB0'},{k:'baud',l:'Baud',d:'9600'}] }
+    ]
+  },
+  { id: 'file_data', label: 'File & Data', color: '#a5d6ff', bg: '#0c2d48',
+    items: [
+      { cmd: 'FILE_READ', doc: 'Read file contents', params: [{k:'path',l:'Path',d:''},{k:'format',l:'Format',d:'text'}] },
+      { cmd: 'FILE_WRITE', doc: 'Write content to file', params: [{k:'path',l:'Path',d:''},{k:'content',l:'Content',d:''}] },
+      { cmd: 'FILE_EXECUTE', doc: 'Execute a file/script', params: [{k:'path',l:'Path',d:''}] },
+      { cmd: 'DATA_TRANSFORM', doc: 'Transform data (map/filter/reduce)', params: [{k:'data',l:'Data',d:''},{k:'operation',l:'Operation',d:''},{k:'expression',l:'Expression',d:''}] }
+    ]
+  },
+  { id: 'communication', label: 'Communication', color: '#d2a8ff', bg: '#2d1b4e',
+    items: [
+      { cmd: 'CHANNEL_SEND', doc: 'Send message to channel', params: [{k:'channel',l:'Channel',d:''},{k:'message',l:'Message',d:''}] },
+      { cmd: 'EMAIL_SEND', doc: 'Send email message', params: [{k:'to',l:'To',d:''},{k:'subject',l:'Subject',d:''},{k:'body',l:'Body',d:''}] },
+      { cmd: 'PUBLISH_CANVAS', doc: 'Publish content to canvas', params: [{k:'canvas',l:'Canvas',d:''},{k:'content',l:'Content',d:''}] }
+    ]
+  },
   { id: 'utility', label: 'Utility', color: '#8b949e', bg: '#21262d',
     items: [
       { cmd: 'FILE_PARSE', doc: 'Parse file (CSV/JSON/PDF)', params: [{k:'filename',l:'File',d:''},{k:'format',l:'Format',d:'csv'}] }
@@ -1652,7 +1694,29 @@ FlowEngine.prototype.astTypeToCmd = function(stmt) {
     'IndicatorCall': function() { return 'INDICATOR'; },
     'Include': function() { return 'INCLUDE'; },
     'FunctionDecl': function() { return 'DEF_FUNC'; },
-    'Chain': function() { return 'CHAIN'; }
+    'Chain': function() { return 'CHAIN'; },
+    'TaskDefine': function() { return 'TASK_DEFINE'; },
+    'TaskAssign': function() { return 'TASK_ASSIGN'; },
+    'TaskChain': function() { return 'TASK_CHAIN'; },
+    'TaskParallel': function() { return 'TASK_PARALLEL'; },
+    'TaskShowFlow': function() { return 'TASK_SHOW_FLOW'; },
+    'TaskLog': function() { return 'TASK_LOG'; },
+    'AgentSpawn': function() { return 'AGENT_SPAWN'; },
+    'AgentCall': function() { return 'AGENT_CALL'; },
+    'AgentPass': function() { return 'AGENT_PASS'; },
+    'AgentTerminate': function() { return 'AGENT_TERMINATE'; },
+    'SkillCall': function() { return 'SKILL_CALL'; },
+    'CronCreate': function() { return 'CRON_CREATE'; },
+    'CronCall': function() { return 'CRON_CALL'; },
+    'WebFetch': function() { return 'WEB_FETCH'; },
+    'WebSerial': function() { return 'WEB_SERIAL'; },
+    'FileRead': function() { return 'FILE_READ'; },
+    'FileWrite': function() { return 'FILE_WRITE'; },
+    'FileExecute': function() { return 'FILE_EXECUTE'; },
+    'DataTransform': function() { return 'DATA_TRANSFORM'; },
+    'ChannelSend': function() { return 'CHANNEL_SEND'; },
+    'EmailSend': function() { return 'EMAIL_SEND'; },
+    'PublishCanvas': function() { return 'PUBLISH_CANVAS'; }
   };
   var fn = map[stmt.type];
   return fn ? fn(stmt) : 'WAIT';
@@ -1749,6 +1813,13 @@ FlowEngine.prototype.toCode = function() {
         lines.push(p + 'ENDFUNC');
         var fnext = self.getConnectedTo(nodeId, 'next');
         fnext.forEach(function(tid) { gen(tid, p); });
+      } else if (node.cmd === 'TASK_DEFINE') {
+        lines.push(p + 'TASK_DEFINE "' + (node.params.name || '') + '"' + (node.params.description ? ' WITH "' + node.params.description + '"' : '') + ' BODY');
+        var tdbody = self.getConnectedTo(nodeId, 'body');
+        tdbody.forEach(function(tid) { gen(tid, p + '  '); });
+        lines.push(p + 'ENDTASK');
+        var tdnext = self.getConnectedTo(nodeId, 'next');
+        tdnext.forEach(function(tid) { gen(tid, p); });
       }
     } else {
       if (line) lines.push(p + line);
@@ -1839,6 +1910,48 @@ FlowEngine.prototype.nodeToLine = function(node) {
     case 'INDICATOR': return 'INDICATOR ' + (p.name || 'RSI') + (p.params ? '(' + p.params + ')' : '');
     case 'INCLUDE': return 'INCLUDE "' + (p.scriptName || '') + '"';
     case 'CHAIN': return 'CHAIN';
+    case 'TASK_ASSIGN': return 'TASK_ASSIGN "' + (p.task || '') + '" TO "' + (p.to || '') + '"';
+    case 'TASK_CHAIN': return 'TASK_CHAIN ' + (p.tasks || '');
+    case 'TASK_PARALLEL': return 'TASK_PARALLEL ' + (p.tasks || '');
+    case 'TASK_SHOW_FLOW': return 'TASK_SHOW_FLOW "' + (p.task || '') + '"';
+    case 'TASK_LOG': return 'TASK_LOG "' + (p.task || '') + '"' + (p.message ? ' MESSAGE "' + p.message + '"' : '');
+    case 'AGENT_SPAWN':
+      var as = 'AGENT_SPAWN "' + (p.name || '') + '"';
+      if (p.prompt) as += ' WITH "' + p.prompt + '"';
+      if (p.timeout) as += ' TIMEOUT ' + p.timeout;
+      return as;
+    case 'AGENT_CALL': return 'AGENT_CALL "' + (p.agent || '') + '" "' + (p.command || '') + '"';
+    case 'AGENT_PASS': return 'AGENT_PASS "' + (p.from || '') + '" "' + (p.to || '') + '"';
+    case 'AGENT_TERMINATE': return 'AGENT_TERMINATE "' + (p.agent || '') + '"';
+    case 'SKILL_CALL':
+      var sc = 'SKILL_CALL "' + (p.skill || '') + '"';
+      if (p.args) sc += ' WITH ' + p.args;
+      return sc;
+    case 'CRON_CREATE': return 'CRON_CREATE "' + (p.name || '') + '" SCHEDULE "' + (p.schedule || '') + '" RUN "' + (p.run || '') + '"';
+    case 'CRON_CALL': return 'CRON_CALL "' + (p.name || '') + '"';
+    case 'WEB_FETCH':
+      var wf = 'WEB_FETCH "' + (p.url || '') + '"';
+      if (p.method && p.method !== 'GET') wf += ' WITH method="' + p.method + '"';
+      if (p.timeout) wf += ' TIMEOUT ' + p.timeout;
+      return wf;
+    case 'WEB_SERIAL':
+      var ws = 'WEB_SERIAL "' + (p.urls || '') + '"';
+      if (p.baud) ws += ' WITH baud=' + p.baud;
+      return ws;
+    case 'FILE_READ':
+      var fr = 'FILE_READ "' + (p.path || '') + '"';
+      if (p.format) fr += ' FORMAT "' + p.format + '"';
+      return fr;
+    case 'FILE_WRITE': return 'FILE_WRITE "' + (p.path || '') + '" "' + (p.content || '') + '"';
+    case 'FILE_EXECUTE': return 'FILE_EXECUTE "' + (p.path || '') + '"';
+    case 'DATA_TRANSFORM':
+      var dt = 'DATA_TRANSFORM ' + (p.data || '');
+      if (p.operation) dt += ' ' + p.operation;
+      if (p.expression) dt += ' "' + p.expression + '"';
+      return dt;
+    case 'CHANNEL_SEND': return 'CHANNEL_SEND "' + (p.channel || '') + '" "' + (p.message || '') + '"';
+    case 'EMAIL_SEND': return 'EMAIL_SEND "' + (p.to || '') + '" "' + (p.body || '') + '"' + (p.subject ? ' SUBJECT "' + p.subject + '"' : '');
+    case 'PUBLISH_CANVAS': return 'PUBLISH_CANVAS "' + (p.canvas || '') + '"' + (p.content ? ' CONTENT "' + p.content + '"' : '');
     case 'OP_ADD': case 'OP_SUB': case 'OP_MUL': case 'OP_DIV': case 'OP_MOD':
     case 'OP_LT': case 'OP_GT': case 'OP_LTE': case 'OP_GTE': case 'OP_EQ': case 'OP_NEQ':
     case 'OP_AND': case 'OP_OR': case 'OP_NOT':

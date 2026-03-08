@@ -54,7 +54,13 @@ var CS_KEYWORDS = [
   'PRT_CORRELATION','PRT_REGRESSION',
   'PRT_DEFPARAM','PRT_RETURN',
   'PRT_DRAWLINE','PRT_DRAWARROW','PRT_HISTOGRAM',
-  'PRT_CROSS','PRT_BARSSINCE','PRT_SUMMATION'
+  'PRT_CROSS','PRT_BARSSINCE','PRT_SUMMATION',
+  'TASK_DEFINE','TASK_ASSIGN','TASK_CHAIN','TASK_PARALLEL','TASK_SHOW_FLOW','TASK_LOG',
+  'AGENT_SPAWN','AGENT_CALL','AGENT_PASS','AGENT_TERMINATE',
+  'SKILL_CALL','CRON_CREATE','CRON_CALL','WEB_FETCH','WEB_SERIAL',
+  'FILE_READ','FILE_WRITE','FILE_EXECUTE','DATA_TRANSFORM',
+  'CHANNEL_SEND','EMAIL_SEND','PUBLISH_CANVAS',
+  'BODY','ENDTASK','PRIORITY','DEPENDS_ON','STEPS','RESULT_VAR','SKILL','PROVIDER','SUBJECT'
 ];
 
 var TRADE_CMDS = ['BUY','SELL','SELLSHORT','EXIT','CLOSE','TRAILSTOP','STRATEGY_ENTRY','STRATEGY_EXIT','STRATEGY_CLOSE','PRT_BUY','PRT_SELL'];
@@ -71,6 +77,7 @@ var PORTFOLIO_CMDS = ['MARKET_SCAN','PORTFOLIO_BUILD','PORTFOLIO_REBALANCE'];
 var PRT_CMDS = ['PRT_AVERAGE','PRT_RSI','PRT_MACD','PRT_BOLLINGER','PRT_STOCHASTIC','PRT_ATR','PRT_CCI','PRT_ADX','PRT_DONCHIAN','PRT_ICHIMOKU','PRT_KELTNERCHANNEL','PRT_PARABOLICSAR','PRT_SUPERTREND','PRT_VOLUMEBYPRICE','PRT_FIBONACCI','PRT_PIVOTPOINT','PRT_DEMARK','PRT_WILLIAMS','PRT_ULTOSC','PRT_CHAIKIN','PRT_ONBALANCEVOLUME','PRT_VWAP','PRT_TIMEFRAME','PRT_BARINDEX','PRT_DATE','PRT_TIME','PRT_CUM','PRT_HIGHEST','PRT_LOWEST','PRT_SUM','PRT_STD','PRT_CORRELATION','PRT_REGRESSION','PRT_DEFPARAM','PRT_RETURN','PRT_DRAWLINE','PRT_DRAWARROW','PRT_HISTOGRAM','PRT_CROSS','PRT_BARSSINCE','PRT_SUMMATION'];
 var TV_CMDS = ['INPUT_INT','INPUT_FLOAT','INPUT_BOOL','INPUT_SYMBOL','TIMEFRAME_PERIOD','TIMEFRAME_IS_DAILY','ARRAY_NEW','ARRAY_PUSH','MATRIX_NEW','MATRIX_SET'];
 var UTILITY_CMDS = ['FILE_PARSE'];
+var AUTOMATION_CMDS = ['TASK_DEFINE','TASK_ASSIGN','TASK_CHAIN','TASK_PARALLEL','TASK_SHOW_FLOW','TASK_LOG','AGENT_SPAWN','AGENT_CALL','AGENT_PASS','AGENT_TERMINATE','SKILL_CALL','CRON_CREATE','CRON_CALL','WEB_FETCH','WEB_SERIAL','FILE_READ','FILE_WRITE','FILE_EXECUTE','DATA_TRANSFORM','CHANNEL_SEND','EMAIL_SEND','PUBLISH_CANVAS'];
 
 var currentAST = null;
 var currentJS = '';
@@ -167,6 +174,7 @@ function syntaxHighlight(code) {
     else if (PRT_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-prt';
     else if (TV_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-tv';
     else if (UTILITY_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-utility';
+    else if (AUTOMATION_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-automation';
     else if (t.type === TOKEN_TYPES.KEYWORD) cls = 'cs-tok-keyword';
     else if (t.type === TOKEN_TYPES.IDENTIFIER) cls = 'cs-tok-ident';
     result += '<span class="' + cls + '">' + escapeHtml(originalText) + '</span>';
@@ -325,6 +333,7 @@ function buildEditorUI() {
   '.cs-tok-prt { color:#db61a2; font-weight:600; }' +
   '.cs-tok-tv { color:#f78166; font-weight:600; }' +
   '.cs-tok-utility { color:#8b949e; font-weight:600; }' +
+  '.cs-tok-automation { color:#e3b341; font-weight:600; }' +
   '.cs-tok-keyword { color:#ff7b72; }' +
   '.cs-tok-string { color:#a5d6ff; }' +
   '.cs-tok-number { color:#79c0ff; }' +
@@ -2418,6 +2427,28 @@ function parseClawScript(code) {
       case 'RUMOR_SCAN': return parseRumorScanStmt();
       case 'CHAIN': return parseChain();
       case 'INDICATOR': return parseIndicatorStmt();
+      case 'TASK_DEFINE': return parseTaskDefineStmt();
+      case 'TASK_ASSIGN': return parseTaskAssignStmt();
+      case 'TASK_CHAIN': return parseTaskChainStmt();
+      case 'TASK_PARALLEL': return parseTaskParallelStmt();
+      case 'TASK_SHOW_FLOW': return parseTaskShowFlowStmt();
+      case 'TASK_LOG': return parseTaskLogStmt();
+      case 'AGENT_SPAWN': return parseAgentSpawnStmt();
+      case 'AGENT_CALL': return parseAgentCallStmt();
+      case 'AGENT_PASS': return parseAgentPassStmt();
+      case 'AGENT_TERMINATE': return parseAgentTerminateStmt();
+      case 'SKILL_CALL': return parseSkillCallStmt();
+      case 'CRON_CREATE': return parseCronCreateStmt();
+      case 'CRON_CALL': return parseCronCallStmt();
+      case 'WEB_FETCH': return parseWebFetchStmt();
+      case 'WEB_SERIAL': return parseWebSerialStmt();
+      case 'FILE_READ': return parseFileReadStmt();
+      case 'FILE_WRITE': return parseFileWriteStmt();
+      case 'FILE_EXECUTE': return parseFileExecuteStmt();
+      case 'DATA_TRANSFORM': return parseDataTransformStmt();
+      case 'CHANNEL_SEND': return parseChannelSendStmt();
+      case 'EMAIL_SEND': return parseEmailSendStmt();
+      case 'PUBLISH_CANVAS': return parsePublishCanvasStmt();
       default:
         if (t.type === TOKEN_TYPES.IDENTIFIER) {
           if (peek() && peek().value === '=') return parseAssignment();
@@ -2475,6 +2506,12 @@ function parseClawScript(code) {
       case 'NOMAD_SCAN': return parseNomadScanExpr();
       case 'RUMOR_SCAN': return parseRumorScanExpr();
       case 'INDICATOR': return parseIndicatorExpr();
+      case 'AGENT_CALL': return parseAgentCallExpr();
+      case 'SKILL_CALL': return parseSkillCallExpr();
+      case 'WEB_FETCH': return parseWebFetchExpr();
+      case 'FILE_READ': return parseFileReadExpr();
+      case 'FILE_EXECUTE': return parseFileExecuteExpr();
+      case 'DATA_TRANSFORM': return parseDataTransformExpr();
       default: return parseExpr();
     }
   }
@@ -2756,6 +2793,36 @@ function parseClawScript(code) {
   }
   function parseFuncCallStmt() { var name = eat().value; var args = []; if (current() && current().value === '(') { eat(); while (current() && current().value !== ')') { args.push(parseExpr()); if (current() && current().value === ',') eat(); } if (current() && current().value === ')') eat(); } return { type: 'FunctionCallStmt', name: name, args: args }; }
 
+  function parseTaskDefineStmt() { eat(); var name = parseExpr(); var priority = null, body = []; if (isKw('PRIORITY')) { eat(); priority = parseExpr(); } if (isKw('BODY')) { eat(); while (current() && !isKw('ENDTASK')) { var s = parseStatement(); if (s) body.push(s); } if (isKw('ENDTASK')) eat(); } imports.automation = true; return { type: 'TaskDefine', name: name, priority: priority, body: body }; }
+  function parseTaskAssignStmt() { eat(); var task = parseExpr(); var to = null; if (isKw('TO')) { eat(); to = parseExpr(); } imports.automation = true; return { type: 'TaskAssign', task: task, to: to }; }
+  function parseTaskChainStmt() { eat(); var steps = [parseExpr()]; while (current() && isKw('THEN')) { eat(); steps.push(parseExpr()); } imports.automation = true; return { type: 'TaskChain', steps: steps }; }
+  function parseTaskParallelStmt() { eat(); var steps = [parseExpr()]; while (current() && current().value === ',') { eat(); steps.push(parseExpr()); } imports.automation = true; return { type: 'TaskParallel', steps: steps }; }
+  function parseTaskShowFlowStmt() { eat(); var name = null; if (current() && current().type !== TOKEN_TYPES.KEYWORD) { name = parseExpr(); } imports.automation = true; return { type: 'TaskShowFlow', name: name }; }
+  function parseTaskLogStmt() { eat(); var msg = parseExpr(); var lv = null; if (isKw('LEVEL')) { eat(); lv = parseExpr(); } imports.automation = true; return { type: 'TaskLog', message: msg, level: lv }; }
+  function parseAgentSpawnExpr() { eat(); var name = parseExpr(); var prompt = null; if (isKw('WITH')) { eat(); prompt = parseExpr(); } imports.automation = true; return { type: 'AgentSpawn', name: name, prompt: prompt }; }
+  function parseAgentSpawnStmt() { return parseAgentSpawnExpr(); }
+  function parseAgentCallExpr() { eat(); var agent = parseExpr(); var cmd = parseExpr(); var rv = null; if (isKw('RESULT_VAR')) { eat(); rv = parseExpr(); } imports.automation = true; return { type: 'AgentCall', agent: agent, command: cmd, resultVar: rv }; }
+  function parseAgentCallStmt() { return parseAgentCallExpr(); }
+  function parseAgentPassStmt() { eat(); var from = parseExpr(); if (isKw('TO')) eat(); var to = parseExpr(); var data = null; if (isKw('WITH')) { eat(); data = parseExpr(); } imports.automation = true; return { type: 'AgentPass', from: from, to: to, data: data }; }
+  function parseAgentTerminateStmt() { eat(); var agent = parseExpr(); imports.automation = true; return { type: 'AgentTerminate', agent: agent }; }
+  function parseSkillCallExpr() { eat(); var skill = parseExpr(); var args = null; if (isKw('WITH')) { eat(); args = parseExpr(); } imports.automation = true; return { type: 'SkillCall', skill: skill, args: args }; }
+  function parseSkillCallStmt() { return parseSkillCallExpr(); }
+  function parseCronCreateStmt() { eat(); var name = parseExpr(); var schedule = null, run = null; if (isKw('SCHEDULE')) { eat(); schedule = parseExpr(); } if (isKw('RUN')) { eat(); run = parseExpr(); } imports.automation = true; return { type: 'CronCreate', name: name, schedule: schedule, run: run }; }
+  function parseCronCallStmt() { eat(); var name = parseExpr(); imports.automation = true; return { type: 'CronCall', name: name }; }
+  function parseWebFetchExpr() { eat(); var url = parseExpr(); var opts = null; if (isKw('OPTIONS')) { eat(); opts = parseExpr(); } imports.automation = true; return { type: 'WebFetch', url: url, options: opts }; }
+  function parseWebFetchStmt() { return parseWebFetchExpr(); }
+  function parseWebSerialStmt() { eat(); var steps = [parseExpr()]; while (current() && isKw('THEN')) { eat(); steps.push(parseExpr()); } imports.automation = true; return { type: 'WebSerial', steps: steps }; }
+  function parseFileReadExpr() { eat(); var path = parseExpr(); var fmt = null; if (isKw('FORMAT')) { eat(); fmt = parseExpr(); } imports.automation = true; return { type: 'FileRead', path: path, format: fmt }; }
+  function parseFileReadStmt() { return parseFileReadExpr(); }
+  function parseFileWriteStmt() { eat(); var path = parseExpr(); var content = parseExpr(); var fmt = null; if (isKw('FORMAT')) { eat(); fmt = parseExpr(); } imports.automation = true; return { type: 'FileWrite', path: path, content: content, format: fmt }; }
+  function parseFileExecuteExpr() { eat(); var cmd = parseExpr(); var to = null; if (isKw('TIMEOUT')) { eat(); to = parseExpr(); } imports.automation = true; return { type: 'FileExecute', command: cmd, timeout: to }; }
+  function parseFileExecuteStmt() { return parseFileExecuteExpr(); }
+  function parseDataTransformExpr() { eat(); var data = parseExpr(); var using = null; if (isKw('USING')) { eat(); using = parseExpr(); } imports.automation = true; return { type: 'DataTransform', data: data, using: using }; }
+  function parseDataTransformStmt() { return parseDataTransformExpr(); }
+  function parseChannelSendStmt() { eat(); var channel = parseExpr(); var msg = parseExpr(); var opts = null; if (isKw('OPTIONS')) { eat(); opts = parseExpr(); } imports.automation = true; return { type: 'ChannelSend', channel: channel, message: msg, options: opts }; }
+  function parseEmailSendStmt() { eat(); var to = parseExpr(); var subj = null, body = null; if (isKw('SUBJECT')) { eat(); subj = parseExpr(); } if (isKw('BODY')) { eat(); body = parseExpr(); } imports.automation = true; return { type: 'EmailSend', to: to, subject: subj, body: body }; }
+  function parsePublishCanvasStmt() { eat(); var name = parseExpr(); var content = null; if (isKw('WITH')) { eat(); content = parseExpr(); } imports.automation = true; return { type: 'PublishCanvas', name: name, content: content }; }
+
   var ast;
   try {
     ast = parseProgram();
@@ -2854,6 +2921,28 @@ function generateJSFromAST(ast) {
       case 'SayToSession': lines.push(p + 'await chat.sayToSession(' + genExpr(stmt.sessionId) + ', ' + genExpr(stmt.message) + ');'); break;
       case 'MutateConfig': lines.push(p + 'this.config[' + genExpr(stmt.key) + '] = ' + (stmt.value ? genExpr(stmt.value) : 'null') + ';'); break;
       case 'CrashScan': lines.push(p + 'this._crashScanEnabled = ' + (stmt.state === 'ON') + ';'); break;
+      case 'TaskDefine': lines.push(p + 'await automation.taskDefine(' + genExpr(stmt.name) + ', { priority: ' + genExpr(stmt.priority) + ' });'); if (stmt.body.length > 0) { stmt.body.forEach(function(s) { genStmt(s, p + '  '); }); } break;
+      case 'TaskAssign': lines.push(p + 'await automation.taskAssign(' + genExpr(stmt.task) + ', ' + genExpr(stmt.to) + ');'); break;
+      case 'TaskChain': lines.push(p + 'await automation.taskChain([' + stmt.steps.map(genExpr).join(', ') + ']);'); break;
+      case 'TaskParallel': lines.push(p + 'await automation.taskParallel([' + stmt.steps.map(genExpr).join(', ') + ']);'); break;
+      case 'TaskShowFlow': lines.push(p + 'await automation.taskShowFlow(' + genExpr(stmt.name) + ');'); break;
+      case 'TaskLog': lines.push(p + 'await automation.taskLog(' + genExpr(stmt.message) + ', ' + genExpr(stmt.level) + ');'); break;
+      case 'AgentSpawn': lines.push(p + 'await automation.agentSpawn(' + genExpr(stmt.name) + ', ' + genExpr(stmt.prompt) + ');'); break;
+      case 'AgentCall': lines.push(p + 'await automation.agentCall(' + genExpr(stmt.agent) + ', ' + genExpr(stmt.command) + ');'); break;
+      case 'AgentPass': lines.push(p + 'await automation.agentPass(' + genExpr(stmt.from) + ', ' + genExpr(stmt.to) + ', ' + genExpr(stmt.data) + ');'); break;
+      case 'AgentTerminate': lines.push(p + 'await automation.agentTerminate(' + genExpr(stmt.agent) + ');'); break;
+      case 'SkillCall': lines.push(p + 'await automation.skillCall(' + genExpr(stmt.skill) + ', ' + genExpr(stmt.args) + ');'); break;
+      case 'CronCreate': lines.push(p + 'await automation.cronCreate(' + genExpr(stmt.name) + ', ' + genExpr(stmt.schedule) + ', ' + genExpr(stmt.run) + ');'); break;
+      case 'CronCall': lines.push(p + 'await automation.cronCall(' + genExpr(stmt.name) + ');'); break;
+      case 'WebFetch': lines.push(p + 'await automation.webFetch(' + genExpr(stmt.url) + ', ' + genExpr(stmt.options) + ');'); break;
+      case 'WebSerial': lines.push(p + 'await automation.webSerial([' + stmt.steps.map(genExpr).join(', ') + ']);'); break;
+      case 'FileRead': lines.push(p + 'await automation.fileRead(' + genExpr(stmt.path) + ', ' + genExpr(stmt.format) + ');'); break;
+      case 'FileWrite': lines.push(p + 'await automation.fileWrite(' + genExpr(stmt.path) + ', ' + genExpr(stmt.content) + ', ' + genExpr(stmt.format) + ');'); break;
+      case 'FileExecute': lines.push(p + 'await automation.fileExecute(' + genExpr(stmt.command) + ', ' + genExpr(stmt.timeout) + ');'); break;
+      case 'DataTransform': lines.push(p + 'await automation.dataTransform(' + genExpr(stmt.data) + ', ' + genExpr(stmt.using) + ');'); break;
+      case 'ChannelSend': lines.push(p + 'await automation.channelSend(' + genExpr(stmt.channel) + ', ' + genExpr(stmt.message) + ', ' + genExpr(stmt.options) + ');'); break;
+      case 'EmailSend': lines.push(p + 'await automation.emailSend(' + genExpr(stmt.to) + ', ' + genExpr(stmt.subject) + ', ' + genExpr(stmt.body) + ');'); break;
+      case 'PublishCanvas': lines.push(p + 'await automation.publishCanvas(' + genExpr(stmt.name) + ', ' + genExpr(stmt.content) + ');'); break;
       default: lines.push(p + '// ' + stmt.type); break;
     }
   }
@@ -2902,7 +2991,29 @@ var NODE_COLORS = {
   'RumorScan': { bg: '#2d1b00', border: '#ffa657', cls: 'cs-fn-advanced' },
   'Optimize': { bg: '#2d1b00', border: '#ffa657', cls: 'cs-fn-advanced' },
   'FunctionDecl': { bg: '#21262d', border: '#ff7b72', cls: 'cs-fn-control' },
-  'Chain': { bg: '#21262d', border: '#ff7b72', cls: 'cs-fn-control' }
+  'Chain': { bg: '#21262d', border: '#ff7b72', cls: 'cs-fn-control' },
+  'TaskDefine': { bg: '#3d2e00', border: '#e3b341', cls: 'cs-fn-advanced' },
+  'TaskAssign': { bg: '#3d2e00', border: '#e3b341', cls: 'cs-fn-advanced' },
+  'TaskChain': { bg: '#3d2e00', border: '#e3b341', cls: 'cs-fn-advanced' },
+  'TaskParallel': { bg: '#3d2e00', border: '#e3b341', cls: 'cs-fn-advanced' },
+  'TaskShowFlow': { bg: '#3d2e00', border: '#e3b341', cls: 'cs-fn-advanced' },
+  'TaskLog': { bg: '#3d2e00', border: '#e3b341', cls: 'cs-fn-advanced' },
+  'AgentSpawn': { bg: '#3d2200', border: '#f0883e', cls: 'cs-fn-agent' },
+  'AgentCall': { bg: '#3d2200', border: '#f0883e', cls: 'cs-fn-agent' },
+  'AgentPass': { bg: '#3d2200', border: '#f0883e', cls: 'cs-fn-agent' },
+  'AgentTerminate': { bg: '#3d2200', border: '#f0883e', cls: 'cs-fn-agent' },
+  'SkillCall': { bg: '#0d3117', border: '#3fb950', cls: 'cs-fn-trade' },
+  'CronCreate': { bg: '#0d3117', border: '#3fb950', cls: 'cs-fn-trade' },
+  'CronCall': { bg: '#0d3117', border: '#3fb950', cls: 'cs-fn-trade' },
+  'WebFetch': { bg: '#0d3117', border: '#3fb950', cls: 'cs-fn-data' },
+  'WebSerial': { bg: '#0d3117', border: '#3fb950', cls: 'cs-fn-data' },
+  'FileRead': { bg: '#0c2d48', border: '#a5d6ff', cls: 'cs-fn-data' },
+  'FileWrite': { bg: '#0c2d48', border: '#a5d6ff', cls: 'cs-fn-data' },
+  'FileExecute': { bg: '#0c2d48', border: '#a5d6ff', cls: 'cs-fn-data' },
+  'DataTransform': { bg: '#0c2d48', border: '#a5d6ff', cls: 'cs-fn-data' },
+  'ChannelSend': { bg: '#2d1b4e', border: '#d2a8ff', cls: 'cs-fn-ai' },
+  'EmailSend': { bg: '#2d1b4e', border: '#d2a8ff', cls: 'cs-fn-ai' },
+  'PublishCanvas': { bg: '#2d1b4e', border: '#d2a8ff', cls: 'cs-fn-ai' }
 };
 
 function getNodeLabel(stmt) {
@@ -2947,6 +3058,28 @@ function getNodeLabel(stmt) {
     case 'FunctionDecl': return 'FUNC ' + stmt.name;
     case 'Chain': return 'CHAIN';
     case 'Include': return 'INCLUDE';
+    case 'TaskDefine': return 'TASK_DEFINE ' + exprLabel(stmt.name);
+    case 'TaskAssign': return 'TASK_ASSIGN';
+    case 'TaskChain': return 'TASK_CHAIN';
+    case 'TaskParallel': return 'TASK_PARALLEL';
+    case 'TaskShowFlow': return 'TASK_SHOW_FLOW';
+    case 'TaskLog': return 'TASK_LOG';
+    case 'AgentSpawn': return 'AGENT_SPAWN';
+    case 'AgentCall': return 'AGENT_CALL';
+    case 'AgentPass': return 'AGENT_PASS';
+    case 'AgentTerminate': return 'AGENT_TERMINATE';
+    case 'SkillCall': return 'SKILL_CALL';
+    case 'CronCreate': return 'CRON_CREATE';
+    case 'CronCall': return 'CRON_CALL';
+    case 'WebFetch': return 'WEB_FETCH';
+    case 'WebSerial': return 'WEB_SERIAL';
+    case 'FileRead': return 'FILE_READ';
+    case 'FileWrite': return 'FILE_WRITE';
+    case 'FileExecute': return 'FILE_EXECUTE';
+    case 'DataTransform': return 'DATA_TRANSFORM';
+    case 'ChannelSend': return 'CHANNEL_SEND';
+    case 'EmailSend': return 'EMAIL_SEND';
+    case 'PublishCanvas': return 'PUBLISH_CANVAS';
     default: return stmt.type;
   }
 }

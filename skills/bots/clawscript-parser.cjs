@@ -65,7 +65,13 @@ const KEYWORDS = new Set([
   'PRT_DRAWLINE', 'PRT_DRAWARROW', 'PRT_HISTOGRAM',
   'PRT_CROSS', 'PRT_BARSSINCE', 'PRT_SUMMATION',
   'PRT_KELTNERCHANNEL', 'PRT_PARABOLICSAR',
-  'SHARES', 'CONTRACTS', 'BAR'
+  'SHARES', 'CONTRACTS', 'BAR',
+  'TASK_DEFINE', 'TASK_ASSIGN', 'TASK_CHAIN', 'TASK_PARALLEL', 'TASK_SHOW_FLOW', 'TASK_LOG',
+  'AGENT_SPAWN', 'AGENT_CALL', 'AGENT_PASS', 'AGENT_TERMINATE',
+  'SKILL_CALL', 'CRON_CREATE', 'CRON_CALL', 'WEB_FETCH', 'WEB_SERIAL',
+  'FILE_READ', 'FILE_WRITE', 'FILE_EXECUTE', 'DATA_TRANSFORM',
+  'CHANNEL_SEND', 'EMAIL_SEND', 'PUBLISH_CANVAS',
+  'ENDTASK', 'BODY', 'SUBJECT'
 ]);
 
 const GENERIC_CMD_DEFS = {
@@ -107,6 +113,26 @@ const GENERIC_CMD_DEFS = {
   'ARRAY_PUSH':           { type: 'GenericCmd', args: 2, optKw: [], imp: 'ext' },
   'MATRIX_NEW':           { type: 'GenericCmd', args: 2, optKw: [], imp: 'ext' },
   'MATRIX_SET':           { type: 'GenericCmd', args: 4, optKw: [], imp: 'ext' },
+  'TASK_ASSIGN':          { type: 'GenericCmd', args: 1, optKw: ['TO'], imp: 'automation' },
+  'TASK_CHAIN':           { type: 'GenericCmd', args: 1, optKw: [], imp: 'automation' },
+  'TASK_PARALLEL':        { type: 'GenericCmd', args: 1, optKw: [], imp: 'automation' },
+  'TASK_SHOW_FLOW':       { type: 'GenericCmd', args: 0, optKw: [], imp: 'automation' },
+  'TASK_LOG':             { type: 'GenericCmd', args: 1, optKw: ['LEVEL'], imp: 'automation' },
+  'AGENT_SPAWN':          { type: 'GenericCmd', args: 1, optKw: ['WITH', 'TIMEOUT'], imp: 'automation' },
+  'AGENT_CALL':           { type: 'GenericCmd', args: 2, optKw: ['TIMEOUT'], imp: 'automation' },
+  'AGENT_PASS':           { type: 'GenericCmd', args: 2, optKw: [], imp: 'automation' },
+  'AGENT_TERMINATE':      { type: 'GenericCmd', args: 1, optKw: ['REASON'], imp: 'automation' },
+  'SKILL_CALL':           { type: 'GenericCmd', args: 1, optKw: ['WITH', 'TIMEOUT'], imp: 'automation' },
+  'CRON_CALL':            { type: 'GenericCmd', args: 1, optKw: [], imp: 'automation' },
+  'WEB_FETCH':            { type: 'GenericCmd', args: 1, optKw: ['WITH', 'TIMEOUT'], imp: 'automation' },
+  'WEB_SERIAL':           { type: 'GenericCmd', args: 1, optKw: ['WITH'], imp: 'automation' },
+  'FILE_READ':            { type: 'GenericCmd', args: 1, optKw: ['FORMAT'], imp: 'automation' },
+  'FILE_WRITE':           { type: 'GenericCmd', args: 2, optKw: [], imp: 'automation' },
+  'FILE_EXECUTE':         { type: 'GenericCmd', args: 1, optKw: ['TIMEOUT'], imp: 'automation' },
+  'DATA_TRANSFORM':       { type: 'GenericCmd', args: 1, optKw: ['USING', 'FORMAT'], imp: 'automation' },
+  'CHANNEL_SEND':         { type: 'GenericCmd', args: 2, optKw: [], imp: 'automation' },
+  'EMAIL_SEND':           { type: 'GenericCmd', args: 2, optKw: ['SUBJECT'], imp: 'automation' },
+  'PUBLISH_CANVAS':       { type: 'GenericCmd', args: 1, optKw: [], imp: 'automation' },
 };
 
 const PRT_STMT_ALIASES = {
@@ -405,6 +431,10 @@ class ClawScriptParser {
         return this.parseNomadAllocate();
       case 'RUMOR_SCAN':
         return this.parseRumorScan(false);
+      case 'TASK_DEFINE':
+        return this.parseTaskDefine();
+      case 'CRON_CREATE':
+        return this.parseCronCreate();
       case 'CHAIN':
         return this.parseChain();
       case 'PRT_DEFPARAM':
@@ -1349,6 +1379,42 @@ class ClawScriptParser {
     return { type: 'FunctionCallStmt', name, args };
   }
 
+  parseTaskDefine() {
+    this.pos++;
+    const name = this.parseExpression();
+    let description = null;
+    if (this.isCurrentKeyword('WITH')) {
+      this.pos++;
+      description = this.parseExpression();
+    }
+    const body = [];
+    if (this.isCurrentKeyword('BODY')) this.pos++;
+    while (this.current() && !this.isCurrentKeyword('ENDTASK')) {
+      const stmt = this.parseStatement();
+      if (stmt) body.push(stmt);
+    }
+    if (this.isCurrentKeyword('ENDTASK')) this.pos++;
+    this.imports.add('automation');
+    return { type: 'TaskDefine', name, description, body };
+  }
+
+  parseCronCreate() {
+    this.pos++;
+    const name = this.parseExpression();
+    let schedule = null;
+    if (this.isCurrentKeyword('SCHEDULE')) {
+      this.pos++;
+      schedule = this.parseExpression();
+    }
+    let run = null;
+    if (this.isCurrentKeyword('RUN')) {
+      this.pos++;
+      run = this.parseExpression();
+    }
+    this.imports.add('automation');
+    return { type: 'CronCreate', name, schedule, run };
+  }
+
   parseChain() {
     this.pos++; // CHAIN
     const steps = [this.parseExpression()];
@@ -1395,7 +1461,7 @@ class ClawScriptParser {
       }
     }
     if (def.imp) this.imports.add(def.imp);
-    return { type: 'GenericCmd', cmd: cmdName, posArgs, kwargs };
+    return { type: 'GenericCmd', cmd: cmdName, posArgs, kwargs, mod: def.imp || 'ext' };
   }
 
   parsePrtIndicator(cmdName) {
@@ -1470,6 +1536,7 @@ class ClawScriptParser {
       trade: `const trade = require('../openclaw-trade.cjs');`,
       nomad: `const nomad = require('../openclaw-nomad.cjs');`,
       ext: `const ext = require('../openclaw-ext.cjs');`,
+      automation: `const automation = require('../openclaw-automation.cjs');`,
     };
 
     this.imports.forEach(imp => {
@@ -1630,12 +1697,21 @@ class ClawScriptParser {
         }
         return chainJs;
       }
+      case 'TaskDefine': {
+        let tdJs = `${indent}await automation.taskDefine(${this.generateExpr(stmt.name)}, ${stmt.description ? this.generateExpr(stmt.description) : 'null'}, async () => {\n`;
+        stmt.body.forEach(s => { tdJs += this.generateStmt(s, indent + '  '); });
+        tdJs += `${indent}});\n`;
+        return tdJs;
+      }
+      case 'CronCreate':
+        return `${indent}await automation.cronCreate(${this.generateExpr(stmt.name)}, ${stmt.schedule ? this.generateExpr(stmt.schedule) : 'null'}, ${stmt.run ? this.generateExpr(stmt.run) : 'null'});\n`;
       case 'GenericCmd': {
         const fn = stmt.cmd.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+        const mod = stmt.mod || 'ext';
         const allArgs = (stmt.posArgs || []).map(a => this.generateExpr(a));
         const kwEntries = Object.entries(stmt.kwargs || {}).map(([k, v]) => `${k.toLowerCase()}: ${this.generateExpr(v)}`);
         if (kwEntries.length) allArgs.push(`{ ${kwEntries.join(', ')} }`);
-        return `${indent}const _${fn}Result = await ext.${fn}(${allArgs.join(', ')});\n`;
+        return `${indent}const _${fn}Result = await ${mod}.${fn}(${allArgs.join(', ')});\n`;
       }
       case 'PrtIndicator':
         return `${indent}const _prt${stmt.name} = await ext.prt${stmt.name}(${stmt.params.map(p => this.generateExpr(p)).join(', ')});\n`;
@@ -1848,12 +1924,17 @@ class ClawScriptParser {
         return `await tools.rumorScan(${this.generateExpr(expr.topic)}, { sources: ${expr.sources ? this.generateExpr(expr.sources) : '"both"'}, limit: ${expr.limit ? this.generateExpr(expr.limit) : '10'} })`;
       case 'IndicatorCall':
         return `indicators.calc${expr.name}(prices${expr.params.map(p => ', ' + this.generateExpr(p)).join('')})`;
+      case 'TaskDefine':
+        return `await automation.taskDefine(${this.generateExpr(expr.name)}, ${expr.description ? this.generateExpr(expr.description) : 'null'}, null)`;
+      case 'CronCreate':
+        return `await automation.cronCreate(${this.generateExpr(expr.name)}, ${expr.schedule ? this.generateExpr(expr.schedule) : 'null'}, ${expr.run ? this.generateExpr(expr.run) : 'null'})`;
       case 'GenericCmd': {
         const fn = expr.cmd.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+        const mod = expr.mod || 'ext';
         const allArgs = (expr.posArgs || []).map(a => this.generateExpr(a));
         const kwEntries = Object.entries(expr.kwargs || {}).map(([k, v]) => `${k.toLowerCase()}: ${this.generateExpr(v)}`);
         if (kwEntries.length) allArgs.push(`{ ${kwEntries.join(', ')} }`);
-        return `await ext.${fn}(${allArgs.join(', ')})`;
+        return `await ${mod}.${fn}(${allArgs.join(', ')})`;
       }
       case 'PrtIndicator':
         return `await ext.prt${expr.name}(${expr.params.map(p => this.generateExpr(p)).join(', ')})`;

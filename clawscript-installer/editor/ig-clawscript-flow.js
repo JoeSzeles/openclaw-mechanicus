@@ -148,25 +148,83 @@ var NODE_CATS = [
       { cmd: 'MONTE_CARLO', doc: 'Monte Carlo simulation', params: [{k:'scenario',l:'Scenario',d:''},{k:'runs',l:'Runs',d:'10000'}] }
     ]
   },
-  { id: 'operators', label: 'Operators', color: '#58a6ff', bg: '#0d2240',
+  { id: 'op-arithmetic', label: 'Arithmetic Operators', color: '#58a6ff', bg: '#0d2240',
     items: [
       { cmd: 'OP_ADD', doc: 'Add two values (+)', params: [], isOperator: true, opSymbol: '+', opInputs: 2 },
-      { cmd: 'OP_SUB', doc: 'Subtract two values (−)', params: [], isOperator: true, opSymbol: '−', opInputs: 2 },
-      { cmd: 'OP_MUL', doc: 'Multiply two values (×)', params: [], isOperator: true, opSymbol: '×', opInputs: 2 },
-      { cmd: 'OP_DIV', doc: 'Divide two values (÷)', params: [], isOperator: true, opSymbol: '÷', opInputs: 2 },
-      { cmd: 'OP_MOD', doc: 'Modulo / remainder (%)', params: [], isOperator: true, opSymbol: '%', opInputs: 2 },
+      { cmd: 'OP_SUB', doc: 'Subtract two values (-)', params: [], isOperator: true, opSymbol: '-', opInputs: 2 },
+      { cmd: 'OP_MUL', doc: 'Multiply two values (*)', params: [], isOperator: true, opSymbol: '*', opInputs: 2 },
+      { cmd: 'OP_DIV', doc: 'Divide two values (/)', params: [], isOperator: true, opSymbol: '/', opInputs: 2 },
+      { cmd: 'OP_MOD', doc: 'Modulo / remainder (%)', params: [], isOperator: true, opSymbol: '%', opInputs: 2 }
+    ]
+  },
+  { id: 'op-comparison', label: 'Comparison Operators', color: '#f0883e', bg: '#3d2200',
+    items: [
       { cmd: 'OP_LT', doc: 'Less than (<)', params: [], isOperator: true, opSymbol: '<', opInputs: 2 },
       { cmd: 'OP_GT', doc: 'Greater than (>)', params: [], isOperator: true, opSymbol: '>', opInputs: 2 },
-      { cmd: 'OP_LTE', doc: 'Less than or equal (≤)', params: [], isOperator: true, opSymbol: '≤', opInputs: 2 },
-      { cmd: 'OP_GTE', doc: 'Greater than or equal (≥)', params: [], isOperator: true, opSymbol: '≥', opInputs: 2 },
+      { cmd: 'OP_LTE', doc: 'Less than or equal (<=)', params: [], isOperator: true, opSymbol: '<=', opInputs: 2 },
+      { cmd: 'OP_GTE', doc: 'Greater than or equal (>=)', params: [], isOperator: true, opSymbol: '>=', opInputs: 2 },
       { cmd: 'OP_EQ', doc: 'Equal to (==)', params: [], isOperator: true, opSymbol: '==', opInputs: 2 },
-      { cmd: 'OP_NEQ', doc: 'Not equal to (!=)', params: [], isOperator: true, opSymbol: '!=', opInputs: 2 },
-      { cmd: 'OP_AND', doc: 'Logical AND', params: [], isOperator: true, opSymbol: 'AND', opInputs: 2 },
-      { cmd: 'OP_OR', doc: 'Logical OR', params: [], isOperator: true, opSymbol: 'OR', opInputs: 2 },
-      { cmd: 'OP_NOT', doc: 'Logical NOT', params: [], isOperator: true, opSymbol: 'NOT', opInputs: 1 },
-      { cmd: 'OP_CROSSES_OVER', doc: 'Crosses over (value crosses above another)', params: [], isOperator: true, opSymbol: '⤴', opInputs: 2 },
-      { cmd: 'OP_CROSSES_UNDER', doc: 'Crosses under (value crosses below another)', params: [], isOperator: true, opSymbol: '⤵', opInputs: 2 },
-      { cmd: 'OP_CONTAINS', doc: 'String contains', params: [], isOperator: true, opSymbol: '⊃', opInputs: 2 }
+      { cmd: 'OP_NEQ', doc: 'Not equal to (!=)', params: [], isOperator: true, opSymbol: '!=', opInputs: 2 }
+    ]
+  },
+  { id: 'op-logical', label: 'Logical Operators', color: '#bc8cff', bg: '#2d1a4e',
+    items: [
+      { cmd: 'OP_AND', doc: 'Logical AND — both conditions must be true', params: [], isOperator: true, opSymbol: 'AND', opInputs: 2 },
+      { cmd: 'OP_OR', doc: 'Logical OR — either condition must be true', params: [], isOperator: true, opSymbol: 'OR', opInputs: 2 },
+      { cmd: 'OP_NOT', doc: 'Logical NOT — inverts condition', params: [], isOperator: true, opSymbol: 'NOT', opInputs: 1 }
+    ]
+  },
+  { id: 'op-crossover', label: 'Crossover Operators', color: '#2dc653', bg: '#0d2d12',
+    items: [
+      { cmd: 'OP_CROSSES_OVER', doc: 'Crosses over — value crosses above another', params: [], isOperator: true, opSymbol: 'X-OVER', opInputs: 2 },
+      { cmd: 'OP_CROSSES_UNDER', doc: 'Crosses under — value crosses below another', params: [], isOperator: true, opSymbol: 'X-UNDER', opInputs: 2 }
+    ]
+  },
+  { id: 'op-string', label: 'String Operators', color: '#f78166', bg: '#3d1a0d',
+    items: [
+      { cmd: 'OP_CONTAINS', doc: 'String contains — check if text contains substring', params: [], isOperator: true, opSymbol: 'HAS', opInputs: 2 }
+    ]
+  },
+  { id: 'task_planning', label: 'Task Planning', color: '#e3b341', bg: '#3d2e00',
+    items: [
+      { cmd: 'TASK_DEFINE', doc: 'Define a named task with body', params: [{k:'name',l:'Name',d:''},{k:'description',l:'Description',d:''}], ports: {out:['body','next']} },
+      { cmd: 'TASK_ASSIGN', doc: 'Assign task to an agent', params: [{k:'task',l:'Task',d:''},{k:'to',l:'To',d:''}] },
+      { cmd: 'TASK_CHAIN', doc: 'Chain tasks sequentially', params: [{k:'tasks',l:'Tasks',d:''}] },
+      { cmd: 'TASK_PARALLEL', doc: 'Run tasks in parallel', params: [{k:'tasks',l:'Tasks',d:''}] },
+      { cmd: 'TASK_SHOW_FLOW', doc: 'Visualise task dependency flow', params: [{k:'task',l:'Task',d:''}] },
+      { cmd: 'TASK_LOG', doc: 'Log task progress or result', params: [{k:'task',l:'Task',d:''},{k:'message',l:'Message',d:''}] }
+    ]
+  },
+  { id: 'agent_mgmt', label: 'Agent Management', color: '#f0883e', bg: '#3d2200',
+    items: [
+      { cmd: 'AGENT_SPAWN', doc: 'Spawn a new agent with instructions', params: [{k:'name',l:'Name',d:''},{k:'prompt',l:'Prompt',d:''}] },
+      { cmd: 'AGENT_CALL', doc: 'Call an agent and get result', params: [{k:'agent',l:'Agent',d:''},{k:'command',l:'Command',d:''}] },
+      { cmd: 'AGENT_PASS', doc: 'Pass data to another agent', params: [{k:'from',l:'Data Var',d:''},{k:'to',l:'Agent',d:''}] },
+      { cmd: 'AGENT_TERMINATE', doc: 'Terminate a running agent', params: [{k:'agent',l:'Agent',d:''}] }
+    ]
+  },
+  { id: 'skills_tools', label: 'Skills & Tools', color: '#3fb950', bg: '#0d3117',
+    items: [
+      { cmd: 'SKILL_CALL', doc: 'Invoke a registered skill', params: [{k:'skill',l:'Skill',d:''},{k:'args',l:'Args',d:''}] },
+      { cmd: 'CRON_CREATE', doc: 'Create a cron schedule', params: [{k:'name',l:'Name',d:''},{k:'schedule',l:'Schedule',d:''},{k:'run',l:'Run',d:''}] },
+      { cmd: 'CRON_CALL', doc: 'Trigger a cron job manually', params: [{k:'name',l:'Name',d:''}] },
+      { cmd: 'WEB_FETCH', doc: 'HTTP fetch from URL', params: [{k:'url',l:'URL',d:''},{k:'method',l:'Method',d:'GET'},{k:'timeout',l:'Timeout',d:''}] },
+      { cmd: 'WEB_SERIAL', doc: 'Serial port I/O', params: [{k:'urls',l:'Port',d:'/dev/ttyUSB0'},{k:'baud',l:'Baud',d:'9600'}] }
+    ]
+  },
+  { id: 'file_data', label: 'File & Data', color: '#a5d6ff', bg: '#0c2d48',
+    items: [
+      { cmd: 'FILE_READ', doc: 'Read file contents', params: [{k:'path',l:'Path',d:''},{k:'format',l:'Format',d:'text'}] },
+      { cmd: 'FILE_WRITE', doc: 'Write content to file', params: [{k:'path',l:'Path',d:''},{k:'content',l:'Content',d:''}] },
+      { cmd: 'FILE_EXECUTE', doc: 'Execute a file/script', params: [{k:'path',l:'Path',d:''}] },
+      { cmd: 'DATA_TRANSFORM', doc: 'Transform data (map/filter/reduce)', params: [{k:'data',l:'Data',d:''},{k:'operation',l:'Operation',d:''},{k:'expression',l:'Expression',d:''}] }
+    ]
+  },
+  { id: 'communication', label: 'Communication', color: '#d2a8ff', bg: '#2d1b4e',
+    items: [
+      { cmd: 'CHANNEL_SEND', doc: 'Send message to channel', params: [{k:'channel',l:'Channel',d:''},{k:'message',l:'Message',d:''}] },
+      { cmd: 'EMAIL_SEND', doc: 'Send email message', params: [{k:'to',l:'To',d:''},{k:'subject',l:'Subject',d:''},{k:'body',l:'Body',d:''}] },
+      { cmd: 'PUBLISH_CANVAS', doc: 'Publish content to canvas', params: [{k:'canvas',l:'Canvas',d:''},{k:'content',l:'Content',d:''}] }
     ]
   },
   { id: 'utility', label: 'Utility', color: '#8b949e', bg: '#21262d',
@@ -265,6 +323,7 @@ FlowEngine.prototype.buildToolbar = function() {
   tb.className = 'cf-toolbar';
   tb.innerHTML =
     '<button class="cf-tb-btn" data-action="connectMode" id="cfConnectModeBtn" title="Connect Mode — click two nodes to connect them">&#x1F517; Connect</button>' +
+    '<button class="cf-tb-btn" data-action="connectionHelp" title="Connection Logic Help" style="font-size:14px;padding:2px 6px;">&#x2753;</button>' +
     '<span class="cf-tb-sep"></span>' +
     '<button class="cf-tb-btn cf-tb-del" data-action="deleteSelected" title="Delete selected node or connection">&#x1F5D1; Delete</button>' +
     '<button class="cf-tb-btn" data-action="selectAll" title="Select all nodes">&#x2610; Select All</button>' +
@@ -300,6 +359,7 @@ FlowEngine.prototype.buildToolbar = function() {
     else if (a === 'undo') self.undo();
     else if (a === 'redo') self.redo();
     else if (a === 'clearAll') self.clearAll();
+    else if (a === 'connectionHelp') self.showConnectionHelp();
   });
 };
 
@@ -324,7 +384,8 @@ FlowEngine.prototype.buildToolbox = function(parent) {
     var groupHdr = document.createElement('div');
     groupHdr.className = 'cf-toolbox-group-header';
     groupHdr.style.borderLeftColor = cat.color;
-    groupHdr.innerHTML = '<span>' + cat.label + '</span><span class="cf-tg-arrow">&#9656;</span>';
+    var isOpCat2 = cat.id && cat.id.indexOf('op-') === 0;
+    groupHdr.innerHTML = '<span>' + cat.label + '</span><span class="cf-tg-arrow">' + (isOpCat2 ? '&#9662;' : '&#9656;') + '</span>';
     groupHdr.addEventListener('click', function() {
       var list = group.querySelector('.cf-toolbox-items');
       var arrow = groupHdr.querySelector('.cf-tg-arrow');
@@ -335,7 +396,8 @@ FlowEngine.prototype.buildToolbox = function(parent) {
 
     var items = document.createElement('div');
     items.className = 'cf-toolbox-items';
-    items.style.display = 'none';
+    var isOpCat = cat.id && cat.id.indexOf('op-') === 0;
+    items.style.display = isOpCat ? '' : 'none';
     cat.items.forEach(function(item) {
       var el = document.createElement('div');
       el.className = 'cf-toolbox-item';
@@ -454,23 +516,6 @@ FlowEngine.prototype.setupEvents = function() {
     self.pushUndo();
     var dropW = isOperatorNode(cmd) ? OP_NODE_SIZE : NODE_W;
     var nid = self.addNode(cmd, snap(pt.x - dropW / 2), snap(pt.y - 15));
-    if (self.selectedId && self.selectedId !== nid) {
-      var selNode = self.nodes[self.selectedId];
-      if (selNode) {
-        var outPorts = self.getOutPorts(selNode);
-        var freePort = null;
-        for (var i = 0; i < outPorts.length; i++) {
-          if (!self.hasConnectionFrom(self.selectedId, outPorts[i])) { freePort = outPorts[i]; break; }
-        }
-        if (!freePort) freePort = outPorts[outPorts.length > 1 ? outPorts.length - 1 : 0];
-        var targetPort = 'in';
-        if (isOperatorNode(cmd)) {
-          var newDef = getCmdDef(cmd);
-          targetPort = (newDef && newDef.item.opInputs === 1) ? 'in' : 'inLeft';
-        }
-        self.addConnection(self.selectedId, freePort, nid, targetPort);
-      }
-    }
     self.selectNode(nid);
     self.syncToCode();
     self.render();
@@ -487,6 +532,7 @@ FlowEngine.prototype.setupEvents = function() {
         var srcNode = self.nodes[self._connectModeFirstNode];
         if (srcNode && srcNode._el) srcNode._el.classList.remove('cf-node-connect-source');
         self._connectModeFirstNode = null;
+        self.clearPortHighlights();
       }
       self.render();
     }
@@ -571,6 +617,9 @@ FlowEngine.prototype.setupEvents = function() {
       if (e.key === 'a') { e.preventDefault(); self.selectAll(); }
     }
     if (e.key === 'Escape' && self._connectMode) {
+      self.toggleConnectMode();
+    }
+    if (e.key === 'c' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest('input,textarea')) {
       self.toggleConnectMode();
     }
   });
@@ -676,9 +725,47 @@ FlowEngine.prototype.deleteSelected = function() {
   this.render();
 };
 
+FlowEngine.prototype.showConnectionHelp = function() {
+  var existing = document.getElementById('cfConnectionHelpOverlay');
+  if (existing) { existing.remove(); return; }
+  var overlay = document.createElement('div');
+  overlay.id = 'cfConnectionHelpOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  var box = document.createElement('div');
+  box.style.cssText = 'background:#161b22;border:1px solid #30363d;border-radius:8px;padding:24px;max-width:520px;color:#c9d1d9;font-size:13px;line-height:1.6;box-shadow:0 8px 32px rgba(0,0,0,0.5);';
+  box.innerHTML =
+    '<h3 style="margin:0 0 12px;color:#58a6ff;font-size:16px;">Connection Logic</h3>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+    '<tr style="border-bottom:1px solid #30363d"><td style="padding:6px;color:#8b949e">Step 1</td><td style="padding:6px">Click <b style="color:#58a6ff">Connect</b> button or press <kbd style="background:#21262d;padding:1px 5px;border-radius:3px;border:1px solid #484f58">C</kbd></td></tr>' +
+    '<tr style="border-bottom:1px solid #30363d"><td style="padding:6px;color:#8b949e">Step 2</td><td style="padding:6px">Click the <b>source</b> node (it glows blue)</td></tr>' +
+    '<tr style="border-bottom:1px solid #30363d"><td style="padding:6px;color:#8b949e">Step 3</td><td style="padding:6px">Ports light up: <span style="color:#2dc653;font-weight:bold">GREEN</span> = valid target, <span style="color:#f85149;font-weight:bold">RED</span> = cannot connect</td></tr>' +
+    '<tr style="border-bottom:1px solid #30363d"><td style="padding:6px;color:#8b949e">Step 4</td><td style="padding:6px">Click the <b>target</b> node to complete the connection</td></tr>' +
+    '<tr style="border-bottom:1px solid #30363d"><td style="padding:6px;color:#8b949e">Cancel</td><td style="padding:6px">Click same node again, click empty canvas, or press <kbd style="background:#21262d;padding:1px 5px;border-radius:3px;border:1px solid #484f58">Esc</kbd></td></tr>' +
+    '</table>' +
+    '<h4 style="margin:14px 0 8px;color:#f0883e;font-size:14px;">Port Types</h4>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+    '<tr style="border-bottom:1px solid #30363d"><td style="padding:4px;color:#8b949e;width:100px">&#x25CF; Top port</td><td style="padding:4px"><b>Input</b> — receives data from another node\'s output</td></tr>' +
+    '<tr style="border-bottom:1px solid #30363d"><td style="padding:4px;color:#8b949e">&#x25CF; Bottom port</td><td style="padding:4px"><b>Output</b> — sends data/flow to another node\'s input</td></tr>' +
+    '<tr style="border-bottom:1px solid #30363d"><td style="padding:4px;color:#8b949e">&#x25CF; L / R ports</td><td style="padding:4px">Operator left &amp; right inputs (e.g. <code style="color:#f0883e">a + b</code>)</td></tr>' +
+    '<tr style="border-bottom:1px solid #30363d"><td style="padding:4px;color:#8b949e">&#x25CF; Condition</td><td style="padding:4px">IF node condition input from operator result</td></tr>' +
+    '</table>' +
+    '<h4 style="margin:14px 0 8px;color:#f0883e;font-size:14px;">Connection Rules</h4>' +
+    '<ul style="margin:0;padding-left:18px;font-size:12px;">' +
+    '<li>Connect <b>output &#x2192; input</b> (top-to-bottom flow)</li>' +
+    '<li>Operators: connect values to <b>L</b> and <b>R</b> inputs, result flows from output</li>' +
+    '<li>IF nodes: connect operator output to the <b>condition</b> port</li>' +
+    '<li>Drag from toolbox drops a standalone node (no auto-connect)</li>' +
+    '</ul>' +
+    '<div style="text-align:right;margin-top:16px"><button onclick="this.closest(\'#cfConnectionHelpOverlay\').remove()" style="background:#238636;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:12px;">Got it</button></div>';
+  overlay.appendChild(box);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+};
+
 FlowEngine.prototype.toggleConnectMode = function() {
   this._connectMode = !this._connectMode;
   this._connectModeFirstNode = null;
+  this.clearPortHighlights();
   var btn = document.getElementById('cfConnectModeBtn');
   if (btn) {
     btn.classList.toggle('cf-tb-active', this._connectMode);
@@ -694,12 +781,14 @@ FlowEngine.prototype.handleConnectModeClick = function(nodeId) {
     this._connectModeFirstNode = nodeId;
     var node = this.nodes[nodeId];
     if (node && node._el) node._el.classList.add('cf-node-connect-source');
+    this.highlightValidTargets(nodeId);
     return true;
   }
   if (this._connectModeFirstNode === nodeId) {
     var srcNode = this.nodes[nodeId];
     if (srcNode && srcNode._el) srcNode._el.classList.remove('cf-node-connect-source');
     this._connectModeFirstNode = null;
+    this.clearPortHighlights();
     return true;
   }
   var fromId = this._connectModeFirstNode;
@@ -727,10 +816,37 @@ FlowEngine.prototype.handleConnectModeClick = function(nodeId) {
     }
     this.addConnection(fromId, freePort, nodeId, targetPort);
     this.syncToCode();
+    this.clearPortHighlights();
     this.renderConnections();
   }
   this._connectModeFirstNode = null;
   return true;
+};
+
+FlowEngine.prototype.highlightValidTargets = function(sourceId) {
+  this.clearPortHighlights();
+  var self = this;
+  var allPorts = this.container.querySelectorAll('.cf-port');
+  allPorts.forEach(function(portEl) {
+    var portNodeId = portEl.getAttribute('data-node-id');
+    var portType = portEl.getAttribute('data-port-type');
+    if (portNodeId === sourceId) {
+      if (portType === 'out') portEl.classList.add('cf-port-valid');
+      return;
+    }
+    if (portType === 'in') {
+      portEl.classList.add('cf-port-valid');
+    } else {
+      portEl.classList.add('cf-port-invalid');
+    }
+  });
+};
+
+FlowEngine.prototype.clearPortHighlights = function() {
+  var allPorts = this.container.querySelectorAll('.cf-port');
+  allPorts.forEach(function(portEl) {
+    portEl.classList.remove('cf-port-valid', 'cf-port-invalid');
+  });
 };
 
 FlowEngine.prototype.selectAll = function() {
@@ -1242,13 +1358,100 @@ FlowEngine.prototype.fromAST = function(ast) {
     var self = this;
     var prevId = null;
 
+    var OP_MAP = {
+      '+': 'OP_ADD', '-': 'OP_SUB', '*': 'OP_MUL', '/': 'OP_DIV', '%': 'OP_MOD',
+      '<': 'OP_LT', '>': 'OP_GT', '<=': 'OP_LTE', '>=': 'OP_GTE', '==': 'OP_EQ', '!=': 'OP_NEQ',
+      'AND': 'OP_AND', 'OR': 'OP_OR', 'NOT': 'OP_NOT',
+      '&&': 'OP_AND', '||': 'OP_OR'
+    };
+
+    function exprToNodeId(expr) {
+      if (!expr) return null;
+      if (expr.type === 'BinaryExpr' && OP_MAP[expr.op]) {
+        var opCmd = OP_MAP[expr.op];
+        var opId = self.addNode(opCmd, 0, 0);
+        var leftId = exprToNodeId(expr.left);
+        var rightId = exprToNodeId(expr.right);
+        if (leftId) self.addConnection(leftId, 'out', opId, 'inLeft');
+        if (rightId) self.addConnection(rightId, 'out', opId, 'inRight');
+        return opId;
+      }
+      if (expr.type === 'UnaryExpr' && (expr.op === 'NOT' || expr.op === '!')) {
+        var notId = self.addNode('OP_NOT', 0, 0);
+        var innerid = exprToNodeId(expr.expr);
+        if (innerid) self.addConnection(innerid, 'out', notId, 'in');
+        return notId;
+      }
+      if (expr.type === 'CrossesExpr') {
+        var crCmd = (expr.direction || 'OVER').toUpperCase() === 'OVER' ? 'OP_CROSSES_OVER' : 'OP_CROSSES_UNDER';
+        var crId = self.addNode(crCmd, 0, 0);
+        var clId = exprToNodeId(expr.left);
+        var crRId = exprToNodeId(expr.right);
+        if (clId) self.addConnection(clId, 'out', crId, 'inLeft');
+        if (crRId) self.addConnection(crRId, 'out', crId, 'inRight');
+        return crId;
+      }
+      if (expr.type === 'ContainsExpr') {
+        var coId = self.addNode('OP_CONTAINS', 0, 0);
+        var coLId = exprToNodeId(expr.left);
+        var coRId = exprToNodeId(expr.right);
+        if (coLId) self.addConnection(coLId, 'out', coId, 'inLeft');
+        if (coRId) self.addConnection(coRId, 'out', coId, 'inRight');
+        return coId;
+      }
+      if (expr.type === 'FunctionCall') {
+        var fnCmd = (expr.name || '').toUpperCase();
+        if (getCmdDef(fnCmd)) {
+          var fnId = self.addNode(fnCmd, 0, 0);
+          return fnId;
+        }
+        var indId = self.addNode('INDICATOR', 0, 0);
+        var indNode = self.nodes[indId];
+        if (indNode) {
+          indNode.params.name = expr.name || '';
+          indNode.params.args = (expr.args || []).map(function(a) { return self.exprToStr(a); }).join(', ');
+        }
+        return indId;
+      }
+      if (expr.type === 'Identifier' || expr.type === 'NumberLiteral' || expr.type === 'StringLiteral') {
+        var valId = self.addNode('SET', 0, 0);
+        var valNode = self.nodes[valId];
+        if (valNode) {
+          valNode.params.name = expr.type === 'Identifier' ? expr.value : '';
+          valNode.params.value = self.exprToStr(expr);
+          valNode._isValueNode = true;
+        }
+        return valId;
+      }
+      return null;
+    }
+
     function processStmt(stmt, parentId, parentPort) {
       if (!stmt) return null;
       var nodeId = self.addNodeFromAST(stmt);
       if (parentId !== null && parentPort) {
         self.addConnection(parentId, parentPort, nodeId, 'in');
       }
+      if (stmt.type === 'IfStatement' && stmt.condition && isDecomposable(stmt.condition)) {
+        var condNodeId = exprToNodeId(stmt.condition);
+        if (condNodeId) {
+          self.addConnection(condNodeId, 'out', nodeId, 'in');
+        }
+      }
+      if ((stmt.type === 'VarDecl' || stmt.type === 'Assignment') && stmt.value && isDecomposable(stmt.value)) {
+        var valNodeId = exprToNodeId(stmt.value);
+        if (valNodeId) {
+          self.addConnection(valNodeId, 'out', nodeId, 'in');
+        }
+      }
       return nodeId;
+    }
+
+    function isDecomposable(expr) {
+      if (!expr) return false;
+      return expr.type === 'BinaryExpr' || expr.type === 'CrossesExpr' ||
+             expr.type === 'ContainsExpr' || (expr.type === 'UnaryExpr' && (expr.op === 'NOT' || expr.op === '!')) ||
+             expr.type === 'FunctionCall';
     }
 
     function processBody(stmts, parentId, parentPort) {
@@ -1491,7 +1694,29 @@ FlowEngine.prototype.astTypeToCmd = function(stmt) {
     'IndicatorCall': function() { return 'INDICATOR'; },
     'Include': function() { return 'INCLUDE'; },
     'FunctionDecl': function() { return 'DEF_FUNC'; },
-    'Chain': function() { return 'CHAIN'; }
+    'Chain': function() { return 'CHAIN'; },
+    'TaskDefine': function() { return 'TASK_DEFINE'; },
+    'TaskAssign': function() { return 'TASK_ASSIGN'; },
+    'TaskChain': function() { return 'TASK_CHAIN'; },
+    'TaskParallel': function() { return 'TASK_PARALLEL'; },
+    'TaskShowFlow': function() { return 'TASK_SHOW_FLOW'; },
+    'TaskLog': function() { return 'TASK_LOG'; },
+    'AgentSpawn': function() { return 'AGENT_SPAWN'; },
+    'AgentCall': function() { return 'AGENT_CALL'; },
+    'AgentPass': function() { return 'AGENT_PASS'; },
+    'AgentTerminate': function() { return 'AGENT_TERMINATE'; },
+    'SkillCall': function() { return 'SKILL_CALL'; },
+    'CronCreate': function() { return 'CRON_CREATE'; },
+    'CronCall': function() { return 'CRON_CALL'; },
+    'WebFetch': function() { return 'WEB_FETCH'; },
+    'WebSerial': function() { return 'WEB_SERIAL'; },
+    'FileRead': function() { return 'FILE_READ'; },
+    'FileWrite': function() { return 'FILE_WRITE'; },
+    'FileExecute': function() { return 'FILE_EXECUTE'; },
+    'DataTransform': function() { return 'DATA_TRANSFORM'; },
+    'ChannelSend': function() { return 'CHANNEL_SEND'; },
+    'EmailSend': function() { return 'EMAIL_SEND'; },
+    'PublishCanvas': function() { return 'PUBLISH_CANVAS'; }
   };
   var fn = map[stmt.type];
   return fn ? fn(stmt) : 'WAIT';
@@ -1588,6 +1813,13 @@ FlowEngine.prototype.toCode = function() {
         lines.push(p + 'ENDFUNC');
         var fnext = self.getConnectedTo(nodeId, 'next');
         fnext.forEach(function(tid) { gen(tid, p); });
+      } else if (node.cmd === 'TASK_DEFINE') {
+        lines.push(p + 'TASK_DEFINE "' + (node.params.name || '') + '"' + (node.params.description ? ' WITH "' + node.params.description + '"' : '') + ' BODY');
+        var tdbody = self.getConnectedTo(nodeId, 'body');
+        tdbody.forEach(function(tid) { gen(tid, p + '  '); });
+        lines.push(p + 'ENDTASK');
+        var tdnext = self.getConnectedTo(nodeId, 'next');
+        tdnext.forEach(function(tid) { gen(tid, p); });
       }
     } else {
       if (line) lines.push(p + line);
@@ -1678,6 +1910,48 @@ FlowEngine.prototype.nodeToLine = function(node) {
     case 'INDICATOR': return 'INDICATOR ' + (p.name || 'RSI') + (p.params ? '(' + p.params + ')' : '');
     case 'INCLUDE': return 'INCLUDE "' + (p.scriptName || '') + '"';
     case 'CHAIN': return 'CHAIN';
+    case 'TASK_ASSIGN': return 'TASK_ASSIGN "' + (p.task || '') + '" TO "' + (p.to || '') + '"';
+    case 'TASK_CHAIN': return 'TASK_CHAIN ' + (p.tasks || '');
+    case 'TASK_PARALLEL': return 'TASK_PARALLEL ' + (p.tasks || '');
+    case 'TASK_SHOW_FLOW': return 'TASK_SHOW_FLOW "' + (p.task || '') + '"';
+    case 'TASK_LOG': return 'TASK_LOG "' + (p.task || '') + '"' + (p.message ? ' MESSAGE "' + p.message + '"' : '');
+    case 'AGENT_SPAWN':
+      var as = 'AGENT_SPAWN "' + (p.name || '') + '"';
+      if (p.prompt) as += ' WITH "' + p.prompt + '"';
+      if (p.timeout) as += ' TIMEOUT ' + p.timeout;
+      return as;
+    case 'AGENT_CALL': return 'AGENT_CALL "' + (p.agent || '') + '" "' + (p.command || '') + '"';
+    case 'AGENT_PASS': return 'AGENT_PASS "' + (p.from || '') + '" "' + (p.to || '') + '"';
+    case 'AGENT_TERMINATE': return 'AGENT_TERMINATE "' + (p.agent || '') + '"';
+    case 'SKILL_CALL':
+      var sc = 'SKILL_CALL "' + (p.skill || '') + '"';
+      if (p.args) sc += ' WITH ' + p.args;
+      return sc;
+    case 'CRON_CREATE': return 'CRON_CREATE "' + (p.name || '') + '" SCHEDULE "' + (p.schedule || '') + '" RUN "' + (p.run || '') + '"';
+    case 'CRON_CALL': return 'CRON_CALL "' + (p.name || '') + '"';
+    case 'WEB_FETCH':
+      var wf = 'WEB_FETCH "' + (p.url || '') + '"';
+      if (p.method && p.method !== 'GET') wf += ' WITH method="' + p.method + '"';
+      if (p.timeout) wf += ' TIMEOUT ' + p.timeout;
+      return wf;
+    case 'WEB_SERIAL':
+      var ws = 'WEB_SERIAL "' + (p.urls || '') + '"';
+      if (p.baud) ws += ' WITH baud=' + p.baud;
+      return ws;
+    case 'FILE_READ':
+      var fr = 'FILE_READ "' + (p.path || '') + '"';
+      if (p.format) fr += ' FORMAT "' + p.format + '"';
+      return fr;
+    case 'FILE_WRITE': return 'FILE_WRITE "' + (p.path || '') + '" "' + (p.content || '') + '"';
+    case 'FILE_EXECUTE': return 'FILE_EXECUTE "' + (p.path || '') + '"';
+    case 'DATA_TRANSFORM':
+      var dt = 'DATA_TRANSFORM ' + (p.data || '');
+      if (p.operation) dt += ' ' + p.operation;
+      if (p.expression) dt += ' "' + p.expression + '"';
+      return dt;
+    case 'CHANNEL_SEND': return 'CHANNEL_SEND "' + (p.channel || '') + '" "' + (p.message || '') + '"';
+    case 'EMAIL_SEND': return 'EMAIL_SEND "' + (p.to || '') + '" "' + (p.body || '') + '"' + (p.subject ? ' SUBJECT "' + p.subject + '"' : '');
+    case 'PUBLISH_CANVAS': return 'PUBLISH_CANVAS "' + (p.canvas || '') + '"' + (p.content ? ' CONTENT "' + p.content + '"' : '');
     case 'OP_ADD': case 'OP_SUB': case 'OP_MUL': case 'OP_DIV': case 'OP_MOD':
     case 'OP_LT': case 'OP_GT': case 'OP_LTE': case 'OP_GTE': case 'OP_EQ': case 'OP_NEQ':
     case 'OP_AND': case 'OP_OR': case 'OP_NOT':

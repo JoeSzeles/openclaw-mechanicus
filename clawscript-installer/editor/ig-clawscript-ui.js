@@ -54,7 +54,13 @@ var CS_KEYWORDS = [
   'PRT_CORRELATION','PRT_REGRESSION',
   'PRT_DEFPARAM','PRT_RETURN',
   'PRT_DRAWLINE','PRT_DRAWARROW','PRT_HISTOGRAM',
-  'PRT_CROSS','PRT_BARSSINCE','PRT_SUMMATION'
+  'PRT_CROSS','PRT_BARSSINCE','PRT_SUMMATION',
+  'TASK_DEFINE','TASK_ASSIGN','TASK_CHAIN','TASK_PARALLEL','TASK_SHOW_FLOW','TASK_LOG',
+  'AGENT_SPAWN','AGENT_CALL','AGENT_PASS','AGENT_TERMINATE',
+  'SKILL_CALL','CRON_CREATE','CRON_CALL','WEB_FETCH','WEB_SERIAL',
+  'FILE_READ','FILE_WRITE','FILE_EXECUTE','DATA_TRANSFORM',
+  'CHANNEL_SEND','EMAIL_SEND','PUBLISH_CANVAS',
+  'BODY','ENDTASK','PRIORITY','DEPENDS_ON','STEPS','RESULT_VAR','SKILL','PROVIDER','SUBJECT'
 ];
 
 var TRADE_CMDS = ['BUY','SELL','SELLSHORT','EXIT','CLOSE','TRAILSTOP','STRATEGY_ENTRY','STRATEGY_EXIT','STRATEGY_CLOSE','PRT_BUY','PRT_SELL'];
@@ -71,6 +77,7 @@ var PORTFOLIO_CMDS = ['MARKET_SCAN','PORTFOLIO_BUILD','PORTFOLIO_REBALANCE'];
 var PRT_CMDS = ['PRT_AVERAGE','PRT_RSI','PRT_MACD','PRT_BOLLINGER','PRT_STOCHASTIC','PRT_ATR','PRT_CCI','PRT_ADX','PRT_DONCHIAN','PRT_ICHIMOKU','PRT_KELTNERCHANNEL','PRT_PARABOLICSAR','PRT_SUPERTREND','PRT_VOLUMEBYPRICE','PRT_FIBONACCI','PRT_PIVOTPOINT','PRT_DEMARK','PRT_WILLIAMS','PRT_ULTOSC','PRT_CHAIKIN','PRT_ONBALANCEVOLUME','PRT_VWAP','PRT_TIMEFRAME','PRT_BARINDEX','PRT_DATE','PRT_TIME','PRT_CUM','PRT_HIGHEST','PRT_LOWEST','PRT_SUM','PRT_STD','PRT_CORRELATION','PRT_REGRESSION','PRT_DEFPARAM','PRT_RETURN','PRT_DRAWLINE','PRT_DRAWARROW','PRT_HISTOGRAM','PRT_CROSS','PRT_BARSSINCE','PRT_SUMMATION'];
 var TV_CMDS = ['INPUT_INT','INPUT_FLOAT','INPUT_BOOL','INPUT_SYMBOL','TIMEFRAME_PERIOD','TIMEFRAME_IS_DAILY','ARRAY_NEW','ARRAY_PUSH','MATRIX_NEW','MATRIX_SET'];
 var UTILITY_CMDS = ['FILE_PARSE'];
+var AUTOMATION_CMDS = ['TASK_DEFINE','TASK_ASSIGN','TASK_CHAIN','TASK_PARALLEL','TASK_SHOW_FLOW','TASK_LOG','AGENT_SPAWN','AGENT_CALL','AGENT_PASS','AGENT_TERMINATE','SKILL_CALL','CRON_CREATE','CRON_CALL','WEB_FETCH','WEB_SERIAL','FILE_READ','FILE_WRITE','FILE_EXECUTE','DATA_TRANSFORM','CHANNEL_SEND','EMAIL_SEND','PUBLISH_CANVAS'];
 
 var currentAST = null;
 var currentJS = '';
@@ -167,6 +174,7 @@ function syntaxHighlight(code) {
     else if (PRT_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-prt';
     else if (TV_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-tv';
     else if (UTILITY_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-utility';
+    else if (AUTOMATION_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-automation';
     else if (t.type === TOKEN_TYPES.KEYWORD) cls = 'cs-tok-keyword';
     else if (t.type === TOKEN_TYPES.IDENTIFIER) cls = 'cs-tok-ident';
     result += '<span class="' + cls + '">' + escapeHtml(originalText) + '</span>';
@@ -261,8 +269,12 @@ function buildEditorUI() {
   '.cf-np-label { font-size:9px; color:#8b949e; min-width:32px; white-space:nowrap; }' +
   '.cf-np-input { flex:1; background:#161b22; border:1px solid #30363d; border-radius:2px; color:#c9d1d9; font-size:10px; padding:1px 4px; outline:none; min-width:0; }' +
   '.cf-np-input:focus { border-color:#58a6ff; }' +
-  '.cf-port { position:absolute; width:' + 14 + 'px; height:' + 14 + 'px; border-radius:50%; border:2px solid #484f58; background:#21262d; z-index:4; cursor:crosshair; }' +
+  '.cf-port { position:absolute; width:' + 14 + 'px; height:' + 14 + 'px; border-radius:50%; border:2px solid #484f58; background:#21262d; z-index:4; cursor:crosshair; transition:all .15s; }' +
   '.cf-port:hover { background:#58a6ff; border-color:#58a6ff; transform:scale(1.2); }' +
+  '.cf-port-valid { background:#2dc653!important; border-color:#2dc653!important; box-shadow:0 0 8px #2dc653; animation:cf-port-pulse 1s infinite; }' +
+  '.cf-port-invalid { background:#f85149!important; border-color:#f85149!important; box-shadow:0 0 6px #f85149; opacity:0.6; }' +
+  '.cf-node-connect-source { box-shadow:0 0 12px rgba(88,166,255,0.6)!important; border-color:#58a6ff!important; }' +
+  '@keyframes cf-port-pulse { 0%,100%{box-shadow:0 0 4px #2dc653} 50%{box-shadow:0 0 12px #2dc653} }' +
   '.cf-port-in { top:-7px; left:50%; margin-left:-7px; }' +
   '.cf-port-out { bottom:-7px; }' +
   '.cf-node-operator { border-radius:50%!important; display:flex; align-items:center; justify-content:center; overflow:visible!important; }' +
@@ -272,12 +284,14 @@ function buildEditorUI() {
   '.cf-conn { cursor:pointer; pointer-events:stroke; }' +
   '.cf-conn:hover { stroke-width:3!important; filter:brightness(1.4); }' +
   '.cs-bottom-panels { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }' +
-  '.cs-logs-pane { background:#0d1117; border:1px solid #30363d; border-radius:6px; max-height:220px; overflow:hidden; display:flex; flex-direction:column; }' +
+  '.cs-logs-pane { background:#0d1117; border:1px solid #30363d; border-radius:6px; height:220px; overflow:hidden; display:flex; flex-direction:column; }' +
   '.cs-logs-header { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:#161b22; border-bottom:1px solid #21262d; font-size:12px; color:#8b949e; flex-shrink:0; }' +
   '.cs-logs-header button { padding:2px 8px; border-radius:3px; font-size:11px; cursor:pointer; border:1px solid #30363d; background:#21262d; color:#c9d1d9; }' +
   '#csLogOutput { padding:6px 10px; font:11px/1.5 "Fira Code",monospace; overflow-y:auto; flex:1; }' +
   '.cs-log-line { margin:1px 0; }' +
-  '.cs-ai-pane { background:#0d1117; border:1px solid #30363d; border-radius:6px; max-height:220px; overflow:hidden; display:flex; flex-direction:column; }' +
+  '.cs-ai-pane { background:#0d1117; border:1px solid #30363d; border-radius:6px; height:220px; overflow:hidden; display:flex; flex-direction:column; position:relative; }' +
+  '.cs-ai-resize-handle { height:6px; cursor:ns-resize; background:transparent; position:absolute; top:0; left:0; right:0; z-index:5; }' +
+  '.cs-ai-resize-handle:hover, .cs-ai-resize-handle.active { background:rgba(88,166,255,0.3); }' +
   '.cs-ai-header { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:#161b22; border-bottom:1px solid #21262d; font-size:12px; color:#8b949e; flex-shrink:0; gap:6px; }' +
   '.cs-ai-header select { padding:2px 6px; font-size:10px; background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:3px; }' +
   '.cs-ai-messages { flex:1; overflow-y:auto; padding:6px 10px; font:11px/1.5 "Fira Code",monospace; }' +
@@ -285,6 +299,10 @@ function buildEditorUI() {
   '.cs-ai-msg-user { background:#1f6feb; color:#fff; margin-left:auto; text-align:right; }' +
   '.cs-ai-msg-assistant { background:#21262d; color:#c9d1d9; }' +
   '.cs-ai-msg-system { background:#3d2800; color:#f0883e; font-size:10px; font-style:italic; }' +
+  '.cs-ai-msg-assistant .cs-ai-error-ref { color:#f85149; cursor:pointer; text-decoration:underline; }' +
+  '.cs-ai-msg-assistant .cs-ai-error-ref:hover { color:#ff7b72; }' +
+  '.cs-ai-implement-btn { display:inline-block; margin-top:6px; padding:3px 10px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-family:inherit; }' +
+  '.cs-ai-implement-btn:hover { background:#2ea043; }' +
   '.cs-ai-input-row { display:flex; gap:4px; padding:6px 8px; border-top:1px solid #21262d; flex-shrink:0; }' +
   '.cs-ai-input { flex:1; padding:4px 8px; font:11px "Fira Code",monospace; background:#161b22; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; outline:none; }' +
   '.cs-ai-input:focus { border-color:#58a6ff; }' +
@@ -315,6 +333,7 @@ function buildEditorUI() {
   '.cs-tok-prt { color:#db61a2; font-weight:600; }' +
   '.cs-tok-tv { color:#f78166; font-weight:600; }' +
   '.cs-tok-utility { color:#8b949e; font-weight:600; }' +
+  '.cs-tok-automation { color:#e3b341; font-weight:600; }' +
   '.cs-tok-keyword { color:#ff7b72; }' +
   '.cs-tok-string { color:#a5d6ff; }' +
   '.cs-tok-number { color:#79c0ff; }' +
@@ -450,7 +469,8 @@ function buildEditorUI() {
       '<div class="cs-logs-header"><span>Output / Logs</span><button id="csBtnClearLog">Clear</button></div>' +
       '<div id="csLogOutput"></div>' +
     '</div>' +
-    '<div class="cs-ai-pane">' +
+    '<div class="cs-ai-pane" id="csAiPane">' +
+      '<div class="cs-ai-resize-handle" id="csAiResizeHandle"></div>' +
       '<div class="cs-ai-header">' +
         '<span>AI Assistant</span>' +
         '<select id="csAiModelSelect">' +
@@ -783,8 +803,14 @@ function autoParse() {
     var result = parseClawScript(code);
     currentAST = result.ast;
     currentJS = result.js;
-    status.innerHTML = '<span style="color:#2dc653">Parsed OK (' + result.ast.body.length + ' statements)</span>';
-    updateLineNumbers({});
+    var warnCount = Object.keys(result.warnings || {}).length;
+    if (warnCount > 0) {
+      status.innerHTML = '<span style="color:#f0883e">Parsed with ' + warnCount + ' warning(s)</span>';
+      updateLineNumbers(result.warnings);
+    } else {
+      status.innerHTML = '<span style="color:#2dc653">Parsed OK (' + result.ast.body.length + ' statements)</span>';
+      updateLineNumbers({});
+    }
     renderFlow(result.ast);
   } catch(e) {
     var errMsg = e.message || 'Unknown error';
@@ -2322,6 +2348,7 @@ function parseClawScript(code) {
   var variables = {};
   var imports = { indicators: true };
   var functions = {};
+  var _parseWarnings = {};
 
   function current() { return tokens[pos] || null; }
   function peek(off) { return tokens[pos + (off || 1)] || null; }
@@ -2400,12 +2427,41 @@ function parseClawScript(code) {
       case 'RUMOR_SCAN': return parseRumorScanStmt();
       case 'CHAIN': return parseChain();
       case 'INDICATOR': return parseIndicatorStmt();
+      case 'TASK_DEFINE': return parseTaskDefineStmt();
+      case 'TASK_ASSIGN': return parseTaskAssignStmt();
+      case 'TASK_CHAIN': return parseTaskChainStmt();
+      case 'TASK_PARALLEL': return parseTaskParallelStmt();
+      case 'TASK_SHOW_FLOW': return parseTaskShowFlowStmt();
+      case 'TASK_LOG': return parseTaskLogStmt();
+      case 'AGENT_SPAWN': return parseAgentSpawnStmt();
+      case 'AGENT_CALL': return parseAgentCallStmt();
+      case 'AGENT_PASS': return parseAgentPassStmt();
+      case 'AGENT_TERMINATE': return parseAgentTerminateStmt();
+      case 'SKILL_CALL': return parseSkillCallStmt();
+      case 'CRON_CREATE': return parseCronCreateStmt();
+      case 'CRON_CALL': return parseCronCallStmt();
+      case 'WEB_FETCH': return parseWebFetchStmt();
+      case 'WEB_SERIAL': return parseWebSerialStmt();
+      case 'FILE_READ': return parseFileReadStmt();
+      case 'FILE_WRITE': return parseFileWriteStmt();
+      case 'FILE_EXECUTE': return parseFileExecuteStmt();
+      case 'DATA_TRANSFORM': return parseDataTransformStmt();
+      case 'CHANNEL_SEND': return parseChannelSendStmt();
+      case 'EMAIL_SEND': return parseEmailSendStmt();
+      case 'PUBLISH_CANVAS': return parsePublishCanvasStmt();
       default:
         if (t.type === TOKEN_TYPES.IDENTIFIER) {
           if (peek() && peek().value === '=') return parseAssignment();
           if (peek() && peek().value === '(') return parseFuncCallStmt();
-          eat();
-          return { type: 'ExpressionStatement', expr: { type: 'Identifier', value: t.value } };
+          if (variables[t.value]) {
+            eat();
+            return { type: 'ExpressionStatement', expr: { type: 'Identifier', value: t.value } };
+          }
+          var unknownTok = eat();
+          var lineOfUnknown = code.substring(0, unknownTok.index || 0).split('\n').length;
+          if (!_parseWarnings) _parseWarnings = {};
+          _parseWarnings[lineOfUnknown] = 'Unknown command or variable: "' + unknownTok.value + '"';
+          return { type: 'ExpressionStatement', expr: { type: 'Identifier', value: unknownTok.value }, _warning: true };
         }
         eat();
         return null;
@@ -2450,6 +2506,12 @@ function parseClawScript(code) {
       case 'NOMAD_SCAN': return parseNomadScanExpr();
       case 'RUMOR_SCAN': return parseRumorScanExpr();
       case 'INDICATOR': return parseIndicatorExpr();
+      case 'AGENT_CALL': return parseAgentCallExpr();
+      case 'SKILL_CALL': return parseSkillCallExpr();
+      case 'WEB_FETCH': return parseWebFetchExpr();
+      case 'FILE_READ': return parseFileReadExpr();
+      case 'FILE_EXECUTE': return parseFileExecuteExpr();
+      case 'DATA_TRANSFORM': return parseDataTransformExpr();
       default: return parseExpr();
     }
   }
@@ -2731,6 +2793,36 @@ function parseClawScript(code) {
   }
   function parseFuncCallStmt() { var name = eat().value; var args = []; if (current() && current().value === '(') { eat(); while (current() && current().value !== ')') { args.push(parseExpr()); if (current() && current().value === ',') eat(); } if (current() && current().value === ')') eat(); } return { type: 'FunctionCallStmt', name: name, args: args }; }
 
+  function parseTaskDefineStmt() { eat(); var name = parseExpr(); var priority = null, body = []; if (isKw('PRIORITY')) { eat(); priority = parseExpr(); } if (isKw('BODY')) { eat(); while (current() && !isKw('ENDTASK')) { var s = parseStatement(); if (s) body.push(s); } if (isKw('ENDTASK')) eat(); } imports.automation = true; return { type: 'TaskDefine', name: name, priority: priority, body: body }; }
+  function parseTaskAssignStmt() { eat(); var task = parseExpr(); var to = null; if (isKw('TO')) { eat(); to = parseExpr(); } imports.automation = true; return { type: 'TaskAssign', task: task, to: to }; }
+  function parseTaskChainStmt() { eat(); var steps = [parseExpr()]; while (current() && isKw('THEN')) { eat(); steps.push(parseExpr()); } imports.automation = true; return { type: 'TaskChain', steps: steps }; }
+  function parseTaskParallelStmt() { eat(); var steps = [parseExpr()]; while (current() && current().value === ',') { eat(); steps.push(parseExpr()); } imports.automation = true; return { type: 'TaskParallel', steps: steps }; }
+  function parseTaskShowFlowStmt() { eat(); var name = null; if (current() && current().type !== TOKEN_TYPES.KEYWORD) { name = parseExpr(); } imports.automation = true; return { type: 'TaskShowFlow', name: name }; }
+  function parseTaskLogStmt() { eat(); var msg = parseExpr(); var lv = null; if (isKw('LEVEL')) { eat(); lv = parseExpr(); } imports.automation = true; return { type: 'TaskLog', message: msg, level: lv }; }
+  function parseAgentSpawnExpr() { eat(); var name = parseExpr(); var prompt = null; if (isKw('WITH')) { eat(); prompt = parseExpr(); } imports.automation = true; return { type: 'AgentSpawn', name: name, prompt: prompt }; }
+  function parseAgentSpawnStmt() { return parseAgentSpawnExpr(); }
+  function parseAgentCallExpr() { eat(); var agent = parseExpr(); var cmd = parseExpr(); var rv = null; if (isKw('RESULT_VAR')) { eat(); rv = parseExpr(); } imports.automation = true; return { type: 'AgentCall', agent: agent, command: cmd, resultVar: rv }; }
+  function parseAgentCallStmt() { return parseAgentCallExpr(); }
+  function parseAgentPassStmt() { eat(); var from = parseExpr(); if (isKw('TO')) eat(); var to = parseExpr(); var data = null; if (isKw('WITH')) { eat(); data = parseExpr(); } imports.automation = true; return { type: 'AgentPass', from: from, to: to, data: data }; }
+  function parseAgentTerminateStmt() { eat(); var agent = parseExpr(); imports.automation = true; return { type: 'AgentTerminate', agent: agent }; }
+  function parseSkillCallExpr() { eat(); var skill = parseExpr(); var args = null; if (isKw('WITH')) { eat(); args = parseExpr(); } imports.automation = true; return { type: 'SkillCall', skill: skill, args: args }; }
+  function parseSkillCallStmt() { return parseSkillCallExpr(); }
+  function parseCronCreateStmt() { eat(); var name = parseExpr(); var schedule = null, run = null; if (isKw('SCHEDULE')) { eat(); schedule = parseExpr(); } if (isKw('RUN')) { eat(); run = parseExpr(); } imports.automation = true; return { type: 'CronCreate', name: name, schedule: schedule, run: run }; }
+  function parseCronCallStmt() { eat(); var name = parseExpr(); imports.automation = true; return { type: 'CronCall', name: name }; }
+  function parseWebFetchExpr() { eat(); var url = parseExpr(); var opts = null; if (isKw('OPTIONS')) { eat(); opts = parseExpr(); } imports.automation = true; return { type: 'WebFetch', url: url, options: opts }; }
+  function parseWebFetchStmt() { return parseWebFetchExpr(); }
+  function parseWebSerialStmt() { eat(); var steps = [parseExpr()]; while (current() && isKw('THEN')) { eat(); steps.push(parseExpr()); } imports.automation = true; return { type: 'WebSerial', steps: steps }; }
+  function parseFileReadExpr() { eat(); var path = parseExpr(); var fmt = null; if (isKw('FORMAT')) { eat(); fmt = parseExpr(); } imports.automation = true; return { type: 'FileRead', path: path, format: fmt }; }
+  function parseFileReadStmt() { return parseFileReadExpr(); }
+  function parseFileWriteStmt() { eat(); var path = parseExpr(); var content = parseExpr(); var fmt = null; if (isKw('FORMAT')) { eat(); fmt = parseExpr(); } imports.automation = true; return { type: 'FileWrite', path: path, content: content, format: fmt }; }
+  function parseFileExecuteExpr() { eat(); var cmd = parseExpr(); var to = null; if (isKw('TIMEOUT')) { eat(); to = parseExpr(); } imports.automation = true; return { type: 'FileExecute', command: cmd, timeout: to }; }
+  function parseFileExecuteStmt() { return parseFileExecuteExpr(); }
+  function parseDataTransformExpr() { eat(); var data = parseExpr(); var using = null; if (isKw('USING')) { eat(); using = parseExpr(); } imports.automation = true; return { type: 'DataTransform', data: data, using: using }; }
+  function parseDataTransformStmt() { return parseDataTransformExpr(); }
+  function parseChannelSendStmt() { eat(); var channel = parseExpr(); var msg = parseExpr(); var opts = null; if (isKw('OPTIONS')) { eat(); opts = parseExpr(); } imports.automation = true; return { type: 'ChannelSend', channel: channel, message: msg, options: opts }; }
+  function parseEmailSendStmt() { eat(); var to = parseExpr(); var subj = null, body = null; if (isKw('SUBJECT')) { eat(); subj = parseExpr(); } if (isKw('BODY')) { eat(); body = parseExpr(); } imports.automation = true; return { type: 'EmailSend', to: to, subject: subj, body: body }; }
+  function parsePublishCanvasStmt() { eat(); var name = parseExpr(); var content = null; if (isKw('WITH')) { eat(); content = parseExpr(); } imports.automation = true; return { type: 'PublishCanvas', name: name, content: content }; }
+
   var ast;
   try {
     ast = parseProgram();
@@ -2745,7 +2837,7 @@ function parseClawScript(code) {
     throw parseErr;
   }
   var metadata = extractClawScriptMetadata(code);
-  return { ast: ast, js: generateJSFromAST(ast), imports: Object.keys(imports), variables: Object.keys(variables), metadata: metadata };
+  return { ast: ast, js: generateJSFromAST(ast), imports: Object.keys(imports), variables: Object.keys(variables), metadata: metadata, warnings: _parseWarnings };
 }
 
 function generateJSFromAST(ast) {
@@ -2829,6 +2921,28 @@ function generateJSFromAST(ast) {
       case 'SayToSession': lines.push(p + 'await chat.sayToSession(' + genExpr(stmt.sessionId) + ', ' + genExpr(stmt.message) + ');'); break;
       case 'MutateConfig': lines.push(p + 'this.config[' + genExpr(stmt.key) + '] = ' + (stmt.value ? genExpr(stmt.value) : 'null') + ';'); break;
       case 'CrashScan': lines.push(p + 'this._crashScanEnabled = ' + (stmt.state === 'ON') + ';'); break;
+      case 'TaskDefine': lines.push(p + 'await automation.taskDefine(' + genExpr(stmt.name) + ', { priority: ' + genExpr(stmt.priority) + ' });'); if (stmt.body.length > 0) { stmt.body.forEach(function(s) { genStmt(s, p + '  '); }); } break;
+      case 'TaskAssign': lines.push(p + 'await automation.taskAssign(' + genExpr(stmt.task) + ', ' + genExpr(stmt.to) + ');'); break;
+      case 'TaskChain': lines.push(p + 'await automation.taskChain([' + stmt.steps.map(genExpr).join(', ') + ']);'); break;
+      case 'TaskParallel': lines.push(p + 'await automation.taskParallel([' + stmt.steps.map(genExpr).join(', ') + ']);'); break;
+      case 'TaskShowFlow': lines.push(p + 'await automation.taskShowFlow(' + genExpr(stmt.name) + ');'); break;
+      case 'TaskLog': lines.push(p + 'await automation.taskLog(' + genExpr(stmt.message) + ', ' + genExpr(stmt.level) + ');'); break;
+      case 'AgentSpawn': lines.push(p + 'await automation.agentSpawn(' + genExpr(stmt.name) + ', ' + genExpr(stmt.prompt) + ');'); break;
+      case 'AgentCall': lines.push(p + 'await automation.agentCall(' + genExpr(stmt.agent) + ', ' + genExpr(stmt.command) + ');'); break;
+      case 'AgentPass': lines.push(p + 'await automation.agentPass(' + genExpr(stmt.from) + ', ' + genExpr(stmt.to) + ', ' + genExpr(stmt.data) + ');'); break;
+      case 'AgentTerminate': lines.push(p + 'await automation.agentTerminate(' + genExpr(stmt.agent) + ');'); break;
+      case 'SkillCall': lines.push(p + 'await automation.skillCall(' + genExpr(stmt.skill) + ', ' + genExpr(stmt.args) + ');'); break;
+      case 'CronCreate': lines.push(p + 'await automation.cronCreate(' + genExpr(stmt.name) + ', ' + genExpr(stmt.schedule) + ', ' + genExpr(stmt.run) + ');'); break;
+      case 'CronCall': lines.push(p + 'await automation.cronCall(' + genExpr(stmt.name) + ');'); break;
+      case 'WebFetch': lines.push(p + 'await automation.webFetch(' + genExpr(stmt.url) + ', ' + genExpr(stmt.options) + ');'); break;
+      case 'WebSerial': lines.push(p + 'await automation.webSerial([' + stmt.steps.map(genExpr).join(', ') + ']);'); break;
+      case 'FileRead': lines.push(p + 'await automation.fileRead(' + genExpr(stmt.path) + ', ' + genExpr(stmt.format) + ');'); break;
+      case 'FileWrite': lines.push(p + 'await automation.fileWrite(' + genExpr(stmt.path) + ', ' + genExpr(stmt.content) + ', ' + genExpr(stmt.format) + ');'); break;
+      case 'FileExecute': lines.push(p + 'await automation.fileExecute(' + genExpr(stmt.command) + ', ' + genExpr(stmt.timeout) + ');'); break;
+      case 'DataTransform': lines.push(p + 'await automation.dataTransform(' + genExpr(stmt.data) + ', ' + genExpr(stmt.using) + ');'); break;
+      case 'ChannelSend': lines.push(p + 'await automation.channelSend(' + genExpr(stmt.channel) + ', ' + genExpr(stmt.message) + ', ' + genExpr(stmt.options) + ');'); break;
+      case 'EmailSend': lines.push(p + 'await automation.emailSend(' + genExpr(stmt.to) + ', ' + genExpr(stmt.subject) + ', ' + genExpr(stmt.body) + ');'); break;
+      case 'PublishCanvas': lines.push(p + 'await automation.publishCanvas(' + genExpr(stmt.name) + ', ' + genExpr(stmt.content) + ');'); break;
       default: lines.push(p + '// ' + stmt.type); break;
     }
   }
@@ -2877,7 +2991,29 @@ var NODE_COLORS = {
   'RumorScan': { bg: '#2d1b00', border: '#ffa657', cls: 'cs-fn-advanced' },
   'Optimize': { bg: '#2d1b00', border: '#ffa657', cls: 'cs-fn-advanced' },
   'FunctionDecl': { bg: '#21262d', border: '#ff7b72', cls: 'cs-fn-control' },
-  'Chain': { bg: '#21262d', border: '#ff7b72', cls: 'cs-fn-control' }
+  'Chain': { bg: '#21262d', border: '#ff7b72', cls: 'cs-fn-control' },
+  'TaskDefine': { bg: '#3d2e00', border: '#e3b341', cls: 'cs-fn-advanced' },
+  'TaskAssign': { bg: '#3d2e00', border: '#e3b341', cls: 'cs-fn-advanced' },
+  'TaskChain': { bg: '#3d2e00', border: '#e3b341', cls: 'cs-fn-advanced' },
+  'TaskParallel': { bg: '#3d2e00', border: '#e3b341', cls: 'cs-fn-advanced' },
+  'TaskShowFlow': { bg: '#3d2e00', border: '#e3b341', cls: 'cs-fn-advanced' },
+  'TaskLog': { bg: '#3d2e00', border: '#e3b341', cls: 'cs-fn-advanced' },
+  'AgentSpawn': { bg: '#3d2200', border: '#f0883e', cls: 'cs-fn-agent' },
+  'AgentCall': { bg: '#3d2200', border: '#f0883e', cls: 'cs-fn-agent' },
+  'AgentPass': { bg: '#3d2200', border: '#f0883e', cls: 'cs-fn-agent' },
+  'AgentTerminate': { bg: '#3d2200', border: '#f0883e', cls: 'cs-fn-agent' },
+  'SkillCall': { bg: '#0d3117', border: '#3fb950', cls: 'cs-fn-trade' },
+  'CronCreate': { bg: '#0d3117', border: '#3fb950', cls: 'cs-fn-trade' },
+  'CronCall': { bg: '#0d3117', border: '#3fb950', cls: 'cs-fn-trade' },
+  'WebFetch': { bg: '#0d3117', border: '#3fb950', cls: 'cs-fn-data' },
+  'WebSerial': { bg: '#0d3117', border: '#3fb950', cls: 'cs-fn-data' },
+  'FileRead': { bg: '#0c2d48', border: '#a5d6ff', cls: 'cs-fn-data' },
+  'FileWrite': { bg: '#0c2d48', border: '#a5d6ff', cls: 'cs-fn-data' },
+  'FileExecute': { bg: '#0c2d48', border: '#a5d6ff', cls: 'cs-fn-data' },
+  'DataTransform': { bg: '#0c2d48', border: '#a5d6ff', cls: 'cs-fn-data' },
+  'ChannelSend': { bg: '#2d1b4e', border: '#d2a8ff', cls: 'cs-fn-ai' },
+  'EmailSend': { bg: '#2d1b4e', border: '#d2a8ff', cls: 'cs-fn-ai' },
+  'PublishCanvas': { bg: '#2d1b4e', border: '#d2a8ff', cls: 'cs-fn-ai' }
 };
 
 function getNodeLabel(stmt) {
@@ -2922,6 +3058,28 @@ function getNodeLabel(stmt) {
     case 'FunctionDecl': return 'FUNC ' + stmt.name;
     case 'Chain': return 'CHAIN';
     case 'Include': return 'INCLUDE';
+    case 'TaskDefine': return 'TASK_DEFINE ' + exprLabel(stmt.name);
+    case 'TaskAssign': return 'TASK_ASSIGN';
+    case 'TaskChain': return 'TASK_CHAIN';
+    case 'TaskParallel': return 'TASK_PARALLEL';
+    case 'TaskShowFlow': return 'TASK_SHOW_FLOW';
+    case 'TaskLog': return 'TASK_LOG';
+    case 'AgentSpawn': return 'AGENT_SPAWN';
+    case 'AgentCall': return 'AGENT_CALL';
+    case 'AgentPass': return 'AGENT_PASS';
+    case 'AgentTerminate': return 'AGENT_TERMINATE';
+    case 'SkillCall': return 'SKILL_CALL';
+    case 'CronCreate': return 'CRON_CREATE';
+    case 'CronCall': return 'CRON_CALL';
+    case 'WebFetch': return 'WEB_FETCH';
+    case 'WebSerial': return 'WEB_SERIAL';
+    case 'FileRead': return 'FILE_READ';
+    case 'FileWrite': return 'FILE_WRITE';
+    case 'FileExecute': return 'FILE_EXECUTE';
+    case 'DataTransform': return 'DATA_TRANSFORM';
+    case 'ChannelSend': return 'CHANNEL_SEND';
+    case 'EmailSend': return 'EMAIL_SEND';
+    case 'PublishCanvas': return 'PUBLISH_CANVAS';
     default: return stmt.type;
   }
 }
@@ -3050,6 +3208,30 @@ function initAiAssistant() {
       if (msgs) msgs.innerHTML = '<div class="cs-ai-msg cs-ai-msg-system">Chat cleared. Ask me anything about your ClawScript code.</div>';
     });
   }
+
+  var resizeHandle = document.getElementById('csAiResizeHandle');
+  var aiPane = document.getElementById('csAiPane');
+  if (resizeHandle && aiPane) {
+    var startY, startH;
+    resizeHandle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      startY = e.clientY;
+      startH = aiPane.offsetHeight;
+      resizeHandle.classList.add('active');
+      function onMove(ev) {
+        var delta = startY - ev.clientY;
+        var newH = Math.max(120, Math.min(window.innerHeight * 0.7, startH + delta));
+        aiPane.style.height = newH + 'px';
+      }
+      function onUp() {
+        resizeHandle.classList.remove('active');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
 }
 
 function getEditorContext() {
@@ -3085,9 +3267,190 @@ function appendAiMessage(role, text) {
   if (!msgs) return;
   var div = document.createElement('div');
   div.className = 'cs-ai-msg cs-ai-msg-' + role;
-  div.textContent = text;
+  if (role === 'assistant') {
+    var codeBlock = extractCodeBlock(text);
+    var html = escapeHtml(text);
+    html = html.replace(/(?:line|Line|LINE)\s+(\d+)/g, function(match, num) {
+      return '<span class="cs-ai-error-ref" data-line="' + num + '">' + match + '</span>';
+    });
+    div.innerHTML = html;
+    if (codeBlock) {
+      var btnApply = document.createElement('button');
+      btnApply.className = 'cs-ai-implement-btn';
+      btnApply.textContent = '\u2699 Apply Code';
+      btnApply.addEventListener('click', function() { applyAiFix(codeBlock); });
+      div.appendChild(btnApply);
+    }
+    var btnFix = document.createElement('button');
+    btnFix.className = 'cs-ai-implement-btn';
+    btnFix.style.marginLeft = '6px';
+    if (codeBlock) btnFix.style.background = '#1f6feb';
+    btnFix.textContent = '\u270E Implement Fix';
+    btnFix.addEventListener('click', function() {
+      btnFix.disabled = true;
+      btnFix.textContent = 'Generating fix...';
+      requestImplementFix(function(fixedCode) {
+        btnFix.disabled = false;
+        btnFix.textContent = '\u270E Implement Fix';
+        if (fixedCode) {
+          applyAiFix(fixedCode);
+        } else {
+          csLog('AI did not return a code block. Check the chat for details.', 'warn');
+        }
+      });
+    });
+    div.appendChild(btnFix);
+    div.querySelectorAll('.cs-ai-error-ref').forEach(function(el) {
+      el.addEventListener('click', function() {
+        var lineNum = parseInt(el.getAttribute('data-line'));
+        scrollEditorToLine(lineNum);
+      });
+    });
+  } else {
+    div.textContent = text;
+  }
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
+}
+
+function extractCodeBlock(text) {
+  var m = text.match(/```(?:clawscript|cs)?\s*\n([\s\S]*?)```/);
+  if (m) return m[1].trim();
+  var m2 = text.match(/```\s*\n([\s\S]*?)```/);
+  if (m2) {
+    var block = m2[1].trim();
+    if (/^(DEF |IF |BUY |SELL |ALERT |SET |STORE_VAR|WHILE |FOR |LOOP |FETCH_|INDICATOR )/m.test(block)) {
+      return block;
+    }
+  }
+  return null;
+}
+
+function requestImplementFix(callback) {
+  var editor = document.getElementById('csCodeEditor');
+  if (!editor || !editor.value.trim()) {
+    callback(null);
+    return;
+  }
+
+  var code = editor.value.trim();
+  var errInfo = '';
+  if (Object.keys(_csErrorLines).length > 0) {
+    errInfo = '\n\n[CURRENT ERRORS]';
+    for (var line in _csErrorLines) {
+      errInfo += '\nLine ' + line + ': ' + _csErrorLines[line];
+    }
+  }
+
+  var fixPrompt = 'TASK: Fix the ClawScript code below. You MUST:\n' +
+    '1. Read each line of the code\n' +
+    '2. Identify ALL errors, invalid syntax, unknown commands, and typos\n' +
+    '3. Fix every issue line by line\n' +
+    '4. Return the COMPLETE corrected ClawScript code inside a ```clawscript code block\n\n' +
+    'RULES:\n' +
+    '- Return ONLY the corrected code in a ```clawscript block — no instructions, no "paste this", no "compile & save"\n' +
+    '- The code block must contain the FULL corrected script, not just changed lines\n' +
+    '- Remove any lines that are not valid ClawScript (like random text or gibberish)\n' +
+    '- Fix spelling errors in command names (e.g. "bullshit" is not a command — remove it)\n' +
+    '- Preserve all valid logic and intent\n\n' +
+    '[CODE TO FIX]\n```\n' + code + '\n```' + errInfo;
+
+  _aiChatHistory.push({ role: 'user', content: fixPrompt });
+  appendAiMessage('user', 'Implement Fix: Analyzing and correcting code...');
+
+  var loadingDiv = document.createElement('div');
+  loadingDiv.className = 'cs-ai-msg cs-ai-msg-system';
+  loadingDiv.textContent = 'Generating corrected code...';
+  loadingDiv.id = 'csAiFixLoading';
+  var msgs = document.getElementById('csAiMessages');
+  if (msgs) { msgs.appendChild(loadingDiv); msgs.scrollTop = msgs.scrollHeight; }
+
+  _sendAiRequest(_aiChatHistory, function(reply) {
+    var fixLoading = document.getElementById('csAiFixLoading');
+    if (fixLoading) fixLoading.remove();
+    if (!reply) {
+      appendAiMessage('system', 'Failed to get fix from AI.');
+      callback(null);
+      return;
+    }
+    _aiChatHistory.push({ role: 'assistant', content: reply });
+    appendAiMessage('assistant', reply);
+    var fixedCode = extractCodeBlock(reply);
+    if (fixedCode) {
+      callback(fixedCode);
+    } else {
+      csLog('AI response did not include a code block. Retrying with stricter prompt...', 'warn');
+      var retryPrompt = 'You did not include a code block. Please respond with ONLY the corrected ClawScript code inside:\n```clawscript\n(your corrected code here)\n```\nNothing else. No explanations. Just the code block.';
+      _aiChatHistory.push({ role: 'user', content: retryPrompt });
+      _sendAiRequest(_aiChatHistory, function(reply2) {
+        if (!reply2) { callback(null); return; }
+        _aiChatHistory.push({ role: 'assistant', content: reply2 });
+        appendAiMessage('assistant', reply2);
+        var fixedCode2 = extractCodeBlock(reply2);
+        callback(fixedCode2);
+      });
+    }
+  });
+}
+
+function _sendAiRequest(messages, callback) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/agent/chat', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  var _csToken = null;
+  try {
+    var stored = localStorage.getItem('openclaw.control.settings.v1');
+    if (stored) { var s = JSON.parse(stored); _csToken = s.token || null; }
+  } catch(_e) {}
+  if (!_csToken) {
+    var cm = document.cookie.match(/openclaw_token=([^;]+)/);
+    if (cm) _csToken = cm[1];
+  }
+  if (_csToken) xhr.setRequestHeader('Authorization', 'Bearer ' + _csToken);
+  xhr.onload = function() {
+    try {
+      var data = JSON.parse(xhr.responseText);
+      var reply = '';
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        reply = data.choices[0].message.content;
+      } else if (data.error) {
+        reply = 'Error: ' + data.error;
+      } else {
+        reply = xhr.responseText.substring(0, 500);
+      }
+      callback(reply);
+    } catch (e) {
+      callback(null);
+    }
+  };
+  xhr.onerror = function() { callback(null); };
+  xhr.send(JSON.stringify({ messages: messages }));
+}
+
+function applyAiFix(code) {
+  var editor = document.getElementById('csCodeEditor');
+  if (!editor) return;
+  editor.value = code;
+  updateLineNumbers();
+  saveDraft();
+  autoParse();
+  csLog('AI fix applied to editor. Review and Compile & Save when ready.', 'success');
+}
+
+function scrollEditorToLine(lineNum) {
+  var editor = document.getElementById('csCodeEditor');
+  if (!editor) return;
+  var lineHeight = parseFloat(getComputedStyle(editor).lineHeight) || 18;
+  var targetScroll = (lineNum - 1) * lineHeight - editor.clientHeight / 3;
+  editor.scrollTop = Math.max(0, targetScroll);
+  editor.focus();
+  var lines = editor.value.split('\n');
+  var pos = 0;
+  for (var i = 0; i < Math.min(lineNum - 1, lines.length); i++) {
+    pos += lines[i].length + 1;
+  }
+  var end = pos + (lines[lineNum - 1] || '').length;
+  editor.setSelectionRange(pos, end);
 }
 
 function sendAiMessage() {
@@ -3103,6 +3466,11 @@ function sendAiMessage() {
   var fullPrompt = 'You are a ClawScript coding assistant for IG trading strategies. ' +
     'ClawScript is a DSL that compiles to JavaScript. ' +
     'Help the user fix errors, improve their strategy code, and answer syntax questions. ' +
+    'IMPORTANT RULES:\n' +
+    '1. When pointing out errors, ALWAYS reference specific line numbers (e.g. "Line 5: issue description")\n' +
+    '2. When the user asks to fix code, you MUST include the COMPLETE corrected code in a ```clawscript code block\n' +
+    '3. NEVER say "paste this" or "compile & save" — just provide the code block directly\n' +
+    '4. The code block should contain the FULL corrected script, not partial snippets\n' +
     'Keep responses concise and actionable.' + contextMsg +
     '\n\nUser question: ' + userMsg;
 
@@ -3117,46 +3485,17 @@ function sendAiMessage() {
   var msgs = document.getElementById('csAiMessages');
   if (msgs) { msgs.appendChild(loadingDiv); msgs.scrollTop = msgs.scrollHeight; }
 
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', '/api/agent/chat', true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  var _csToken = null;
-  try {
-    var stored = localStorage.getItem('openclaw.control.settings.v1');
-    if (stored) { var s = JSON.parse(stored); _csToken = s.token || null; }
-  } catch(_e) {}
-  if (!_csToken) {
-    var cm = document.cookie.match(/openclaw_token=([^;]+)/);
-    if (cm) _csToken = cm[1];
-  }
-  if (_csToken) xhr.setRequestHeader('Authorization', 'Bearer ' + _csToken);
-  xhr.onload = function() {
+  _sendAiRequest(_aiChatHistory, function(reply) {
     var loading = document.getElementById('csAiLoading');
     if (loading) loading.remove();
     if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
-    try {
-      var data = JSON.parse(xhr.responseText);
-      var reply = '';
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        reply = data.choices[0].message.content;
-      } else if (data.error) {
-        reply = 'Error: ' + data.error;
-      } else {
-        reply = xhr.responseText.substring(0, 500);
-      }
+    if (reply) {
       _aiChatHistory.push({ role: 'assistant', content: reply });
       appendAiMessage('assistant', reply);
-    } catch (e) {
-      appendAiMessage('assistant', 'Error: ' + e.message);
+    } else {
+      appendAiMessage('assistant', 'Network error. Make sure the agent is running.');
     }
-  };
-  xhr.onerror = function() {
-    var loading = document.getElementById('csAiLoading');
-    if (loading) loading.remove();
-    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
-    appendAiMessage('assistant', 'Network error. Make sure the agent is running.');
-  };
-  xhr.send(JSON.stringify({ messages: _aiChatHistory }));
+  });
 }
 
 if (document.getElementById('csEditorRoot')) {

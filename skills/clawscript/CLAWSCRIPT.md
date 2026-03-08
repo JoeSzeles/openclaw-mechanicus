@@ -362,10 +362,236 @@ ClawScript strategies and simulations can access price data through multiple tie
 The system automatically builds candles from tick data at all standard resolutions:
 `SECOND, SECOND_2, SECOND_5, SECOND_10, SECOND_20, SECOND_30, SECOND_40, MINUTE, MINUTE_5, MINUTE_15, HOUR, HOUR_4, DAY`
 
+## General Automation & AI Agent Orchestration
+
+ClawScript extends beyond trading into general-purpose automation. These commands let you plan tasks, manage agents, call skills, automate files, schedule jobs, and send notifications — all from ClawScript.
+
+Wrapper module: `skills/bots/openclaw-automation.cjs`
+
+### Task Planning & Workflow
+
+<!-- @tag: TASK_DEFINE -->
+#### TASK_DEFINE
+Define a reusable task with a body of commands.
+```clawscript
+TASK_DEFINE "analyze_news" WITH "Summarize news from URL" BODY
+  DEF page = WEB_FETCH "https://news.com"
+  TASK_LOG "Fetched page" LEVEL "info"
+ENDTASK
+```
+Grammar: `TASK_DEFINE "name" WITH "description" BODY ... ENDTASK`
+
+<!-- @tag: TASK_ASSIGN -->
+#### TASK_ASSIGN
+Assign a defined task to an agent.
+```clawscript
+TASK_ASSIGN "analyze_news" TO "researcher"
+```
+Grammar: `TASK_ASSIGN "task_name" TO "agent_name"`
+
+<!-- @tag: TASK_CHAIN -->
+#### TASK_CHAIN
+Chain tasks sequentially — output of each feeds into the next.
+```clawscript
+TASK_CHAIN "fetch_data"
+```
+Grammar: `TASK_CHAIN "task_name"`
+
+<!-- @tag: TASK_PARALLEL -->
+#### TASK_PARALLEL
+Run tasks in parallel.
+```clawscript
+TASK_PARALLEL "scan_x"
+```
+Grammar: `TASK_PARALLEL "task_name"`
+
+<!-- @tag: TASK_SHOW_FLOW -->
+#### TASK_SHOW_FLOW
+Generate a visual flow of the current workflow.
+```clawscript
+TASK_SHOW_FLOW
+```
+Grammar: `TASK_SHOW_FLOW`
+
+<!-- @tag: TASK_LOG -->
+#### TASK_LOG
+Log a message with severity level.
+```clawscript
+TASK_LOG "Analysis started" LEVEL "info"
+TASK_LOG "Critical failure" LEVEL "error"
+```
+Grammar: `TASK_LOG "message" [LEVEL "info|warn|error"]`
+
+### Agent Management
+
+<!-- @tag: AGENT_SPAWN -->
+#### AGENT_SPAWN
+Spawn a new sub-agent with instructions.
+```clawscript
+AGENT_SPAWN "analyzer" WITH "Review market data for anomalies"
+```
+Grammar: `AGENT_SPAWN "name" WITH "instructions" [TIMEOUT minutes]`
+
+<!-- @tag: AGENT_CALL -->
+#### AGENT_CALL
+Call a running agent with a command and get the result.
+```clawscript
+DEF data = AGENT_CALL "fetcher" "get_latest_news"
+```
+Grammar: `DEF result = AGENT_CALL "agent_name" "command" [TIMEOUT seconds]`
+
+<!-- @tag: AGENT_PASS -->
+#### AGENT_PASS
+Pass data from one agent to another.
+```clawscript
+AGENT_PASS "analysis_data" "reporter"
+```
+Grammar: `AGENT_PASS "data_var" "agent_name"`
+
+<!-- @tag: AGENT_TERMINATE -->
+#### AGENT_TERMINATE
+Terminate a running agent.
+```clawscript
+AGENT_TERMINATE "analyzer" REASON "Task complete"
+```
+Grammar: `AGENT_TERMINATE "agent_name" [REASON "text"]`
+
+### Skills & Tools
+
+<!-- @tag: SKILL_CALL -->
+#### SKILL_CALL
+Call any OpenClaw skill by name.
+```clawscript
+DEF data = SKILL_CALL "ig-market-data" WITH epic="AUDUSD"
+```
+Grammar: `DEF result = SKILL_CALL "skill_name" [WITH key=value] [TIMEOUT seconds]`
+
+<!-- @tag: CRON_CREATE -->
+#### CRON_CREATE
+Create a scheduled cron job.
+```clawscript
+CRON_CREATE "daily_backup" SCHEDULE "0 0 * * *" RUN "backup_all"
+```
+Grammar: `CRON_CREATE "name" SCHEDULE "cron_pattern" RUN "command"`
+
+<!-- @tag: CRON_CALL -->
+#### CRON_CALL
+Trigger a cron job manually.
+```clawscript
+CRON_CALL "daily_backup"
+```
+Grammar: `CRON_CALL "name"`
+
+<!-- @tag: WEB_FETCH -->
+#### WEB_FETCH
+HTTP fetch with optional method/body.
+```clawscript
+DEF page = WEB_FETCH "https://api.example.com/data"
+DEF result = WEB_FETCH "https://api.example.com" WITH method="POST"
+```
+Grammar: `DEF result = WEB_FETCH "url" [WITH key=value] [TIMEOUT ms]`
+
+<!-- @tag: WEB_SERIAL -->
+#### WEB_SERIAL
+Serial port I/O for hardware integration.
+```clawscript
+WEB_SERIAL "/dev/ttyUSB0" WITH baud=9600
+```
+Grammar: `WEB_SERIAL "port" [WITH key=value]`
+
+### File & Data
+
+<!-- @tag: FILE_READ -->
+#### FILE_READ
+Read a file with optional format parsing.
+```clawscript
+DEF content = FILE_READ "data.csv" FORMAT "csv"
+DEF config = FILE_READ "settings.json" FORMAT "json"
+```
+Grammar: `DEF content = FILE_READ "filename" [FORMAT "text|csv|json"]`
+
+<!-- @tag: FILE_WRITE -->
+#### FILE_WRITE
+Write content to a file.
+```clawscript
+FILE_WRITE "log.txt" "Entry: trade executed"
+```
+Grammar: `FILE_WRITE "filename" expression`
+
+<!-- @tag: FILE_EXECUTE -->
+#### FILE_EXECUTE
+Execute a file as ClawScript or shell command.
+```clawscript
+DEF result = FILE_EXECUTE "sub_script.cs"
+```
+Grammar: `DEF result = FILE_EXECUTE "filename" [TIMEOUT ms]`
+
+<!-- @tag: DATA_TRANSFORM -->
+#### DATA_TRANSFORM
+Transform data with operations (filter, map, sort).
+```clawscript
+DEF filtered = DATA_TRANSFORM trades USING "filter"
+```
+Grammar: `DEF result = DATA_TRANSFORM data_var USING "operation" [FORMAT "output_format"]`
+
+### Communication
+
+<!-- @tag: CHANNEL_SEND -->
+#### CHANNEL_SEND
+Send a message to a communication channel (Telegram, SMS, Discord).
+```clawscript
+CHANNEL_SEND "telegram" "Trade alert: BUY signal on AUDUSD"
+```
+Grammar: `CHANNEL_SEND "channel" "message"`
+
+<!-- @tag: EMAIL_SEND -->
+#### EMAIL_SEND
+Send an email with optional subject and attachment.
+```clawscript
+EMAIL_SEND "me@gmail.com" "Daily P&L report attached" SUBJECT "Daily Summary"
+```
+Grammar: `EMAIL_SEND "address" "body" [SUBJECT "text"]`
+
+<!-- @tag: PUBLISH_CANVAS -->
+#### PUBLISH_CANVAS
+Publish data to the OpenClaw canvas dashboard.
+```clawscript
+PUBLISH_CANVAS "status_page"
+```
+Grammar: `PUBLISH_CANVAS "page_name"`
+
+### Example: Full Automation Script
+
+```clawscript
+// Morning routine automation
+TASK_LOG "Starting morning analysis" LEVEL "info"
+
+// Spawn agents for parallel work
+AGENT_SPAWN "news_bot" WITH "Scan financial news"
+AGENT_SPAWN "market_bot" WITH "Check market conditions"
+
+// Fetch data in parallel
+DEF news = AGENT_CALL "news_bot" "scan_headlines"
+DEF market = SKILL_CALL "ig-market-data" WITH epic="AUDUSD"
+
+// Analyze and decide
+DEF rsi = RSI(14)
+IF rsi < 30 THEN
+  BUY 1 AT MARKET STOP 30 LIMIT 60 REASON "RSI oversold + news positive"
+  CHANNEL_SEND "telegram" "BUY signal triggered on AUDUSD"
+  EMAIL_SEND "trader@example.com" "RSI BUY on AUDUSD" SUBJECT "Trade Alert"
+ENDIF
+
+// Log and clean up
+FILE_WRITE "trades.log" "Morning analysis complete"
+TASK_LOG "Morning routine finished" LEVEL "info"
+AGENT_TERMINATE "news_bot"
+AGENT_TERMINATE "market_bot"
+```
+
 ## Test Suite
 
-- **82 parser tests**: Lexer, AST, code generation for all command categories
-- **139 pipeline tests**: End-to-end parse → compile → save → load across 21 categories
-- **100% pass rate** including real BTC data integration tests
+- **169 pipeline tests**: End-to-end parse → compile → save → load across 26 categories
+- **100% pass rate** including real BTC data integration tests and all automation commands
 - Test runner: `skills/bots/tests/test-clawscript-parser.cjs` and `test-clawscript-pipeline.cjs`
 - Report saved to: `.openclaw/clawscript-pipeline-report.json`
