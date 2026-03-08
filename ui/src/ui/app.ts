@@ -1,5 +1,6 @@
 import { LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { voiceManager } from "./voice/voice-manager.ts";
 import { i18n, I18nController, isSupportedLocale } from "../i18n/index.ts";
 import {
   handleChannelConfigReload as handleChannelConfigReloadInternal,
@@ -361,6 +362,11 @@ export class OpenClawApp extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     handleConnected(this as unknown as Parameters<typeof handleConnected>[0]);
+    voiceManager.setOnStateChange(() => this.requestUpdate());
+    voiceManager.setOnTranscript((text: string) => {
+      this.chatMessage = (this.chatMessage ? this.chatMessage + " " : "") + text;
+      this.requestUpdate();
+    });
   }
 
   protected firstUpdated() {

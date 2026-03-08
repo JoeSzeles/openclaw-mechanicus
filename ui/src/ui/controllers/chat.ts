@@ -2,6 +2,7 @@ import { extractText } from "../chat/message-extract.ts";
 import type { GatewayBrowserClient } from "../gateway.ts";
 import type { ChatAttachment } from "../ui-types.ts";
 import { generateUUID } from "../uuid.ts";
+import { voiceManager } from "../voice/voice-manager.ts";
 
 export type ChatState = {
   client: GatewayBrowserClient | null;
@@ -208,6 +209,10 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
       }
     }
   } else if (payload.state === "final") {
+    const finalText = extractText(payload.message);
+    if (typeof finalText === "string" && finalText.trim()) {
+      voiceManager.speak(finalText);
+    }
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;

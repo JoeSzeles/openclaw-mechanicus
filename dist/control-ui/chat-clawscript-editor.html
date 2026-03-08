@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0d1117;color:#c9d1d9;padding:8px;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0d1117;color:#c9d1d9;padding:8px;height:100vh;overflow:auto;display:flex;flex-direction:column}
 .header{display:flex;align-items:center;gap:8px;padding:4px 0 8px;flex-shrink:0;flex-wrap:wrap}
 .header h1{font-size:13px;font-weight:700;color:#c9d1d9;white-space:nowrap}
 .header .instrument{font-size:11px;color:#8b949e;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:2px 8px;outline:none;color:#c9d1d9;width:120px}
@@ -227,7 +227,7 @@ compileBtn.addEventListener('click', async function() {
   setStatus('<span class="spinner"></span> Compiling...', 'status-busy');
   switchTab('output');
   try {
-    var data = await apiPost('/api/clawscript/compile', { source: code });
+    var data = await apiPost('/api/clawscript/compile', { code: code });
     if (data.error) {
       setOutput('Compile Error:\n' + data.error, 'error-output');
       setStatus('\u2718 Compile failed', 'status-err');
@@ -258,7 +258,7 @@ backtestBtn.addEventListener('click', async function() {
   setStatus('<span class="spinner"></span> Running backtest...', 'status-busy');
   switchTab('output');
   try {
-    var body = { source: code };
+    var body = { code: code };
     if (instrument) body.instrument = instrument;
     var data = await apiPost('/api/clawscript/backtest', body);
     if (data.error) {

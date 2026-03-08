@@ -14,6 +14,7 @@ import type { ChatItem, MessageGroup } from "../types/chat-types.ts";
 import type { ChatAttachment, ChatQueueItem } from "../ui-types.ts";
 import { renderMarkdownSidebar } from "./markdown-sidebar.ts";
 import "../components/resizable-divider.ts";
+import { voiceManager } from "../voice/voice-manager.ts";
 
 export type CompactionIndicatorStatus = {
   active: boolean;
@@ -152,6 +153,35 @@ function handlePaste(e: ClipboardEvent, props: ChatProps) {
     });
     reader.readAsDataURL(file);
   }
+}
+
+function handleFileUpload(props: ChatProps) {
+  if (!props.onAttachmentsChange) return;
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.multiple = true;
+  input.addEventListener("change", () => {
+    const files = input.files;
+    if (!files) return;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file.type.startsWith("image/")) continue;
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        const dataUrl = reader.result as string;
+        const newAtt: ChatAttachment = {
+          id: generateAttachmentId(),
+          dataUrl,
+          mimeType: file.type,
+        };
+        const current = props.attachments ?? [];
+        props.onAttachmentsChange?.([...current, newAtt]);
+      });
+      reader.readAsDataURL(file);
+    }
+  });
+  input.click();
 }
 
 function renderAttachmentPreview(props: ChatProps) {
@@ -373,7 +403,47 @@ export function renderChat(props: ChatProps) {
 
       <div class="chat-compose">
         ${renderAttachmentPreview(props)}
+        ${voiceManager.voiceModeActive
+          ? html`<div class="chat-voice-indicator">
+              ${icons.bluetooth} Voice Mode Active
+            </div>`
+          : nothing
+        }
         <div class="chat-compose__row">
+          <div class="chat-compose__left-actions">
+            <button
+              class="btn btn-icon chat-upload-btn"
+              type="button"
+              title="Upload image"
+              ?disabled=${!props.connected}
+              @click=${() => handleFileUpload(props)}
+            >
+              ${icons.paperclip}
+            </button>
+            ${voiceManager.supported
+              ? html`<button
+                  class="btn btn-icon chat-mic-btn ${voiceManager.listening ? "chat-mic-btn--active" : ""}"
+                  type="button"
+                  title="${voiceManager.listening ? "Stop recording" : "Voice input"}"
+                  ?disabled=${!props.connected}
+                  @click=${() => voiceManager.toggleListening()}
+                >
+                  ${voiceManager.listening ? icons.micOff : icons.mic}
+                </button>`
+              : nothing
+            }
+            ${voiceManager.synthSupported
+              ? html`<button
+                  class="btn btn-icon chat-speaker-btn ${voiceManager.speakerEnabled ? "chat-speaker-btn--active" : ""}"
+                  type="button"
+                  title="${voiceManager.speakerEnabled ? "Disable voice output" : "Enable voice output"}"
+                  @click=${() => voiceManager.toggleSpeaker()}
+                >
+                  ${voiceManager.speakerEnabled ? icons.volume2 : icons.volumeX}
+                </button>`
+              : nothing
+            }
+          </div>
           <label class="field chat-compose__field">
             <span>Message</span>
             <textarea
