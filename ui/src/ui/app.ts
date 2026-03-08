@@ -363,9 +363,21 @@ export class OpenClawApp extends LitElement {
     super.connectedCallback();
     handleConnected(this as unknown as Parameters<typeof handleConnected>[0]);
     voiceManager.setOnStateChange(() => this.requestUpdate());
+    voiceManager.setOnAutoSend(() => {
+      if (this.chatMessage?.trim()) {
+        this.handleSendChat();
+      }
+    });
     voiceManager.setOnTranscript((text: string) => {
       this.chatMessage = (this.chatMessage ? this.chatMessage + " " : "") + text;
       this.requestUpdate();
+      if (voiceManager.autoSend && text.trim()) {
+        setTimeout(() => {
+          if (this.chatMessage?.trim()) {
+            this.handleSendChat();
+          }
+        }, 500);
+      }
     });
   }
 

@@ -443,6 +443,17 @@ export function renderChat(props: ChatProps) {
                 </button>`
               : nothing
             }
+            ${voiceManager.supported
+              ? html`<button
+                  class="btn btn-icon chat-handsfree-btn ${voiceManager.autoSend ? "chat-handsfree-btn--active" : ""}"
+                  type="button"
+                  title="${voiceManager.autoSend ? "Disable hands-free (auto-send)" : "Enable hands-free (auto-send after voice)"}"
+                  @click=${() => voiceManager.setAutoSend(!voiceManager.autoSend)}
+                >
+                  ${icons.zap}
+                </button>`
+              : nothing
+            }
           </div>
           <label class="field chat-compose__field">
             <span>Message</span>

@@ -316,6 +316,16 @@
   stroke: #22c55e;
 }
 
+.chat-handsfree-btn--active {
+  background: rgba(234, 179, 8, 0.15);
+  border-color: #eab308;
+  color: #eab308;
+}
+
+.chat-handsfree-btn--active svg {
+  stroke: #eab308;
+}
+
 .chat-voice-indicator {
   display: flex;
   align-items: center;

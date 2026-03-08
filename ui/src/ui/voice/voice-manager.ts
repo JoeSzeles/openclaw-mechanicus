@@ -20,6 +20,8 @@ class VoiceManager {
   private _audioChunks: Blob[] = [];
   private _mediaStream: MediaStream | null = null;
   private _sttFailCount = 0;
+  private _autoSend = false;
+  private _onAutoSend: (() => void) | null = null;
 
   constructor() {
     this._speakerEnabled = localStorage.getItem(LS_KEY_SPEAKER) === "true";
@@ -238,6 +240,15 @@ class VoiceManager {
 
   speak(text: string) {
     if (!this._synthSupported || !this._speakerEnabled) return;
+    this._doSpeak(text);
+  }
+
+  speakDirect(text: string) {
+    if (!this._synthSupported) return;
+    this._doSpeak(text);
+  }
+
+  private _doSpeak(text: string) {
     this.stopSpeaking();
     const clean = text
       .replace(/```[\s\S]*?```/g, "")
@@ -251,6 +262,23 @@ class VoiceManager {
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
     speechSynthesis.speak(utterance);
+  }
+
+  get isSpeaking(): boolean {
+    return this._synthSupported && speechSynthesis.speaking;
+  }
+
+  get autoSend(): boolean {
+    return this._autoSend;
+  }
+
+  setAutoSend(enabled: boolean) {
+    this._autoSend = enabled;
+    this._notify();
+  }
+
+  setOnAutoSend(cb: (() => void) | null) {
+    this._onAutoSend = cb;
   }
 
   stopSpeaking() {

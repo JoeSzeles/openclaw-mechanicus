@@ -1,9 +1,11 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { AssistantIdentity } from "../assistant-identity.ts";
+import { icons } from "../icons.ts";
 import { toSanitizedMarkdownHtml } from "../markdown.ts";
 import { detectTextDirection } from "../text-direction.ts";
 import type { MessageGroup } from "../types/chat-types.ts";
+import { voiceManager } from "../voice/voice-manager.ts";
 import { renderCopyAsMarkdownButton } from "./copy-as-markdown.ts";
 import {
   extractTextCached,
@@ -272,6 +274,36 @@ function renderMessageImages(images: ImageBlock[]) {
   `;
 }
 
+function renderSpeakButton(text: string) {
+  if (!voiceManager.synthSupported) return nothing;
+  return html`
+    <button
+      class="chat-speak-btn"
+      type="button"
+      title="Read aloud"
+      aria-label="Read aloud"
+      @click=${(e: Event) => {
+        const btn = e.currentTarget as HTMLButtonElement;
+        if (voiceManager.isSpeaking) {
+          voiceManager.stopSpeaking();
+          btn.classList.remove("speaking");
+        } else {
+          voiceManager.speakDirect(text);
+          btn.classList.add("speaking");
+          const check = setInterval(() => {
+            if (!speechSynthesis.speaking) {
+              btn.classList.remove("speaking");
+              clearInterval(check);
+            }
+          }, 200);
+        }
+      }}
+    >
+      <span class="chat-speak-btn__icon" aria-hidden="true">${icons.volume2}</span>
+    </button>
+  `;
+}
+
 function renderGroupedMessage(
   message: unknown,
   opts: { isStreaming: boolean; showReasoning: boolean },
@@ -298,6 +330,7 @@ function renderGroupedMessage(
   const reasoningMarkdown = extractedThinking ? formatReasoningMarkdown(extractedThinking) : null;
   const markdown = markdownBase;
   const canCopyMarkdown = role === "assistant" && Boolean(markdown?.trim());
+  const canSpeak = role === "assistant" && Boolean(markdown?.trim());
 
   const bubbleClasses = [
     "chat-bubble",
@@ -319,6 +352,7 @@ function renderGroupedMessage(
   return html`
     <div class="${bubbleClasses}">
       ${canCopyMarkdown ? renderCopyAsMarkdownButton(markdown!) : nothing}
+      ${canSpeak ? renderSpeakButton(markdown!) : nothing}
       ${renderMessageImages(images)}
       ${
         reasoningMarkdown
