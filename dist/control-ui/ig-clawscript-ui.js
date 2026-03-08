@@ -498,9 +498,6 @@ function buildEditorUI() {
     '</div>' +
   '</div>';
 
-  if (root.parentElement === document.body || root.classList.contains('cs-standalone')) {
-    root.classList.add('cs-standalone');
-  }
 
   loadSavedScripts();
   attachEditorEvents();
