@@ -1,0 +1,172 @@
+CREATE TABLE "agent_backups" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"agent_id" varchar NOT NULL,
+	"backup_name" varchar,
+	"files" jsonb DEFAULT '{}' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "agent_memory" (
+	"agent_id" varchar NOT NULL,
+	"entry_type" varchar NOT NULL,
+	"entry_date" date DEFAULT '1970-01-01' NOT NULL,
+	"content" text DEFAULT '' NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now(),
+	CONSTRAINT "agent_memory_agent_id_entry_type_entry_date_pk" PRIMARY KEY("agent_id","entry_type","entry_date")
+);
+--> statement-breakpoint
+CREATE TABLE "agent_subconscious" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"agent_id" varchar NOT NULL,
+	"category" varchar NOT NULL,
+	"key" varchar NOT NULL,
+	"value" text DEFAULT '' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now(),
+	"updated_at" timestamp with time zone DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "price_candles" (
+	"epic" varchar(60) NOT NULL,
+	"resolution" varchar(20) NOT NULL,
+	"ts" bigint NOT NULL,
+	"open" double precision NOT NULL,
+	"high" double precision NOT NULL,
+	"low" double precision NOT NULL,
+	"close" double precision NOT NULL,
+	"volume" integer DEFAULT 0,
+	CONSTRAINT "price_candles_epic_resolution_ts_pk" PRIMARY KEY("epic","resolution","ts")
+);
+--> statement-breakpoint
+CREATE TABLE "scalper_backtests" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"strategy_id" integer,
+	"timeframe" varchar,
+	"candle_count" integer,
+	"total_trades" integer,
+	"win_count" integer,
+	"loss_count" integer,
+	"win_rate" numeric,
+	"total_pnl" numeric,
+	"max_drawdown" numeric,
+	"sharpe_ratio" numeric,
+	"avg_win" numeric,
+	"avg_loss" numeric,
+	"trades" jsonb,
+	"config_snapshot" jsonb,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "scalper_config" (
+	"id" integer PRIMARY KEY DEFAULT 1 NOT NULL,
+	"enabled" boolean DEFAULT true,
+	"budget" numeric DEFAULT '50000',
+	"max_drawdown" numeric DEFAULT '2000',
+	"max_margin_pct" numeric DEFAULT '10',
+	"break_even_buffer" numeric DEFAULT '1.5',
+	"drawdown_tripped" boolean DEFAULT false,
+	"updated_at" timestamp DEFAULT now(),
+	"demo_mode" boolean DEFAULT true,
+	"demo_reject_pct" numeric DEFAULT '5',
+	"demo_slippage_min" numeric DEFAULT '0.1',
+	"demo_slippage_max" numeric DEFAULT '0.5'
+);
+--> statement-breakpoint
+CREATE TABLE "scalper_strategies" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"instrument" varchar NOT NULL,
+	"name" varchar,
+	"direction" varchar DEFAULT 'BOTH',
+	"enabled" boolean DEFAULT false,
+	"size" numeric DEFAULT '1',
+	"stop_distance" numeric,
+	"limit_distance" numeric,
+	"min_momentum_pct" numeric DEFAULT '0.03',
+	"cooldown_ms" integer DEFAULT 6000,
+	"tick_window" integer DEFAULT 15,
+	"max_open_positions" integer DEFAULT 2,
+	"min_size" numeric DEFAULT '0.5',
+	"max_size" numeric DEFAULT '10',
+	"profit_target" numeric DEFAULT '0',
+	"trailing_stop" numeric DEFAULT '0',
+	"warmup_ms" integer DEFAULT 60000,
+	"rsi_enabled" boolean DEFAULT false,
+	"rsi_period" integer DEFAULT 14,
+	"rsi_overbought" integer DEFAULT 70,
+	"rsi_oversold" integer DEFAULT 30,
+	"ema_enabled" boolean DEFAULT false,
+	"ema_short" integer DEFAULT 9,
+	"ema_long" integer DEFAULT 21,
+	"macd_enabled" boolean DEFAULT false,
+	"macd_fast" integer DEFAULT 12,
+	"macd_slow" integer DEFAULT 26,
+	"macd_signal" integer DEFAULT 9,
+	"contract_size" numeric,
+	"deal_id" varchar,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now(),
+	"timeframe" varchar DEFAULT 'MINUTE',
+	"strategy_type" varchar DEFAULT 'scalper',
+	"adx_enabled" boolean DEFAULT false,
+	"adx_period" integer DEFAULT 14,
+	"adx_threshold" numeric DEFAULT '25',
+	"bollinger_enabled" boolean DEFAULT false,
+	"bollinger_period" integer DEFAULT 20,
+	"bollinger_sd" numeric DEFAULT '2',
+	"stochastic_enabled" boolean DEFAULT false,
+	"stochastic_k" integer DEFAULT 14,
+	"stochastic_d" integer DEFAULT 3,
+	"stochastic_ob" integer DEFAULT 80,
+	"stochastic_os" integer DEFAULT 20,
+	"atr_enabled" boolean DEFAULT false,
+	"atr_period" integer DEFAULT 14,
+	"atr_multiplier" numeric DEFAULT '2',
+	"roc_enabled" boolean DEFAULT false,
+	"roc_period" integer DEFAULT 12,
+	"roc_threshold" numeric DEFAULT '5',
+	"cci_enabled" boolean DEFAULT false,
+	"cci_period" integer DEFAULT 20,
+	"cci_threshold" numeric DEFAULT '100',
+	"williams_enabled" boolean DEFAULT false,
+	"williams_period" integer DEFAULT 14,
+	"keltner_enabled" boolean DEFAULT false,
+	"keltner_period" integer DEFAULT 20,
+	"keltner_atr_mult" numeric DEFAULT '1.5',
+	"ichimoku_enabled" boolean DEFAULT false,
+	"ichimoku_tenkan" integer DEFAULT 9,
+	"ichimoku_kijun" integer DEFAULT 26,
+	"ichimoku_senkou" integer DEFAULT 52,
+	"parabolic_sar_enabled" boolean DEFAULT false,
+	"sar_accel" numeric DEFAULT '0.02',
+	"sar_max" numeric DEFAULT '0.2',
+	"aroon_enabled" boolean DEFAULT false,
+	"aroon_period" integer DEFAULT 25,
+	"obv_enabled" boolean DEFAULT false,
+	"vwap_enabled" boolean DEFAULT false,
+	"zscore_enabled" boolean DEFAULT false,
+	"zscore_period" integer DEFAULT 20,
+	"zscore_threshold" numeric DEFAULT '2',
+	"fib_enabled" boolean DEFAULT false,
+	"fib_lookback" integer DEFAULT 50,
+	"grid_levels" integer DEFAULT 5,
+	"grid_spacing" numeric DEFAULT '0',
+	"kelly_enabled" boolean DEFAULT false,
+	"sentiment_enabled" boolean DEFAULT false
+);
+--> statement-breakpoint
+CREATE TABLE "scalper_trades" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"deal_id" varchar,
+	"epic" varchar,
+	"direction" varchar,
+	"size" numeric,
+	"entry_price" numeric,
+	"exit_price" numeric,
+	"pnl" numeric,
+	"type" varchar,
+	"strategy_name" varchar,
+	"opened_at" timestamp,
+	"closed_at" timestamp,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE INDEX "idx_price_candles_lookup" ON "price_candles" USING btree ("epic","resolution","ts" desc);

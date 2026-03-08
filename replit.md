@@ -72,6 +72,7 @@ OpenClaw Cloud employs a "CEO Proxy + Gateway" architecture, where two component
 -   **Package Manager**: pnpm (10.23.0)
 -   **Build Tool**: tsdown
 -   **UI**: Vite-based Lit web components.
+-   **Database Migrations**: Drizzle ORM schema in `shared/schema.ts` with config in `drizzle.config.ts`. Migrations generated in `migrations/` directory. Runtime code still uses raw `pg` queries — the Drizzle setup exists purely to satisfy Replit's deployment migration validator. Run `npm run db:push` to sync schema changes.
 
 ### UI/UX Decisions:
 -   Browser-accessible Control UI.

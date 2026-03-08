@@ -47,6 +47,7 @@
     "./cli-entry": "./openclaw.mjs"
   },
   "scripts": {
+    "db:push": "drizzle-kit push",
     "android:assemble": "cd apps/android && ./gradlew :app:assembleDebug",
     "android:install": "cd apps/android && ./gradlew :app:installDebug",
     "android:run": "cd apps/android && ./gradlew :app:installDebug && adb shell am start -n ai.openclaw.android/.MainActivity",
@@ -154,6 +155,8 @@
     "croner": "^10.0.1",
     "discord-api-types": "^0.38.39",
     "dotenv": "^17.3.1",
+    "drizzle-kit": "^0.31.9",
+    "drizzle-orm": "^0.45.1",
     "express": "^5.2.1",
     "file-type": "^21.3.0",
     "grammy": "^1.40.0",
