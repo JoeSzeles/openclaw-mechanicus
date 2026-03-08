@@ -141,6 +141,23 @@
 
 - Rebrand/migration issues or legacy config/service warnings: run `openclaw doctor` (see `docs/gateway/doctor.md`).
 
+## ClawScript (Trading DSL)
+
+- ClawScript is a domain-specific language for writing automated trading strategies that compile to JavaScript.
+- **Parser**: `skills/bots/clawscript-parser.cjs` — lexer + recursive-descent parser + JS code generator.
+- **Editor**: IG Dashboard → ClawScript Editor tab (accessible via top nav "ClawScript" link).
+- **Flow Builder**: `ig-clawscript-flow.js` — visual drag-drop node editor with bidirectional code sync.
+- **Templates**: `.openclaw/canvas/templates/` — 7 sample strategies (RSI, EMA crossover, multi-indicator, sentiment, BTC scalper, mean reversion, bourse trackers).
+- **Compiled strategies**: saved to `skills/bots/strategies/` as `.cjs` files extending `BaseStrategy`, auto-discovered by the engine.
+- **80+ commands** across 16 categories: Trading, Variables, Control Flow, AI/Analysis, Data Fetch, Agent Orchestration, Advanced, Functions, TradingView-Style, Bloomberg/Data Access, Time/Schedule, Portfolio, Economic/Political, Scientific/Quantitative, Utility, PRT Compatibility.
+- **Variable tooltips**: `INPUT_*` declarations and `DEF` comments become editable fields and tooltips in the bot dashboard.
+- **Save pipeline**: Compile & Save dialog → writes `.cjs` to `strategies/` → bot engine auto-discovers → ClawScript strategies appear in separate dropdown section with `[CS]` badge.
+- **API endpoints**: `GET/POST /api/clawscript/strategies`, `DELETE /api/clawscript/strategies/:name`, `GET /api/clawscript/templates`, `POST /api/clawscript/backtest`.
+- **Simulation & Backtest**: run against synthetic ticks or real IG price data (e.g., BTC `CS.D.BITCOIN.CFD.IP`).
+- **PRT compatibility**: 40+ ProRealTime ProBuilder commands with `PRT_` prefix.
+- **Full docs**: `skills/clawscript/CLAWSCRIPT.md`, `/__openclaw__/canvas/clawscript-docs.html`.
+- **Naming**: UI says "Claw Trader" (not "Scalper"); API endpoints remain `/api/ig/scalper/...` for compatibility.
+
 ## Agent-Specific Notes
 
 - Vocabulary: "makeup" = "mac app".

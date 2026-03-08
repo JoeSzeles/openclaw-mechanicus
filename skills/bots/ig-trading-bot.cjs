@@ -198,7 +198,37 @@ async function fetchPrice(epic) {
   return res.body;
 }
 
+const REJECTIONS_FILE = path.join(DASHBOARD_DIR, "ig-rejections.json");
 const VERIFY_LOG_PATH = path.join(DASHBOARD_DIR, "ig-verify-log.json");
+
+function logRejection(rejection) {
+  try {
+    if (!fs.existsSync(DASHBOARD_DIR)) fs.mkdirSync(DASHBOARD_DIR, { recursive: true });
+    let existing = [];
+    try {
+      if (fs.existsSync(REJECTIONS_FILE)) {
+        existing = JSON.parse(fs.readFileSync(REJECTIONS_FILE, "utf8"));
+      }
+    } catch (_) {}
+    existing.push(rejection);
+    if (existing.length > 200) existing = existing.slice(-200);
+    fs.writeFileSync(REJECTIONS_FILE, JSON.stringify(existing, null, 2));
+  } catch (_) {}
+}
+
+function writeAlertNotification(alertEntry) {
+  try {
+    let alerts = [];
+    try {
+      if (fs.existsSync(ALERTS_PATH)) {
+        alerts = JSON.parse(fs.readFileSync(ALERTS_PATH, "utf8"));
+      }
+    } catch (_) {}
+    alerts.push(alertEntry);
+    if (alerts.length > 500) alerts = alerts.slice(-500);
+    fs.writeFileSync(ALERTS_PATH, JSON.stringify(alerts, null, 2));
+  } catch (_) {}
+}
 
 function loadVerifyLog() {
   try {
@@ -412,15 +442,83 @@ async function openPosition(strategy) {
     return { dealReference: "TEST-" + Date.now(), testMode: true };
   }
 
-  const res = await proxyRequest("POST", "/api/ig/positions/open", body);
+  let res;
+  try {
+    res = await proxyRequest("POST", "/api/ig/positions/open", body);
+  } catch (apiErr) {
+    const errMsg = `API network error opening position: ${apiErr.message} | strategy="${strategy.name || strategy.instrument}" instrument=${strategy.instrument} direction=${strategy.direction} size=${strategy.size}`;
+    log("ERROR", errMsg, { error: apiErr.message, strategy: strategy.name, instrument: strategy.instrument });
+    const rejection = {
+      timestamp: new Date().toISOString(),
+      type: "trade_rejected",
+      source: "ig-trading-bot",
+      strategyName: strategy.name || strategy.instrument,
+      instrument: strategy.instrument,
+      direction: strategy.direction,
+      size: strategy.size,
+      stopDistance: strategy.stopDistance,
+      limitDistance: strategy.limitDistance,
+      reason: "API network error: " + apiErr.message,
+      igErrorCode: "NETWORK_ERROR",
+      details: errMsg
+    };
+    logRejection(rejection);
+    writeAlertNotification({ timestamp: new Date().toISOString(), type: "trade_rejected", epic: strategy.instrument, name: strategy.name || strategy.instrument, message: errMsg });
+    return null;
+  }
+
   if (res.status !== 200 || !res.body?.ok) {
-    log("ERROR", `Failed to open position for ${strategy.instrument}`, { status: res.status, error: res.body?.error || res.body?.errorCode });
+    const igError = res.body?.error || res.body?.errorCode || "unknown";
+    const errMsg = `TRADE REJECTED: Failed to open position | strategy="${strategy.name || strategy.instrument}" instrument=${strategy.instrument} direction=${strategy.direction} size=${strategy.size} stop=${strategy.stopDistance} limit=${strategy.limitDistance} httpStatus=${res.status} igError="${igError}"`;
+    log("ERROR", errMsg, { status: res.status, error: igError, body: res.body });
+    const rejection = {
+      timestamp: new Date().toISOString(),
+      type: "trade_rejected",
+      source: "ig-trading-bot",
+      strategyName: strategy.name || strategy.instrument,
+      instrument: strategy.instrument,
+      direction: strategy.direction,
+      size: strategy.size,
+      stopDistance: strategy.stopDistance,
+      limitDistance: strategy.limitDistance,
+      reason: "IG API rejected: " + igError,
+      igErrorCode: String(igError),
+      httpStatus: res.status,
+      details: errMsg,
+      rawResponse: res.body
+    };
+    logRejection(rejection);
+    writeAlertNotification({ timestamp: new Date().toISOString(), type: "trade_rejected", epic: strategy.instrument, name: strategy.name || strategy.instrument, message: errMsg });
     return null;
   }
 
   const dealRef = res.body.dealReference;
   const confirmation = res.body.confirmation;
   if (confirmation) {
+    if (confirmation.dealStatus !== "ACCEPTED") {
+      const rejReason = confirmation.reason || confirmation.dealStatus || "unknown";
+      const rejMsg = `TRADE REJECTED by IG confirmation: strategy="${strategy.name || strategy.instrument}" instrument=${strategy.instrument} direction=${strategy.direction} size=${strategy.size} dealStatus="${confirmation.dealStatus}" reason="${rejReason}" dealId=${confirmation.dealId || "none"}`;
+      log("ERROR", rejMsg, { dealId: confirmation.dealId, status: confirmation.dealStatus, reason: rejReason });
+      const rejection = {
+        timestamp: new Date().toISOString(),
+        type: "trade_rejected",
+        source: "ig-trading-bot",
+        strategyName: strategy.name || strategy.instrument,
+        instrument: strategy.instrument,
+        direction: strategy.direction,
+        size: strategy.size,
+        stopDistance: strategy.stopDistance,
+        limitDistance: strategy.limitDistance,
+        reason: rejReason,
+        igErrorCode: confirmation.dealStatus,
+        dealReference: dealRef,
+        details: rejMsg,
+        rawResponse: confirmation
+      };
+      logRejection(rejection);
+      writeAlertNotification({ timestamp: new Date().toISOString(), type: "trade_rejected", epic: strategy.instrument, name: strategy.name || strategy.instrument, message: rejMsg });
+      return null;
+    }
     log("TRADE", `Deal confirmed: ${confirmation.dealStatus}`, {
       dealId: confirmation.dealId,
       status: confirmation.dealStatus,
@@ -692,7 +790,23 @@ async function runCycle(config) {
 
     const risk = checkRiskLimits(strategy, config, openPositions, marketData);
     if (!risk.allowed) {
-      log("WARN", `${strategy.instrument}: Blocked — ${risk.reason}`);
+      const rejMsg = `TRADE BLOCKED by risk limits: strategy="${strategy.name || strategy.instrument}" instrument=${strategy.instrument} direction=${strategy.direction} size=${strategy.size} | ${risk.reason}`;
+      log("ERROR", rejMsg);
+      const rejection = {
+        timestamp: new Date().toISOString(),
+        type: "trade_rejected",
+        source: "ig-trading-bot",
+        engine: "risk-limits",
+        strategyName: strategy.name || strategy.instrument,
+        instrument: strategy.instrument,
+        direction: strategy.direction,
+        size: strategy.size,
+        reason: "Risk limit: " + risk.reason,
+        igErrorCode: "RISK_LIMIT",
+        details: rejMsg
+      };
+      logRejection(rejection);
+      writeAlertNotification({ timestamp: new Date().toISOString(), type: "trade_rejected", epic: strategy.instrument, name: strategy.name || strategy.instrument, message: rejMsg });
       continue;
     }
 
@@ -710,7 +824,28 @@ async function runCycle(config) {
     if (prEnabled) {
       const verification = await proofReadTrade(strategy, marketData);
       if (!verification.approved) {
-        log("WARN", `TRADE BLOCKED by proof reader: ${strategy.instrument} — ${verification.reason}`);
+        const failedChecks = (verification.checks || []).filter(c => !c.pass);
+        const failedDetails = failedChecks.map(c => `${c.check}: ${c.detail}`).join("; ");
+        const rejMsg = `TRADE BLOCKED by proof reader: strategy="${strategy.name || strategy.instrument}" instrument=${strategy.instrument} direction=${strategy.direction} size=${strategy.size} | Failed checks: ${failedDetails}`;
+        log("ERROR", rejMsg, { instrument: strategy.instrument, failedChecks });
+        const rejection = {
+          timestamp: new Date().toISOString(),
+          type: "trade_rejected",
+          source: "ig-trading-bot",
+          engine: "proof-reader",
+          strategyName: strategy.name || strategy.instrument,
+          instrument: strategy.instrument,
+          direction: strategy.direction,
+          size: strategy.size,
+          stopDistance: strategy.stopDistance,
+          limitDistance: strategy.limitDistance,
+          reason: "Proof reader: " + verification.reason,
+          igErrorCode: "PROOF_READ_FAIL",
+          failedChecks: failedChecks.map(c => ({ check: c.check, detail: c.detail })),
+          details: rejMsg
+        };
+        logRejection(rejection);
+        writeAlertNotification({ timestamp: new Date().toISOString(), type: "trade_rejected", epic: strategy.instrument, name: strategy.name || strategy.instrument, message: rejMsg });
         continue;
       }
       log("INFO", `TRADE APPROVED by proof reader: ${strategy.instrument}`);

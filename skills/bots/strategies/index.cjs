@@ -7,8 +7,8 @@ const BaseStrategy = require("./base-strategy.cjs");
 const registry = {};
 let loaded = false;
 
-function loadStrategies() {
-  if (loaded) return;
+function loadStrategies(force) {
+  if (loaded && !force) return;
   const files = fs.readdirSync(strategiesDir).filter(f =>
     f.endsWith("-strategy.cjs") && f !== "base-strategy.cjs"
   );

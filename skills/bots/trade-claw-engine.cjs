@@ -6,6 +6,7 @@ const DATA_DIR = path.join(process.cwd(), ".openclaw");
 const DEFAULTS_FILE = path.join(DATA_DIR, "ig-scalper-defaults.json");
 const CONFIG_FILE = path.join(DATA_DIR, "ig-scalper-config.json");
 const ALERTS_FILE = path.join(DATA_DIR, "ig-alerts.json");
+const REJECTIONS_FILE = path.join(DATA_DIR, "canvas", "ig-rejections.json");
 
 const strategyLoader = require("./strategies/index.cjs");
 
@@ -129,6 +130,36 @@ function candlesToTicks(candles) {
 function log(level, msg) {
   const ts = new Date().toISOString().slice(11, 23);
   console.log(`[${ts}] [trade-claw] [${level}] ${msg}`);
+}
+
+function logRejection(rejection) {
+  try {
+    const canvasDir = path.join(DATA_DIR, "canvas");
+    if (!fs.existsSync(canvasDir)) fs.mkdirSync(canvasDir, { recursive: true });
+    let existing = [];
+    try {
+      if (fs.existsSync(REJECTIONS_FILE)) {
+        existing = JSON.parse(fs.readFileSync(REJECTIONS_FILE, "utf8"));
+      }
+    } catch (_) {}
+    existing.push(rejection);
+    if (existing.length > 200) existing = existing.slice(-200);
+    fs.writeFileSync(REJECTIONS_FILE, JSON.stringify(existing, null, 2));
+  } catch (_) {}
+}
+
+function writeAlertNotification(alertEntry) {
+  try {
+    let alerts = [];
+    try {
+      if (fs.existsSync(ALERTS_FILE)) {
+        alerts = JSON.parse(fs.readFileSync(ALERTS_FILE, "utf8"));
+      }
+    } catch (_) {}
+    alerts.push(alertEntry);
+    if (alerts.length > 500) alerts = alerts.slice(-500);
+    fs.writeFileSync(ALERTS_FILE, JSON.stringify(alerts, null, 2));
+  } catch (_) {}
 }
 
 function getStrategyInstance(strat) {
@@ -546,7 +577,27 @@ async function evaluateEntry(strat, epic, ticks) {
   try {
     await openTrade(strat, epic, direction, size, stopDist, limitDist, latest, reason, htfBias);
   } catch (e) {
-    log("ERROR", `Trade failed: ${e.message}`);
+    const errMsg = `Trade execution failed: ${e.message} | strategy="${strat.name || epic}" type="${strat.strategyType || "scalper"}" instrument=${epic} direction=${direction} size=${size} stop=${stopDist.toFixed(2)} limit=${limitDist.toFixed(2)}`;
+    log("ERROR", errMsg);
+    const rejection = {
+      timestamp: new Date().toISOString(),
+      type: "trade_rejected",
+      source: "trade-claw-engine",
+      strategyName: strat.name || epic,
+      strategyType: strat.strategyType || "scalper",
+      instrument: epic,
+      direction,
+      size,
+      stopDistance: stopDist,
+      limitDistance: limitDist,
+      reason: "Execution error: " + e.message,
+      igErrorCode: "EXECUTION_ERROR",
+      details: errMsg
+    };
+    logRejection(rejection);
+    writeAlertNotification({ timestamp: new Date().toISOString(), type: "trade_rejected", epic, name: strat.name || epic, message: errMsg, mid: latest.mid });
+    tradeLog.push({ type: "rejection", timestamp: new Date().toISOString(), epic, direction, size, reason: "Execution error: " + e.message, strategyName: strat.name || epic });
+    saveTradeLog();
   }
 }
 
@@ -601,7 +652,28 @@ async function openTrade(strat, epic, direction, size, stopDist, limitDist, tick
   if (config.demoMode) {
     const rejectChance = config.demoRejectPct || 5;
     if (Math.random() * 100 < rejectChance) {
-      log("DEMO", `Simulated rejection for ${direction} ${epic} (${rejectChance}% chance)`);
+      const rejMsg = `Simulated rejection for ${direction} ${epic} size=${size} stop=${stopDist} limit=${limitDist} strategy="${strat.name || epic}" type="${strat.strategyType || "scalper"}" (${rejectChance}% chance)`;
+      log("ERROR", `TRADE REJECTED (demo): ${rejMsg}`);
+      const rejection = {
+        timestamp: new Date().toISOString(),
+        type: "trade_rejected",
+        source: "trade-claw-engine",
+        engine: "demo",
+        strategyName: strat.name || epic,
+        strategyType: strat.strategyType || "scalper",
+        instrument: epic,
+        direction,
+        size,
+        stopDistance: stopDist,
+        limitDistance: limitDist,
+        reason: "Demo simulated rejection",
+        igErrorCode: "DEMO_REJECT",
+        details: rejMsg
+      };
+      logRejection(rejection);
+      writeAlertNotification({ timestamp: new Date().toISOString(), type: "trade_rejected", epic, name: strat.name || epic, message: rejMsg, mid: tick.mid });
+      tradeLog.push({ type: "rejection", timestamp: new Date().toISOString(), epic, direction, size, reason: "Demo simulated rejection", strategyName: strat.name || epic });
+      saveTradeLog();
       return;
     }
   }
@@ -629,10 +701,56 @@ async function openTrade(strat, epic, direction, size, stopDist, limitDist, tick
     limitDistance: limitDist
   };
 
-  const result = await proxyPost("/api/ig/positions/open", body);
+  let result;
+  try {
+    result = await proxyPost("/api/ig/positions/open", body);
+  } catch (apiErr) {
+    const errMsg = `API error opening trade: ${apiErr.message} | strategy="${strat.name || epic}" type="${strat.strategyType || "scalper"}" instrument=${epic} direction=${direction} size=${size}`;
+    log("ERROR", errMsg);
+    const rejection = {
+      timestamp: new Date().toISOString(),
+      type: "trade_rejected",
+      source: "trade-claw-engine",
+      strategyName: strat.name || epic,
+      strategyType: strat.strategyType || "scalper",
+      instrument: epic,
+      direction,
+      size,
+      stopDistance: stopDist,
+      limitDistance: limitDist,
+      reason: "API network error: " + apiErr.message,
+      igErrorCode: "NETWORK_ERROR",
+      details: errMsg
+    };
+    logRejection(rejection);
+    writeAlertNotification({ timestamp: new Date().toISOString(), type: "trade_rejected", epic, name: strat.name || epic, message: errMsg, mid: tick.mid });
+    tradeLog.push({ type: "rejection", timestamp: new Date().toISOString(), epic, direction, size, reason: "API error: " + apiErr.message, strategyName: strat.name || epic });
+    saveTradeLog();
+    return;
+  }
 
   if (!result) {
-    log("ERROR", "No response from trade API");
+    const errMsg = `No response from trade API | strategy="${strat.name || epic}" type="${strat.strategyType || "scalper"}" instrument=${epic} direction=${direction} size=${size} stop=${stopDist} limit=${limitDist}`;
+    log("ERROR", errMsg);
+    const rejection = {
+      timestamp: new Date().toISOString(),
+      type: "trade_rejected",
+      source: "trade-claw-engine",
+      strategyName: strat.name || epic,
+      strategyType: strat.strategyType || "scalper",
+      instrument: epic,
+      direction,
+      size,
+      stopDistance: stopDist,
+      limitDistance: limitDist,
+      reason: "No response from trade API",
+      igErrorCode: "NO_RESPONSE",
+      details: errMsg
+    };
+    logRejection(rejection);
+    writeAlertNotification({ timestamp: new Date().toISOString(), type: "trade_rejected", epic, name: strat.name || epic, message: errMsg, mid: tick.mid });
+    tradeLog.push({ type: "rejection", timestamp: new Date().toISOString(), epic, direction, size, reason: "No API response", strategyName: strat.name || epic });
+    saveTradeLog();
     return;
   }
 
@@ -693,7 +811,30 @@ async function openTrade(strat, epic, direction, size, stopDist, limitDist, tick
     await logTradeToDb({ dealId: conf.dealId, epic, direction, size, entryPrice: entry, type: "OPEN", strategyName: strat.name || epic, openedAt: new Date().toISOString() });
   } else {
     const rejectReason = conf ? (conf.reason || conf.dealStatus || "unknown") : "no confirmation";
-    log("WARN", `Trade rejected: ${rejectReason}`);
+    const igErrorCode = conf ? (conf.reason || conf.dealStatus || "UNKNOWN") : "NO_CONFIRMATION";
+    const rejMsg = `TRADE REJECTED by IG: strategy="${strat.name || epic}" type="${strat.strategyType || "scalper"}" instrument=${epic} direction=${direction} size=${size} stop=${stopDist.toFixed(2)} limit=${limitDist.toFixed(2)} reason="${rejectReason}" igErrorCode="${igErrorCode}" dealRef=${conf ? (conf.dealReference || conf.dealId || "none") : "none"}`;
+    log("ERROR", rejMsg);
+    const rejection = {
+      timestamp: new Date().toISOString(),
+      type: "trade_rejected",
+      source: "trade-claw-engine",
+      strategyName: strat.name || epic,
+      strategyType: strat.strategyType || "scalper",
+      instrument: epic,
+      direction,
+      size,
+      stopDistance: stopDist,
+      limitDistance: limitDist,
+      reason: rejectReason,
+      igErrorCode,
+      dealReference: conf ? (conf.dealReference || conf.dealId || null) : null,
+      details: rejMsg,
+      rawResponse: conf
+    };
+    logRejection(rejection);
+    writeAlertNotification({ timestamp: new Date().toISOString(), type: "trade_rejected", epic, name: strat.name || epic, message: rejMsg, mid: tick.mid });
+    tradeLog.push({ type: "rejection", timestamp: new Date().toISOString(), epic, direction, size, reason: rejectReason, igErrorCode, strategyName: strat.name || epic });
+    saveTradeLog();
   }
 }
 

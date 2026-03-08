@@ -260,12 +260,15 @@ DEF vol = VOLUME()
 
 ## Sample Templates
 
-Four ready-to-use templates are in `.openclaw/canvas/clawscript-templates/`:
+Seven ready-to-use templates are in `.openclaw/canvas/templates/`:
 
 1. **rsi-simple.cs** — Basic RSI oversold/overbought strategy
 2. **ema-crossover.cs** — EMA crossover with trailing stop
 3. **multi-indicator.cs** — RSI + MACD + Bollinger with try/catch
 4. **sentiment-scan.cs** — AI sentiment + market scanner
+5. **btc-scalper.cs** — Fast BTC scalping with RSI + EMA and tight stops
+6. **mean-reversion.cs** — Bollinger Band mean reversion with error handling
+7. **bourse-trackers.cs** — Multi-indicator approach for major index CFDs (US 500, FTSE, DAX)
 
 ## Compiled Strategy Format
 
@@ -277,6 +280,51 @@ Generated `.cjs` files extend `BaseStrategy` and export a class with:
 
 Place compiled strategies in `skills/bots/strategies/` to auto-register with the engine.
 
+## Variable Tooltips & Comment Convention
+
+ClawScript supports inline comments on variable declarations. These comments are extracted during compilation and become tooltips in the bot strategy editor UI.
+
+```clawscript
+DEF rsi_period = 14       // RSI lookback period
+DEF stop_dist = 20        // Stop distance in points
+DEF use_trailing = true   // Enable trailing stop logic
+INPUT_INT lookback DEFAULT 50   // Number of candles to analyze
+INPUT_FLOAT risk_pct DEFAULT 0.02  // Risk per trade as decimal
+```
+
+When a ClawScript strategy is loaded in the bot dashboard:
+- `INPUT_INT`, `INPUT_FLOAT`, `INPUT_BOOL`, and `INPUT_SYMBOL` declarations become editable fields
+- `DEF` variables with inline comments show the comment text as a hover tooltip
+- Standard fields not used by the strategy are greyed out with `(unused)` label
+
+## Strategy Save & Deploy Pipeline
+
+1. **Write** ClawScript in the editor (code or flow builder)
+2. **Compile & Save** — opens a dialog with strategy name and filename fields
+3. The compiled `.cjs` file is saved to `skills/bots/strategies/`
+4. The strategy loader auto-discovers and registers it
+5. In the bot dashboard, ClawScript strategies appear in a separate dropdown section
+6. `INPUT_*` variables appear as editable config fields
+7. The engine calls `evaluateEntry()` / `evaluateExit()` on each tick
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/clawscript/strategies` | GET | List all ClawScript-compiled strategies |
+| `/api/clawscript/strategies` | POST | Save a compiled strategy file |
+| `/api/clawscript/strategies/:name` | DELETE | Remove a strategy |
+| `/api/clawscript/strategies/:name/schema` | GET | Get strategy config schema |
+| `/api/clawscript/templates` | GET | List available templates |
+| `/api/clawscript/templates/:name` | GET | Get template source code |
+| `/api/clawscript/backtest` | POST | Run backtest with historical data |
+
+## Simulation & Backtest
+
+- **Run Simulation**: Executes strategy against synthetic tick data for logic validation
+- **Run with Real Data**: Fetches real IG price candles (e.g., BTC `CS.D.BITCOIN.CFD.IP`) and uses them as tick source
+- **Run Backtest**: Sends compiled strategy + instrument + timeframe to the backtest endpoint; returns P&L, win rate, max drawdown, and trade list
+
 ## Visual Flow Builder
 
 The flow builder provides a drag-drop node editor:
@@ -285,6 +333,118 @@ The flow builder provides a drag-drop node editor:
 - **Port connections**: Connect output ports to input ports
 - **Bidirectional sync**: Code changes update flow, flow changes update code
 - **Zoom/Pan**: Scroll to zoom (cursor-relative), click+drag to pan
-- **Auto-layout**: Automatic node arrangement
+- **Auto-layout**: Automatic grid-based node arrangement (linear chains group into rows of 4)
 - **Undo/Redo**: Ctrl+Z / Ctrl+Y
 - **Export**: PNG screenshot of flow diagram
+
+## Usage Examples
+
+### Complete RSI Strategy with Variables
+
+```clawscript
+// BTC RSI Mean Reversion
+INPUT_INT rsi_period DEFAULT 14    // RSI calculation period
+INPUT_FLOAT oversold DEFAULT 30    // Oversold threshold
+INPUT_FLOAT overbought DEFAULT 70  // Overbought threshold
+INPUT_FLOAT size DEFAULT 0.5       // Position size
+
+DEF rsi = RSI(rsi_period)
+DEF atr = ATR(14)                  // For dynamic stops
+
+IF rsi < oversold THEN
+  BUY size AT MARKET STOP 20 LIMIT 40 REASON "RSI oversold"
+ENDIF
+
+IF rsi > overbought THEN
+  SELL size AT MARKET STOP 20 REASON "RSI overbought"
+ENDIF
+```
+
+### EMA Crossover with Trailing Stop
+
+```clawscript
+DEF ema_fast = EMA(9)
+DEF ema_slow = EMA(21)
+
+IF ema_fast CROSSES OVER ema_slow THEN
+  BUY 1 AT MARKET STOP 25 REASON "EMA bullish crossover"
+  TRAILSTOP 15 ACCEL 0.02 MAX 0.2
+ENDIF
+
+IF ema_fast CROSSES UNDER ema_slow THEN
+  SELL 1 AT MARKET STOP 25 REASON "EMA bearish crossover"
+  TRAILSTOP 15 ACCEL 0.02 MAX 0.2
+ENDIF
+```
+
+### AI Sentiment with Error Handling
+
+```clawscript
+DEF rsi = RSI(14)
+DEF sentiment = 0
+
+TRY
+  AI_QUERY "Analyze current BTC market sentiment" TOOL "web_search" ARG "bitcoin sentiment"
+  SET sentiment = AI_RESULT
+
+  IF sentiment > 0.6 AND rsi < 40 THEN
+    BUY 1 AT MARKET STOP 50 LIMIT 100 REASON "Bullish sentiment + RSI dip"
+    ALERT "Sentiment BUY entry" LEVEL "info"
+  ENDIF
+CATCH err
+  ALERT "Sentiment analysis failed" LEVEL "error"
+ENDTRY
+```
+
+### Loop with Storage
+
+```clawscript
+DEF count = 0
+LOAD_VAR "trade_count" DEFAULT 0
+SET count = AI_RESULT
+
+LOOP 5 TIMES
+  DEF rsi = RSI(14)
+  IF rsi < 30 THEN
+    BUY 1 AT MARKET STOP 20 REASON "Loop iteration buy"
+    SET count = count + 1
+    STORE_VAR "trade_count" count
+  ENDIF
+  WAIT 1000
+ENDLOOP
+```
+
+### Bloomberg-Style Data Fetch
+
+```clawscript
+DEF hist = FETCH_HISTORICAL "PX_LAST" FROM "2024-01-01" TO "2024-12-31"
+DEF members = FETCH_MEMBERS "SPX Index"
+DEF gdp = ECON_DATA "GDP" COUNTRY "US" DATE "2024-Q4"
+
+IF gdp > 2.5 THEN
+  ALERT "Strong GDP — bullish bias" LEVEL "info"
+ENDIF
+```
+
+### Portfolio Management
+
+```clawscript
+DEF scan = MARKET_SCAN "forex" CRITERIA "rsi < 30" LIMIT 10
+PORTFOLIO_BUILD FROM scan NUM 5 SIZING "equal" MAX_RISK 0.02
+PORTFOLIO_REBALANCE THRESHOLD 10
+
+SCHEDULE "rebalance" AT "09:00" REPEAT "daily"
+```
+
+### PRT Compatibility
+
+```clawscript
+PRT_DEFPARAM CumulateOrders = false
+DEF rsi = PRT_RSI 14 (CLOSE)
+DEF bb = PRT_BOLLINGER 20 2 (CLOSE)
+DEF ich = PRT_ICHIMOKU 9 26 52
+
+IF PRT_CROSS(rsi, 30) THEN
+  PRT_BUY 1 AT MARKET
+ENDIF
+```

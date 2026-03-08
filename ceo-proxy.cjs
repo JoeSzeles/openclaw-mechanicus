@@ -90,7 +90,7 @@ function isLoginExempt(req) {
       p.startsWith("/api/ig/pricehistory") || p.startsWith("/api/ig/watchlists") || p.startsWith("/api/ig/activity") ||
       p.startsWith("/api/ig/session") || p === "/api/ig/refresh-snapshots" ||
       p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/strategy-templates") || p.startsWith("/api/ig/proofread") || p.startsWith("/api/ig/watchedlist") || p.startsWith("/api/ig/scalper") ||
-      p.startsWith("/api/agents/") ||
+      p.startsWith("/api/agents/") || p.startsWith("/api/clawscript/") ||
       p.startsWith("/api/bots") || p.startsWith("/api/processes")) {
     if (hasValidBearerToken(req)) return true;
   }
@@ -1021,6 +1021,370 @@ function igJsonResponse(res, statusCode, body) {
     return json(res, 502, { error: "IG returned non-JSON response", detail: parsed._raw });
   }
   return json(res, statusCode, parsed);
+}
+
+const CLAWSCRIPT_STRATEGIES_DIR = path.join(__dirname, "skills", "bots", "strategies");
+const CLAWSCRIPT_META_FILE = path.join(DATA_DIR, "clawscript-strategies.json");
+
+function loadClawScriptMeta() {
+  try { return JSON.parse(fs.readFileSync(CLAWSCRIPT_META_FILE, "utf8")); } catch (_) { return { strategies: [] }; }
+}
+function saveClawScriptMeta(meta) {
+  fs.writeFileSync(CLAWSCRIPT_META_FILE, JSON.stringify(meta, null, 2));
+}
+
+async function handleClawScriptApi(req, res, p) {
+  if (req.method === "OPTIONS") return json(res, 200, { ok: true });
+  if (!authGateway(req) && !validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" });
+
+  if (req.method === "GET" && p === "/api/clawscript/strategies") {
+    const meta = loadClawScriptMeta();
+    meta.strategies = meta.strategies.filter(s => {
+      const fp = path.join(CLAWSCRIPT_STRATEGIES_DIR, s.filename);
+      return fs.existsSync(fp);
+    });
+    saveClawScriptMeta(meta);
+    return json(res, 200, meta);
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/strategies") {
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    const { name, filename, code, js, variables, imports, metadata } = body;
+    if (!name || !filename || !js) return json(res, 400, { error: "Missing name, filename, or js" });
+    const safeFilename = filename.replace(/[^a-zA-Z0-9_\-.]/g, "");
+    if (!safeFilename.endsWith("-strategy.cjs")) return json(res, 400, { error: "Filename must end with -strategy.cjs" });
+    const filePath = path.join(CLAWSCRIPT_STRATEGIES_DIR, safeFilename);
+    if (!filePath.startsWith(CLAWSCRIPT_STRATEGIES_DIR)) return json(res, 400, { error: "Invalid filename" });
+    fs.writeFileSync(filePath, js);
+    const typeMatch = js.match(/STRATEGY_TYPE\(\)\s*\{\s*return\s*['"]([^'"]+)['"]/);
+    const strategyType = typeMatch ? typeMatch[1] : "custom-" + name.toLowerCase().replace(/\s+/g, "-");
+    const meta = loadClawScriptMeta();
+    const existing = meta.strategies.findIndex(s => s.filename === safeFilename);
+    const entry = {
+      name,
+      filename: safeFilename,
+      strategyType,
+      variables: variables || [],
+      imports: imports || [],
+      metadata: metadata || null,
+      clawscript: true,
+      savedAt: new Date().toISOString(),
+      sourceCode: code || ""
+    };
+    if (existing >= 0) meta.strategies[existing] = entry;
+    else meta.strategies.push(entry);
+    saveClawScriptMeta(meta);
+    try {
+      delete require.cache[require.resolve(filePath)];
+      delete require.cache[require.resolve("./skills/bots/strategies/index.cjs")];
+      const sl = require("./skills/bots/strategies/index.cjs");
+      sl.loadStrategies(true);
+    } catch (_) {}
+    console.log(`[clawscript-api] Saved strategy "${name}" as ${safeFilename} (type: ${strategyType})`);
+    return json(res, 200, { ok: true, entry });
+  }
+
+  const deleteMatch = p.match(/^\/api\/clawscript\/strategies\/([^/]+)$/);
+  if (req.method === "DELETE" && deleteMatch) {
+    const target = decodeURIComponent(deleteMatch[1]);
+    const meta = loadClawScriptMeta();
+    const idx = meta.strategies.findIndex(s => s.filename === target || s.name === target);
+    if (idx < 0) return json(res, 404, { error: "Strategy not found" });
+    const entry = meta.strategies[idx];
+    const filePath = path.join(CLAWSCRIPT_STRATEGIES_DIR, entry.filename);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    meta.strategies.splice(idx, 1);
+    saveClawScriptMeta(meta);
+    delete require.cache[require.resolve("./skills/bots/strategies/index.cjs")];
+    console.log(`[clawscript-api] Deleted strategy "${entry.name}" (${entry.filename})`);
+    return json(res, 200, { ok: true, deleted: entry.name });
+  }
+
+  const schemaMatch = p.match(/^\/api\/clawscript\/strategies\/([^/]+)\/schema$/);
+  if (req.method === "GET" && schemaMatch) {
+    const target = decodeURIComponent(schemaMatch[1]);
+    const meta = loadClawScriptMeta();
+    const entry = meta.strategies.find(s => s.filename === target || s.strategyType === target || s.name === target);
+    if (!entry) return json(res, 404, { error: "Strategy not found" });
+    const filePath = path.join(CLAWSCRIPT_STRATEGIES_DIR, entry.filename);
+    if (!fs.existsSync(filePath)) return json(res, 404, { error: "Strategy file missing" });
+    try {
+      delete require.cache[filePath];
+      const Cls = require(filePath);
+      const instance = new Cls({});
+      return json(res, 200, {
+        name: entry.name,
+        type: entry.strategyType,
+        schema: instance.getConfigSchema(),
+        variables: entry.variables,
+        metadata: entry.metadata || null,
+        sourceCode: entry.sourceCode
+      });
+    } catch (e) {
+      return json(res, 500, { error: "Failed to load strategy: " + e.message });
+    }
+  }
+
+  const sourceMatch = p.match(/^\/api\/clawscript\/strategies\/([^/]+)\/source$/);
+  if (req.method === "GET" && sourceMatch) {
+    const target = decodeURIComponent(sourceMatch[1]);
+    const meta = loadClawScriptMeta();
+    const entry = meta.strategies.find(s => s.filename === target || s.name === target);
+    if (!entry) return json(res, 404, { error: "Strategy not found" });
+    return json(res, 200, { name: entry.name, sourceCode: entry.sourceCode || "" });
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/backtest") {
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    const { code, instrument, resolution, candleCount } = body;
+    if (!code) return json(res, 400, { error: "Missing code (ClawScript source)" });
+    const epic = instrument || "CS.D.BITCOIN.CFD.IP";
+    const res_ = resolution || "HOUR";
+    const max = Math.min(candleCount || 200, 2000);
+
+    try {
+      const parser = require("./skills/bots/clawscript-parser.cjs");
+      const parsed = parser.parse(code);
+      if (!parsed || !parsed.ast) return json(res, 400, { error: "Parse error: " + (parsed ? parsed.error : "unknown") });
+      const ast = parsed.ast;
+
+      const session = await igAuth();
+      const url = new URL("http://localhost/api/ig/pricehistory/" + epic);
+      url.searchParams.set("resolution", res_);
+      url.searchParams.set("max", String(max));
+      const igR = await igRequest("GET", "/prices/" + epic + "?resolution=" + res_ + "&max=" + max + "&pageSize=" + max, igHeaders(session));
+      let candles = [];
+      if (igR.status === 200) {
+        const data = safeParseIgBody(igR.body);
+        if (data && data.prices) {
+          candles = data.prices.map(p => {
+            let rawTime = p.snapshotTimeUTC || p.snapshotTime || "";
+            if (typeof rawTime === "string") rawTime = rawTime.replace(/\//g, "-");
+            const dt = new Date(rawTime);
+            const om = p.openPrice || {}, hm = p.highPrice || {}, lm = p.lowPrice || {}, cm = p.closePrice || {};
+            return {
+              ts: Math.floor(dt.getTime() / 1000),
+              time: Math.floor(dt.getTime() / 1000),
+              open: ((om.bid || 0) + (om.ask || om.offer || 0)) / 2,
+              high: ((hm.bid || 0) + (hm.ask || hm.offer || 0)) / 2,
+              low: ((lm.bid || 0) + (lm.ask || lm.offer || 0)) / 2,
+              close: ((cm.bid || 0) + (cm.ask || cm.offer || 0)) / 2,
+              volume: p.lastTradedVolume || 0
+            };
+          }).sort((a, b) => a.ts - b.ts);
+        }
+      }
+
+      if (candles.length === 0) {
+        try {
+          const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+          const stored = await scalperDb.getStoredCandles(epic, res_, max);
+          if (stored.length > 0) {
+            candles = stored.map(r => ({
+              ts: parseInt(r.ts), time: parseInt(r.ts),
+              open: parseFloat(r.open), high: parseFloat(r.high),
+              low: parseFloat(r.low), close: parseFloat(r.close),
+              volume: parseInt(r.volume) || 0
+            }));
+            console.log(`[clawscript-backtest] Using ${candles.length} DB-cached candles for ${epic} ${res_}`);
+          }
+        } catch (_) {}
+      }
+
+      if (candles.length < 5) return json(res, 400, { error: "Insufficient price data: " + candles.length + " candles for " + epic + " " + res_ });
+
+      const trades = [];
+      let openTrade = null;
+      let vars = {};
+      const closePrices = candles.map(c => c.close);
+      let totalPnl = 0;
+      let peakEquity = 0;
+      let maxDrawdown = 0;
+      const equityCurve = [];
+
+      function calcRSI(prices, period) {
+        if (prices.length < period + 1) return 50;
+        let avgGain = 0, avgLoss = 0;
+        for (let i = prices.length - period; i < prices.length; i++) {
+          const diff = prices[i] - prices[i - 1];
+          if (diff > 0) avgGain += diff; else avgLoss -= diff;
+        }
+        if (avgLoss === 0) return 100;
+        return 100 - (100 / (1 + (avgGain / period) / (avgLoss / period)));
+      }
+
+      function calcEMA(prices, period) {
+        if (prices.length < period) return prices[prices.length - 1] || 0;
+        const k = 2 / (period + 1);
+        let ema = prices.slice(0, period).reduce((s, v) => s + v, 0) / period;
+        for (let i = period; i < prices.length; i++) ema = prices[i] * k + ema * (1 - k);
+        return ema;
+      }
+
+      function calcSMA(prices, period) {
+        if (prices.length < period) return prices[prices.length - 1] || 0;
+        let sum = 0;
+        for (let i = prices.length - period; i < prices.length; i++) sum += prices[i];
+        return sum / period;
+      }
+
+      function evalExpr(expr, pricesSlice) {
+        if (!expr) return null;
+        switch (expr.type) {
+          case 'NumberLiteral': return expr.value;
+          case 'StringLiteral': return expr.value;
+          case 'BooleanLiteral': return expr.value;
+          case 'NullLiteral': return null;
+          case 'Identifier': return vars[expr.value] !== undefined ? vars[expr.value] : expr.value;
+          case 'BinaryExpr': {
+            const l = evalExpr(expr.left, pricesSlice), r = evalExpr(expr.right, pricesSlice);
+            switch (expr.op) {
+              case '+': return (typeof l === 'string' || typeof r === 'string') ? String(l) + String(r) : l + r;
+              case '-': return l - r; case '*': return l * r;
+              case '/': return r !== 0 ? l / r : 0; case '%': return l % r;
+              case '>': return l > r; case '<': return l < r;
+              case '>=': return l >= r; case '<=': return l <= r;
+              case '==': return l == r; case '!=': return l != r;
+              case '&&': return l && r; case '||': return l || r;
+              default: return null;
+            }
+          }
+          case 'UnaryExpr': { const v = evalExpr(expr.expr, pricesSlice); return expr.op === '-' ? -v : !v; }
+          case 'ContainsExpr': return String(evalExpr(expr.left, pricesSlice)).includes(String(evalExpr(expr.right, pricesSlice)));
+          case 'CrossesExpr': return expr.direction === 'OVER' ? evalExpr(expr.left, pricesSlice) > evalExpr(expr.right, pricesSlice) : evalExpr(expr.left, pricesSlice) < evalExpr(expr.right, pricesSlice);
+          case 'FunctionCall': {
+            const name = expr.name.toUpperCase();
+            const args = expr.args.map(a => evalExpr(a, pricesSlice));
+            if (name === 'RSI') return calcRSI(pricesSlice, args[0] || 14);
+            if (name === 'EMA') return calcEMA(pricesSlice, args[0] || 20);
+            if (name === 'SMA') return calcSMA(pricesSlice, args[0] || 20);
+            return 0;
+          }
+          case 'IndicatorCall': {
+            const iname = expr.name.toUpperCase();
+            const iparams = expr.params.map(a => evalExpr(a, pricesSlice));
+            if (iname === 'RSI') return calcRSI(pricesSlice, iparams[0] || 14);
+            if (iname === 'EMA') return calcEMA(pricesSlice, iparams[0] || 20);
+            if (iname === 'SMA') return calcSMA(pricesSlice, iparams[0] || 20);
+            return 0;
+          }
+          case 'MemberExpr': { const obj = evalExpr(expr.object, pricesSlice); return obj && typeof obj === 'object' ? obj[expr.property] : null; }
+          case 'LoopCount': return evalExpr(expr.num, pricesSlice);
+          default: return null;
+        }
+      }
+
+      function execStmt(stmt, pricesSlice, depth) {
+        if (!stmt || depth > 50) return;
+        switch (stmt.type) {
+          case 'VarDecl': vars[stmt.name] = evalExpr(stmt.value, pricesSlice); break;
+          case 'Assignment': vars[stmt.name] = evalExpr(stmt.value, pricesSlice); break;
+          case 'Trade': {
+            const cond = stmt.condition ? evalExpr(stmt.condition, pricesSlice) : true;
+            if (cond) {
+              const sz = stmt.size ? evalExpr(stmt.size, pricesSlice) : 1;
+              const dir = stmt.command;
+              const price = pricesSlice[pricesSlice.length - 1];
+              if (!openTrade) {
+                openTrade = { direction: dir, size: sz, entryPrice: price, entryTime: candles[Math.min(pricesSlice.length - 1, candles.length - 1)].ts };
+              }
+            }
+            break;
+          }
+          case 'Exit': {
+            const econd = stmt.condition ? evalExpr(stmt.condition, pricesSlice) : true;
+            if (econd && openTrade) {
+              const exitPrice = pricesSlice[pricesSlice.length - 1];
+              const pnl = openTrade.direction === 'BUY' ? (exitPrice - openTrade.entryPrice) * openTrade.size : (openTrade.entryPrice - exitPrice) * openTrade.size;
+              totalPnl += pnl;
+              trades.push({ direction: openTrade.direction, size: openTrade.size, entryPrice: openTrade.entryPrice, exitPrice, pnl: Math.round(pnl * 100) / 100, entryTime: openTrade.entryTime, exitTime: candles[Math.min(pricesSlice.length - 1, candles.length - 1)].ts });
+              openTrade = null;
+            }
+            break;
+          }
+          case 'IfStatement': {
+            const ifCond = evalExpr(stmt.condition, pricesSlice);
+            const body = ifCond ? stmt.thenBody : stmt.elseBody;
+            for (let i = 0; i < body.length; i++) execStmt(body[i], pricesSlice, depth + 1);
+            break;
+          }
+          case 'Loop': {
+            if (stmt.condition && stmt.condition.type === 'LoopCount') {
+              const count = Math.min(evalExpr(stmt.condition.num, pricesSlice) || 0, 10);
+              for (let i = 0; i < count; i++) { vars['i'] = i; for (let j = 0; j < stmt.body.length; j++) execStmt(stmt.body[j], pricesSlice, depth + 1); }
+            }
+            break;
+          }
+          default: break;
+        }
+      }
+
+      for (let i = 20; i < candles.length; i++) {
+        const pricesSlice = closePrices.slice(0, i + 1);
+        vars['price'] = closePrices[i];
+        vars['close'] = closePrices[i];
+        vars['open'] = candles[i].open;
+        vars['high'] = candles[i].high;
+        vars['low'] = candles[i].low;
+        vars['volume'] = candles[i].volume;
+        vars['bar'] = i;
+
+        for (let s = 0; s < ast.body.length; s++) {
+          execStmt(ast.body[s], pricesSlice, 0);
+        }
+
+        if (openTrade) {
+          const unrealized = openTrade.direction === 'BUY' ? (closePrices[i] - openTrade.entryPrice) * openTrade.size : (openTrade.entryPrice - closePrices[i]) * openTrade.size;
+          const equity = totalPnl + unrealized;
+          if (equity > peakEquity) peakEquity = equity;
+          const dd = peakEquity - equity;
+          if (dd > maxDrawdown) maxDrawdown = dd;
+          equityCurve.push({ ts: candles[i].ts, equity: Math.round(equity * 100) / 100 });
+        } else {
+          if (totalPnl > peakEquity) peakEquity = totalPnl;
+          const dd = peakEquity - totalPnl;
+          if (dd > maxDrawdown) maxDrawdown = dd;
+          equityCurve.push({ ts: candles[i].ts, equity: Math.round(totalPnl * 100) / 100 });
+        }
+      }
+
+      if (openTrade) {
+        const lastPrice = closePrices[closePrices.length - 1];
+        const pnl = openTrade.direction === 'BUY' ? (lastPrice - openTrade.entryPrice) * openTrade.size : (openTrade.entryPrice - lastPrice) * openTrade.size;
+        totalPnl += pnl;
+        trades.push({ direction: openTrade.direction, size: openTrade.size, entryPrice: openTrade.entryPrice, exitPrice: lastPrice, pnl: Math.round(pnl * 100) / 100, entryTime: openTrade.entryTime, exitTime: candles[candles.length - 1].ts, openAtEnd: true });
+        openTrade = null;
+      }
+
+      const wins = trades.filter(t => t.pnl > 0).length;
+      const losses = trades.filter(t => t.pnl <= 0).length;
+      const winRate = trades.length > 0 ? Math.round((wins / trades.length) * 10000) / 100 : 0;
+
+      console.log(`[clawscript-backtest] ${epic} ${res_}: ${trades.length} trades, P&L=${Math.round(totalPnl * 100) / 100}, winRate=${winRate}%, maxDD=${Math.round(maxDrawdown * 100) / 100}`);
+
+      return json(res, 200, {
+        ok: true,
+        instrument: epic,
+        resolution: res_,
+        candlesUsed: candles.length,
+        totalPnl: Math.round(totalPnl * 100) / 100,
+        trades: trades.length,
+        wins,
+        losses,
+        winRate,
+        maxDrawdown: Math.round(maxDrawdown * 100) / 100,
+        tradeList: trades.slice(-100),
+        equityCurve: equityCurve.length > 200 ? equityCurve.filter((_, i) => i % Math.ceil(equityCurve.length / 200) === 0) : equityCurve
+      });
+    } catch (e) {
+      console.log(`[clawscript-backtest] Error: ${e.message}`);
+      return json(res, 500, { error: "Backtest failed: " + e.message });
+    }
+  }
+
+  return json(res, 404, { error: "Unknown ClawScript API endpoint" });
 }
 
 async function handleIgApi(req, res, p) {
@@ -4004,6 +4368,7 @@ async function handleApi(req, res) {
     }
     await handleIgApi(req, res, p); return true;
   }
+  if (p.startsWith("/api/clawscript/")) { await handleClawScriptApi(req, res, p); return true; }
   if (p.startsWith("/api/agents/")) { await handleAgentsApi(req, res, p); return true; }
   if (p.startsWith("/api/bots")) { await handleBotsApi(req, res, p); return true; }
   if (p.startsWith("/api/processes")) { await handleProcesses(req, res, p); return true; }
@@ -4224,7 +4589,35 @@ async function handleCanvasApiRoutes(req, res) {
     return true;
   }
 
-  json(res, 404, { error: "Unknown canvas API route", available: ["config/scalper-config", "config/strategy", "config/monitor-config", "config/proofread-config", "scalper/status", "scalper/start", "scalper/stop", "scalper/reset"] });
+  if (route === "clawscript/templates" && req.method === "GET") {
+    try {
+      const templatesDir = path.join(CANVAS_DIR, "templates");
+      if (!fs.existsSync(templatesDir)) { json(res, 200, []); return true; }
+      const files = fs.readdirSync(templatesDir).filter(f => f.endsWith(".cs"));
+      const templates = files.map(f => {
+        const content = fs.readFileSync(path.join(templatesDir, f), "utf8");
+        const firstLine = content.split("\n").find(l => l.trim().startsWith("//")) || "";
+        return { name: f.replace(/\.cs$/, ""), file: f, description: firstLine.replace(/^\/\/\s*/, "").trim() };
+      });
+      json(res, 200, templates);
+    } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  if (route.startsWith("clawscript/templates/") && req.method === "GET") {
+    const tplName = route.slice("clawscript/templates/".length);
+    const templatesDir = path.join(CANVAS_DIR, "templates");
+    const fileName = tplName.endsWith(".cs") ? tplName : tplName + ".cs";
+    const filePath = path.join(templatesDir, fileName);
+    if (!fs.existsSync(filePath)) { json(res, 404, { error: "Template not found: " + tplName }); return true; }
+    try {
+      const content = fs.readFileSync(filePath, "utf8");
+      json(res, 200, { name: tplName.replace(/\.cs$/, ""), file: fileName, content: content });
+    } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  json(res, 404, { error: "Unknown canvas API route", available: ["config/scalper-config", "config/strategy", "config/monitor-config", "config/proofread-config", "scalper/status", "scalper/start", "scalper/stop", "scalper/reset", "clawscript/templates"] });
   return true;
 }
 
