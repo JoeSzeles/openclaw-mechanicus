@@ -77,6 +77,7 @@ var currentJS = '';
 var viewMode = 'split';
 var savedScripts = {};
 var simLog = [];
+var _csStoredResults = { simulation: null, backtest: null, flowTrace: [] };
 
 function csLog(msg, type) {
   type = type || 'info';
@@ -210,6 +211,10 @@ function buildEditorUI() {
   '.cf-tb-btn:hover { border-color:#58a6ff; color:#fff; }' +
   '.cf-tb-del { color:#f85149; }' +
   '.cf-tb-del:hover { border-color:#f85149; background:#3d1a1a; }' +
+  '.cf-tb-danger { color:#f0883e; }' +
+  '.cf-tb-danger:hover { border-color:#f0883e; background:#3d2200; }' +
+  '.cf-tb-active { border-color:#58a6ff; background:#0c2d48; color:#58a6ff; box-shadow:0 0 4px rgba(88,166,255,0.3); }' +
+  '.cf-node-connect-source { box-shadow:0 0 8px 2px #58a6ff !important; }' +
   '.cf-tb-sep { width:1px; height:16px; background:#30363d; margin:0 2px; }' +
   '.cf-zoom-label { font-size:11px; color:#8b949e; min-width:36px; text-align:center; }' +
   '.cf-node-count { font-size:11px; color:#8b949e; margin-left:auto; }' +
@@ -230,6 +235,21 @@ function buildEditorUI() {
   '.cf-toolbox-item:hover { background:#21262d; }' +
   '.cf-toolbox-item:active { cursor:grabbing; }' +
   '.cf-ti-name { font-weight:600; }' +
+  '.cf-toolbox-item { display:flex; align-items:center; justify-content:space-between; }' +
+  '.cf-ti-info { font-size:13px; color:#484f58; cursor:pointer; margin-left:auto; padding:0 2px; line-height:1; flex-shrink:0; }' +
+  '.cf-ti-info:hover { color:#58a6ff; }' +
+  '.cf-info-popup { position:fixed; z-index:9999; width:260px; background:#161b22; border:1px solid #30363d; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.6); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; overflow:hidden; }' +
+  '.cf-info-popup-header { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:#21262d; border-bottom:1px solid #30363d; }' +
+  '.cf-info-popup-cmd { font-size:13px; font-weight:700; color:#c9d1d9; }' +
+  '.cf-info-popup-cat { font-size:10px; color:#8b949e; }' +
+  '.cf-info-popup-body { padding:10px; }' +
+  '.cf-info-desc { font-size:12px; color:#c9d1d9; margin-bottom:10px; line-height:1.4; }' +
+  '.cf-info-section { margin-bottom:8px; }' +
+  '.cf-info-section-title { font-size:10px; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }' +
+  '.cf-info-syntax { font:11px/1.5 "Fira Code",monospace; color:#79c0ff; background:#0d1117; padding:6px 8px; border-radius:4px; margin:0; white-space:pre-wrap; word-break:break-all; }' +
+  '.cf-info-param { display:flex; justify-content:space-between; align-items:center; padding:2px 0; font-size:11px; }' +
+  '.cf-info-param-name { color:#c9d1d9; font-weight:600; }' +
+  '.cf-info-param-default { color:#484f58; font-size:10px; font-style:italic; }' +
   '.cf-canvas-wrap { flex:1; position:relative; overflow:hidden; background:#0d1117; cursor:grab; }' +
   '.cf-canvas-wrap:active { cursor:grabbing; }' +
   '.cf-canvas-inner { position:absolute; top:0; left:0; width:10000px; height:10000px; transform-origin:0 0; }' +
@@ -245,6 +265,9 @@ function buildEditorUI() {
   '.cf-port:hover { background:#58a6ff; border-color:#58a6ff; transform:scale(1.2); }' +
   '.cf-port-in { top:-7px; left:50%; margin-left:-7px; }' +
   '.cf-port-out { bottom:-7px; }' +
+  '.cf-node-operator { border-radius:50%!important; display:flex; align-items:center; justify-content:center; overflow:visible!important; }' +
+  '.cf-node-operator .cf-op-symbol { border-radius:50%; }' +
+  '.cf-port-op { position:absolute; }' +
   '.cf-port-label { position:absolute; bottom:-20px; font-size:8px; color:#8b949e; white-space:nowrap; text-align:center; width:24px; pointer-events:none; }' +
   '.cf-conn { cursor:pointer; pointer-events:stroke; }' +
   '.cf-conn:hover { stroke-width:3!important; filter:brightness(1.4); }' +
@@ -331,6 +354,51 @@ function buildEditorUI() {
   '.cs-save-inner button.cs-primary { background:#1f6feb; border-color:#58a6ff; color:#fff; }' +
   '.cs-save-inner .cs-save-status { margin-top:8px; font-size:12px; color:#2dc653; min-height:16px; }' +
   '@media (max-width:768px) { .cs-main { grid-template-columns:1fr !important; } .cs-flow-pane { min-height:300px; } }' +
+  '@keyframes cfPulseGlow { 0%,100%{ box-shadow:0 0 8px 2px rgba(88,166,255,0.5); } 50%{ box-shadow:0 0 18px 6px rgba(88,166,255,0.9); } }' +
+  '@keyframes cfFlowDash { to { stroke-dashoffset: -30; } }' +
+  '.cf-anim-active { animation: cfPulseGlow 0.8s ease-in-out infinite !important; z-index:10 !important; }' +
+  '.cf-anim-green { box-shadow:0 0 12px 3px rgba(45,198,83,0.7) !important; border-color:#2dc653 !important; }' +
+  '.cf-anim-red { box-shadow:0 0 12px 3px rgba(248,81,73,0.7) !important; border-color:#f85149 !important; }' +
+  '.cf-anim-blue { box-shadow:0 0 12px 3px rgba(121,192,255,0.7) !important; border-color:#79c0ff !important; }' +
+  '.cf-conn-active { stroke:#58a6ff !important; stroke-width:3 !important; filter:drop-shadow(0 0 4px rgba(88,166,255,0.6)); }' +
+  '.cf-anim-value { position:absolute; top:-22px; left:50%; transform:translateX(-50%); background:#1f6feb; color:#fff; font-size:9px; font-weight:700; padding:2px 6px; border-radius:10px; white-space:nowrap; z-index:20; pointer-events:none; box-shadow:0 2px 6px rgba(0,0,0,0.4); }' +
+  '.cf-anim-counter { position:absolute; top:-10px; right:-10px; background:#f0883e; color:#fff; font-size:9px; font-weight:700; min-width:18px; height:18px; line-height:18px; text-align:center; border-radius:50%; z-index:20; pointer-events:none; box-shadow:0 2px 4px rgba(0,0,0,0.3); }' +
+  '.cs-speed-control { display:inline-flex; align-items:center; gap:4px; margin-left:4px; }' +
+  '.cs-speed-btn { padding:3px 7px; border-radius:3px; font-size:10px; cursor:pointer; border:1px solid #30363d; background:#21262d; color:#c9d1d9; }' +
+  '.cs-speed-btn:hover { border-color:#58a6ff; }' +
+  '.cs-speed-btn.cs-speed-active { background:#1f6feb; border-color:#58a6ff; color:#fff; }' +
+  '.cs-speed-label { font-size:10px; color:#8b949e; }' +
+  '.cs-results-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9998; }' +
+  '.cs-results-popup { position:fixed; z-index:9999; width:680px; max-width:90vw; max-height:80vh; background:#161b22; border:1px solid #30363d; border-radius:8px; box-shadow:0 12px 40px rgba(0,0,0,0.7); display:flex; flex-direction:column; overflow:hidden; }' +
+  '.cs-results-header { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#21262d; border-bottom:1px solid #30363d; cursor:move; user-select:none; }' +
+  '.cs-results-header h3 { margin:0; font-size:14px; color:#c9d1d9; font-weight:700; }' +
+  '.cs-results-close { background:none; border:none; color:#8b949e; font-size:18px; cursor:pointer; padding:0 4px; line-height:1; }' +
+  '.cs-results-close:hover { color:#f85149; }' +
+  '.cs-results-tabs { display:flex; border-bottom:1px solid #30363d; background:#161b22; flex-shrink:0; }' +
+  '.cs-results-tab { padding:8px 16px; font-size:12px; color:#8b949e; cursor:pointer; border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; }' +
+  '.cs-results-tab:hover { color:#c9d1d9; background:#21262d; }' +
+  '.cs-results-tab.cs-rt-active { color:#58a6ff; border-bottom-color:#58a6ff; }' +
+  '.cs-results-body { flex:1; overflow-y:auto; padding:14px; font:12px/1.6 "Fira Code",monospace; color:#c9d1d9; }' +
+  '.cs-results-empty { color:#484f58; font-style:italic; text-align:center; padding:40px 0; }' +
+  '.cs-results-stat { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #21262d; }' +
+  '.cs-results-stat-label { color:#8b949e; }' +
+  '.cs-results-stat-value { font-weight:600; }' +
+  '.cs-results-pnl-pos { color:#2dc653; }' +
+  '.cs-results-pnl-neg { color:#f85149; }' +
+  '.cs-results-section { margin-bottom:14px; }' +
+  '.cs-results-section-title { font-size:11px; font-weight:700; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; border-bottom:1px solid #21262d; padding-bottom:4px; }' +
+  '.cs-results-trade-row { display:grid; grid-template-columns:30px 60px 50px 1fr 80px; gap:6px; padding:3px 0; border-bottom:1px solid rgba(48,54,61,0.5); font-size:11px; align-items:center; }' +
+  '.cs-results-trade-header { font-weight:700; color:#8b949e; font-size:10px; text-transform:uppercase; }' +
+  '.cs-results-equity-chart { width:100%; height:120px; background:#0d1117; border:1px solid #21262d; border-radius:4px; margin-top:8px; }' +
+  '.cs-results-signal-row { padding:3px 0; border-bottom:1px solid rgba(48,54,61,0.5); font-size:11px; }' +
+  '.cs-results-trace-line { padding:2px 0; font-size:11px; }' +
+  '.cs-results-trace-info { color:#8b949e; }' +
+  '.cs-results-trace-success { color:#2dc653; }' +
+  '.cs-results-trace-error { color:#f85149; }' +
+  '.cs-results-trace-warn { color:#f0883e; }' +
+  '.cs-results-trace-trace { color:#79c0ff; }' +
+  '.cs-results-fetch-btn { padding:4px 10px; background:#21262d; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; cursor:pointer; font-size:11px; margin-top:8px; }' +
+  '.cs-results-fetch-btn:hover { border-color:#58a6ff; }' +
   '</style>' +
 
   '<div class="cs-toolbar">' +
@@ -338,6 +406,14 @@ function buildEditorUI() {
     '<button id="csBtnPaste" title="Paste Code">Paste Code</button>' +
     '<button id="csBtnCompile" title="Compile & Save">Compile & Save</button>' +
     '<button id="csBtnSimulate" title="Run Simulation" style="background:#1b4332;border-color:#2dc653;color:#2dc653;font-size:14px;padding:4px 12px;">&#9654;</button>' +
+    '<div class="cs-speed-control">' +
+      '<span class="cs-speed-label">Speed:</span>' +
+      '<button class="cs-speed-btn" data-speed="200" title="Fast">Fast</button>' +
+      '<button class="cs-speed-btn cs-speed-active" data-speed="600" title="Normal">Normal</button>' +
+      '<button class="cs-speed-btn" data-speed="1500" title="Slow">Slow</button>' +
+      '<button class="cs-speed-btn" data-speed="step" title="Step through one node at a time">Step</button>' +
+      '<button class="cs-speed-btn" id="csStepNext" title="Next Step (when in Step mode)" style="display:none;">&#x23ED; Next</button>' +
+    '</div>' +
     '<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#8b949e;cursor:pointer;"><input type="checkbox" id="csRealDataCheck" style="cursor:pointer;"> Real Data</label>' +
     '<input id="csInstrumentInput" type="text" placeholder="Epic (e.g. CS.D.BITCOIN.CFD.IP)" value="CS.D.BITCOIN.CFD.IP" style="width:200px;padding:3px 8px;font-size:11px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;" title="Instrument epic for simulation/backtest">' +
     '<button id="csBtnBacktest" title="Run Backtest with Real Data" style="background:#0c2d48;border-color:#58a6ff;color:#58a6ff;">&#9654; Backtest</button>' +
@@ -350,6 +426,7 @@ function buildEditorUI() {
     '<button id="csBtnModeSplit" class="cs-active" title="Split View">Split</button>' +
     '<button id="csBtnModeFlow" title="Flow Only">Flow</button>' +
     '<div class="cs-sep"></div>' +
+    '<button id="csBtnResults" title="View Results" style="background:#2d1b4e;border-color:#bc8cff;color:#bc8cff;">&#128202; Results</button>' +
     '<button id="csBtnExportCS" title="Export ClawScript">Export .cs</button>' +
     '<button id="csBtnExportJSON" title="Export Flow JSON">Export JSON</button>' +
     '<button id="csBtnExportJS" title="Export Generated JS">Export .js</button>' +
@@ -448,7 +525,9 @@ function attachEditorEvents() {
   document.getElementById('csBtnSimulate').addEventListener('click', runSimulation);
   document.getElementById('csBtnBacktest').addEventListener('click', runBacktest);
   document.getElementById('csBtnClearLog').addEventListener('click', clearLog);
+  initSpeedControls();
   initAiAssistant();
+  document.getElementById('csBtnResults').addEventListener('click', openResultsPopup);
   document.getElementById('csBtnExportCS').addEventListener('click', exportCS);
   document.getElementById('csBtnExportJSON').addEventListener('click', exportJSON);
   document.getElementById('csBtnExportJS').addEventListener('click', exportGenJS);
@@ -515,19 +594,56 @@ function updateErrorOverlay(lines) {
   var hasErrors = false;
   for (var k in _csErrorLines) { hasErrors = true; break; }
   if (!hasErrors) return;
+  var editor = document.getElementById('csCodeEditor');
+  var lineH = 19.2;
+  var padTop = 8;
+  if (editor) {
+    var cs = window.getComputedStyle(editor);
+    var fSize = parseFloat(cs.fontSize) || 12;
+    var lh = cs.lineHeight;
+    if (lh && lh !== 'normal') lineH = parseFloat(lh);
+    else lineH = fSize * 1.6;
+    padTop = parseFloat(cs.paddingTop) || 8;
+  }
   var overlay = document.createElement('div');
   overlay.className = 'cs-error-highlight';
-  overlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:1;padding:8px;font:12px/1.6 "Fira Code",monospace;overflow:hidden;';
+  overlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:1;overflow:hidden;';
+  var scrollTop = editor ? editor.scrollTop : 0;
   for (var lineNum in _csErrorLines) {
     var ln = parseInt(lineNum, 10);
     if (isNaN(ln) || ln < 1) continue;
     var lineDiv = document.createElement('div');
     lineDiv.className = 'cs-error-highlight-line';
-    lineDiv.style.cssText = 'position:absolute;left:40px;right:0;height:19.2px;top:' + ((ln - 1) * 19.2 + 8) + 'px;';
+    var topPos = (ln - 1) * lineH + padTop - scrollTop;
+    lineDiv.style.cssText = 'position:absolute;left:0;right:0;height:' + lineH + 'px;top:' + topPos + 'px;';
+    var errLabel = document.createElement('span');
+    errLabel.className = 'cs-error-inline-msg';
+    errLabel.textContent = _csErrorLines[lineNum];
+    errLabel.style.cssText = 'position:absolute;right:8px;top:0;font-size:11px;color:#f85149;background:rgba(248,81,73,0.15);padding:0 6px;border-radius:3px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:' + lineH + 'px;pointer-events:auto;cursor:help;';
+    errLabel.title = _csErrorLines[lineNum];
+    lineDiv.appendChild(errLabel);
     overlay.appendChild(lineDiv);
   }
   wrap.style.position = 'relative';
   wrap.appendChild(overlay);
+  if (editor) {
+    editor.addEventListener('scroll', function onScrl() {
+      var ov = wrap.querySelector('.cs-error-highlight');
+      if (!ov) { editor.removeEventListener('scroll', onScrl); return; }
+      var st = editor.scrollTop;
+      var divs = ov.querySelectorAll('.cs-error-highlight-line');
+      for (var di = 0; di < divs.length; di++) {
+        var origLn = parseInt(divs[di].getAttribute('data-line') || '0', 10);
+        divs[di].style.top = ((origLn - 1) * lineH + padTop - st) + 'px';
+      }
+    });
+    var divs = overlay.querySelectorAll('.cs-error-highlight-line');
+    var lineIdx = 0;
+    for (var lnKey in _csErrorLines) {
+      if (lineIdx < divs.length) divs[lineIdx].setAttribute('data-line', lnKey);
+      lineIdx++;
+    }
+  }
 }
 
 function loadTemplatesList(selectEl) {
@@ -935,9 +1051,8 @@ function runSimWithTicks(result, ticks, source) {
     if (ticks[r].mid > maxP) maxP = ticks[r].mid;
   }
   csLog('Source: ' + source + ' | Price range: $' + Math.round(minP) + ' - $' + Math.round(maxP), 'info');
-  simulateAST(result.ast, ticks);
-  csLog('=== SIMULATION COMPLETE (Real Data via ' + source + ') ===', 'success');
   renderFlow(result.ast);
+  animatedSimulateAST(result.ast, ticks);
 }
 
 function runSimulationWithMockData(result) {
@@ -951,9 +1066,8 @@ function runSimulationWithMockData(result) {
     });
   }
   csLog('Generated 100 mock ticks (BTC-like prices ~$48k-$52k)', 'info');
-  simulateAST(result.ast, mockTicks);
-  csLog('=== SIMULATION COMPLETE ===', 'success');
   renderFlow(result.ast);
+  animatedSimulateAST(result.ast, mockTicks);
 }
 
 function runBacktest() {
@@ -1004,6 +1118,8 @@ function runBacktest() {
           }
         }
         csLog('=== BACKTEST COMPLETE ===', 'success');
+        storeBacktestResults(data);
+        _csStoredResults.flowTrace = simLog.slice();
       } else {
         csLog('Backtest Error: ' + (data.error || 'Unknown error'), 'error');
       }
@@ -1016,6 +1132,341 @@ function runBacktest() {
     csLog('Backtest Error: Network error', 'error');
   };
   xhr.send(payload);
+}
+
+var _csAnimSpeed = 600;
+var _csAnimStepMode = false;
+
+function initSpeedControls() {
+  var btns = document.querySelectorAll('.cs-speed-btn[data-speed]');
+  var stepNextBtn = document.getElementById('csStepNext');
+  btns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      btns.forEach(function(b) { b.classList.remove('cs-speed-active'); });
+      btn.classList.add('cs-speed-active');
+      var speed = btn.getAttribute('data-speed');
+      if (speed === 'step') {
+        _csAnimStepMode = true;
+        _csAnimSpeed = 100;
+        if (stepNextBtn) stepNextBtn.style.display = '';
+      } else {
+        _csAnimStepMode = false;
+        _csAnimSpeed = parseInt(speed);
+        if (stepNextBtn) stepNextBtn.style.display = 'none';
+      }
+      if (window._csFlowEngine) {
+        window._csFlowEngine.setAnimSpeed(_csAnimSpeed);
+        window._csFlowEngine._animStepMode = _csAnimStepMode;
+      }
+    });
+  });
+  if (stepNextBtn) {
+    stepNextBtn.addEventListener('click', function() {
+      if (window._csFlowEngine) window._csFlowEngine.stepResume();
+    });
+  }
+}
+
+function animatedSimulateAST(ast, ticks) {
+  var fe = window._csFlowEngine;
+  if (!fe || !fe.nodes || Object.keys(fe.nodes).length === 0) {
+    simulateAST(ast, ticks);
+    return;
+  }
+
+  fe.clearAnimations();
+  fe._animRunning = true;
+  fe.setAnimSpeed(_csAnimSpeed);
+  fe._animStepMode = _csAnimStepMode;
+
+  var vars = {};
+  var prices = ticks.map(function(t) { return t.mid; });
+  var signals = [];
+  var nodeIds = fe.getNodeIds();
+  var nodeIdx = 0;
+
+  function evalExprAnim(expr) {
+    if (!expr) return null;
+    switch(expr.type) {
+      case 'NumberLiteral': return expr.value;
+      case 'StringLiteral': return expr.value;
+      case 'BooleanLiteral': return expr.value;
+      case 'NullLiteral': return null;
+      case 'Identifier': return vars[expr.value] !== undefined ? vars[expr.value] : expr.value;
+      case 'BinaryExpr':
+        var l = evalExprAnim(expr.left), r = evalExprAnim(expr.right);
+        switch(expr.op) {
+          case '+': return (typeof l === 'string' || typeof r === 'string') ? String(l) + String(r) : l + r;
+          case '-': return l - r; case '*': return l * r;
+          case '/': return r !== 0 ? l / r : 0; case '%': return l % r;
+          case '>': return l > r; case '<': return l < r;
+          case '>=': return l >= r; case '<=': return l <= r;
+          case '==': return l == r; case '!=': return l != r;
+          case '&&': return l && r; case '||': return l || r;
+          default: return null;
+        }
+      case 'UnaryExpr':
+        var v = evalExprAnim(expr.expr);
+        return expr.op === '-' ? -v : !v;
+      case 'ContainsExpr':
+        return String(evalExprAnim(expr.left)).includes(String(evalExprAnim(expr.right)));
+      case 'CrossesExpr':
+        return expr.direction === 'OVER' ? evalExprAnim(expr.left) > evalExprAnim(expr.right) : evalExprAnim(expr.left) < evalExprAnim(expr.right);
+      case 'FunctionCall':
+        var name = expr.name.toUpperCase();
+        var args = expr.args.map(evalExprAnim);
+        if (name === 'RSI') return mockRSI(prices, args[0] || 14);
+        if (name === 'EMA') return mockEMA(prices, args[0] || 20);
+        if (name === 'SMA') return mockSMA(prices, args[0] || 20);
+        if (name === 'ATR') return mockATR(ticks, args[0] || 14);
+        if (name === 'MACD') return mockMACD(prices, args[0] || 12, args[1] || 26, args[2] || 9);
+        if (name === 'BOLLINGER') return mockBollinger(prices, args[0] || 20, args[1] || 2);
+        if (name === 'BOLLINGER_UPPER') { var bb = mockBollinger(prices, args[0] || 20, args[1] || 2); return bb ? bb.upper : 0; }
+        if (name === 'BOLLINGER_LOWER') { var bbl = mockBollinger(prices, args[0] || 20, args[1] || 2); return bbl ? bbl.lower : 0; }
+        if (name === 'LAST_PRICE') return prices[prices.length - 1] || 0;
+        if (name === 'VOLUME') return 0;
+        if (name === 'STOCHASTIC' || name === 'STOCH') return mockStochastic(prices, args[0] || 14, args[1] || 3);
+        if (name === 'STOCHASTIC_K') { var sk = mockStochastic(prices, args[0] || 14, args[1] || 3); return sk ? sk.k : 50; }
+        if (name === 'STOCHASTIC_D') { var sd = mockStochastic(prices, args[0] || 14, args[1] || 3); return sd ? sd.d : 50; }
+        if (name === 'CCI') return mockCCI(prices, args[0] || 20);
+        if (name === 'WILLIAMS_R') return mockWilliamsR(prices, args[0] || 14);
+        if (name === 'ROC') return mockROC(prices, args[0] || 12);
+        if (name === 'ADX') return mockADX(prices, args[0] || 14);
+        if (name === 'AROON_UP') return 50;
+        if (name === 'AROON_DOWN') return 50;
+        if (name === 'ICHIMOKU_TENKAN') return mockSMA(prices, args[0] || 9);
+        if (name === 'ICHIMOKU_KIJUN') return mockSMA(prices, args[0] || 26);
+        if (name === 'PARABOLIC_SAR') return prices[prices.length - 2] || 0;
+        if (name === 'KELTNER_UPPER') { return Math.round((mockEMA(prices, args[0] || 20) + mockATR(ticks, args[0] || 20) * (args[1] || 2)) * 100) / 100; }
+        if (name === 'KELTNER_LOWER') { return Math.round((mockEMA(prices, args[0] || 20) - mockATR(ticks, args[0] || 20) * (args[1] || 2)) * 100) / 100; }
+        if (name === 'DONCHIAN_HIGH') return mockDonchianHigh(prices, args[0] || 20);
+        if (name === 'DONCHIAN_LOW') return mockDonchianLow(prices, args[0] || 20);
+        if (name === 'OBV') return 0;
+        if (name === 'VWAP') return mockSMA(prices, prices.length);
+        if (name === 'CMF') return 0;
+        if (name === 'ZSCORE') return mockZScore(prices, args[0] || 20);
+        return 0;
+      case 'MemberExpr':
+        var obj = evalExprAnim(expr.object);
+        return obj && typeof obj === 'object' ? obj[expr.property] : null;
+      case 'LoopCount': return evalExprAnim(expr.num);
+      default: return null;
+    }
+  }
+
+  function formatVal(v) {
+    if (v === null || v === undefined) return 'null';
+    if (typeof v === 'number') return Math.round(v * 100) / 100 + '';
+    if (typeof v === 'object') return JSON.stringify(v).substring(0, 18);
+    return String(v).substring(0, 18);
+  }
+
+  function getNodeForStmt(stmtIdx) {
+    if (stmtIdx < nodeIds.length) return nodeIds[stmtIdx];
+    return null;
+  }
+
+  async function execStmtAnim(stmt, depth, stmtGlobalIdx) {
+    if (!stmt || !fe._animRunning) return { idx: stmtGlobalIdx };
+    if (depth > 50) return { idx: stmtGlobalIdx };
+
+    var nid = getNodeForStmt(stmtGlobalIdx);
+    var prefix = '  '.repeat(depth);
+    var nextIdx = stmtGlobalIdx + 1;
+
+    if (nid) {
+      fe.highlightNode(nid);
+      var prevNid = stmtGlobalIdx > 0 ? getNodeForStmt(stmtGlobalIdx - 1) : null;
+      if (prevNid && prevNid !== nid) fe.animateConnection(prevNid, nid);
+      await fe.animDelay();
+    }
+
+    switch(stmt.type) {
+      case 'VarDecl':
+        var val = evalExprAnim(stmt.value);
+        vars[stmt.name] = val;
+        csLog(prefix + (stmt.isDef ? 'DEF' : 'SET') + ' ' + stmt.name + ' = ' + JSON.stringify(val), 'trace');
+        if (nid) {
+          fe.showNodeValue(nid, stmt.name + '=' + formatVal(val));
+          fe.setNodeResult(nid, 'blue');
+        }
+        break;
+      case 'Assignment':
+        vars[stmt.name] = evalExprAnim(stmt.value);
+        csLog(prefix + 'SET ' + stmt.name + ' = ' + JSON.stringify(vars[stmt.name]), 'trace');
+        if (nid) {
+          fe.showNodeValue(nid, stmt.name + '=' + formatVal(vars[stmt.name]));
+          fe.setNodeResult(nid, 'blue');
+        }
+        break;
+      case 'Trade':
+        var cond = stmt.condition ? evalExprAnim(stmt.condition) : true;
+        if (cond) {
+          var sz = stmt.size ? evalExprAnim(stmt.size) : 1;
+          var reason = stmt.reason ? evalExprAnim(stmt.reason) : 'Auto';
+          signals.push({ dir: stmt.command, size: sz, reason: reason });
+          csLog(prefix + stmt.command + ' signal! Size=' + sz + ' Reason="' + reason + '"', 'success');
+          if (nid) {
+            fe.showNodeValue(nid, stmt.command + ' x' + sz);
+            fe.setNodeResult(nid, 'green');
+          }
+        } else {
+          csLog(prefix + stmt.command + ' condition false, no signal', 'info');
+          if (nid) fe.setNodeResult(nid, 'red');
+        }
+        break;
+      case 'Exit':
+        var econd = stmt.condition ? evalExprAnim(stmt.condition) : true;
+        if (econd) {
+          csLog(prefix + 'EXIT signal! Type=' + stmt.exitType, 'success');
+          if (nid) { fe.showNodeValue(nid, 'EXIT ' + stmt.exitType); fe.setNodeResult(nid, 'green'); }
+        } else {
+          if (nid) fe.setNodeResult(nid, 'red');
+        }
+        break;
+      case 'TrailStop':
+        csLog(prefix + 'TRAILSTOP set: distance=' + evalExprAnim(stmt.distance), 'trace');
+        if (nid) { fe.showNodeValue(nid, 'dist=' + formatVal(evalExprAnim(stmt.distance))); fe.setNodeResult(nid, 'blue'); }
+        break;
+      case 'IfStatement':
+        var ifCond = evalExprAnim(stmt.condition);
+        csLog(prefix + 'IF condition = ' + ifCond, 'trace');
+        if (nid) {
+          fe.showNodeValue(nid, ifCond ? 'TRUE' : 'FALSE');
+          fe.setNodeResult(nid, ifCond ? 'green' : 'red');
+        }
+        if (ifCond) {
+          for (var ti = 0; ti < stmt.thenBody.length; ti++) {
+            var res = await execStmtAnim(stmt.thenBody[ti], depth + 1, nextIdx);
+            nextIdx = res.idx;
+          }
+        } else if (stmt.elseBody.length > 0) {
+          csLog(prefix + 'ELSE branch', 'trace');
+          var skipThen = stmt.thenBody.length;
+          nextIdx += skipThen;
+          for (var ei = 0; ei < stmt.elseBody.length; ei++) {
+            var res2 = await execStmtAnim(stmt.elseBody[ei], depth + 1, nextIdx);
+            nextIdx = res2.idx;
+          }
+        } else {
+          nextIdx += stmt.thenBody.length;
+        }
+        break;
+      case 'Loop':
+        if (stmt.condition && stmt.condition.type === 'LoopCount') {
+          var count = evalExprAnim(stmt.condition.num);
+          csLog(prefix + 'LOOP ' + count + ' TIMES', 'trace');
+          var maxIter = Math.min(count, 10);
+          for (var li = 0; li < maxIter; li++) {
+            vars['i'] = li;
+            if (nid) {
+              fe.highlightNode(nid);
+              fe.showLoopCounter(nid, li + 1, maxIter);
+              await fe.animDelay();
+            }
+            var bodyIdx = nextIdx;
+            for (var lj = 0; lj < stmt.body.length; lj++) {
+              var res3 = await execStmtAnim(stmt.body[lj], depth + 1, bodyIdx);
+              bodyIdx = res3.idx;
+            }
+          }
+          nextIdx = bodyIdx || (nextIdx + stmt.body.length);
+          if (nid) fe.setNodeResult(nid, 'blue');
+        } else if (stmt.isForever) {
+          csLog(prefix + 'LOOP FOREVER (simulating 3 iterations)', 'trace');
+          for (var fi = 0; fi < 3; fi++) {
+            if (nid) {
+              fe.highlightNode(nid);
+              fe.showLoopCounter(nid, fi + 1, 3);
+              await fe.animDelay();
+            }
+            var bodyIdx2 = nextIdx;
+            for (var fj = 0; fj < stmt.body.length; fj++) {
+              var res4 = await execStmtAnim(stmt.body[fj], depth + 1, bodyIdx2);
+              bodyIdx2 = res4.idx;
+            }
+          }
+          nextIdx = bodyIdx2 || (nextIdx + stmt.body.length);
+          if (nid) fe.setNodeResult(nid, 'blue');
+        } else {
+          csLog(prefix + 'WHILE loop (simulating up to 10 iterations)', 'trace');
+          var wc = 0;
+          var bodyIdx3 = nextIdx;
+          while (evalExprAnim(stmt.condition) && wc < 10) {
+            if (nid) {
+              fe.highlightNode(nid);
+              fe.showLoopCounter(nid, wc + 1, '?');
+              await fe.animDelay();
+            }
+            bodyIdx3 = nextIdx;
+            for (var wj = 0; wj < stmt.body.length; wj++) {
+              var res5 = await execStmtAnim(stmt.body[wj], depth + 1, bodyIdx3);
+              bodyIdx3 = res5.idx;
+            }
+            wc++;
+          }
+          nextIdx = bodyIdx3 || (nextIdx + stmt.body.length);
+          if (nid) fe.setNodeResult(nid, 'blue');
+        }
+        break;
+      case 'TryCatch':
+        csLog(prefix + 'TRY', 'trace');
+        if (nid) fe.showNodeValue(nid, 'TRY');
+        try {
+          for (var tci = 0; tci < stmt.tryBody.length; tci++) {
+            var res6 = await execStmtAnim(stmt.tryBody[tci], depth + 1, nextIdx);
+            nextIdx = res6.idx;
+          }
+          if (nid) fe.setNodeResult(nid, 'green');
+        } catch(e) {
+          csLog(prefix + 'CATCH ' + stmt.catchVar + ' = ' + e.message, 'warn');
+          vars[stmt.catchVar] = e.message;
+          if (nid) fe.setNodeResult(nid, 'red');
+          nextIdx += stmt.tryBody.length;
+          for (var cci = 0; cci < stmt.catchBody.length; cci++) {
+            var res7 = await execStmtAnim(stmt.catchBody[cci], depth + 1, nextIdx);
+            nextIdx = res7.idx;
+          }
+        }
+        break;
+      case 'ErrorThrow':
+        csLog(prefix + 'ERROR: ' + evalExprAnim(stmt.message), 'error');
+        if (nid) { fe.showNodeValue(nid, 'ERROR'); fe.setNodeResult(nid, 'red'); }
+        throw new Error(evalExprAnim(stmt.message));
+      case 'Wait':
+        csLog(prefix + 'WAIT: ' + evalExprAnim(stmt.ms) + 'ms (skipped in sim)', 'trace');
+        if (nid) { fe.showNodeValue(nid, evalExprAnim(stmt.ms) + 'ms'); fe.setNodeResult(nid, 'blue'); }
+        break;
+      default:
+        csLog(prefix + stmt.type, 'trace');
+        if (nid) fe.setNodeResult(nid, 'blue');
+        break;
+    }
+
+    if (nid) fe.unhighlightNode(nid);
+    return { idx: nextIdx };
+  }
+
+  (async function() {
+    var globalIdx = 0;
+    for (var si = 0; si < ast.body.length; si++) {
+      try {
+        var result = await execStmtAnim(ast.body[si], 0, globalIdx);
+        globalIdx = result.idx;
+      } catch(e) {
+        csLog('Runtime error: ' + e.message, 'error');
+        globalIdx++;
+      }
+    }
+
+    csLog('Signals generated: ' + signals.length, signals.length > 0 ? 'success' : 'info');
+    for (var qi = 0; qi < signals.length; qi++) {
+      csLog('  Signal #' + (qi + 1) + ': ' + signals[qi].dir + ' size=' + signals[qi].size + ' reason="' + signals[qi].reason + '"', 'success');
+    }
+
+    fe._animRunning = false;
+    csLog('=== FLOW ANIMATION COMPLETE ===', 'success');
+  })();
 }
 
 function simulateAST(ast, ticks) {
@@ -1063,6 +1514,38 @@ function simulateAST(ast, ticks) {
         if (name === 'EMA') return mockEMA(prices, args[0] || 20);
         if (name === 'SMA') return mockSMA(prices, args[0] || 20);
         if (name === 'ATR') return mockATR(ticks, args[0] || 14);
+        if (name === 'MACD') return mockMACD(prices, args[0] || 12, args[1] || 26, args[2] || 9);
+        if (name === 'BOLLINGER') return mockBollinger(prices, args[0] || 20, args[1] || 2);
+        if (name === 'BOLLINGER_UPPER') { var bb = mockBollinger(prices, args[0] || 20, args[1] || 2); return bb ? bb.upper : 0; }
+        if (name === 'BOLLINGER_LOWER') { var bbl = mockBollinger(prices, args[0] || 20, args[1] || 2); return bbl ? bbl.lower : 0; }
+        if (name === 'LAST_PRICE') return prices[prices.length - 1] || 0;
+        if (name === 'VOLUME') return 0;
+        if (name === 'STOCHASTIC' || name === 'STOCH') return mockStochastic(prices, args[0] || 14, args[1] || 3);
+        if (name === 'STOCHASTIC_K') { var sk = mockStochastic(prices, args[0] || 14, args[1] || 3); return sk ? sk.k : 50; }
+        if (name === 'STOCHASTIC_D') { var sd = mockStochastic(prices, args[0] || 14, args[1] || 3); return sd ? sd.d : 50; }
+        if (name === 'CCI') return mockCCI(prices, args[0] || 20);
+        if (name === 'WILLIAMS_R') return mockWilliamsR(prices, args[0] || 14);
+        if (name === 'ROC') return mockROC(prices, args[0] || 12);
+        if (name === 'ADX') return mockADX(prices, args[0] || 14);
+        if (name === 'AROON_UP') return 50;
+        if (name === 'AROON_DOWN') return 50;
+        if (name === 'ICHIMOKU_TENKAN') return mockSMA(prices, args[0] || 9);
+        if (name === 'ICHIMOKU_KIJUN') return mockSMA(prices, args[0] || 26);
+        if (name === 'PARABOLIC_SAR') return prices[prices.length - 2] || 0;
+        if (name === 'KELTNER_UPPER') { var ku = mockEMA(prices, args[0] || 20) + mockATR(ticks, args[0] || 20) * (args[1] || 2); return Math.round(ku * 100) / 100; }
+        if (name === 'KELTNER_LOWER') { var kl = mockEMA(prices, args[0] || 20) - mockATR(ticks, args[0] || 20) * (args[1] || 2); return Math.round(kl * 100) / 100; }
+        if (name === 'DONCHIAN_HIGH') return mockDonchianHigh(prices, args[0] || 20);
+        if (name === 'DONCHIAN_LOW') return mockDonchianLow(prices, args[0] || 20);
+        if (name === 'OBV') return 0;
+        if (name === 'VWAP') return mockSMA(prices, prices.length);
+        if (name === 'CMF') return 0;
+        if (name === 'ZSCORE') return mockZScore(prices, args[0] || 20);
+        if (name === 'FIBONACCI') return null;
+        if (name === 'ULTIMATE_OSC') return 50;
+        if (name === 'CHAIKIN_VOL') return 0;
+        if (name === 'SUPERTREND') return null;
+        if (name === 'DONCHIAN') return { upper: mockDonchianHigh(prices, args[0] || 20), lower: mockDonchianLow(prices, args[0] || 20) };
+        if (name === 'KELTNER') return { upper: mockEMA(prices, args[0] || 20) + mockATR(ticks, args[0] || 20) * (args[1] || 2), lower: mockEMA(prices, args[0] || 20) - mockATR(ticks, args[0] || 20) * (args[1] || 2) };
         return 0;
       case 'MemberExpr':
         var obj = evalExpr(expr.object);
@@ -1121,7 +1604,16 @@ function simulateAST(ast, ticks) {
         var iparams = expr.params.map(evalExpr);
         if (iname === 'RSI') return mockRSI(prices, iparams[0] || 14);
         if (iname === 'EMA') return mockEMA(prices, iparams[0] || 20);
+        if (iname === 'SMA') return mockSMA(prices, iparams[0] || 20);
         if (iname === 'ATR') return mockATR(ticks, iparams[0] || 14);
+        if (iname === 'MACD') return mockMACD(prices, iparams[0] || 12, iparams[1] || 26, iparams[2] || 9);
+        if (iname === 'BOLLINGER') return mockBollinger(prices, iparams[0] || 20, iparams[1] || 2);
+        if (iname === 'CCI') return mockCCI(prices, iparams[0] || 20);
+        if (iname === 'WILLIAMS_R') return mockWilliamsR(prices, iparams[0] || 14);
+        if (iname === 'ROC') return mockROC(prices, iparams[0] || 12);
+        if (iname === 'ADX') return mockADX(prices, iparams[0] || 14);
+        if (iname === 'STOCHASTIC' || iname === 'STOCH') return mockStochastic(prices, iparams[0] || 14, iparams[1] || 3);
+        if (iname === 'ZSCORE') return mockZScore(prices, iparams[0] || 20);
         return 0;
       default:
         return null;
@@ -1330,6 +1822,8 @@ function simulateAST(ast, ticks) {
   for (var qi = 0; qi < signals.length; qi++) {
     csLog('  Signal #' + (qi + 1) + ': ' + signals[qi].dir + ' size=' + signals[qi].size + ' reason="' + signals[qi].reason + '"', 'success');
   }
+
+  storeSimulationResults(signals, vars, ticks);
 }
 
 function mockRSI(prices, period) {
@@ -1373,6 +1867,395 @@ function mockATR(ticks, period) {
   var sum = 0;
   for (var j = trs.length - period; j < trs.length; j++) sum += trs[j];
   return Math.round((sum / period) * 100) / 100;
+}
+
+function mockMACD(prices, fast, slow, signal) {
+  var fEma = mockEMA(prices, fast);
+  var sEma = mockEMA(prices, slow);
+  return { macdLine: Math.round((fEma - sEma) * 100) / 100, signalLine: 0, histogram: Math.round((fEma - sEma) * 100) / 100 };
+}
+
+function mockBollinger(prices, period, sd) {
+  if (prices.length < period) return { upper: 0, middle: 0, lower: 0 };
+  var slice = prices.slice(-period);
+  var mean = 0;
+  for (var i = 0; i < slice.length; i++) mean += slice[i];
+  mean /= period;
+  var variance = 0;
+  for (var j = 0; j < slice.length; j++) variance += (slice[j] - mean) * (slice[j] - mean);
+  variance /= period;
+  var stdDev = Math.sqrt(variance);
+  return { upper: Math.round((mean + sd * stdDev) * 100) / 100, middle: Math.round(mean * 100) / 100, lower: Math.round((mean - sd * stdDev) * 100) / 100 };
+}
+
+function mockStochastic(prices, kPeriod, dPeriod) {
+  if (prices.length < kPeriod + dPeriod) return { k: 50, d: 50 };
+  var kValues = [];
+  for (var i = kPeriod - 1; i < prices.length; i++) {
+    var high = -Infinity, low = Infinity;
+    for (var j = i - kPeriod + 1; j <= i; j++) { if (prices[j] > high) high = prices[j]; if (prices[j] < low) low = prices[j]; }
+    var range = high - low;
+    kValues.push(range > 0 ? ((prices[i] - low) / range) * 100 : 50);
+  }
+  var dSlice = kValues.slice(-dPeriod);
+  var dSum = 0;
+  for (var d = 0; d < dSlice.length; d++) dSum += dSlice[d];
+  return { k: Math.round(kValues[kValues.length - 1] * 100) / 100, d: Math.round((dSum / dPeriod) * 100) / 100 };
+}
+
+function mockCCI(prices, period) {
+  if (prices.length < period) return 0;
+  var slice = prices.slice(-period);
+  var mean = 0;
+  for (var i = 0; i < slice.length; i++) mean += slice[i];
+  mean /= period;
+  var meanDev = 0;
+  for (var j = 0; j < slice.length; j++) meanDev += Math.abs(slice[j] - mean);
+  meanDev /= period;
+  if (meanDev === 0) return 0;
+  return Math.round(((prices[prices.length - 1] - mean) / (0.015 * meanDev)) * 100) / 100;
+}
+
+function mockWilliamsR(prices, period) {
+  if (prices.length < period) return -50;
+  var high = -Infinity, low = Infinity;
+  for (var i = prices.length - period; i < prices.length; i++) { if (prices[i] > high) high = prices[i]; if (prices[i] < low) low = prices[i]; }
+  var range = high - low;
+  if (range === 0) return -50;
+  return Math.round(((high - prices[prices.length - 1]) / range) * -100 * 100) / 100;
+}
+
+function mockROC(prices, period) {
+  if (prices.length < period + 1) return 0;
+  var current = prices[prices.length - 1];
+  var past = prices[prices.length - 1 - period];
+  if (past === 0) return 0;
+  return Math.round(((current - past) / past) * 100 * 100) / 100;
+}
+
+function mockADX(prices, period) {
+  return 25;
+}
+
+function mockDonchianHigh(prices, period) {
+  if (prices.length < period) return prices[prices.length - 1] || 0;
+  var high = -Infinity;
+  for (var i = prices.length - period; i < prices.length; i++) if (prices[i] > high) high = prices[i];
+  return Math.round(high * 100) / 100;
+}
+
+function mockDonchianLow(prices, period) {
+  if (prices.length < period) return prices[prices.length - 1] || 0;
+  var low = Infinity;
+  for (var i = prices.length - period; i < prices.length; i++) if (prices[i] < low) low = prices[i];
+  return Math.round(low * 100) / 100;
+}
+
+function mockZScore(prices, period) {
+  if (prices.length < period) return 0;
+  var slice = prices.slice(-period);
+  var mean = 0;
+  for (var i = 0; i < slice.length; i++) mean += slice[i];
+  mean /= period;
+  var variance = 0;
+  for (var j = 0; j < slice.length; j++) variance += (slice[j] - mean) * (slice[j] - mean);
+  variance /= period;
+  var stdDev = Math.sqrt(variance);
+  if (stdDev === 0) return 0;
+  return Math.round(((prices[prices.length - 1] - mean) / stdDev) * 100) / 100;
+}
+
+function storeSimulationResults(signals, vars, ticks) {
+  _csStoredResults.simulation = {
+    type: 'simulation',
+    signals: signals || [],
+    variables: {},
+    tickCount: ticks ? ticks.length : 0,
+    timestamp: Date.now()
+  };
+  if (vars) {
+    for (var k in vars) {
+      if (vars.hasOwnProperty(k)) {
+        var v = vars[k];
+        if (typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean' || v === null) {
+          _csStoredResults.simulation.variables[k] = v;
+        }
+      }
+    }
+  }
+  _csStoredResults.flowTrace = simLog.slice();
+  postResultsToServer();
+}
+
+function storeBacktestResults(data) {
+  _csStoredResults.backtest = data;
+  _csStoredResults.backtest.type = 'backtest';
+  postResultsToServer();
+}
+
+function postResultsToServer() {
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/clawscript/results', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.send(JSON.stringify(_csStoredResults));
+  } catch(e) {}
+}
+
+function openResultsPopup() {
+  var existing = document.getElementById('csResultsOverlay');
+  if (existing) existing.remove();
+  existing = document.getElementById('csResultsPopup');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'csResultsOverlay';
+  overlay.className = 'cs-results-overlay';
+  overlay.addEventListener('click', closeResultsPopup);
+  document.body.appendChild(overlay);
+
+  var popup = document.createElement('div');
+  popup.id = 'csResultsPopup';
+  popup.className = 'cs-results-popup';
+  popup.style.top = '10vh';
+  popup.style.left = 'calc(50% - 340px)';
+
+  var header = document.createElement('div');
+  header.className = 'cs-results-header';
+  header.innerHTML = '<h3>&#128202; Results</h3><button class="cs-results-close" id="csResultsCloseBtn">&times;</button>';
+  popup.appendChild(header);
+
+  var tabs = document.createElement('div');
+  tabs.className = 'cs-results-tabs';
+  tabs.innerHTML = '<button class="cs-results-tab cs-rt-active" data-tab="simulation">Simulation</button>' +
+    '<button class="cs-results-tab" data-tab="backtest">Backtest</button>' +
+    '<button class="cs-results-tab" data-tab="trace">Flow Trace</button>';
+  popup.appendChild(tabs);
+
+  var body = document.createElement('div');
+  body.className = 'cs-results-body';
+  body.id = 'csResultsBody';
+  popup.appendChild(body);
+
+  document.body.appendChild(popup);
+
+  header.querySelector('#csResultsCloseBtn').addEventListener('click', closeResultsPopup);
+
+  var tabBtns = tabs.querySelectorAll('.cs-results-tab');
+  for (var i = 0; i < tabBtns.length; i++) {
+    tabBtns[i].addEventListener('click', function() {
+      for (var j = 0; j < tabBtns.length; j++) tabBtns[j].classList.remove('cs-rt-active');
+      this.classList.add('cs-rt-active');
+      renderResultsTab(this.getAttribute('data-tab'));
+    });
+  }
+
+  makeDraggable(popup, header);
+  renderResultsTab('simulation');
+}
+
+function closeResultsPopup() {
+  var overlay = document.getElementById('csResultsOverlay');
+  if (overlay) overlay.remove();
+  var popup = document.getElementById('csResultsPopup');
+  if (popup) popup.remove();
+}
+
+function makeDraggable(el, handle) {
+  var isDragging = false;
+  var startX, startY, origLeft, origTop;
+  handle.addEventListener('mousedown', function(e) {
+    if (e.target.tagName === 'BUTTON') return;
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    origLeft = el.offsetLeft;
+    origTop = el.offsetTop;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!isDragging) return;
+    el.style.left = (origLeft + e.clientX - startX) + 'px';
+    el.style.top = (origTop + e.clientY - startY) + 'px';
+  });
+  document.addEventListener('mouseup', function() { isDragging = false; });
+}
+
+function renderResultsTab(tab) {
+  var body = document.getElementById('csResultsBody');
+  if (!body) return;
+
+  if (tab === 'simulation') {
+    renderSimulationResults(body);
+  } else if (tab === 'backtest') {
+    renderBacktestResults(body);
+  } else if (tab === 'trace') {
+    renderFlowTrace(body);
+  }
+}
+
+function renderSimulationResults(body) {
+  var sim = _csStoredResults.simulation;
+  if (!sim) {
+    body.innerHTML = '<div class="cs-results-empty">No simulation results yet. Run a simulation first.</div>';
+    return;
+  }
+  var html = '<div class="cs-results-section"><div class="cs-results-section-title">Simulation Summary</div>';
+  html += '<div class="cs-results-stat"><span class="cs-results-stat-label">Ticks Processed</span><span class="cs-results-stat-value">' + sim.tickCount + '</span></div>';
+  html += '<div class="cs-results-stat"><span class="cs-results-stat-label">Signals Generated</span><span class="cs-results-stat-value">' + sim.signals.length + '</span></div>';
+  html += '<div class="cs-results-stat"><span class="cs-results-stat-label">Timestamp</span><span class="cs-results-stat-value">' + new Date(sim.timestamp).toLocaleString() + '</span></div>';
+  html += '</div>';
+
+  if (sim.signals.length > 0) {
+    html += '<div class="cs-results-section"><div class="cs-results-section-title">Signals</div>';
+    for (var i = 0; i < sim.signals.length; i++) {
+      var s = sim.signals[i];
+      var cls = (s.dir === 'BUY') ? 'cs-results-pnl-pos' : 'cs-results-pnl-neg';
+      html += '<div class="cs-results-signal-row"><span class="' + cls + '">' + s.dir + '</span> x' + s.size + ' &mdash; ' + escapeHtml(String(s.reason)) + '</div>';
+    }
+    html += '</div>';
+  }
+
+  var varKeys = Object.keys(sim.variables || {});
+  if (varKeys.length > 0) {
+    html += '<div class="cs-results-section"><div class="cs-results-section-title">Variables</div>';
+    for (var v = 0; v < varKeys.length; v++) {
+      var val = sim.variables[varKeys[v]];
+      html += '<div class="cs-results-stat"><span class="cs-results-stat-label">' + escapeHtml(varKeys[v]) + '</span><span class="cs-results-stat-value">' + escapeHtml(String(val)) + '</span></div>';
+    }
+    html += '</div>';
+  }
+
+  body.innerHTML = html;
+}
+
+function renderBacktestResults(body) {
+  var bt = _csStoredResults.backtest;
+  if (!bt) {
+    body.innerHTML = '<div class="cs-results-empty">No backtest results yet. Run a backtest first.</div>' +
+      '<div style="text-align:center;"><button class="cs-results-fetch-btn" id="csResultsFetchBtn">Fetch from Server</button></div>';
+    var fetchBtn = body.querySelector('#csResultsFetchBtn');
+    if (fetchBtn) {
+      fetchBtn.addEventListener('click', function() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/clawscript/results', true);
+        xhr.onload = function() {
+          try {
+            var data = JSON.parse(xhr.responseText);
+            if (data && data.results) {
+              _csStoredResults.backtest = data.results;
+              renderBacktestResults(body);
+            } else {
+              body.innerHTML = '<div class="cs-results-empty">No results found on server.</div>';
+            }
+          } catch(e) { body.innerHTML = '<div class="cs-results-empty">Error fetching results.</div>'; }
+        };
+        xhr.send();
+      });
+    }
+    return;
+  }
+
+  var pnlCls = bt.totalPnl >= 0 ? 'cs-results-pnl-pos' : 'cs-results-pnl-neg';
+  var html = '<div class="cs-results-section"><div class="cs-results-section-title">Backtest Summary</div>';
+  html += '<div class="cs-results-stat"><span class="cs-results-stat-label">Instrument</span><span class="cs-results-stat-value">' + escapeHtml(bt.instrument || '?') + '</span></div>';
+  html += '<div class="cs-results-stat"><span class="cs-results-stat-label">Resolution</span><span class="cs-results-stat-value">' + escapeHtml(bt.resolution || '?') + '</span></div>';
+  html += '<div class="cs-results-stat"><span class="cs-results-stat-label">Candles</span><span class="cs-results-stat-value">' + (bt.candlesUsed || 0) + '</span></div>';
+  html += '<div class="cs-results-stat"><span class="cs-results-stat-label">Total P&L</span><span class="cs-results-stat-value ' + pnlCls + '">' + (bt.totalPnl >= 0 ? '+' : '') + bt.totalPnl + '</span></div>';
+  html += '<div class="cs-results-stat"><span class="cs-results-stat-label">Trades</span><span class="cs-results-stat-value">' + (bt.trades || 0) + '</span></div>';
+  html += '<div class="cs-results-stat"><span class="cs-results-stat-label">Wins / Losses</span><span class="cs-results-stat-value">' + (bt.wins || 0) + ' / ' + (bt.losses || 0) + '</span></div>';
+  html += '<div class="cs-results-stat"><span class="cs-results-stat-label">Win Rate</span><span class="cs-results-stat-value">' + (bt.winRate || 0) + '%</span></div>';
+  html += '<div class="cs-results-stat"><span class="cs-results-stat-label">Max Drawdown</span><span class="cs-results-stat-value cs-results-pnl-neg">' + (bt.maxDrawdown || 0) + '</span></div>';
+  html += '</div>';
+
+  if (bt.equityCurve && bt.equityCurve.length > 1) {
+    html += '<div class="cs-results-section"><div class="cs-results-section-title">Equity Curve</div>';
+    html += '<canvas id="csEquityCanvas" class="cs-results-equity-chart"></canvas>';
+    html += '</div>';
+  }
+
+  if (bt.tradeList && bt.tradeList.length > 0) {
+    html += '<div class="cs-results-section"><div class="cs-results-section-title">Trade List (' + bt.tradeList.length + ')</div>';
+    html += '<div class="cs-results-trade-row cs-results-trade-header"><span>#</span><span>Dir</span><span>Size</span><span>Entry → Exit</span><span>P&L</span></div>';
+    for (var t = 0; t < bt.tradeList.length; t++) {
+      var tr = bt.tradeList[t];
+      var trPnlCls = tr.pnl >= 0 ? 'cs-results-pnl-pos' : 'cs-results-pnl-neg';
+      html += '<div class="cs-results-trade-row">';
+      html += '<span>' + (t + 1) + '</span>';
+      html += '<span>' + tr.direction + '</span>';
+      html += '<span>' + tr.size + '</span>';
+      html += '<span>' + Math.round(tr.entryPrice * 100) / 100 + ' → ' + Math.round(tr.exitPrice * 100) / 100 + (tr.openAtEnd ? ' [open]' : '') + '</span>';
+      html += '<span class="' + trPnlCls + '">' + (tr.pnl >= 0 ? '+' : '') + tr.pnl + '</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  body.innerHTML = html;
+
+  if (bt.equityCurve && bt.equityCurve.length > 1) {
+    setTimeout(function() { drawEquityCurve(bt.equityCurve); }, 50);
+  }
+}
+
+function drawEquityCurve(curve) {
+  var canvas = document.getElementById('csEquityCanvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var w = canvas.offsetWidth;
+  var h = canvas.offsetHeight;
+  canvas.width = w * 2;
+  canvas.height = h * 2;
+  ctx.scale(2, 2);
+
+  var vals = curve.map(function(c) { return c.equity; });
+  var minV = Math.min.apply(null, vals);
+  var maxV = Math.max.apply(null, vals);
+  var range = maxV - minV || 1;
+  var pad = 4;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = '#58a6ff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (var i = 0; i < vals.length; i++) {
+    var x = pad + (i / (vals.length - 1)) * (w - pad * 2);
+    var y = h - pad - ((vals[i] - minV) / range) * (h - pad * 2);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = '#30363d';
+  ctx.lineWidth = 0.5;
+  ctx.setLineDash([4, 4]);
+  var zeroY = h - pad - ((0 - minV) / range) * (h - pad * 2);
+  if (zeroY > pad && zeroY < h - pad) {
+    ctx.beginPath();
+    ctx.moveTo(pad, zeroY);
+    ctx.lineTo(w - pad, zeroY);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+function renderFlowTrace(body) {
+  var trace = _csStoredResults.flowTrace;
+  if (!trace || trace.length === 0) {
+    body.innerHTML = '<div class="cs-results-empty">No flow execution trace yet. Run a simulation or backtest first.</div>';
+    return;
+  }
+  var html = '<div class="cs-results-section"><div class="cs-results-section-title">Execution Trace (' + trace.length + ' entries)</div>';
+  var maxShow = Math.min(trace.length, 500);
+  for (var i = 0; i < maxShow; i++) {
+    var entry = trace[i];
+    var cls = 'cs-results-trace-' + (entry.type || 'info');
+    html += '<div class="cs-results-trace-line ' + cls + '">[' + (entry.time || '') + '] ' + escapeHtml(entry.msg || '') + '</div>';
+  }
+  if (trace.length > maxShow) {
+    html += '<div class="cs-results-trace-line cs-results-trace-info">... and ' + (trace.length - maxShow) + ' more entries</div>';
+  }
+  html += '</div>';
+  body.innerHTML = html;
 }
 
 function extractClawScriptMetadata(code) {
@@ -1885,9 +2768,21 @@ function generateJSFromAST(ast) {
       case 'CrossesExpr': return '(' + genExpr(expr.left) + (expr.direction === 'OVER' ? ' > ' : ' < ') + genExpr(expr.right) + ')';
       case 'FunctionCall':
         var fn = expr.name.toUpperCase();
-        if (['RSI','EMA','SMA','ATR','MACD','BOLLINGER','ADX','STOCH','CCI','OBV','VWAP','ROC'].indexOf(fn) >= 0) {
-          return 'indicators.calc' + fn + '(prices' + expr.args.map(function(a) { return ', ' + genExpr(a); }).join('') + ')';
-        }
+        var fnArgs = expr.args.map(function(a) { return ', ' + genExpr(a); }).join('');
+        var _siMap = { 'RSI':'calcRSI','EMA':'calcEMA','SMA':'calcSMA','ATR':'calcATRFromTicks','MACD':'calcMACD','BOLLINGER':'calcBollinger','ROC':'calcROC','ZSCORE':'calcZScore','FIBONACCI':'calcFibonacci','KELTNER':'calcKeltner' };
+        var _fpMap = { 'ADX':'calcADXFromPrices','STOCH':'calcStochasticFromPrices','STOCHASTIC':'calcStochasticFromPrices','CCI':'calcCCIFromPrices','WILLIAMS_R':'calcWilliamsRFromPrices','PARABOLIC_SAR':'calcParabolicSARFromPrices','DONCHIAN':'calcDonchianFromPrices' };
+        var _propMap = { 'BOLLINGER_UPPER':['calcBollinger','upper'],'BOLLINGER_LOWER':['calcBollinger','lower'],'STOCHASTIC_K':['calcStochasticFromPrices','k'],'STOCHASTIC_D':['calcStochasticFromPrices','d'],'AROON_UP':['calcAroonFromPrices','up'],'AROON_DOWN':['calcAroonFromPrices','down'],'ICHIMOKU_TENKAN':['calcIchimokuFromPrices','tenkanSen'],'ICHIMOKU_KIJUN':['calcIchimokuFromPrices','kijunSen'],'KELTNER_UPPER':['calcKeltner','upper'],'KELTNER_LOWER':['calcKeltner','lower'],'DONCHIAN_HIGH':['calcDonchianFromPrices','upper'],'DONCHIAN_LOW':['calcDonchianFromPrices','lower'] };
+        if (_siMap[fn]) return 'indicators.' + _siMap[fn] + '(prices' + fnArgs + ')';
+        if (_fpMap[fn]) return 'indicators.' + _fpMap[fn] + '(prices' + fnArgs + ')' + (fn === 'PARABOLIC_SAR' ? '.sar' : '');
+        if (_propMap[fn]) return '(indicators.' + _propMap[fn][0] + '(prices' + fnArgs + ') || {}).' + _propMap[fn][1];
+        if (fn === 'LAST_PRICE') return 'prices[prices.length - 1]';
+        if (fn === 'VOLUME') return '0';
+        if (fn === 'OBV') return 'indicators.calcOBV(prices, prices.map(function(){return 1}))';
+        if (fn === 'VWAP') return 'indicators.calcVWAP(prices, prices, prices, prices.map(function(){return 1}))';
+        if (fn === 'CMF') return 'indicators.calcCMF(prices, prices, prices, prices.map(function(){return 1})' + fnArgs + ')';
+        if (fn === 'ULTIMATE_OSC') return 'indicators.calcUltimateOscillator(prices, prices, prices)';
+        if (fn === 'CHAIKIN_VOL') return 'indicators.calcChaikinVolatility(prices, prices' + fnArgs + ')';
+        if (fn === 'SUPERTREND') return 'null';
         return expr.name + '(' + expr.args.map(genExpr).join(', ') + ')';
       case 'MemberExpr': return genExpr(expr.object) + '.' + expr.property;
       case 'IndexExpr': return genExpr(expr.object) + '[' + genExpr(expr.index) + ']';
@@ -2225,6 +3120,16 @@ function sendAiMessage() {
   var xhr = new XMLHttpRequest();
   xhr.open('POST', '/api/agent/chat', true);
   xhr.setRequestHeader('Content-Type', 'application/json');
+  var _csToken = null;
+  try {
+    var stored = localStorage.getItem('openclaw.control.settings.v1');
+    if (stored) { var s = JSON.parse(stored); _csToken = s.token || null; }
+  } catch(_e) {}
+  if (!_csToken) {
+    var cm = document.cookie.match(/openclaw_token=([^;]+)/);
+    if (cm) _csToken = cm[1];
+  }
+  if (_csToken) xhr.setRequestHeader('Authorization', 'Bearer ' + _csToken);
   xhr.onload = function() {
     var loading = document.getElementById('csAiLoading');
     if (loading) loading.remove();

@@ -148,6 +148,27 @@ var NODE_CATS = [
       { cmd: 'MONTE_CARLO', doc: 'Monte Carlo simulation', params: [{k:'scenario',l:'Scenario',d:''},{k:'runs',l:'Runs',d:'10000'}] }
     ]
   },
+  { id: 'operators', label: 'Operators', color: '#58a6ff', bg: '#0d2240',
+    items: [
+      { cmd: 'OP_ADD', doc: 'Add two values (+)', params: [], isOperator: true, opSymbol: '+', opInputs: 2 },
+      { cmd: 'OP_SUB', doc: 'Subtract two values (−)', params: [], isOperator: true, opSymbol: '−', opInputs: 2 },
+      { cmd: 'OP_MUL', doc: 'Multiply two values (×)', params: [], isOperator: true, opSymbol: '×', opInputs: 2 },
+      { cmd: 'OP_DIV', doc: 'Divide two values (÷)', params: [], isOperator: true, opSymbol: '÷', opInputs: 2 },
+      { cmd: 'OP_MOD', doc: 'Modulo / remainder (%)', params: [], isOperator: true, opSymbol: '%', opInputs: 2 },
+      { cmd: 'OP_LT', doc: 'Less than (<)', params: [], isOperator: true, opSymbol: '<', opInputs: 2 },
+      { cmd: 'OP_GT', doc: 'Greater than (>)', params: [], isOperator: true, opSymbol: '>', opInputs: 2 },
+      { cmd: 'OP_LTE', doc: 'Less than or equal (≤)', params: [], isOperator: true, opSymbol: '≤', opInputs: 2 },
+      { cmd: 'OP_GTE', doc: 'Greater than or equal (≥)', params: [], isOperator: true, opSymbol: '≥', opInputs: 2 },
+      { cmd: 'OP_EQ', doc: 'Equal to (==)', params: [], isOperator: true, opSymbol: '==', opInputs: 2 },
+      { cmd: 'OP_NEQ', doc: 'Not equal to (!=)', params: [], isOperator: true, opSymbol: '!=', opInputs: 2 },
+      { cmd: 'OP_AND', doc: 'Logical AND', params: [], isOperator: true, opSymbol: 'AND', opInputs: 2 },
+      { cmd: 'OP_OR', doc: 'Logical OR', params: [], isOperator: true, opSymbol: 'OR', opInputs: 2 },
+      { cmd: 'OP_NOT', doc: 'Logical NOT', params: [], isOperator: true, opSymbol: 'NOT', opInputs: 1 },
+      { cmd: 'OP_CROSSES_OVER', doc: 'Crosses over (value crosses above another)', params: [], isOperator: true, opSymbol: '⤴', opInputs: 2 },
+      { cmd: 'OP_CROSSES_UNDER', doc: 'Crosses under (value crosses below another)', params: [], isOperator: true, opSymbol: '⤵', opInputs: 2 },
+      { cmd: 'OP_CONTAINS', doc: 'String contains', params: [], isOperator: true, opSymbol: '⊃', opInputs: 2 }
+    ]
+  },
   { id: 'utility', label: 'Utility', color: '#8b949e', bg: '#21262d',
     items: [
       { cmd: 'FILE_PARSE', doc: 'Parse file (CSV/JSON/PDF)', params: [{k:'filename',l:'File',d:''},{k:'format',l:'Format',d:'csv'}] }
@@ -187,6 +208,13 @@ function getCmdDef(cmd) {
   return CMD_LOOKUP[cmd] || null;
 }
 
+function isOperatorNode(cmd) {
+  var def = getCmdDef(cmd);
+  return def && def.item.isOperator;
+}
+
+var OP_NODE_SIZE = 70;
+
 function snap(v) { return Math.round(v / SNAP) * SNAP; }
 
 function FlowEngine(container, onCodeChange) {
@@ -206,6 +234,9 @@ function FlowEngine(container, onCodeChange) {
   this._connectState = null;
   this._panState = null;
   this._toolboxCollapsed = false;
+  this._connectMode = false;
+  this._connectModeFirstNode = null;
+  this._selectedConnId = null;
   this.svgEl = null;
   this.canvasInner = null;
   this.canvasWrap = null;
@@ -233,18 +264,23 @@ FlowEngine.prototype.buildToolbar = function() {
   var tb = document.createElement('div');
   tb.className = 'cf-toolbar';
   tb.innerHTML =
-    '<button class="cf-tb-btn" data-action="zoomIn" title="Zoom In">+</button>' +
-    '<button class="cf-tb-btn" data-action="zoomOut" title="Zoom Out">&minus;</button>' +
-    '<button class="cf-tb-btn" data-action="zoomFit" title="Fit View">Fit</button>' +
+    '<button class="cf-tb-btn" data-action="connectMode" id="cfConnectModeBtn" title="Connect Mode — click two nodes to connect them">&#x1F517; Connect</button>' +
+    '<span class="cf-tb-sep"></span>' +
+    '<button class="cf-tb-btn cf-tb-del" data-action="deleteSelected" title="Delete selected node or connection">&#x1F5D1; Delete</button>' +
+    '<button class="cf-tb-btn" data-action="selectAll" title="Select all nodes">&#x2610; Select All</button>' +
+    '<span class="cf-tb-sep"></span>' +
+    '<button class="cf-tb-btn" data-action="zoomIn" title="Zoom In">&#x1F50D;+</button>' +
+    '<button class="cf-tb-btn" data-action="zoomOut" title="Zoom Out">&#x1F50D;&minus;</button>' +
+    '<button class="cf-tb-btn" data-action="zoomFit" title="Fit all nodes in view">Fit</button>' +
     '<span class="cf-zoom-label" id="cfZoomLabel">100%</span>' +
     '<span class="cf-tb-sep"></span>' +
     '<button class="cf-tb-btn" data-action="autoLayout" title="Auto-Layout (arrange nodes)">Auto-Layout</button>' +
     '<button class="cf-tb-btn" data-action="exportPNG" title="Export flow as PNG image">Export PNG</button>' +
     '<span class="cf-tb-sep"></span>' +
-    '<button class="cf-tb-btn" data-action="undo" title="Undo last change">Undo</button>' +
-    '<button class="cf-tb-btn" data-action="redo" title="Redo">Redo</button>' +
+    '<button class="cf-tb-btn" data-action="undo" title="Undo last change">&#x21A9; Undo</button>' +
+    '<button class="cf-tb-btn" data-action="redo" title="Redo last undone change">&#x21AA; Redo</button>' +
     '<span class="cf-tb-sep"></span>' +
-    '<button class="cf-tb-btn cf-tb-del" data-action="deleteSelected" title="Delete selected node">Delete</button>' +
+    '<button class="cf-tb-btn cf-tb-danger" data-action="clearAll" title="Remove all nodes and connections">&#x1F6AE; Clear All</button>' +
     '<span class="cf-tb-sep"></span>' +
     '<span class="cf-node-count" id="cfNodeCount">0 nodes</span>';
   this.container.appendChild(tb);
@@ -253,14 +289,17 @@ FlowEngine.prototype.buildToolbar = function() {
     var btn = e.target.closest('[data-action]');
     if (!btn) return;
     var a = btn.getAttribute('data-action');
-    if (a === 'zoomIn') self.setZoom(self.zoom + ZOOM_STEP);
+    if (a === 'connectMode') self.toggleConnectMode();
+    else if (a === 'deleteSelected') self.deleteSelected();
+    else if (a === 'selectAll') self.selectAll();
+    else if (a === 'zoomIn') self.setZoom(self.zoom + ZOOM_STEP);
     else if (a === 'zoomOut') self.setZoom(self.zoom - ZOOM_STEP);
     else if (a === 'zoomFit') self.zoomFit();
     else if (a === 'autoLayout') self.autoLayout();
     else if (a === 'exportPNG') self.exportPNG();
     else if (a === 'undo') self.undo();
     else if (a === 'redo') self.redo();
-    else if (a === 'deleteSelected') self.deleteSelected();
+    else if (a === 'clearAll') self.clearAll();
   });
 };
 
@@ -303,11 +342,20 @@ FlowEngine.prototype.buildToolbox = function(parent) {
       el.setAttribute('draggable', 'true');
       el.setAttribute('data-cmd', item.cmd);
       el.style.borderLeftColor = cat.color;
-      el.innerHTML = '<span class="cf-ti-name">' + item.cmd + '</span>';
+      el.innerHTML = '<span class="cf-ti-name">' + item.cmd + '</span><span class="cf-ti-info" data-info-cmd="' + item.cmd + '" title="Info">&#9432;</span>';
       el.title = item.doc;
       el.addEventListener('dragstart', function(e) {
         e.dataTransfer.setData('text/plain', item.cmd);
         e.dataTransfer.effectAllowed = 'copy';
+      });
+      var infoBtn = el.querySelector('.cf-ti-info');
+      infoBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        self.showInfoPopup(item, cat, e);
+      });
+      infoBtn.addEventListener('mousedown', function(e) {
+        e.stopPropagation();
       });
       items.appendChild(el);
     });
@@ -404,7 +452,8 @@ FlowEngine.prototype.setupEvents = function() {
     if (!cmd || !getCmdDef(cmd)) return;
     var pt = self.clientToCanvas(e.clientX, e.clientY);
     self.pushUndo();
-    var nid = self.addNode(cmd, snap(pt.x - NODE_W / 2), snap(pt.y - 15));
+    var dropW = isOperatorNode(cmd) ? OP_NODE_SIZE : NODE_W;
+    var nid = self.addNode(cmd, snap(pt.x - dropW / 2), snap(pt.y - 15));
     if (self.selectedId && self.selectedId !== nid) {
       var selNode = self.nodes[self.selectedId];
       if (selNode) {
@@ -413,9 +462,13 @@ FlowEngine.prototype.setupEvents = function() {
         for (var i = 0; i < outPorts.length; i++) {
           if (!self.hasConnectionFrom(self.selectedId, outPorts[i])) { freePort = outPorts[i]; break; }
         }
-        if (freePort) {
-          self.addConnection(self.selectedId, freePort, nid, 'in');
+        if (!freePort) freePort = outPorts[outPorts.length > 1 ? outPorts.length - 1 : 0];
+        var targetPort = 'in';
+        if (isOperatorNode(cmd)) {
+          var newDef = getCmdDef(cmd);
+          targetPort = (newDef && newDef.item.opInputs === 1) ? 'in' : 'inLeft';
         }
+        self.addConnection(self.selectedId, freePort, nid, targetPort);
       }
     }
     self.selectNode(nid);
@@ -429,6 +482,12 @@ FlowEngine.prototype.setupEvents = function() {
     if (!onNode) {
       self._panState = { startX: e.clientX, startY: e.clientY, origPanX: self.panX, origPanY: self.panY };
       self.selectNode(null);
+      self._selectedConnId = null;
+      if (self._connectModeFirstNode) {
+        var srcNode = self.nodes[self._connectModeFirstNode];
+        if (srcNode && srcNode._el) srcNode._el.classList.remove('cf-node-connect-source');
+        self._connectModeFirstNode = null;
+      }
       self.render();
     }
   });
@@ -472,7 +531,7 @@ FlowEngine.prototype.setupEvents = function() {
       var port = self.findPortAtPoint(e.clientX, e.clientY);
       if (port && port.nodeId !== self._connectState.nodeId && port.type === 'in') {
         self.pushUndo();
-        self.addConnection(self._connectState.nodeId, self._connectState.portId, port.nodeId, 'in');
+        self.addConnection(self._connectState.nodeId, self._connectState.portId, port.nodeId, port.portId);
         self.syncToCode();
         self.render();
       }
@@ -501,13 +560,18 @@ FlowEngine.prototype.setupEvents = function() {
   document.addEventListener('keydown', function(e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (self.selectedId && document.activeElement && !document.activeElement.closest('.cf-node-param')) {
+      if (document.activeElement && document.activeElement.closest('.cf-node-param')) return;
+      if (self._selectedConnId || self.selectedId) {
         self.deleteSelected();
       }
     }
     if (e.ctrlKey || e.metaKey) {
       if (e.key === 'z') { e.preventDefault(); self.undo(); }
       if (e.key === 'y') { e.preventDefault(); self.redo(); }
+      if (e.key === 'a') { e.preventDefault(); self.selectAll(); }
+    }
+    if (e.key === 'Escape' && self._connectMode) {
+      self.toggleConnectMode();
     }
   });
 };
@@ -524,6 +588,22 @@ FlowEngine.prototype.hasConnectionFrom = function(nodeId, portId) {
     if (conns[k].fromId === nodeId && conns[k].fromPort === portId) return true;
   }
   return false;
+};
+
+FlowEngine.prototype.countConnectionsFrom = function(nodeId, portId) {
+  var count = 0;
+  for (var k in this.connections) {
+    if (this.connections[k].fromId === nodeId && this.connections[k].fromPort === portId) count++;
+  }
+  return count;
+};
+
+FlowEngine.prototype.countConnectionsTo = function(nodeId, portId) {
+  var count = 0;
+  for (var k in this.connections) {
+    if (this.connections[k].toId === nodeId && this.connections[k].toPort === portId) count++;
+  }
+  return count;
 };
 
 FlowEngine.prototype.findPortAtPoint = function(cx, cy) {
@@ -564,8 +644,8 @@ FlowEngine.prototype.removeNode = function(id) {
 FlowEngine.prototype.addConnection = function(fromId, fromPort, toId, toPort) {
   for (var k in this.connections) {
     var c = this.connections[k];
-    if (c.toId === toId && c.toPort === toPort) return;
-    if (c.fromId === fromId && c.fromPort === fromPort) { delete this.connections[k]; break; }
+    if (c.fromId === fromId && c.fromPort === fromPort && c.toId === toId && c.toPort === toPort) return;
+    if ((toPort === 'inLeft' || toPort === 'inRight') && c.toId === toId && c.toPort === toPort) return;
   }
   var cid = 'c' + (this.nextId++);
   this.connections[cid] = { id: cid, fromId: fromId, fromPort: fromPort, toId: toId, toPort: toPort };
@@ -581,9 +661,95 @@ FlowEngine.prototype.selectNode = function(id) {
 };
 
 FlowEngine.prototype.deleteSelected = function() {
+  if (this._selectedConnId) {
+    this.pushUndo();
+    delete this.connections[this._selectedConnId];
+    this._selectedConnId = null;
+    this.syncToCode();
+    this.renderConnections();
+    return;
+  }
   if (!this.selectedId) return;
   this.pushUndo();
   this.removeNode(this.selectedId);
+  this.syncToCode();
+  this.render();
+};
+
+FlowEngine.prototype.toggleConnectMode = function() {
+  this._connectMode = !this._connectMode;
+  this._connectModeFirstNode = null;
+  var btn = document.getElementById('cfConnectModeBtn');
+  if (btn) {
+    btn.classList.toggle('cf-tb-active', this._connectMode);
+  }
+  if (this.canvasWrap) {
+    this.canvasWrap.style.cursor = this._connectMode ? 'crosshair' : 'grab';
+  }
+};
+
+FlowEngine.prototype.handleConnectModeClick = function(nodeId) {
+  if (!this._connectMode) return false;
+  if (!this._connectModeFirstNode) {
+    this._connectModeFirstNode = nodeId;
+    var node = this.nodes[nodeId];
+    if (node && node._el) node._el.classList.add('cf-node-connect-source');
+    return true;
+  }
+  if (this._connectModeFirstNode === nodeId) {
+    var srcNode = this.nodes[nodeId];
+    if (srcNode && srcNode._el) srcNode._el.classList.remove('cf-node-connect-source');
+    this._connectModeFirstNode = null;
+    return true;
+  }
+  var fromId = this._connectModeFirstNode;
+  var fromNode = this.nodes[fromId];
+  if (fromNode) {
+    if (fromNode._el) fromNode._el.classList.remove('cf-node-connect-source');
+    var outPorts = this.getOutPorts(fromNode);
+    var freePort = null;
+    for (var i = 0; i < outPorts.length; i++) {
+      if (!this.hasConnectionFrom(fromId, outPorts[i])) { freePort = outPorts[i]; break; }
+    }
+    if (!freePort) freePort = outPorts[outPorts.length > 1 ? outPorts.length - 1 : 0];
+    this.pushUndo();
+    var targetPort = 'in';
+    var targetNode = this.nodes[nodeId];
+    if (targetNode && isOperatorNode(targetNode.cmd)) {
+      var tDef = getCmdDef(targetNode.cmd);
+      if (tDef && tDef.item.opInputs !== 1) {
+        var hasLeft = false;
+        for (var ck in this.connections) {
+          if (this.connections[ck].toId === nodeId && this.connections[ck].toPort === 'inLeft') { hasLeft = true; break; }
+        }
+        targetPort = hasLeft ? 'inRight' : 'inLeft';
+      }
+    }
+    this.addConnection(fromId, freePort, nodeId, targetPort);
+    this.syncToCode();
+    this.renderConnections();
+  }
+  this._connectModeFirstNode = null;
+  return true;
+};
+
+FlowEngine.prototype.selectAll = function() {
+  var allNodes = this.container.querySelectorAll('.cf-node');
+  for (var i = 0; i < allNodes.length; i++) {
+    allNodes[i].classList.add('cf-node-selected');
+  }
+  var keys = Object.keys(this.nodes);
+  if (keys.length > 0) this.selectedId = keys[0];
+};
+
+FlowEngine.prototype.clearAll = function() {
+  if (Object.keys(this.nodes).length === 0) return;
+  if (!confirm('Remove all nodes and connections?')) return;
+  this.pushUndo();
+  this.nodes = {};
+  this.connections = {};
+  this.selectedId = null;
+  this._selectedConnId = null;
   this.syncToCode();
   this.render();
 };
@@ -611,7 +777,8 @@ FlowEngine.prototype.zoomFit = function() {
     if (n.x < minX) minX = n.x;
     if (n.y < minY) minY = n.y;
     var nh = this.getNodeHeight(n);
-    if (n.x + NODE_W > maxX) maxX = n.x + NODE_W;
+    var nw = isOperatorNode(n.cmd) ? OP_NODE_SIZE : NODE_W;
+    if (n.x + nw > maxX) maxX = n.x + nw;
     if (n.y + nh > maxY) maxY = n.y + nh;
   }
   var pad = 40;
@@ -629,6 +796,7 @@ FlowEngine.prototype.zoomFit = function() {
 };
 
 FlowEngine.prototype.getNodeHeight = function(node) {
+  if (isOperatorNode(node.cmd)) return OP_NODE_SIZE;
   var def = getCmdDef(node.cmd);
   var paramCount = def ? def.item.params.length : 0;
   return NODE_HEADER_H + Math.max(paramCount, 1) * NODE_PARAM_H + 10;
@@ -653,101 +821,174 @@ FlowEngine.prototype.renderNode = function(node) {
   var color = cat ? cat.color : '#8b949e';
   var bg = cat ? cat.bg : '#21262d';
   var nh = this.getNodeHeight(node);
+  var isOp = isOperatorNode(node.cmd);
 
   var el = document.createElement('div');
-  el.className = 'cf-node' + (node.id === this.selectedId ? ' cf-node-selected' : '');
+  el.className = 'cf-node' + (node.id === this.selectedId ? ' cf-node-selected' : '') + (isOp ? ' cf-node-operator' : '');
   el.setAttribute('data-node-id', node.id);
-  el.style.cssText = 'left:' + node.x + 'px;top:' + node.y + 'px;width:' + NODE_W + 'px;height:' + nh + 'px;background:' + bg + ';border-color:' + color + ';';
 
-  var header = document.createElement('div');
-  header.className = 'cf-node-header';
-  header.style.background = color;
-  header.textContent = node.cmd;
-  header.title = def ? def.item.doc : node.cmd;
-  el.appendChild(header);
+  if (isOp) {
+    el.style.cssText = 'left:' + node.x + 'px;top:' + node.y + 'px;width:' + OP_NODE_SIZE + 'px;height:' + OP_NODE_SIZE + 'px;background:' + bg + ';border-color:' + color + ';border-radius:50%;';
+    var opLabel = document.createElement('div');
+    opLabel.className = 'cf-op-symbol';
+    opLabel.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:22px;font-weight:bold;color:' + color + ';cursor:grab;user-select:none;';
+    opLabel.textContent = def.item.opSymbol || node.cmd;
+    opLabel.title = def ? def.item.doc : node.cmd;
+    el.appendChild(opLabel);
 
-  header.addEventListener('mousedown', function(e) {
-    if (e.button !== 0) return;
-    e.stopPropagation();
-    self.selectNode(node.id);
-    var pt = self.clientToCanvas(e.clientX, e.clientY);
-    self._dragState = {
-      nodeId: node.id,
-      offX: pt.x - node.x,
-      offY: pt.y - node.y
-    };
-  });
-
-  var body = document.createElement('div');
-  body.className = 'cf-node-body';
-  if (def) {
-    def.item.params.forEach(function(p) {
-      var row = document.createElement('div');
-      row.className = 'cf-node-param';
-      var lbl = document.createElement('span');
-      lbl.className = 'cf-np-label';
-      lbl.textContent = p.l + ':';
-      var inp = document.createElement('input');
-      inp.className = 'cf-np-input';
-      inp.type = 'text';
-      inp.value = node.params[p.k] || '';
-      inp.setAttribute('data-key', p.k);
-      inp.addEventListener('input', function() {
-        node.params[p.k] = inp.value;
-      });
-      inp.addEventListener('change', function() {
-        self.pushUndo();
-        self.syncToCode();
-      });
-      inp.addEventListener('mousedown', function(e) { e.stopPropagation(); });
-      row.appendChild(lbl);
-      row.appendChild(inp);
-      body.appendChild(row);
+    opLabel.addEventListener('mousedown', function(e) {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      if (self.handleConnectModeClick(node.id)) return;
+      self.selectNode(node.id);
+      var pt = self.clientToCanvas(e.clientX, e.clientY);
+      self._dragState = { nodeId: node.id, offX: pt.x - node.x, offY: pt.y - node.y };
     });
-  }
-  el.appendChild(body);
 
-  var portIn = document.createElement('div');
-  portIn.className = 'cf-port cf-port-in';
-  portIn.setAttribute('data-node-id', node.id);
-  portIn.setAttribute('data-port-id', 'in');
-  portIn.setAttribute('data-port-type', 'in');
-  portIn.title = 'Input';
-  portIn.addEventListener('mouseup', function(e) { e.stopPropagation(); });
-  el.appendChild(portIn);
+    var numInputs = def.item.opInputs || 2;
+    if (numInputs === 1) {
+      var portInSingle = document.createElement('div');
+      portInSingle.className = 'cf-port cf-port-in cf-port-op';
+      portInSingle.setAttribute('data-node-id', node.id);
+      portInSingle.setAttribute('data-port-id', 'in');
+      portInSingle.setAttribute('data-port-type', 'in');
+      portInSingle.title = 'Input';
+      portInSingle.style.cssText = 'left:' + (OP_NODE_SIZE / 2 - PORT_R) + 'px;top:-' + PORT_R + 'px;';
+      portInSingle.addEventListener('mouseup', function(e) { e.stopPropagation(); });
+      el.appendChild(portInSingle);
+    } else {
+      var portInL = document.createElement('div');
+      portInL.className = 'cf-port cf-port-in cf-port-op';
+      portInL.setAttribute('data-node-id', node.id);
+      portInL.setAttribute('data-port-id', 'inLeft');
+      portInL.setAttribute('data-port-type', 'in');
+      portInL.title = 'Left operand';
+      portInL.style.cssText = 'left:-' + PORT_R + 'px;top:' + (OP_NODE_SIZE / 2 - PORT_R) + 'px;';
+      portInL.addEventListener('mouseup', function(e) { e.stopPropagation(); });
+      el.appendChild(portInL);
 
-  var outPorts = this.getOutPorts(node);
-  var outW = NODE_W / (outPorts.length + 1);
-  for (var oi = 0; oi < outPorts.length; oi++) {
-    var portOut = document.createElement('div');
-    portOut.className = 'cf-port cf-port-out';
-    portOut.setAttribute('data-node-id', node.id);
-    portOut.setAttribute('data-port-id', outPorts[oi]);
-    portOut.setAttribute('data-port-type', 'out');
-    var portLabel = outPorts[oi];
-    if (portLabel === 'out') portLabel = '';
-    else if (portLabel === 'true') { portOut.style.background = '#2dc653'; portOut.style.borderColor = '#2dc653'; }
-    else if (portLabel === 'false') { portOut.style.background = '#f85149'; portOut.style.borderColor = '#f85149'; }
-    else if (portLabel === 'body') { portOut.style.background = '#f0883e'; portOut.style.borderColor = '#f0883e'; }
-    else if (portLabel === 'catch') { portOut.style.background = '#bc8cff'; portOut.style.borderColor = '#bc8cff'; }
-    portOut.style.left = (outW * (oi + 1) - PORT_R) + 'px';
-    portOut.title = portLabel || 'Output';
-    if (portLabel) {
-      var plbl = document.createElement('span');
-      plbl.className = 'cf-port-label';
-      plbl.textContent = portLabel;
-      plbl.style.left = (outW * (oi + 1) - 10) + 'px';
-      el.appendChild(plbl);
+      var portInR = document.createElement('div');
+      portInR.className = 'cf-port cf-port-in cf-port-op';
+      portInR.setAttribute('data-node-id', node.id);
+      portInR.setAttribute('data-port-id', 'inRight');
+      portInR.setAttribute('data-port-type', 'in');
+      portInR.title = 'Right operand';
+      portInR.style.cssText = 'left:' + (OP_NODE_SIZE - PORT_R) + 'px;top:' + (OP_NODE_SIZE / 2 - PORT_R) + 'px;';
+      portInR.addEventListener('mouseup', function(e) { e.stopPropagation(); });
+      el.appendChild(portInR);
     }
-    (function(pout, pid) {
+
+    var portOutOp = document.createElement('div');
+    portOutOp.className = 'cf-port cf-port-out cf-port-op';
+    portOutOp.setAttribute('data-node-id', node.id);
+    portOutOp.setAttribute('data-port-id', 'out');
+    portOutOp.setAttribute('data-port-type', 'out');
+    portOutOp.title = 'Output';
+    portOutOp.style.cssText = 'left:' + (OP_NODE_SIZE / 2 - PORT_R) + 'px;bottom:-' + PORT_R + 'px;top:auto;';
+    (function(pout) {
       pout.addEventListener('mousedown', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        self._connectState = { nodeId: node.id, portId: pid };
+        self._connectState = { nodeId: node.id, portId: 'out' };
         self.createTempLine();
       });
-    })(portOut, outPorts[oi]);
-    el.appendChild(portOut);
+    })(portOutOp);
+    el.appendChild(portOutOp);
+
+  } else {
+    el.style.cssText = 'left:' + node.x + 'px;top:' + node.y + 'px;width:' + NODE_W + 'px;height:' + nh + 'px;background:' + bg + ';border-color:' + color + ';';
+
+    var header = document.createElement('div');
+    header.className = 'cf-node-header';
+    header.style.background = color;
+    header.textContent = node.cmd;
+    header.title = def ? def.item.doc : node.cmd;
+    el.appendChild(header);
+
+    header.addEventListener('mousedown', function(e) {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      if (self.handleConnectModeClick(node.id)) return;
+      self.selectNode(node.id);
+      var pt = self.clientToCanvas(e.clientX, e.clientY);
+      self._dragState = {
+        nodeId: node.id,
+        offX: pt.x - node.x,
+        offY: pt.y - node.y
+      };
+    });
+
+    var body = document.createElement('div');
+    body.className = 'cf-node-body';
+    if (def) {
+      def.item.params.forEach(function(p) {
+        var row = document.createElement('div');
+        row.className = 'cf-node-param';
+        var lbl = document.createElement('span');
+        lbl.className = 'cf-np-label';
+        lbl.textContent = p.l + ':';
+        var inp = document.createElement('input');
+        inp.className = 'cf-np-input';
+        inp.type = 'text';
+        inp.value = node.params[p.k] || '';
+        inp.setAttribute('data-key', p.k);
+        inp.addEventListener('input', function() {
+          node.params[p.k] = inp.value;
+        });
+        inp.addEventListener('change', function() {
+          self.pushUndo();
+          self.syncToCode();
+        });
+        inp.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+        row.appendChild(lbl);
+        row.appendChild(inp);
+        body.appendChild(row);
+      });
+    }
+    el.appendChild(body);
+
+    var portIn = document.createElement('div');
+    portIn.className = 'cf-port cf-port-in';
+    portIn.setAttribute('data-node-id', node.id);
+    portIn.setAttribute('data-port-id', 'in');
+    portIn.setAttribute('data-port-type', 'in');
+    portIn.title = 'Input';
+    portIn.addEventListener('mouseup', function(e) { e.stopPropagation(); });
+    el.appendChild(portIn);
+
+    var outPorts = this.getOutPorts(node);
+    var outW = NODE_W / (outPorts.length + 1);
+    for (var oi = 0; oi < outPorts.length; oi++) {
+      var portOut = document.createElement('div');
+      portOut.className = 'cf-port cf-port-out';
+      portOut.setAttribute('data-node-id', node.id);
+      portOut.setAttribute('data-port-id', outPorts[oi]);
+      portOut.setAttribute('data-port-type', 'out');
+      var portLabel = outPorts[oi];
+      if (portLabel === 'out') portLabel = '';
+      else if (portLabel === 'true') { portOut.style.background = '#2dc653'; portOut.style.borderColor = '#2dc653'; }
+      else if (portLabel === 'false') { portOut.style.background = '#f85149'; portOut.style.borderColor = '#f85149'; }
+      else if (portLabel === 'body') { portOut.style.background = '#f0883e'; portOut.style.borderColor = '#f0883e'; }
+      else if (portLabel === 'catch') { portOut.style.background = '#bc8cff'; portOut.style.borderColor = '#bc8cff'; }
+      portOut.style.left = (outW * (oi + 1) - PORT_R) + 'px';
+      portOut.title = portLabel || 'Output';
+      if (portLabel) {
+        var plbl = document.createElement('span');
+        plbl.className = 'cf-port-label';
+        plbl.textContent = portLabel;
+        plbl.style.left = (outW * (oi + 1) - 10) + 'px';
+        el.appendChild(plbl);
+      }
+      (function(pout, pid) {
+        pout.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          self._connectState = { nodeId: node.id, portId: pid };
+          self.createTempLine();
+        });
+      })(portOut, outPorts[oi]);
+      el.appendChild(portOut);
+    }
   }
 
   this.canvasInner.appendChild(el);
@@ -761,27 +1002,74 @@ FlowEngine.prototype.renderNodePosition = function(id) {
   node._el.style.top = node.y + 'px';
 };
 
+FlowEngine.prototype.getPortPosition = function(node, portId, portType) {
+  var isOp = isOperatorNode(node.cmd);
+  if (isOp) {
+    if (portType === 'out') {
+      return { x: node.x + OP_NODE_SIZE / 2, y: node.y + OP_NODE_SIZE };
+    }
+    var def = getCmdDef(node.cmd);
+    var numInputs = def ? (def.item.opInputs || 2) : 2;
+    if (numInputs === 1) {
+      return { x: node.x + OP_NODE_SIZE / 2, y: node.y };
+    }
+    if (portId === 'inLeft') return { x: node.x, y: node.y + OP_NODE_SIZE / 2 };
+    if (portId === 'inRight') return { x: node.x + OP_NODE_SIZE, y: node.y + OP_NODE_SIZE / 2 };
+    return { x: node.x + OP_NODE_SIZE / 2, y: node.y };
+  }
+  if (portType === 'in') {
+    return { x: node.x + NODE_W / 2, y: node.y };
+  }
+  var outPorts = this.getOutPorts(node);
+  var portIdx = outPorts.indexOf(portId);
+  if (portIdx < 0) portIdx = 0;
+  var outW = NODE_W / (outPorts.length + 1);
+  var nh = this.getNodeHeight(node);
+  return { x: node.x + outW * (portIdx + 1), y: node.y + nh };
+};
+
 FlowEngine.prototype.renderConnections = function() {
   var oldPaths = this.svgEl.querySelectorAll('.cf-conn');
   for (var i = 0; i < oldPaths.length; i++) oldPaths[i].remove();
+  var oldBadges = this.svgEl.querySelectorAll('.cf-fanout-badge');
+  for (var b = 0; b < oldBadges.length; b++) oldBadges[b].remove();
 
   var self = this;
+  var fanoutIndex = {};
+
+  Object.keys(this.connections).forEach(function(cid) {
+    var c = self.connections[cid];
+    var fanKey = c.fromId + ':' + c.fromPort;
+    if (!fanoutIndex[fanKey]) fanoutIndex[fanKey] = { count: 0, idx: 0 };
+    fanoutIndex[fanKey].count++;
+  });
+
+  var fanoutCurrent = {};
+
   Object.keys(this.connections).forEach(function(cid) {
     var c = self.connections[cid];
     var fromNode = self.nodes[c.fromId];
     var toNode = self.nodes[c.toId];
     if (!fromNode || !toNode) return;
 
-    var fromPorts = self.getOutPorts(fromNode);
-    var portIdx = fromPorts.indexOf(c.fromPort);
-    if (portIdx < 0) portIdx = 0;
-    var outW = NODE_W / (fromPorts.length + 1);
-    var fromNH = self.getNodeHeight(fromNode);
+    var fromPos = self.getPortPosition(fromNode, c.fromPort, 'out');
+    var toPos = self.getPortPosition(toNode, c.toPort, 'in');
 
-    var x1 = fromNode.x + outW * (portIdx + 1);
-    var y1 = fromNode.y + fromNH;
-    var x2 = toNode.x + NODE_W / 2;
-    var y2 = toNode.y;
+    var fanKey = c.fromId + ':' + c.fromPort;
+    var fanTotal = fanoutIndex[fanKey].count;
+    if (!fanoutCurrent[fanKey]) fanoutCurrent[fanKey] = 0;
+    var fanIdx = fanoutCurrent[fanKey]++;
+
+    var x1 = fromPos.x;
+    var y1 = fromPos.y;
+    var x2 = toPos.x;
+    var y2 = toPos.y;
+
+    if (fanTotal > 1) {
+      var spread = 15;
+      var offset = (fanIdx - (fanTotal - 1) / 2) * spread;
+      x1 += offset;
+    }
 
     var dy = Math.abs(y2 - y1);
     var cp = Math.max(40, dy * 0.4);
@@ -798,26 +1086,58 @@ FlowEngine.prototype.renderConnections = function() {
     else if (c.fromPort === 'body') { markerRef = 'url(#cfArrowBody)'; strokeColor = '#f0883e'; }
     else if (c.fromPort === 'catch') { markerRef = 'url(#cfArrowCatch)'; strokeColor = '#bc8cff'; }
 
-    path.setAttribute('stroke', strokeColor);
-    path.setAttribute('stroke-width', '2');
+    var isSelected = (cid === self._selectedConnId);
+    path.setAttribute('stroke', isSelected ? '#58a6ff' : strokeColor);
+    path.setAttribute('stroke-width', isSelected ? '3' : '2');
     path.setAttribute('fill', 'none');
     path.setAttribute('marker-end', markerRef);
+    if (isSelected) path.setAttribute('stroke-dasharray', '8,4');
     path.style.pointerEvents = 'stroke';
     path.style.cursor = 'pointer';
 
     (function(connId) {
       path.addEventListener('click', function(e) {
         e.stopPropagation();
-        if (confirm('Remove this connection?')) {
-          self.pushUndo();
-          delete self.connections[connId];
-          self.syncToCode();
-          self.renderConnections();
-        }
+        self._selectedConnId = connId;
+        self.selectNode(null);
+        self.renderConnections();
       });
     })(cid);
 
     self.svgEl.appendChild(path);
+  });
+
+  var badgeDrawn = {};
+  Object.keys(fanoutIndex).forEach(function(fanKey) {
+    var fi = fanoutIndex[fanKey];
+    if (fi.count <= 1 || badgeDrawn[fanKey]) return;
+    badgeDrawn[fanKey] = true;
+    var parts = fanKey.split(':');
+    var nodeId = parts[0];
+    var portId = parts[1];
+    var node = self.nodes[nodeId];
+    if (!node) return;
+    var pos = self.getPortPosition(node, portId, 'out');
+    var badge = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    badge.setAttribute('class', 'cf-fanout-badge');
+    var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', pos.x + 12);
+    circle.setAttribute('cy', pos.y + 4);
+    circle.setAttribute('r', '8');
+    circle.setAttribute('fill', '#58a6ff');
+    circle.setAttribute('stroke', '#0d1117');
+    circle.setAttribute('stroke-width', '1');
+    badge.appendChild(circle);
+    var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', pos.x + 12);
+    text.setAttribute('y', pos.y + 8);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('font-size', '10');
+    text.setAttribute('font-weight', 'bold');
+    text.setAttribute('fill', '#fff');
+    text.textContent = fi.count;
+    badge.appendChild(text);
+    self.svgEl.appendChild(badge);
   });
 };
 
@@ -836,13 +1156,9 @@ FlowEngine.prototype.drawTempLine = function(mx, my) {
   if (!this.tempLine || !this._connectState) return;
   var fromNode = this.nodes[this._connectState.nodeId];
   if (!fromNode) return;
-  var fromPorts = this.getOutPorts(fromNode);
-  var portIdx = fromPorts.indexOf(this._connectState.portId);
-  if (portIdx < 0) portIdx = 0;
-  var outW = NODE_W / (fromPorts.length + 1);
-  var fromNH = this.getNodeHeight(fromNode);
-  var x1 = fromNode.x + outW * (portIdx + 1);
-  var y1 = fromNode.y + fromNH;
+  var fromPos = this.getPortPosition(fromNode, this._connectState.portId, 'out');
+  var x1 = fromPos.x;
+  var y1 = fromPos.y;
 
   var pt = this.clientToCanvas(mx, my);
 
@@ -1362,6 +1678,11 @@ FlowEngine.prototype.nodeToLine = function(node) {
     case 'INDICATOR': return 'INDICATOR ' + (p.name || 'RSI') + (p.params ? '(' + p.params + ')' : '');
     case 'INCLUDE': return 'INCLUDE "' + (p.scriptName || '') + '"';
     case 'CHAIN': return 'CHAIN';
+    case 'OP_ADD': case 'OP_SUB': case 'OP_MUL': case 'OP_DIV': case 'OP_MOD':
+    case 'OP_LT': case 'OP_GT': case 'OP_LTE': case 'OP_GTE': case 'OP_EQ': case 'OP_NEQ':
+    case 'OP_AND': case 'OP_OR': case 'OP_NOT':
+    case 'OP_CROSSES_OVER': case 'OP_CROSSES_UNDER': case 'OP_CONTAINS':
+      return '// [operator] ' + node.cmd;
     default: return '// ' + node.cmd;
   }
 };
@@ -1503,7 +1824,8 @@ FlowEngine.prototype.exportPNG = function() {
     var nh = self.getNodeHeight(n);
     if (n.x < minX) minX = n.x;
     if (n.y < minY) minY = n.y;
-    if (n.x + NODE_W > maxX) maxX = n.x + NODE_W;
+    var nw = isOperatorNode(n.cmd) ? OP_NODE_SIZE : NODE_W;
+    if (n.x + nw > maxX) maxX = n.x + nw;
     if (n.y + nh > maxY) maxY = n.y + nh;
   });
 
@@ -1531,16 +1853,31 @@ FlowEngine.prototype.exportPNG = function() {
     ctx.fillStyle = bg;
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(x, y, NODE_W, nh, 6);
-    ctx.fill();
-    ctx.stroke();
 
-    ctx.fillStyle = color;
-    ctx.fillRect(x, y, NODE_W, NODE_HEADER_H);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.fillText(n.cmd, x + 8, y + 19);
+    if (isOperatorNode(n.cmd)) {
+      ctx.beginPath();
+      ctx.arc(x + OP_NODE_SIZE / 2, y + OP_NODE_SIZE / 2, OP_NODE_SIZE / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.font = 'bold 20px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(def ? def.item.opSymbol : n.cmd, x + OP_NODE_SIZE / 2, y + OP_NODE_SIZE / 2);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+    } else {
+      ctx.beginPath();
+      ctx.roundRect(x, y, NODE_W, nh, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, NODE_W, NODE_HEADER_H);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(n.cmd, x + 8, y + 19);
+    }
   });
 
   for (var ck in self.connections) {
@@ -1548,15 +1885,12 @@ FlowEngine.prototype.exportPNG = function() {
     var fromN = self.nodes[c.fromId];
     var toN = self.nodes[c.toId];
     if (!fromN || !toN) continue;
-    var fromPorts = self.getOutPorts(fromN);
-    var portIdx = fromPorts.indexOf(c.fromPort);
-    if (portIdx < 0) portIdx = 0;
-    var outW = NODE_W / (fromPorts.length + 1);
-    var fromNH = self.getNodeHeight(fromN);
-    var x1 = fromN.x - minX + pad + outW * (portIdx + 1);
-    var y1 = fromN.y - minY + pad + fromNH;
-    var x2 = toN.x - minX + pad + NODE_W / 2;
-    var y2 = toN.y - minY + pad;
+    var fromPos = self.getPortPosition(fromN, c.fromPort, 'out');
+    var toPos = self.getPortPosition(toN, c.toPort, 'in');
+    var x1 = fromPos.x - minX + pad;
+    var y1 = fromPos.y - minY + pad;
+    var x2 = toPos.x - minX + pad;
+    var y2 = toPos.y - minY + pad;
 
     ctx.strokeStyle = c.fromPort === 'true' ? '#2dc653' : c.fromPort === 'false' ? '#f85149' : c.fromPort === 'body' ? '#f0883e' : '#484f58';
     ctx.lineWidth = 2;
@@ -1574,6 +1908,205 @@ FlowEngine.prototype.exportPNG = function() {
     a.download = 'clawscript-flow.png';
     a.click();
     URL.revokeObjectURL(url);
+  });
+};
+
+FlowEngine.prototype.showInfoPopup = function(item, cat, evt) {
+  this.dismissInfoPopup();
+  var paramLines = '';
+  if (item.params && item.params.length > 0) {
+    paramLines = '<div class="cf-info-section"><div class="cf-info-section-title">Parameters</div>';
+    for (var i = 0; i < item.params.length; i++) {
+      var p = item.params[i];
+      paramLines += '<div class="cf-info-param"><span class="cf-info-param-name">' + p.l + '</span>';
+      if (p.d) paramLines += '<span class="cf-info-param-default">default: ' + p.d + '</span>';
+      paramLines += '</div>';
+    }
+    paramLines += '</div>';
+  }
+  var syntax = item.cmd;
+  if (item.params && item.params.length > 0) {
+    var parts = [];
+    for (var j = 0; j < item.params.length; j++) {
+      parts.push(item.params[j].d || item.params[j].k);
+    }
+    syntax += ' ' + parts.join(' ');
+  }
+  var popup = document.createElement('div');
+  popup.className = 'cf-info-popup';
+  popup.innerHTML =
+    '<div class="cf-info-popup-header" style="border-left:4px solid ' + cat.color + '">' +
+      '<span class="cf-info-popup-cmd">' + item.cmd + '</span>' +
+      '<span class="cf-info-popup-cat">' + cat.label + '</span>' +
+    '</div>' +
+    '<div class="cf-info-popup-body">' +
+      '<div class="cf-info-desc">' + item.doc + '</div>' +
+      '<div class="cf-info-section"><div class="cf-info-section-title">Syntax</div>' +
+        '<pre class="cf-info-syntax">' + syntax + '</pre>' +
+      '</div>' +
+      paramLines +
+    '</div>';
+  document.body.appendChild(popup);
+  this._infoPopup = popup;
+  var rect = evt.target.getBoundingClientRect();
+  var popupW = 260;
+  var left = rect.right + 8;
+  var top = rect.top - 10;
+  if (left + popupW > window.innerWidth) left = rect.left - popupW - 8;
+  if (top + 200 > window.innerHeight) top = window.innerHeight - 220;
+  if (top < 10) top = 10;
+  popup.style.left = left + 'px';
+  popup.style.top = top + 'px';
+  var self = this;
+  setTimeout(function() {
+    self._infoPopupClickHandler = function(e) {
+      if (!popup.contains(e.target)) self.dismissInfoPopup();
+    };
+    document.addEventListener('mousedown', self._infoPopupClickHandler);
+  }, 0);
+};
+
+FlowEngine.prototype.dismissInfoPopup = function() {
+  if (this._infoPopup) {
+    this._infoPopup.remove();
+    this._infoPopup = null;
+  }
+  if (this._infoPopupClickHandler) {
+    document.removeEventListener('mousedown', this._infoPopupClickHandler);
+    this._infoPopupClickHandler = null;
+  }
+};
+
+FlowEngine.prototype._animSpeed = 600;
+FlowEngine.prototype._animRunning = false;
+FlowEngine.prototype._animStepMode = false;
+FlowEngine.prototype._animStepResolve = null;
+
+FlowEngine.prototype.setAnimSpeed = function(speed) {
+  this._animSpeed = speed;
+};
+
+FlowEngine.prototype.clearAnimations = function() {
+  this._animRunning = false;
+  var allNodes = this.canvasInner.querySelectorAll('.cf-node');
+  for (var i = 0; i < allNodes.length; i++) {
+    allNodes[i].classList.remove('cf-anim-active', 'cf-anim-green', 'cf-anim-red', 'cf-anim-blue');
+    var badge = allNodes[i].querySelector('.cf-anim-value');
+    if (badge) badge.remove();
+    var counter = allNodes[i].querySelector('.cf-anim-counter');
+    if (counter) counter.remove();
+  }
+  var paths = this.svgEl.querySelectorAll('.cf-conn');
+  for (var j = 0; j < paths.length; j++) {
+    paths[j].classList.remove('cf-conn-active');
+    paths[j].removeAttribute('stroke-dasharray');
+    paths[j].style.animation = '';
+  }
+};
+
+FlowEngine.prototype.highlightNode = function(nodeId) {
+  var node = this.nodes[nodeId];
+  if (!node || !node._el) return;
+  node._el.classList.add('cf-anim-active');
+};
+
+FlowEngine.prototype.unhighlightNode = function(nodeId) {
+  var node = this.nodes[nodeId];
+  if (!node || !node._el) return;
+  node._el.classList.remove('cf-anim-active');
+};
+
+FlowEngine.prototype.setNodeResult = function(nodeId, result) {
+  var node = this.nodes[nodeId];
+  if (!node || !node._el) return;
+  node._el.classList.remove('cf-anim-active', 'cf-anim-green', 'cf-anim-red', 'cf-anim-blue');
+  if (result === 'green') node._el.classList.add('cf-anim-green');
+  else if (result === 'red') node._el.classList.add('cf-anim-red');
+  else if (result === 'blue') node._el.classList.add('cf-anim-blue');
+};
+
+FlowEngine.prototype.showNodeValue = function(nodeId, text) {
+  var node = this.nodes[nodeId];
+  if (!node || !node._el) return;
+  var existing = node._el.querySelector('.cf-anim-value');
+  if (existing) existing.remove();
+  var badge = document.createElement('div');
+  badge.className = 'cf-anim-value';
+  badge.textContent = text.length > 20 ? text.substring(0, 18) + '..' : text;
+  node._el.appendChild(badge);
+};
+
+FlowEngine.prototype.showLoopCounter = function(nodeId, iteration, total) {
+  var node = this.nodes[nodeId];
+  if (!node || !node._el) return;
+  var existing = node._el.querySelector('.cf-anim-counter');
+  if (existing) existing.remove();
+  var counter = document.createElement('div');
+  counter.className = 'cf-anim-counter';
+  counter.textContent = iteration + '/' + total;
+  node._el.appendChild(counter);
+};
+
+FlowEngine.prototype.animateConnection = function(fromId, toId) {
+  var self = this;
+  for (var k in this.connections) {
+    var c = this.connections[k];
+    if (c.fromId === fromId && c.toId === toId) {
+      var path = this.svgEl.querySelector('[data-conn-id="' + k + '"]');
+      if (path) {
+        path.classList.add('cf-conn-active');
+        var len = path.getTotalLength ? path.getTotalLength() : 100;
+        path.setAttribute('stroke-dasharray', '10,5');
+        path.style.animation = 'cfFlowDash ' + (self._animSpeed / 1000) + 's linear infinite';
+      }
+    }
+  }
+};
+
+FlowEngine.prototype.findNodeByCmd = function(cmd, index) {
+  var count = 0;
+  var keys = Object.keys(this.nodes).sort(function(a, b) {
+    return parseInt(a.replace('n', '')) - parseInt(b.replace('n', ''));
+  });
+  for (var i = 0; i < keys.length; i++) {
+    if (this.nodes[keys[i]].cmd === cmd) {
+      if (count === (index || 0)) return keys[i];
+      count++;
+    }
+  }
+  return null;
+};
+
+FlowEngine.prototype.findNodeByIndex = function(index) {
+  var keys = Object.keys(this.nodes).sort(function(a, b) {
+    return parseInt(a.replace('n', '')) - parseInt(b.replace('n', ''));
+  });
+  return keys[index] || null;
+};
+
+FlowEngine.prototype.getNodeIds = function() {
+  return Object.keys(this.nodes).sort(function(a, b) {
+    return parseInt(a.replace('n', '')) - parseInt(b.replace('n', ''));
+  });
+};
+
+FlowEngine.prototype.stepResume = function() {
+  if (this._animStepResolve) {
+    var r = this._animStepResolve;
+    this._animStepResolve = null;
+    r();
+  }
+};
+
+FlowEngine.prototype.animDelay = function() {
+  var self = this;
+  if (self._animStepMode) {
+    return new Promise(function(resolve) {
+      self._animStepResolve = resolve;
+    });
+  }
+  return new Promise(function(resolve) {
+    setTimeout(resolve, self._animSpeed);
   });
 };
 

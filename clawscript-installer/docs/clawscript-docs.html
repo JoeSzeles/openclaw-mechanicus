@@ -134,6 +134,24 @@ pre code { background: none; padding: 0; }
     <a href="#export">Export & Compile</a>
   </div>
   <div class="nav-group">
+    <div class="nav-group-title">Pipeline</div>
+    <a href="#pipeline">Save &amp; Deploy</a>
+    <a href="#tooltips">Variable Tooltips</a>
+    <a href="#backtest">Simulation &amp; Backtest</a>
+    <a href="#templates">Templates</a>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">New Features</div>
+    <a href="#new-indicators">Extended Indicators</a>
+    <a href="#operators">Operators</a>
+    <a href="#operator-nodes">Operator Nodes</a>
+    <a href="#flow-toolbar">Flow Toolbar</a>
+    <a href="#animated-flow">Animated Execution</a>
+    <a href="#info-icons">Command Info Icons</a>
+    <a href="#output-popup">Output Popup</a>
+    <a href="#standalone-editor">Standalone Editor</a>
+  </div>
+  <div class="nav-group">
     <div class="nav-group-title">Strategies</div>
     <a href="#sample-rsi">RSI Buy/Sell</a>
     <a href="#sample-ema">EMA Crossover</a>
@@ -1299,6 +1317,234 @@ module.exports = MyStrategyStrategy;</code></pre>
 </table>
 
 <div class="tip"><strong>Tip:</strong> Use the Split view in the editor to see both your ClawScript code and the visual flow simultaneously. Changes in one pane automatically sync to the other.</div>
+
+<hr style="border-color:#21262d;margin:32px 0">
+
+<h2 id="pipeline">Strategy Save &amp; Deploy Pipeline</h2>
+<p>ClawScript strategies integrate directly with the Claw Trader bot engine through a complete save-and-deploy pipeline:</p>
+
+<h4>Pipeline Steps</h4>
+<ol>
+  <li><strong>Write</strong> &mdash; Create your strategy in the code editor or flow builder</li>
+  <li><strong>Compile &amp; Save</strong> &mdash; Opens a dialog with strategy name and filename fields</li>
+  <li><strong>Deploy</strong> &mdash; The compiled <code>.cjs</code> file is saved to <code>skills/bots/strategies/</code></li>
+  <li><strong>Discover</strong> &mdash; The strategy loader auto-registers the new strategy</li>
+  <li><strong>Configure</strong> &mdash; <code>INPUT_*</code> variables appear as editable fields in the bot dashboard</li>
+  <li><strong>Run</strong> &mdash; The engine calls <code>evaluateEntry()</code> / <code>evaluateExit()</code> on each market tick</li>
+</ol>
+
+<h4>API Endpoints</h4>
+<table class="param-table">
+<tr><th>Endpoint</th><th>Method</th><th>Description</th></tr>
+<tr><td><code>/api/clawscript/strategies</code></td><td>GET</td><td>List all ClawScript-compiled strategies</td></tr>
+<tr><td><code>/api/clawscript/strategies</code></td><td>POST</td><td>Save a compiled strategy file</td></tr>
+<tr><td><code>/api/clawscript/strategies/:name</code></td><td>DELETE</td><td>Remove a strategy</td></tr>
+<tr><td><code>/api/clawscript/strategies/:name/schema</code></td><td>GET</td><td>Get strategy config schema</td></tr>
+<tr><td><code>/api/clawscript/templates</code></td><td>GET</td><td>List available templates</td></tr>
+<tr><td><code>/api/clawscript/templates/:name</code></td><td>GET</td><td>Get template source code</td></tr>
+<tr><td><code>/api/clawscript/backtest</code></td><td>POST</td><td>Run backtest with historical data</td></tr>
+</table>
+
+<h2 id="tooltips">Variable Tooltips &amp; Comment Convention</h2>
+<p>ClawScript supports inline comments on variable declarations. These comments are extracted during compilation and become tooltips in the bot strategy editor UI.</p>
+
+<pre><code><span class="kw">DEF</span> rsi_period = <span class="num">14</span>       <span class="cmt">// RSI lookback period</span>
+<span class="kw">DEF</span> stop_dist = <span class="num">20</span>        <span class="cmt">// Stop distance in points</span>
+<span class="kw">INPUT_INT</span> lookback <span class="kw">DEFAULT</span> <span class="num">50</span>   <span class="cmt">// Number of candles to analyze</span>
+<span class="kw">INPUT_FLOAT</span> risk_pct <span class="kw">DEFAULT</span> <span class="num">0.02</span>  <span class="cmt">// Risk per trade as decimal</span>
+<span class="kw">INPUT_BOOL</span> use_trailing <span class="kw">DEFAULT</span> true   <span class="cmt">// Enable trailing stop</span></code></pre>
+
+<p>When a ClawScript strategy is loaded in the bot dashboard:</p>
+<ul>
+  <li><code>INPUT_INT</code>, <code>INPUT_FLOAT</code>, <code>INPUT_BOOL</code>, and <code>INPUT_SYMBOL</code> declarations become editable fields</li>
+  <li><code>DEF</code> variables with inline comments show the comment text as a hover tooltip</li>
+  <li>Standard fields not used by the ClawScript strategy are greyed out with <code>(unused)</code> label</li>
+  <li>ClawScript strategies appear in the bot dropdown with a <code>[CS]</code> badge and distinct styling</li>
+</ul>
+
+<h2 id="backtest">Simulation &amp; Backtest</h2>
+<h4>Run Simulation</h4>
+<p>Executes the strategy against synthetic tick data for logic validation. Use the "Run with Real Data" checkbox to fetch real IG price candles instead.</p>
+
+<h4>Run Backtest</h4>
+<p>Sends the compiled strategy, instrument, and timeframe to the <code>/api/clawscript/backtest</code> endpoint. Returns:</p>
+<ul>
+  <li>Total P&amp;L and win rate</li>
+  <li>Max drawdown</li>
+  <li>Complete trade list with entry/exit details</li>
+  <li>Results displayed in the editor log pane</li>
+</ul>
+
+<div class="note"><strong>Note:</strong> Backtest uses historical IG candle data. Default instrument is BTC (<code>CS.D.BITCOIN.CFD.IP</code>). Results are displayed in the Output panel below the editor.</div>
+
+<h2 id="templates">Available Templates</h2>
+<p>Seven ready-to-use templates are available from the Templates dropdown in the editor toolbar:</p>
+<table class="param-table">
+<tr><th>Template</th><th>Description</th></tr>
+<tr><td><code>rsi-simple.cs</code></td><td>Basic RSI oversold/overbought strategy</td></tr>
+<tr><td><code>ema-crossover.cs</code></td><td>EMA fast/slow crossover with trailing stop</td></tr>
+<tr><td><code>multi-indicator.cs</code></td><td>RSI + MACD + Bollinger Bands with try/catch error handling</td></tr>
+<tr><td><code>sentiment-scan.cs</code></td><td>AI sentiment analysis + market scanner</td></tr>
+<tr><td><code>btc-scalper.cs</code></td><td>Fast BTC scalping with RSI + EMA and tight stops</td></tr>
+<tr><td><code>mean-reversion.cs</code></td><td>Bollinger Band mean reversion with error handling</td></tr>
+<tr><td><code>bourse-trackers.cs</code></td><td>Multi-indicator approach for major index CFDs (US 500, FTSE, DAX)</td></tr>
+</table>
+
+<h2 id="new-indicators">Extended Indicators</h2>
+<p>ClawScript now supports 30+ technical indicators in <code>DEF</code> statements. Each maps to the corresponding <code>indicators.calc*</code> function at runtime:</p>
+
+<table class="param-table">
+<tr><th>Indicator</th><th>Parameters</th><th>Description</th></tr>
+<tr><td><code>SMA(period)</code></td><td>period (default 20)</td><td>Simple Moving Average</td></tr>
+<tr><td><code>EMA(period)</code></td><td>period (default 20)</td><td>Exponential Moving Average</td></tr>
+<tr><td><code>RSI(period)</code></td><td>period (default 14)</td><td>Relative Strength Index</td></tr>
+<tr><td><code>MACD(fast, slow, signal)</code></td><td>12, 26, 9</td><td>Moving Average Convergence Divergence</td></tr>
+<tr><td><code>ATR(period)</code></td><td>period (default 14)</td><td>Average True Range</td></tr>
+<tr><td><code>ADX(period)</code></td><td>period (default 14)</td><td>Average Directional Index</td></tr>
+<tr><td><code>BOLLINGER_UPPER(period, dev)</code></td><td>20, 2</td><td>Bollinger Band upper bound</td></tr>
+<tr><td><code>BOLLINGER_LOWER(period, dev)</code></td><td>20, 2</td><td>Bollinger Band lower bound</td></tr>
+<tr><td><code>STOCHASTIC(period)</code></td><td>period (default 14)</td><td>Stochastic Oscillator %K</td></tr>
+<tr><td><code>STOCHASTIC_K(period)</code></td><td>period (default 14)</td><td>Stochastic %K (alias)</td></tr>
+<tr><td><code>STOCHASTIC_D(period)</code></td><td>period (default 14)</td><td>Stochastic %D (smoothed)</td></tr>
+<tr><td><code>CCI(period)</code></td><td>period (default 20)</td><td>Commodity Channel Index</td></tr>
+<tr><td><code>WILLIAMS_R(period)</code></td><td>period (default 14)</td><td>Williams %R</td></tr>
+<tr><td><code>ROC(period)</code></td><td>period (default 12)</td><td>Rate of Change</td></tr>
+<tr><td><code>AROON_UP(period)</code></td><td>period (default 25)</td><td>Aroon Up indicator</td></tr>
+<tr><td><code>AROON_DOWN(period)</code></td><td>period (default 25)</td><td>Aroon Down indicator</td></tr>
+<tr><td><code>ICHIMOKU_TENKAN(period)</code></td><td>period (default 9)</td><td>Ichimoku Tenkan-sen</td></tr>
+<tr><td><code>ICHIMOKU_KIJUN(period)</code></td><td>period (default 26)</td><td>Ichimoku Kijun-sen</td></tr>
+<tr><td><code>PARABOLIC_SAR(step, max)</code></td><td>0.02, 0.2</td><td>Parabolic SAR</td></tr>
+<tr><td><code>KELTNER_UPPER(period, mult)</code></td><td>20, 1.5</td><td>Keltner Channel upper</td></tr>
+<tr><td><code>KELTNER_LOWER(period, mult)</code></td><td>20, 1.5</td><td>Keltner Channel lower</td></tr>
+<tr><td><code>DONCHIAN_HIGH(period)</code></td><td>period (default 20)</td><td>Donchian Channel high</td></tr>
+<tr><td><code>DONCHIAN_LOW(period)</code></td><td>period (default 20)</td><td>Donchian Channel low</td></tr>
+<tr><td><code>OBV</code></td><td>&mdash;</td><td>On-Balance Volume</td></tr>
+<tr><td><code>VWAP</code></td><td>&mdash;</td><td>Volume Weighted Average Price</td></tr>
+<tr><td><code>CMF(period)</code></td><td>period (default 20)</td><td>Chaikin Money Flow</td></tr>
+<tr><td><code>ZSCORE(period)</code></td><td>period (default 20)</td><td>Z-Score</td></tr>
+<tr><td><code>FIBONACCI(period)</code></td><td>period (default 20)</td><td>Fibonacci retracement levels</td></tr>
+<tr><td><code>SUPERTREND(period, mult)</code></td><td>10, 3</td><td>Supertrend indicator</td></tr>
+<tr><td><code>ULTIMATE_OSC(s, m, l)</code></td><td>7, 14, 28</td><td>Ultimate Oscillator</td></tr>
+<tr><td><code>CHAIKIN_VOL(period)</code></td><td>period (default 10)</td><td>Chaikin Volatility</td></tr>
+<tr><td><code>LAST_PRICE</code></td><td>&mdash;</td><td>Most recent price</td></tr>
+<tr><td><code>VOLUME</code></td><td>&mdash;</td><td>Current volume</td></tr>
+</table>
+
+<h4>Example Usage</h4>
+<pre><code>DEF bb_upper = BOLLINGER_UPPER(20, 2)
+DEF bb_lower = BOLLINGER_LOWER(20, 2)
+DEF stoch = STOCHASTIC(14)
+DEF cci_val = CCI(20)
+
+IF price > bb_upper AND stoch > 80
+  SELL 1 UNIT
+IF price < bb_lower AND cci_val < -100
+  BUY 1 UNIT</code></pre>
+
+<h2 id="operators">Operators</h2>
+<p>ClawScript supports several categories of operators for building expressions:</p>
+
+<h3>Arithmetic Operators</h3>
+<table class="param-table">
+<tr><th>Operator</th><th>Symbol</th><th>Example</th></tr>
+<tr><td>Addition</td><td><code>+</code></td><td><code>DEF total = price + spread</code></td></tr>
+<tr><td>Subtraction</td><td><code>-</code></td><td><code>DEF diff = high - low</code></td></tr>
+<tr><td>Multiplication</td><td><code>*</code></td><td><code>DEF qty = size * 2</code></td></tr>
+<tr><td>Division</td><td><code>/</code></td><td><code>DEF avg = total / count</code></td></tr>
+<tr><td>Modulo</td><td><code>%</code></td><td><code>DEF rem = index % 5</code></td></tr>
+</table>
+
+<h3>Comparison Operators</h3>
+<table class="param-table">
+<tr><th>Operator</th><th>Symbol</th><th>Example</th></tr>
+<tr><td>Less than</td><td><code>&lt;</code></td><td><code>IF rsi &lt; 30</code></td></tr>
+<tr><td>Greater than</td><td><code>&gt;</code></td><td><code>IF rsi &gt; 70</code></td></tr>
+<tr><td>Less or equal</td><td><code>&lt;=</code></td><td><code>IF price &lt;= stop_level</code></td></tr>
+<tr><td>Greater or equal</td><td><code>&gt;=</code></td><td><code>IF profit &gt;= target</code></td></tr>
+<tr><td>Equal</td><td><code>==</code></td><td><code>IF status == "OPEN"</code></td></tr>
+<tr><td>Not equal</td><td><code>!=</code></td><td><code>IF trend != "DOWN"</code></td></tr>
+</table>
+
+<h3>Logical Operators</h3>
+<table class="param-table">
+<tr><th>Operator</th><th>Example</th></tr>
+<tr><td><code>AND</code></td><td><code>IF rsi &lt; 30 AND macd &gt; 0</code></td></tr>
+<tr><td><code>OR</code></td><td><code>IF rsi &lt; 20 OR cci &lt; -200</code></td></tr>
+<tr><td><code>NOT</code></td><td><code>IF NOT in_position</code></td></tr>
+</table>
+
+<h3>Crossover Operators</h3>
+<table class="param-table">
+<tr><th>Operator</th><th>Example</th></tr>
+<tr><td><code>CROSSES OVER</code></td><td><code>IF ema_fast CROSSES OVER ema_slow</code></td></tr>
+<tr><td><code>CROSSES UNDER</code></td><td><code>IF ema_fast CROSSES UNDER ema_slow</code></td></tr>
+</table>
+
+<h2 id="operator-nodes">Operator Nodes (Flow Builder)</h2>
+<p>The Visual Flow Builder now includes round/circular operator nodes, visually distinct from rectangular command nodes. Each operator node has input ports on the sides and an output port at the bottom.</p>
+<h4>Available Operator Categories</h4>
+<ul>
+  <li><strong>Arithmetic:</strong> +, -, &times;, &divide;, %</li>
+  <li><strong>Comparison:</strong> &lt;, &gt;, &le;, &ge;, ==, !=</li>
+  <li><strong>Logical:</strong> AND, OR, NOT (NOT has 1 input)</li>
+  <li><strong>Crossover:</strong> CROSSES OVER, CROSSES UNDER</li>
+  <li><strong>String:</strong> CONTAINS</li>
+</ul>
+<p>Drag operators from the "Operators" category in the sidebar. Connect them to DEF/variable nodes as inputs, and route the output to IF/condition nodes.</p>
+
+<h2 id="flow-toolbar">Flow Toolbar</h2>
+<p>The flow builder canvas includes a toolbar with essential tools:</p>
+<ul>
+  <li><strong>Connect Mode:</strong> Click source node, then target node to create a connection</li>
+  <li><strong>Delete:</strong> Remove selected node or connection</li>
+  <li><strong>Select All:</strong> Select all nodes (also Ctrl+A)</li>
+  <li><strong>Zoom In/Out/Fit:</strong> Zoom controls with percentage display</li>
+  <li><strong>Auto-Layout:</strong> Automatically arrange nodes in a clean layout</li>
+  <li><strong>Export PNG:</strong> Save the flow diagram as a PNG image</li>
+  <li><strong>Undo/Redo:</strong> Step backwards/forwards (Ctrl+Z / Ctrl+Y)</li>
+  <li><strong>Clear All:</strong> Remove all nodes and connections (with confirmation)</li>
+</ul>
+
+<h2 id="animated-flow">Animated Flow Execution</h2>
+<p>When running a simulation or backtest, the flow builder animates the execution in real-time:</p>
+<ul>
+  <li><strong>Active Node Glow:</strong> The currently executing node pulses with a glowing blue border</li>
+  <li><strong>Connection Animation:</strong> Active connection paths display flowing dash animations</li>
+  <li><strong>Real Values:</strong> Nodes display their computed values as they execute (e.g., RSI=42.3)</li>
+  <li><strong>Result Coloring:</strong> Green = signal triggered, Red = condition failed, Blue = data node</li>
+  <li><strong>Loop Counter:</strong> Loop nodes show iteration count as a badge</li>
+  <li><strong>Speed Control:</strong> Adjustable execution speed (fast/slow/step-through)</li>
+</ul>
+
+<h2 id="info-icons">Command Info Icons</h2>
+<p>Each command in the Flow Builder sidebar has a small <strong>&#9432;</strong> info icon. Click it to see a floating documentation card showing:</p>
+<ul>
+  <li>Command name and category</li>
+  <li>Description of what the command does</li>
+  <li>Syntax example with parameters</li>
+  <li>List of parameters with default values</li>
+</ul>
+<p>The popup dismisses when you click outside it.</p>
+
+<h2 id="output-popup">Visual Output Popup</h2>
+<p>Click the "Results" button in the editor toolbar to open a draggable modal overlay displaying:</p>
+<ul>
+  <li><strong>Simulation results:</strong> Generated trades, P&amp;L, signal log</li>
+  <li><strong>Backtest results:</strong> Equity curve, statistics, trade list with entry/exit details</li>
+  <li><strong>Flow execution trace:</strong> Step-by-step log of flow node execution</li>
+</ul>
+<p>Results are also available via the <code>GET /api/clawscript/results</code> API endpoint for programmatic access.</p>
+
+<h2 id="standalone-editor">Standalone Editor Page</h2>
+<p>Access the full ClawScript editor as a standalone page via the <strong>"Code"</strong> link in the top navigation bar. This opens <code>/__openclaw__/canvas/clawscript-editor.html</code> with:</p>
+<ul>
+  <li>Full editor textarea with syntax highlighting and error markers</li>
+  <li>Visual Flow Builder with all toolbar tools</li>
+  <li>AI Assistant panel</li>
+  <li>Output/results panel</li>
+  <li>Templates, export, and compile features</li>
+</ul>
+<p>The standalone editor loads the same JavaScript files as the embedded dashboard editor, ensuring feature parity.</p>
 
 </main>
 </div>

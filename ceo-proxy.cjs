@@ -1146,7 +1146,9 @@ async function handleClawScriptApi(req, res, p) {
 
     try {
       const parser = require("./skills/bots/clawscript-parser.cjs");
-      const parsed = parser.parse(code);
+      let parsed;
+      try { parsed = parser.parseAndGenerate(code); }
+      catch (parseErr) { return json(res, 400, { error: "Parse error: " + parseErr.message }); }
       if (!parsed || !parsed.ast) return json(res, 400, { error: "Parse error: " + (parsed ? parsed.error : "unknown") });
       const ast = parsed.ast;
 
@@ -1244,6 +1246,116 @@ async function handleClawScriptApi(req, res, p) {
         return sum / period;
       }
 
+      function calcMACD(prices, fast, slow, sig) {
+        fast = fast || 12; slow = slow || 26; sig = sig || 9;
+        if (prices.length < slow) return 0;
+        const emaF = calcEMA(prices, fast), emaS = calcEMA(prices, slow);
+        return emaF - emaS;
+      }
+
+      function calcATR(prices, period) {
+        if (prices.length < period + 1) return 0;
+        let sum = 0;
+        for (let i = prices.length - period; i < prices.length; i++) sum += Math.abs(prices[i] - prices[i-1]);
+        return sum / period;
+      }
+
+      function calcADX(prices, period) {
+        if (prices.length < period * 2) return 25;
+        let plusDM = 0, minusDM = 0, tr = 0;
+        for (let i = prices.length - period; i < prices.length; i++) {
+          const diff = prices[i] - prices[i-1];
+          if (diff > 0) plusDM += diff; else minusDM += Math.abs(diff);
+          tr += Math.abs(prices[i] - prices[i-1]);
+        }
+        if (tr === 0) return 0;
+        const pdi = (plusDM / tr) * 100, ndi = (minusDM / tr) * 100;
+        const dxSum = pdi + ndi;
+        return dxSum > 0 ? Math.abs(pdi - ndi) / dxSum * 100 : 0;
+      }
+
+      function calcBollinger(prices, period, dev) {
+        period = period || 20; dev = dev || 2;
+        const sma = calcSMA(prices, period);
+        if (prices.length < period) return { upper: sma, lower: sma, mid: sma };
+        let variance = 0;
+        for (let i = prices.length - period; i < prices.length; i++) variance += Math.pow(prices[i] - sma, 2);
+        const std = Math.sqrt(variance / period);
+        return { upper: sma + dev * std, lower: sma - dev * std, mid: sma };
+      }
+
+      function calcStochastic(prices, kPeriod) {
+        kPeriod = kPeriod || 14;
+        if (prices.length < kPeriod) return 50;
+        const slice = prices.slice(-kPeriod);
+        const high = Math.max(...slice), low = Math.min(...slice);
+        return high === low ? 50 : ((prices[prices.length-1] - low) / (high - low)) * 100;
+      }
+
+      function calcROC(prices, period) {
+        period = period || 12;
+        if (prices.length < period + 1) return 0;
+        const old = prices[prices.length - period - 1];
+        return old !== 0 ? ((prices[prices.length-1] - old) / old) * 100 : 0;
+      }
+
+      function calcCCI(prices, period) {
+        period = period || 20;
+        const sma = calcSMA(prices, period);
+        if (prices.length < period) return 0;
+        let meanDev = 0;
+        for (let i = prices.length - period; i < prices.length; i++) meanDev += Math.abs(prices[i] - sma);
+        meanDev /= period;
+        return meanDev !== 0 ? (prices[prices.length-1] - sma) / (0.015 * meanDev) : 0;
+      }
+
+      function calcWilliamsR(prices, period) {
+        period = period || 14;
+        if (prices.length < period) return -50;
+        const slice = prices.slice(-period);
+        const high = Math.max(...slice), low = Math.min(...slice);
+        return high === low ? -50 : ((high - prices[prices.length-1]) / (high - low)) * -100;
+      }
+
+      function evalIndicator(name, args, pricesSlice) {
+        const indicators = require("./skills/bots/indicators.cjs");
+        if (name === 'RSI') return calcRSI(pricesSlice, args[0] || 14);
+        if (name === 'EMA') return calcEMA(pricesSlice, args[0] || 20);
+        if (name === 'SMA') return calcSMA(pricesSlice, args[0] || 20);
+        if (name === 'MACD') return calcMACD(pricesSlice, args[0] || 12, args[1] || 26, args[2] || 9);
+        if (name === 'ATR') return calcATR(pricesSlice, args[0] || 14);
+        if (name === 'ADX') return calcADX(pricesSlice, args[0] || 14);
+        if (name === 'BOLLINGER') return calcBollinger(pricesSlice, args[0] || 20, args[1] || 2);
+        if (name === 'BOLLINGER_UPPER') { const bb = calcBollinger(pricesSlice, args[0] || 20, args[1] || 2); return bb.upper; }
+        if (name === 'BOLLINGER_LOWER') { const bb = calcBollinger(pricesSlice, args[0] || 20, args[1] || 2); return bb.lower; }
+        if (name === 'STOCHASTIC' || name === 'STOCHASTIC_K') return indicators.calcStochasticFromPrices(pricesSlice, args[0] || 14, args[1] || 3).k;
+        if (name === 'STOCHASTIC_D') return indicators.calcStochasticFromPrices(pricesSlice, args[0] || 14, args[1] || 3).d;
+        if (name === 'ROC') return calcROC(pricesSlice, args[0] || 12);
+        if (name === 'CCI') return indicators.calcCCIFromPrices(pricesSlice, args[0] || 20);
+        if (name === 'WILLIAMS_R') return indicators.calcWilliamsRFromPrices(pricesSlice, args[0] || 14);
+        if (name === 'AROON_UP') { const ar = indicators.calcAroonFromPrices(pricesSlice, args[0] || 25); return ar.up; }
+        if (name === 'AROON_DOWN') { const ar = indicators.calcAroonFromPrices(pricesSlice, args[0] || 25); return ar.down; }
+        if (name === 'ICHIMOKU_TENKAN') { const ich = indicators.calcIchimokuFromPrices(pricesSlice, args[0] || 9, args[1] || 26, args[2] || 52); return ich.tenkan; }
+        if (name === 'ICHIMOKU_KIJUN') { const ich = indicators.calcIchimokuFromPrices(pricesSlice, args[0] || 9, args[1] || 26, args[2] || 52); return ich.kijun; }
+        if (name === 'PARABOLIC_SAR') return indicators.calcParabolicSARFromPrices(pricesSlice, args[0] || 0.02, args[1] || 0.2);
+        if (name === 'KELTNER_UPPER') { const k = indicators.calcKeltner(pricesSlice, args[0] || 20, args[1] || 1.5, args[2] || 10); return k.upper; }
+        if (name === 'KELTNER_LOWER') { const k = indicators.calcKeltner(pricesSlice, args[0] || 20, args[1] || 1.5, args[2] || 10); return k.lower; }
+        if (name === 'DONCHIAN_HIGH') { const d = indicators.calcDonchianFromPrices(pricesSlice, args[0] || 20); return d.high; }
+        if (name === 'DONCHIAN_LOW') { const d = indicators.calcDonchianFromPrices(pricesSlice, args[0] || 20); return d.low; }
+        if (name === 'OBV') return 0;
+        if (name === 'VWAP') return pricesSlice.length > 0 ? pricesSlice[pricesSlice.length - 1] : 0;
+        if (name === 'CMF') return 0;
+        if (name === 'ZSCORE') return indicators.calcZScore(pricesSlice, args[0] || 20);
+        if (name === 'FIBONACCI') { const fib = indicators.calcFibonacci(pricesSlice, args[0] || 20); return fib.level_50 || 0; }
+        if (name === 'SUPERTREND') return pricesSlice.length > 0 ? pricesSlice[pricesSlice.length - 1] : 0;
+        if (name === 'ULTIMATE_OSC') return 50;
+        if (name === 'CHAIKIN_VOL') return 0;
+        if (name === 'LAST_PRICE') return pricesSlice.length > 0 ? pricesSlice[pricesSlice.length - 1] : 0;
+        if (name === 'VOLUME') return 0;
+        console.log(`[clawscript-backtest] Unknown indicator: ${name}, returning 0`);
+        return 0;
+      }
+
       function evalExpr(expr, pricesSlice) {
         if (!expr) return null;
         switch (expr.type) {
@@ -1271,18 +1383,12 @@ async function handleClawScriptApi(req, res, p) {
           case 'FunctionCall': {
             const name = expr.name.toUpperCase();
             const args = expr.args.map(a => evalExpr(a, pricesSlice));
-            if (name === 'RSI') return calcRSI(pricesSlice, args[0] || 14);
-            if (name === 'EMA') return calcEMA(pricesSlice, args[0] || 20);
-            if (name === 'SMA') return calcSMA(pricesSlice, args[0] || 20);
-            return 0;
+            return evalIndicator(name, args, pricesSlice);
           }
           case 'IndicatorCall': {
             const iname = expr.name.toUpperCase();
             const iparams = expr.params.map(a => evalExpr(a, pricesSlice));
-            if (iname === 'RSI') return calcRSI(pricesSlice, iparams[0] || 14);
-            if (iname === 'EMA') return calcEMA(pricesSlice, iparams[0] || 20);
-            if (iname === 'SMA') return calcSMA(pricesSlice, iparams[0] || 20);
-            return 0;
+            return evalIndicator(iname, iparams, pricesSlice);
           }
           case 'MemberExpr': { const obj = evalExpr(expr.object, pricesSlice); return obj && typeof obj === 'object' ? obj[expr.property] : null; }
           case 'LoopCount': return evalExpr(expr.num, pricesSlice);
@@ -1378,7 +1484,7 @@ async function handleClawScriptApi(req, res, p) {
 
       console.log(`[clawscript-backtest] ${epic} ${res_}: ${trades.length} trades, P&L=${Math.round(totalPnl * 100) / 100}, winRate=${winRate}%, maxDD=${Math.round(maxDrawdown * 100) / 100}`);
 
-      return json(res, 200, {
+      const btResult = {
         ok: true,
         instrument: epic,
         resolution: res_,
@@ -1390,11 +1496,41 @@ async function handleClawScriptApi(req, res, p) {
         winRate,
         maxDrawdown: Math.round(maxDrawdown * 100) / 100,
         tradeList: trades.slice(-100),
-        equityCurve: equityCurve.length > 200 ? equityCurve.filter((_, i) => i % Math.ceil(equityCurve.length / 200) === 0) : equityCurve
-      });
+        equityCurve: equityCurve.length > 200 ? equityCurve.filter((_, i) => i % Math.ceil(equityCurve.length / 200) === 0) : equityCurve,
+        timestamp: Date.now()
+      };
+      global._csLastResults = btResult;
+      return json(res, 200, btResult);
     } catch (e) {
       console.log(`[clawscript-backtest] Error: ${e.message}`);
       return json(res, 500, { error: "Backtest failed: " + e.message });
+    }
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/sync") {
+    try {
+      const { execSync } = require("child_process");
+      const syncScript = require("path").join(__dirname, ".openclaw/canvas/sync-clawscript.sh");
+      const out = execSync(`bash "${syncScript}"`, { cwd: __dirname, timeout: 10000 }).toString();
+      return json(res, 200, { ok: true, output: out });
+    } catch (e) {
+      return json(res, 500, { error: "Sync failed: " + e.message });
+    }
+  }
+
+  if (req.method === "GET" && p === "/api/clawscript/results") {
+    return json(res, 200, { results: global._csLastResults || null });
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/results") {
+    try {
+      const body = JSON.parse((await readBody(req)).toString() || "{}");
+      if (body.backtest) global._csLastResults = body.backtest;
+      else if (body.simulation) global._csLastResults = body.simulation;
+      global._csAllResults = body;
+      return json(res, 200, { ok: true });
+    } catch (e) {
+      return json(res, 400, { error: "Invalid JSON" });
     }
   }
 

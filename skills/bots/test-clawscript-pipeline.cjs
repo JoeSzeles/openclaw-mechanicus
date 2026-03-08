@@ -842,7 +842,7 @@ ENDIF
 
   await test('Indicators', 'BOLLINGER() function call', () => {
     const r = parseOk(`DEF bb = BOLLINGER(20, 2)`, 'BollingerFunc');
-    assertIncludes(r.js, 'indicators.calcBOLLINGER');
+    assertIncludes(r.js, 'indicators.calcBollinger');
   });
 
   await test('Indicators', 'ATR() function call', () => {

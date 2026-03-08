@@ -6,17 +6,24 @@ A domain-specific language (DSL) for writing automated trading strategies in [Op
 
 - **80+ commands** across 16 categories: Trading, Variables, Control Flow, AI/Analysis, Data Fetch, Agent Orchestration, Advanced, Functions, TradingView-Style, Bloomberg/Data Access, Time/Schedule, Portfolio, Economic/Political, Scientific/Quantitative, Utility, and PRT Compatibility (40+ ProRealTime commands)
 - **Visual Flow Builder** — drag-and-drop node editor with bidirectional code-to-flow synchronization
-- **Code Editor** — syntax-highlighted editor with live parsing, VS Code-style error highlighting with wavy underlines
-- **AI Assistant** — built-in chat panel that reads your code, errors, and logs to help fix issues and optimize strategies
+- **Operator Nodes** — round/circular operator nodes (Arithmetic, Comparison, Logical, Crossover, String) with multi-port I/O
+- **Flow Toolbar** — Connect mode, Delete, Select All, Zoom In/Out/Fit, Auto-Layout, Export PNG, Undo/Redo, Clear All
+- **Animated Flow Execution** — real-time node highlighting, glowing connection paths, live values on nodes, speed control (Fast/Normal/Slow/Step)
+- **Command Info Icons** — ⓘ icons in sidebar showing floating documentation cards per command
+- **Visual Output Popup** — draggable results modal with Simulation, Backtest, and Flow Trace tabs; equity curve canvas
+- **Code Editor** — syntax-highlighted editor with live parsing, VS Code-style error highlighting with dynamic line height
+- **Standalone Editor Page** — full editor accessible via "Code" link in top navigation bar
+- **AI Assistant** — built-in chat panel with Bearer token auth, reads code/errors/logs to help fix issues
 - **Strategy Compiler** — compiles `.cs` scripts to production-ready `.cjs` strategy modules
 - **Save & Deploy Pipeline** — save dialog with strategy name/filename, auto-deploy to `strategies/` for bot engine discovery
 - **Simulation & Backtest** — test strategies with real or cached price data; green play button, instrument selector, multi-tier data fallback (API → DB cache → stream ticks → mock)
 - **AI Integration** — query AI models, generate scripts, analyze logs, and scan sentiment
 - **Agent Orchestration** — spawn agents, manage sessions, mutate configs at runtime
-- **Technical Indicators** — RSI, EMA, SMA, MACD, Bollinger Bands, ATR, ADX, Stochastic, CCI, OBV, VWAP, ROC, and more
+- **30+ Technical Indicators** — RSI, EMA, SMA, MACD, Bollinger Bands (Upper/Lower), ATR, ADX, Stochastic (K/D), CCI, Williams %R, ROC, Aroon, Ichimoku, Parabolic SAR, Keltner, Donchian, OBV, VWAP, CMF, ZScore, Supertrend, and more
 - **Variable Tooltips** — `INPUT_*` declarations and `DEF` comments become editable fields and tooltips in bot dashboard
 - **PRT Compatibility** — 40+ ProRealTime ProBuilder commands (PRT_RSI, PRT_MACD, PRT_BOLLINGER, PRT_ICHIMOKU, etc.)
 - **Export** — `.cs` source, `.json` AST, `.js` compiled output, `.png` flow diagram
+- **Single-Source Sync** — `sync-clawscript.sh` script keeps installer in sync with canonical sources
 - **221 tests** — 82 parser tests + 139 pipeline tests, 100% pass rate
 
 ## Quick Start

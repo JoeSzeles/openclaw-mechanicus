@@ -1759,11 +1759,55 @@ class ClawScriptParser {
           return `(${this.generateExpr(expr.left)} > ${this.generateExpr(expr.right)})`;
         }
         return `(${this.generateExpr(expr.left)} < ${this.generateExpr(expr.right)})`;
-      case 'FunctionCall':
-        if (['RSI', 'EMA', 'SMA', 'ATR', 'MACD', 'BOLLINGER', 'ADX', 'STOCH', 'CCI', 'OBV', 'VWAP', 'ROC'].includes(expr.name.toUpperCase())) {
-          return `indicators.calc${expr.name.toUpperCase()}(prices${expr.args.map(a => ', ' + this.generateExpr(a)).join('')})`;
+      case 'FunctionCall': {
+        const _fn = expr.name.toUpperCase();
+        const _args = expr.args.map(a => ', ' + this.generateExpr(a)).join('');
+        const _simpleIndicators = {
+          'RSI': 'calcRSI', 'EMA': 'calcEMA', 'SMA': 'calcSMA', 'ATR': 'calcATRFromTicks',
+          'MACD': 'calcMACD', 'BOLLINGER': 'calcBollinger', 'ROC': 'calcROC',
+          'ZSCORE': 'calcZScore', 'FIBONACCI': 'calcFibonacci', 'KELTNER': 'calcKeltner'
+        };
+        const _fromPricesIndicators = {
+          'ADX': 'calcADXFromPrices', 'STOCH': 'calcStochasticFromPrices',
+          'STOCHASTIC': 'calcStochasticFromPrices', 'CCI': 'calcCCIFromPrices',
+          'WILLIAMS_R': 'calcWilliamsRFromPrices', 'PARABOLIC_SAR': 'calcParabolicSARFromPrices',
+          'DONCHIAN': 'calcDonchianFromPrices'
+        };
+        const _fromPricesProp = {
+          'BOLLINGER_UPPER': { func: 'calcBollinger', prop: 'upper' },
+          'BOLLINGER_LOWER': { func: 'calcBollinger', prop: 'lower' },
+          'STOCHASTIC_K': { func: 'calcStochasticFromPrices', prop: 'k' },
+          'STOCHASTIC_D': { func: 'calcStochasticFromPrices', prop: 'd' },
+          'AROON_UP': { func: 'calcAroonFromPrices', prop: 'up' },
+          'AROON_DOWN': { func: 'calcAroonFromPrices', prop: 'down' },
+          'ICHIMOKU_TENKAN': { func: 'calcIchimokuFromPrices', prop: 'tenkanSen' },
+          'ICHIMOKU_KIJUN': { func: 'calcIchimokuFromPrices', prop: 'kijunSen' },
+          'KELTNER_UPPER': { func: 'calcKeltner', prop: 'upper' },
+          'KELTNER_LOWER': { func: 'calcKeltner', prop: 'lower' },
+          'DONCHIAN_HIGH': { func: 'calcDonchianFromPrices', prop: 'upper' },
+          'DONCHIAN_LOW': { func: 'calcDonchianFromPrices', prop: 'lower' }
+        };
+        const _sarProp = { 'PARABOLIC_SAR': 'sar' };
+        if (_simpleIndicators[_fn]) {
+          return `indicators.${_simpleIndicators[_fn]}(prices${_args})`;
         }
+        if (_fromPricesIndicators[_fn]) {
+          const _prop = _sarProp[_fn];
+          return `indicators.${_fromPricesIndicators[_fn]}(prices${_args})` + (_prop ? `.${_prop}` : '');
+        }
+        if (_fromPricesProp[_fn]) {
+          return `(indicators.${_fromPricesProp[_fn].func}(prices${_args}) || {}).${_fromPricesProp[_fn].prop}`;
+        }
+        if (_fn === 'LAST_PRICE') return `prices[prices.length - 1]`;
+        if (_fn === 'VOLUME') return `0`;
+        if (_fn === 'OBV') return `indicators.calcOBV(prices, prices.map(() => 1))`;
+        if (_fn === 'VWAP') return `indicators.calcVWAP(prices, prices, prices, prices.map(() => 1))`;
+        if (_fn === 'CMF') return `indicators.calcCMF(prices, prices, prices, prices.map(() => 1)${_args})`;
+        if (_fn === 'ULTIMATE_OSC') return `indicators.calcUltimateOscillator(prices, prices, prices)`;
+        if (_fn === 'CHAIKIN_VOL') return `indicators.calcChaikinVolatility(prices, prices${_args})`;
+        if (_fn === 'SUPERTREND') return `indicators.calcSupertrend ? indicators.calcSupertrend(prices${_args}) : null`;
         return `${expr.name}(${expr.args.map(a => this.generateExpr(a)).join(', ')})`;
+      }
       case 'MemberExpr':
         return `${this.generateExpr(expr.object)}.${expr.property}`;
       case 'IndexExpr':

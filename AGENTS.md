@@ -152,10 +152,18 @@
 - **80+ commands** across 16 categories: Trading, Variables, Control Flow, AI/Analysis, Data Fetch, Agent Orchestration, Advanced, Functions, TradingView-Style, Bloomberg/Data Access, Time/Schedule, Portfolio, Economic/Political, Scientific/Quantitative, Utility, PRT Compatibility.
 - **Variable tooltips**: `INPUT_*` declarations and `DEF` comments become editable fields and tooltips in the bot dashboard.
 - **Save pipeline**: Compile & Save dialog → writes `.cjs` to `strategies/` → bot engine auto-discovers → ClawScript strategies appear in separate dropdown section with `[CS]` badge.
-- **API endpoints**: `GET/POST /api/clawscript/strategies`, `DELETE /api/clawscript/strategies/:name`, `GET /api/clawscript/templates`, `POST /api/clawscript/backtest`.
+- **API endpoints**: `GET/POST /api/clawscript/strategies`, `DELETE /api/clawscript/strategies/:name`, `GET /api/clawscript/templates`, `POST /api/clawscript/backtest`, `GET /api/clawscript/results`, `POST /api/clawscript/results`, `POST /api/clawscript/sync`.
 - **Simulation & Backtest**: Instrument selector for any IG epic, multi-tier data fallback (IG API → DB-cached candles → in-memory stream ticks → mock data). Green play button for simulation, separate backtest endpoint.
-- **AI Assistant**: Built-in chat panel in editor that reads code, errors, and logs to help fix issues and optimize strategies.
-- **Error highlighting**: VS Code-style red wavy underlines on error lines with gutter icons and inline annotations.
+- **AI Assistant**: Built-in chat panel with Bearer token auth from localStorage/cookie, reads code, errors, and logs.
+- **Error highlighting**: VS Code-style red wavy underlines with dynamic line height computation and scroll-sync.
+- **30+ indicators**: RSI, EMA, SMA, MACD, ATR, ADX, Bollinger Upper/Lower, Stochastic K/D, CCI, Williams %R, ROC, Aroon, Ichimoku, Parabolic SAR, Keltner, Donchian, OBV, VWAP, CMF, ZScore, Supertrend, and more.
+- **Operator nodes**: Round/circular nodes in flow builder for Arithmetic, Comparison, Logical, Crossover, String operators with multi-port I/O.
+- **Flow toolbar**: Connect mode, Delete, Select All, Zoom, Auto-Layout, Export PNG, Undo/Redo, Clear All.
+- **Animated flow execution**: Active node glow, flowing dash paths, real values on nodes, result coloring, speed control (Fast/Normal/Slow/Step).
+- **Command info icons**: ⓘ icons in sidebar showing floating doc cards per command.
+- **Visual output popup**: Draggable results modal with Simulation, Backtest, and Flow Trace tabs.
+- **Standalone editor**: `/__openclaw__/canvas/clawscript-editor.html` — full editor via "Code" link in top nav.
+- **Single-source sync**: `.openclaw/canvas/sync-clawscript.sh` copies canonical sources to `clawscript-installer/`.
 - **PRT compatibility**: 40+ ProRealTime ProBuilder commands with `PRT_` prefix.
 - **Full docs / Handbook**: `clawscript-installer/docs/CLAWSCRIPT.md` (complete language reference), `/__openclaw__/canvas/clawscript-docs.html` (interactive docs).
 - **GitHub**: https://github.com/JoeSzeles/clawscript (separate repo, not main app git).
