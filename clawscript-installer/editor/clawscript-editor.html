@@ -5,14 +5,22 @@
 <title>ClawScript Editor</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 0; padding-top: 40px; overflow: hidden; }
-#csEditorRoot { width: 100vw; height: calc(100vh - 40px); }
+html, body { height: 100%; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0d1117; color: #c9d1d9; overflow: hidden; }
+#csEditorRoot { width: 100%; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 </style>
 </head>
 <body>
 <div id="csEditorRoot"></div>
-<script src="/__openclaw__/canvas/ig-clawscript-flow.js"></script>
-<script src="/__openclaw__/canvas/ig-clawscript-ui.js"></script>
-<script src="/nav-inject.js"></script>
+<script src="ig-clawscript-flow.js"></script>
+<script src="ig-clawscript-ui.js"></script>
+<script>
+(function() {
+  var s = document.createElement('script');
+  s.src = '/nav-inject.js';
+  s.onerror = function() {};
+  document.body.appendChild(s);
+})();
+</script>
 </body>
 </html>

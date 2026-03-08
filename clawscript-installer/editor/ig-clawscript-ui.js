@@ -194,8 +194,11 @@ function buildEditorUI() {
 
   root.innerHTML = '' +
   '<style>' +
-  '#csEditorRoot { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }' +
-  '.cs-toolbar { display:flex; gap:6px; padding:8px 0; flex-wrap:wrap; align-items:center; border-bottom:1px solid #30363d; margin-bottom:8px; }' +
+  '#csEditorRoot { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding:0 8px; }' +
+  '#csEditorRoot.cs-standalone { display:flex; flex-direction:column; overflow:hidden; }' +
+  '#csEditorRoot.cs-standalone .cs-main { flex:1; min-height:0; }' +
+  '#csEditorRoot.cs-standalone .cs-bottom-panels { flex-shrink:0; }' +
+  '.cs-toolbar { display:flex; gap:6px; padding:8px 0; flex-wrap:wrap; align-items:center; border-bottom:1px solid #30363d; margin-bottom:8px; flex-shrink:0; }' +
   '.cs-toolbar button, .cs-toolbar select { padding:4px 10px; border-radius:4px; font-size:12px; cursor:pointer; border:1px solid #30363d; background:#21262d; color:#c9d1d9; white-space:nowrap; }' +
   '.cs-toolbar button:hover { border-color:#58a6ff; }' +
   '.cs-toolbar button.cs-active { background:#1f6feb; border-color:#58a6ff; color:#fff; }' +
@@ -490,6 +493,11 @@ function buildEditorUI() {
       '</div>' +
     '</div>' +
   '</div>';
+
+  if (root.style.height && root.style.height.indexOf('vh') >= 0 ||
+      root.parentElement === document.body && getComputedStyle(root).height !== 'auto') {
+    root.classList.add('cs-standalone');
+  }
 
   loadSavedScripts();
   attachEditorEvents();
