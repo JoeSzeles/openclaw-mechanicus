@@ -41,21 +41,25 @@ class VoiceManager {
       this._supported = true;
       this._useServerSTT = false;
       this._recognition = new SpeechRecognitionCtor();
-      this._recognition!.continuous = false;
+      this._recognition!.continuous = true;
       this._recognition!.interimResults = false;
       this._recognition!.lang = "en-US";
 
       this._recognition!.onresult = (event: SpeechRecognitionEvent) => {
-        const transcript = event.results[0]?.[0]?.transcript ?? "";
-        if (transcript && this._onTranscript) {
-          this._onTranscript(transcript);
+        const last = event.results[event.results.length - 1];
+        if (last?.isFinal) {
+          const transcript = last[0]?.transcript ?? "";
+          if (transcript && this._onTranscript) {
+            this._onTranscript(transcript);
+          }
         }
       };
 
       this._recognition!.onend = () => {
+        const wasListening = this._listening;
         this._listening = false;
         this._notify();
-        if (this._voiceModeActive) {
+        if (wasListening && this._voiceModeActive) {
           setTimeout(() => this.startListening(), 300);
         }
       };
@@ -63,6 +67,9 @@ class VoiceManager {
       this._recognition!.onerror = (event: SpeechRecognitionErrorEvent) => {
         if (event.error !== "no-speech" && event.error !== "aborted") {
           console.warn("[voice] Recognition error:", event.error);
+        }
+        if (event.error === "no-speech" && this._listening && this._voiceModeActive) {
+          return;
         }
         this._listening = false;
         this._notify();
