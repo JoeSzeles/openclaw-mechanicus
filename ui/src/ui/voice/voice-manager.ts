@@ -15,6 +15,11 @@ class VoiceManager {
   private _onStateChange: StateCallback | null = null;
   private _supported = false;
   private _synthSupported = false;
+  private _useServerSTT = false;
+  private _mediaRecorder: MediaRecorder | null = null;
+  private _audioChunks: Blob[] = [];
+  private _mediaStream: MediaStream | null = null;
+  private _sttFailCount = 0;
 
   constructor() {
     this._speakerEnabled = localStorage.getItem(LS_KEY_SPEAKER) === "true";
@@ -27,10 +32,12 @@ class VoiceManager {
 
     const SpeechRecognitionCtor =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    this._supported = Boolean(SpeechRecognitionCtor);
+    const hasNativeSTT = Boolean(SpeechRecognitionCtor);
     this._synthSupported = "speechSynthesis" in window;
 
-    if (this._supported) {
+    if (hasNativeSTT) {
+      this._supported = true;
+      this._useServerSTT = false;
       this._recognition = new SpeechRecognitionCtor();
       this._recognition!.continuous = false;
       this._recognition!.interimResults = false;
@@ -58,6 +65,9 @@ class VoiceManager {
         this._listening = false;
         this._notify();
       };
+    } else if (typeof MediaRecorder !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+      this._supported = true;
+      this._useServerSTT = true;
     }
 
     this._initBluetoothDetection();
@@ -96,7 +106,12 @@ class VoiceManager {
   }
 
   startListening() {
-    if (!this._supported || !this._recognition || this._listening) return;
+    if (!this._supported || this._listening) return;
+    if (this._useServerSTT) {
+      this._startServerSTT();
+      return;
+    }
+    if (!this._recognition) return;
     try {
       this._recognition.start();
       this._listening = true;
@@ -107,7 +122,12 @@ class VoiceManager {
   }
 
   stopListening() {
-    if (!this._recognition || !this._listening) return;
+    if (!this._listening) return;
+    if (this._useServerSTT) {
+      this._stopServerSTT();
+      return;
+    }
+    if (!this._recognition) return;
     try {
       this._recognition.stop();
     } catch {
@@ -115,6 +135,81 @@ class VoiceManager {
     }
     this._listening = false;
     this._notify();
+  }
+
+  private async _startServerSTT() {
+    try {
+      this._audioChunks = [];
+      this._mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : "audio/ogg;codecs=opus";
+      this._mediaRecorder = new MediaRecorder(this._mediaStream, { mimeType });
+      this._mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) this._audioChunks.push(e.data);
+      };
+      this._mediaRecorder.onstop = () => {
+        this._sendAudioToServer();
+      };
+      this._mediaRecorder.start();
+      this._listening = true;
+      this._notify();
+    } catch (e) {
+      console.warn("[voice] Could not start recording:", e);
+      this._listening = false;
+      this._notify();
+    }
+  }
+
+  private _stopServerSTT() {
+    if (this._mediaRecorder && this._mediaRecorder.state !== "inactive") {
+      this._mediaRecorder.stop();
+    }
+    if (this._mediaStream) {
+      this._mediaStream.getTracks().forEach(t => t.stop());
+      this._mediaStream = null;
+    }
+    this._listening = false;
+    this._notify();
+  }
+
+  private async _sendAudioToServer() {
+    if (this._audioChunks.length === 0) return;
+    const blob = new Blob(this._audioChunks, { type: this._audioChunks[0].type || "audio/webm" });
+    this._audioChunks = [];
+    if (blob.size < 1000) return;
+    const ext = blob.type.includes("ogg") ? "ogg" : blob.type.includes("mp4") ? "mp4" : "webm";
+    const formData = new FormData();
+    formData.append("file", blob, `recording.${ext}`);
+    try {
+      const token = localStorage.getItem("oc-token") ||
+        document.cookie.split(";").map(c => c.trim()).find(c => c.startsWith("oc-token="))?.split("=")[1] || "";
+      const resp = await fetch("/api/voice/transcribe", {
+        method: "POST",
+        headers: token ? { "Authorization": "Bearer " + token } : {},
+        body: formData,
+      });
+      const data = await resp.json();
+      if (data.ok && data.text && data.text.trim()) {
+        this._onTranscript?.(data.text.trim());
+        this._sttFailCount = 0;
+      } else if (data.error) {
+        console.warn("[voice] Server transcription error:", data.error);
+        this._sttFailCount++;
+      }
+    } catch (e) {
+      console.warn("[voice] Server transcription failed:", e);
+      this._sttFailCount++;
+    }
+    if (this._voiceModeActive && this._sttFailCount < 5) {
+      const delay = Math.min(300 * Math.pow(2, this._sttFailCount), 10000);
+      setTimeout(() => this.startListening(), delay);
+    } else if (this._sttFailCount >= 5) {
+      console.warn("[voice] Too many STT failures, stopping voice mode");
+      this.setVoiceMode(false);
+    }
   }
 
   toggleListening() {

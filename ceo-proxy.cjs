@@ -90,7 +90,7 @@ function isLoginExempt(req) {
       p.startsWith("/api/ig/pricehistory") || p.startsWith("/api/ig/watchlists") || p.startsWith("/api/ig/activity") ||
       p.startsWith("/api/ig/session") || p === "/api/ig/refresh-snapshots" ||
       p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/strategy-templates") || p.startsWith("/api/ig/proofread") || p.startsWith("/api/ig/watchedlist") || p.startsWith("/api/ig/scalper") ||
-      p.startsWith("/api/agents/") || p.startsWith("/api/clawscript/") ||
+      p.startsWith("/api/agents/") || p.startsWith("/api/clawscript/") || p.startsWith("/api/voice/") ||
       p.startsWith("/api/bots") || p.startsWith("/api/processes")) {
     if (hasValidBearerToken(req)) return true;
   }
@@ -4778,6 +4778,96 @@ async function handleApi(req, res) {
     return json(res, 201, { ok: true, taskId: task.id, workerName: w.name }), true;
   }
 
+  async function handleVoiceApi(req, res, p) {
+    if (req.method === "POST" && p === "/api/voice/transcribe") {
+      const groqKey = process.env.GROQ_API_KEY;
+      if (!groqKey) return json(res, 500, { error: "GROQ_API_KEY not configured" });
+      const contentType = req.headers["content-type"] || "";
+      if (!contentType.includes("multipart/form-data")) return json(res, 400, { error: "Expected multipart/form-data" });
+      const contentLength = parseInt(req.headers["content-length"] || "0", 10);
+      const MAX_AUDIO_SIZE = 10 * 1024 * 1024;
+      if (contentLength > MAX_AUDIO_SIZE) return json(res, 413, { error: "Audio file too large (max 10MB)" });
+      try {
+        const raw = await readBody(req, MAX_AUDIO_SIZE);
+        if (raw.length > MAX_AUDIO_SIZE) return json(res, 413, { error: "Audio file too large (max 10MB)" });
+        const boundary = contentType.split("boundary=")[1];
+        if (!boundary) return json(res, 400, { error: "Missing boundary" });
+        const parts = parseMultipart(raw, boundary);
+        const audioPart = parts.find(p => p.name === "file");
+        if (!audioPart || !audioPart.data || audioPart.data.length === 0) return json(res, 400, { error: "Missing audio file" });
+        const https = require("https");
+        const formBoundary = "----VoiceBoundary" + Date.now();
+        const filename = audioPart.filename || "audio.webm";
+        const mimeType = audioPart.contentType || "audio/webm";
+        const header = Buffer.from(
+          `--${formBoundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`
+        );
+        const modelField = Buffer.from(
+          `\r\n--${formBoundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-large-v3-turbo\r\n--${formBoundary}--\r\n`
+        );
+        const postBody = Buffer.concat([header, audioPart.data, modelField]);
+        const result = await new Promise((resolve, reject) => {
+          const r = https.request({
+            hostname: "api.groq.com", port: 443, path: "/openai/v1/audio/transcriptions",
+            method: "POST",
+            headers: {
+              "Authorization": "Bearer " + groqKey,
+              "Content-Type": "multipart/form-data; boundary=" + formBoundary,
+              "Content-Length": postBody.length,
+            },
+            timeout: 30000,
+          }, (resp) => {
+            const chunks = [];
+            resp.on("data", c => chunks.push(c));
+            resp.on("end", () => {
+              try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+              catch (e) { reject(new Error("Invalid Groq response")); }
+            });
+          });
+          r.on("error", reject);
+          r.on("timeout", () => { r.destroy(); reject(new Error("Groq timeout")); });
+          r.write(postBody);
+          r.end();
+        });
+        if (result.error) return json(res, 502, { error: result.error.message || "Groq API error" });
+        return json(res, 200, { text: result.text || "", ok: true });
+      } catch (e) {
+        console.error("[voice] Transcribe error:", e.message);
+        return json(res, 500, { error: "Transcription failed: " + e.message });
+      }
+    }
+    return json(res, 404, { error: "Not found" });
+  }
+
+  function parseMultipart(buf, boundary) {
+    const parts = [];
+    const boundaryBuf = Buffer.from("--" + boundary);
+    let start = 0;
+    const indices = [];
+    for (let i = 0; i <= buf.length - boundaryBuf.length; i++) {
+      if (buf.slice(i, i + boundaryBuf.length).equals(boundaryBuf)) indices.push(i);
+    }
+    for (let idx = 0; idx < indices.length - 1; idx++) {
+      const partStart = indices[idx] + boundaryBuf.length + 2;
+      const partEnd = indices[idx + 1];
+      const partBuf = buf.slice(partStart, partEnd);
+      const headerEnd = partBuf.indexOf("\r\n\r\n");
+      if (headerEnd === -1) continue;
+      const headerStr = partBuf.slice(0, headerEnd).toString();
+      const data = partBuf.slice(headerEnd + 4, partBuf.length - 2);
+      const nameMatch = headerStr.match(/name="([^"]+)"/);
+      const filenameMatch = headerStr.match(/filename="([^"]+)"/);
+      const ctMatch = headerStr.match(/Content-Type:\s*(.+)/i);
+      parts.push({
+        name: nameMatch ? nameMatch[1] : "",
+        filename: filenameMatch ? filenameMatch[1] : null,
+        contentType: ctMatch ? ctMatch[1].trim() : null,
+        data,
+      });
+    }
+    return parts;
+  }
+
   if (p.startsWith("/api/ig/")) {
     if (p === "/api/ig/logs/scalper-trades") {
       try {
@@ -4800,6 +4890,7 @@ async function handleApi(req, res) {
     await handleIgApi(req, res, p); return true;
   }
   if (p.startsWith("/api/clawscript/")) { await handleClawScriptApi(req, res, p); return true; }
+  if (p.startsWith("/api/voice/")) { await handleVoiceApi(req, res, p); return true; }
   if (p.startsWith("/api/agents/")) { await handleAgentsApi(req, res, p); return true; }
   if (p.startsWith("/api/bots")) { await handleBotsApi(req, res, p); return true; }
   if (p.startsWith("/api/processes")) { await handleProcesses(req, res, p); return true; }
