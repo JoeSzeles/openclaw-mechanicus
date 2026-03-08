@@ -1,4 +1,4 @@
-modules = ["swift-5.8", "bash", "nodejs-22", "postgresql-16", "python-3.11"]
+modules = ["swift-5.8", "bash", "nodejs-22", "python-3.11", "postgresql-16"]
 [agent]
 expertMode = true
 integrations = ["github:1.0.0"]
