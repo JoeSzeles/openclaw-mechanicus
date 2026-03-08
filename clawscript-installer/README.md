@@ -2,9 +2,12 @@
 
 A domain-specific language (DSL) for writing automated trading strategies in [OpenClaw](https://github.com/openclaw). Write strategies in simple, readable commands — ClawScript compiles them to JavaScript classes that run inside the Trade Claw Engine.
 
+![ClawScript Editor — Code + Flow Builder + AI Assistant](screenshots/clawscript-full-editor.png)
+
 ## Features
 
 - **80+ commands** across 16 categories: Trading, Variables, Control Flow, AI/Analysis, Data Fetch, Agent Orchestration, Advanced, Functions, TradingView-Style, Bloomberg/Data Access, Time/Schedule, Portfolio, Economic/Political, Scientific/Quantitative, Utility, and PRT Compatibility (40+ ProRealTime commands)
+- **21 Automation Commands** — define tasks, chain workflows, schedule cron jobs, send notifications via chat channels and email, read/write/execute files, and publish scripts — all from within `.cs` scripts
 - **Visual Flow Builder** — drag-and-drop node editor with bidirectional code-to-flow synchronization
 - **Operator Nodes** — round/circular operator nodes (Arithmetic, Comparison, Logical, Crossover, String) with multi-port I/O
 - **Flow Toolbar** — Connect mode, Delete, Select All, Zoom In/Out/Fit, Auto-Layout, Export PNG, Undo/Redo, Clear All
@@ -16,6 +19,7 @@ A domain-specific language (DSL) for writing automated trading strategies in [Op
 - **AI Assistant** — built-in chat panel with Bearer token auth, reads code/errors/logs to help fix issues
 - **Strategy Compiler** — compiles `.cs` scripts to production-ready `.cjs` strategy modules
 - **Save & Deploy Pipeline** — save dialog with strategy name/filename, auto-deploy to `strategies/` for bot engine discovery
+- **Run Live** — one-click deployment of compiled strategies as persistent background processes
 - **Simulation & Backtest** — test strategies with real or cached price data; green play button, instrument selector, multi-tier data fallback (API → DB cache → stream ticks → mock)
 - **AI Integration** — query AI models, generate scripts, analyze logs, and scan sentiment
 - **Agent Orchestration** — spawn agents, manage sessions, mutate configs at runtime
@@ -25,6 +29,76 @@ A domain-specific language (DSL) for writing automated trading strategies in [Op
 - **Export** — `.cs` source, `.json` AST, `.js` compiled output, `.png` flow diagram
 - **Single-Source Sync** — `sync-clawscript.sh` script keeps installer in sync with canonical sources
 - **221 tests** — 82 parser tests + 139 pipeline tests, 100% pass rate
+
+## Screenshots
+
+### Code Editor + Flow Builder + AI Assistant
+![Full editor with code, visual flow builder, AI chat, and simulation output](screenshots/clawscript-full-editor.png)
+
+The editor combines a syntax-highlighted code pane (left), a visual flow builder (right), an Output/Logs panel (bottom-left), and an AI Assistant chat (bottom-right). The toolbar provides Compile & Save, speed controls, instrument selector, Backtest, and Run Live buttons.
+
+### Visual Flow Builder
+![Flow builder with drag-and-drop nodes and operator connections](screenshots/clawscript-flow-builder.png)
+
+The flow view renders ClawScript as a directed graph. Rectangular nodes represent commands (trading, variables, control flow), circular nodes represent operators (AND, OR, comparisons, crossovers). The Commands sidebar organizes all 80+ blocks into collapsible categories.
+
+### Simulation Output
+![Simulation running with parsed statements and indicator values](screenshots/clawscript-simulation.png)
+
+Real-time simulation output showing parsed statement count, data fetching with automatic fallback (API → mock data), and live indicator computation (EMA, RSI, MACD).
+
+## OpenClaw Automation
+
+ClawScript v1.1.0 introduces 21 automation commands via the `openclaw-automation` module. These commands let scripts define reusable tasks, chain workflows, schedule recurring jobs, and send notifications — turning ClawScript from a strategy language into a full workflow automation DSL.
+
+### Automation Commands
+
+| Command | Description |
+|---------|-------------|
+| `TASK_DEFINE` | Define a named task with a body — `TASK_DEFINE <name> ... ENDTASK` |
+| `TASK_ASSIGN` | Assign a task to an agent — `TASK_ASSIGN <task> <agent>` |
+| `TASK_CHAIN` | Run tasks in sequence — `TASK_CHAIN <task1> <task2> [...]` |
+| `TASK_PARALLEL` | Run tasks concurrently — `TASK_PARALLEL <task1> <task2> [...]` |
+| `TASK_SCHEDULE` | Schedule recurring task — `TASK_SCHEDULE <task> <cron>` |
+| `TASK_LOG` | Log from within a task — `TASK_LOG <message>` |
+| `TASK_SHOW_FLOW` | Display task execution flow diagram |
+| `AGENT_SPAWN` | Create a new agent — `AGENT_SPAWN <name> <prompt>` |
+| `AGENT_CALL` | Call an agent — `AGENT_CALL <agent> <command>` |
+| `AGENT_PASS` | Pass data to an agent — `AGENT_PASS <agent> <data>` |
+| `AGENT_TERMINATE` | Terminate an agent — `AGENT_TERMINATE <name>` |
+| `SKILL_CALL` | Invoke a skill — `SKILL_CALL <name> [ARGS <json>]` |
+| `FILE_READ` | Read a file — `FILE_READ <path>` |
+| `FILE_WRITE` | Write to a file — `FILE_WRITE <path> <content>` |
+| `FILE_EXECUTE` | Execute a file/script — `FILE_EXECUTE <path>` |
+| `FILE_PARSE` | Parse a file — `FILE_PARSE <path> [FORMAT <fmt>]` |
+| `CHANNEL_SEND` | Send to a channel — `CHANNEL_SEND <channel> <message>` |
+| `EMAIL_SEND` | Send email — `EMAIL_SEND <to> SUBJECT <subj> BODY <body>` |
+| `CRON_CREATE` | Create cron job — `CRON_CREATE <name> <schedule> <command>` |
+| `CRON_CALL` | Trigger a cron job manually — `CRON_CALL <name>` |
+| `PUBLISH_CANVAS` | Publish a canvas page — `PUBLISH_CANVAS <name> [VERSION <ver>]` |
+
+### Automation Example
+
+```clawscript
+TASK_DEFINE "DailyScan"
+  SET bull = BOLLINGER(20)
+  IF CLOSE > bull.upper THEN
+    CHANNEL_SEND "#trading-chat" "🚀 Bullish breakout on " + epic + "! RSI: " + rsi
+  ENDIF
+  EMAIL_SEND "trader@example.com" SUBJECT "Daily Update" BODY "Scan complete. Positions: " + POSITION_COUNT()
+ENDTASK
+
+TASK_DEFINE "RiskCheck"
+  IF DRAWDOWN(%) > 5% THEN
+    CLOSE ALL
+    CHANNEL_SEND "#alerts" "⚠️ High drawdown! All positions closed."
+  ENDIF
+ENDTASK
+
+TASK_CHAIN "DailyScan" "RiskCheck"
+TASK_ASSIGN "DailyScan" "main"
+CRON_CREATE "NightlyBackup" "0 0 * * *" "FILE_WRITE ./backup.json HISTORICAL(epic)"
+```
 
 ## Quick Start
 
@@ -99,6 +173,7 @@ clawscript/
       openclaw-tools.cjs      #   External tool execution
       openclaw-channels.cjs   #   Channel/alert management
       openclaw-nomad.cjs      #   Market scanning and allocation
+      openclaw-automation.cjs #   Task, cron, file, email, channel automation
   editor/
     ig-clawscript-ui.js       # Code editor with syntax highlighting
     ig-clawscript-flow.js     # Visual flow builder (drag-drop node editor)
@@ -115,8 +190,10 @@ clawscript/
   docs/
     CLAWSCRIPT.md             # Full language reference (agent-readable)
     clawscript-docs.html      # Interactive documentation page
+  screenshots/                # Editor and flow builder screenshots
   test/
     test-clawscript-parser.cjs  # 82-test suite
+    test-clawscript-pipeline.cjs # 139-test pipeline suite
 ```
 
 ## Command Reference
@@ -350,7 +427,7 @@ The editor includes a built-in AI assistant (right panel, next to Output/Logs):
 
 ## Simulation & Backtest
 
-- **Green play button (▶)** runs simulation with real or mock data
+- **Green play button** runs simulation with real or mock data
 - **Instrument selector**: Set any IG epic manually (e.g. `CS.D.CFAGOLD.CFA.IP` for weekend markets)
 - **Multi-tier data fallback**: IG REST API → DB-cached candles → in-memory stream ticks → mock data
 - **Server-side backtest**: Full indicator computation with up to 2000 historical candles
