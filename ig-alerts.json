@@ -255,6 +255,38 @@
       "level": "debug",
       "channel": "default",
       "timestamp": "2026-03-08T08:36:34.824Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-08T08:44:12.589Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-08T08:44:13.004Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-08T08:44:34.335Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-08T08:44:34.627Z"
     }
   ]
 }
