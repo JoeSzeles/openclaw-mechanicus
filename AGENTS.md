@@ -153,10 +153,14 @@
 - **Variable tooltips**: `INPUT_*` declarations and `DEF` comments become editable fields and tooltips in the bot dashboard.
 - **Save pipeline**: Compile & Save dialog → writes `.cjs` to `strategies/` → bot engine auto-discovers → ClawScript strategies appear in separate dropdown section with `[CS]` badge.
 - **API endpoints**: `GET/POST /api/clawscript/strategies`, `DELETE /api/clawscript/strategies/:name`, `GET /api/clawscript/templates`, `POST /api/clawscript/backtest`.
-- **Simulation & Backtest**: run against synthetic ticks or real IG price data (e.g., BTC `CS.D.BITCOIN.CFD.IP`).
+- **Simulation & Backtest**: Instrument selector for any IG epic, multi-tier data fallback (IG API → DB-cached candles → in-memory stream ticks → mock data). Green play button for simulation, separate backtest endpoint.
+- **AI Assistant**: Built-in chat panel in editor that reads code, errors, and logs to help fix issues and optimize strategies.
+- **Error highlighting**: VS Code-style red wavy underlines on error lines with gutter icons and inline annotations.
 - **PRT compatibility**: 40+ ProRealTime ProBuilder commands with `PRT_` prefix.
-- **Full docs**: `skills/clawscript/CLAWSCRIPT.md`, `/__openclaw__/canvas/clawscript-docs.html`.
+- **Full docs / Handbook**: `clawscript-installer/docs/CLAWSCRIPT.md` (complete language reference), `/__openclaw__/canvas/clawscript-docs.html` (interactive docs).
+- **GitHub**: https://github.com/JoeSzeles/clawscript (separate repo, not main app git).
 - **Naming**: UI says "Claw Trader" (not "Scalper"); API endpoints remain `/api/ig/scalper/...` for compatibility.
+- **Test suite**: 82 parser tests + 139 pipeline tests = 221 total, 100% pass rate.
 
 ## Agent-Specific Notes
 

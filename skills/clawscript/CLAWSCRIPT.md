@@ -1,24 +1,62 @@
-# ClawScript DSL Reference (Agent Skill)
+# ClawScript Handbook — Complete Language Reference
 
-ClawScript is a domain-specific language for writing automated trading strategies. Scripts are written in a simple imperative syntax and compile to JavaScript strategy classes that run inside the Trade Claw Engine.
+ClawScript is a domain-specific language (DSL) for writing automated trading strategies. Scripts are written in a simple imperative syntax and compile to JavaScript strategy classes that run inside the Trade Claw Engine.
 
 ## Quick Start
 
 ```clawscript
+// Simple RSI strategy
 DEF rsi = RSI(14)
+
 IF rsi < 30 THEN
   BUY 1 AT MARKET STOP 20 LIMIT 40 REASON "RSI oversold"
+ENDIF
+
+IF rsi > 70 THEN
+  SELL 1 AT MARKET STOP 20 REASON "RSI overbought"
 ENDIF
 ```
 
 ## Where to Find ClawScript
 
-- **Editor**: IG Dashboard → ClawScript Editor tab
+- **Editor**: IG Dashboard → ClawScript Editor tab (top nav link)
 - **Parser**: `skills/bots/clawscript-parser.cjs`
 - **Flow Builder**: `ig-clawscript-flow.js` (visual node editor)
-- **Templates**: `.openclaw/canvas/clawscript-templates/` (4 sample strategies)
+- **Templates**: `.openclaw/canvas/clawscript-templates/` (7 sample strategies)
 - **Full Docs**: `/__openclaw__/canvas/clawscript-docs.html`
 - **Compiled Strategies**: `skills/bots/strategies/` (`.cjs` files extending `BaseStrategy`)
+- **GitHub Repo**: https://github.com/JoeSzeles/clawscript
+- **Handbook (this file)**: `clawscript-installer/docs/CLAWSCRIPT.md`
+
+## Editor Features
+
+- **Syntax Highlighting**: Color-coded keywords by category (trade=green, AI=purple, data=blue, control=red)
+- **VS Code-style Error Highlighting**: Red wavy underlines on error lines, gutter icons, inline error annotations
+- **AI Assistant Panel**: Built-in chat that reads your code, errors, and logs — ask it to fix issues or explain syntax
+- **Live Parse**: Real-time parsing as you type with statement count display
+- **Instrument Selector**: Set any IG epic for simulation/backtest (not just BTC)
+- **Real Data with Fallback**: IG API → DB-cached candles → in-memory stream ticks → mock data
+- **Green Play Button**: One-click simulation with visual feedback
+- **Templates Dropdown**: 7 built-in templates across 3 sections (Default, ClawScript, Load Custom)
+- **Export**: `.cs` source, `.json` AST, `.js` compiled output
+- **Visual Flow Builder**: Drag-drop node editor with bidirectional code sync
+
+## Strategy Save & Deploy Pipeline
+
+1. Write ClawScript in the editor
+2. Click "Compile & Save" — parses, generates JS, opens save dialog
+3. Enter strategy name and filename (auto-generated)
+4. Save to Bot — strategy file saved to `strategies/` folder
+5. Strategy auto-discovered by bot engine, appears in Claw Trader dashboard with `[CS]` badge
+6. `INPUT_*` and `DEF` variables become editable fields with tooltips in bot config
+
+### API Endpoints (authenticated)
+- `GET /api/clawscript/strategies` — list saved strategies
+- `POST /api/clawscript/strategies` — save new strategy
+- `DELETE /api/clawscript/strategies/:name` — delete strategy
+- `GET /api/clawscript/strategies/:name/schema` — get config schema
+- `GET /api/clawscript/strategies/:name/source` — get source code
+- `POST /api/clawscript/backtest` — run backtest with real/cached data
 
 ## Using the Parser
 
@@ -260,15 +298,12 @@ DEF vol = VOLUME()
 
 ## Sample Templates
 
-Seven ready-to-use templates are in `.openclaw/canvas/templates/`:
+Four ready-to-use templates are in `.openclaw/canvas/clawscript-templates/`:
 
 1. **rsi-simple.cs** — Basic RSI oversold/overbought strategy
 2. **ema-crossover.cs** — EMA crossover with trailing stop
 3. **multi-indicator.cs** — RSI + MACD + Bollinger with try/catch
 4. **sentiment-scan.cs** — AI sentiment + market scanner
-5. **btc-scalper.cs** — Fast BTC scalping with RSI + EMA and tight stops
-6. **mean-reversion.cs** — Bollinger Band mean reversion with error handling
-7. **bourse-trackers.cs** — Multi-indicator approach for major index CFDs (US 500, FTSE, DAX)
 
 ## Compiled Strategy Format
 
@@ -280,171 +315,57 @@ Generated `.cjs` files extend `BaseStrategy` and export a class with:
 
 Place compiled strategies in `skills/bots/strategies/` to auto-register with the engine.
 
-## Variable Tooltips & Comment Convention
-
-ClawScript supports inline comments on variable declarations. These comments are extracted during compilation and become tooltips in the bot strategy editor UI.
-
-```clawscript
-DEF rsi_period = 14       // RSI lookback period
-DEF stop_dist = 20        // Stop distance in points
-DEF use_trailing = true   // Enable trailing stop logic
-INPUT_INT lookback DEFAULT 50   // Number of candles to analyze
-INPUT_FLOAT risk_pct DEFAULT 0.02  // Risk per trade as decimal
-```
-
-When a ClawScript strategy is loaded in the bot dashboard:
-- `INPUT_INT`, `INPUT_FLOAT`, `INPUT_BOOL`, and `INPUT_SYMBOL` declarations become editable fields
-- `DEF` variables with inline comments show the comment text as a hover tooltip
-- Standard fields not used by the strategy are greyed out with `(unused)` label
-
-## Strategy Save & Deploy Pipeline
-
-1. **Write** ClawScript in the editor (code or flow builder)
-2. **Compile & Save** — opens a dialog with strategy name and filename fields
-3. The compiled `.cjs` file is saved to `skills/bots/strategies/`
-4. The strategy loader auto-discovers and registers it
-5. In the bot dashboard, ClawScript strategies appear in a separate dropdown section
-6. `INPUT_*` variables appear as editable config fields
-7. The engine calls `evaluateEntry()` / `evaluateExit()` on each tick
-
-### API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/clawscript/strategies` | GET | List all ClawScript-compiled strategies |
-| `/api/clawscript/strategies` | POST | Save a compiled strategy file |
-| `/api/clawscript/strategies/:name` | DELETE | Remove a strategy |
-| `/api/clawscript/strategies/:name/schema` | GET | Get strategy config schema |
-| `/api/clawscript/templates` | GET | List available templates |
-| `/api/clawscript/templates/:name` | GET | Get template source code |
-| `/api/clawscript/backtest` | POST | Run backtest with historical data |
-
-## Simulation & Backtest
-
-- **Run Simulation**: Executes strategy against synthetic tick data for logic validation
-- **Run with Real Data**: Fetches real IG price candles (e.g., BTC `CS.D.BITCOIN.CFD.IP`) and uses them as tick source
-- **Run Backtest**: Sends compiled strategy + instrument + timeframe to the backtest endpoint; returns P&L, win rate, max drawdown, and trade list
-
 ## Visual Flow Builder
 
 The flow builder provides a drag-drop node editor:
-- **Toolbox sidebar**: 16 categories, 80+ command nodes
+- **Toolbox sidebar**: 16 categories, 80+ command nodes (collapsed by default)
 - **Drag & drop**: Drag commands onto the canvas
 - **Port connections**: Connect output ports to input ports
 - **Bidirectional sync**: Code changes update flow, flow changes update code
 - **Zoom/Pan**: Scroll to zoom (cursor-relative), click+drag to pan
-- **Auto-layout**: Automatic grid-based node arrangement (linear chains group into rows of 4)
+- **Auto-layout**: Smart grid layout — linear scripts display ~4 nodes per row
 - **Undo/Redo**: Ctrl+Z / Ctrl+Y
 - **Export**: PNG screenshot of flow diagram
 
-## Usage Examples
+## Simulation & Backtest
 
-### Complete RSI Strategy with Variables
+### Simulation (▶ play button)
+- Parses script and evaluates AST against price ticks
+- With "Real Data" checked: fetches from IG API for the selected instrument
+- **Fallback chain**: IG API → DB-cached candles (`/api/ig/stream/candles`) → in-memory stream ticks → mock data
+- Instrument selector allows any IG epic (e.g. `CS.D.BITCOIN.CFD.IP`, `CS.D.CFAGOLD.CFA.IP`)
+- Mock data generates 100 BTC-like ticks (~$48k-$52k) for offline testing
 
-```clawscript
-// BTC RSI Mean Reversion
-INPUT_INT rsi_period DEFAULT 14    // RSI calculation period
-INPUT_FLOAT oversold DEFAULT 30    // Oversold threshold
-INPUT_FLOAT overbought DEFAULT 70  // Overbought threshold
-INPUT_FLOAT size DEFAULT 0.5       // Position size
+### Backtest
+- Sends strategy to server-side backtest engine with full indicator computation
+- Uses same fallback chain: IG API → DB-cached → stream candles → error
+- Returns: P&L, win rate, max drawdown, trade list with entry/exit prices and times
+- Uses up to 2000 historical candles at HOUR resolution
 
-DEF rsi = RSI(rsi_period)
-DEF atr = ATR(14)                  // For dynamic stops
+## AI Assistant
 
-IF rsi < oversold THEN
-  BUY size AT MARKET STOP 20 LIMIT 40 REASON "RSI oversold"
-ENDIF
+Built into the editor's bottom panel (right side):
+- **Model selector**: CEO Agent (default, routes to OpenClaw gateway) or Grok
+- **Context-aware**: Automatically includes current code, parse errors, and recent logs in each prompt
+- **Capabilities**: Fix syntax errors, optimize strategies, explain ClawScript commands, suggest improvements
+- **Chat interface**: Full conversation history with send on Enter
 
-IF rsi > overbought THEN
-  SELL size AT MARKET STOP 20 REASON "RSI overbought"
-ENDIF
-```
+## Data Sources
 
-### EMA Crossover with Trailing Stop
+ClawScript strategies and simulations can access price data through multiple tiers:
 
-```clawscript
-DEF ema_fast = EMA(9)
-DEF ema_slow = EMA(21)
+1. **IG REST API** — live prices via `/api/ig/pricehistory/:epic` (rate-limited, may return 403 on weekends)
+2. **DB-Cached Candles** — stored in `price_candles` table from Lightstreamer stream, flushed every 10s
+3. **In-Memory Stream** — real-time tick data aggregated into candles at multiple resolutions (1s to 1D)
+4. **Mock Data** — generated sine-wave + noise for offline development
 
-IF ema_fast CROSSES OVER ema_slow THEN
-  BUY 1 AT MARKET STOP 25 REASON "EMA bullish crossover"
-  TRAILSTOP 15 ACCEL 0.02 MAX 0.2
-ENDIF
+The system automatically builds candles from tick data at all standard resolutions:
+`SECOND, SECOND_2, SECOND_5, SECOND_10, SECOND_20, SECOND_30, SECOND_40, MINUTE, MINUTE_5, MINUTE_15, HOUR, HOUR_4, DAY`
 
-IF ema_fast CROSSES UNDER ema_slow THEN
-  SELL 1 AT MARKET STOP 25 REASON "EMA bearish crossover"
-  TRAILSTOP 15 ACCEL 0.02 MAX 0.2
-ENDIF
-```
+## Test Suite
 
-### AI Sentiment with Error Handling
-
-```clawscript
-DEF rsi = RSI(14)
-DEF sentiment = 0
-
-TRY
-  AI_QUERY "Analyze current BTC market sentiment" TOOL "web_search" ARG "bitcoin sentiment"
-  SET sentiment = AI_RESULT
-
-  IF sentiment > 0.6 AND rsi < 40 THEN
-    BUY 1 AT MARKET STOP 50 LIMIT 100 REASON "Bullish sentiment + RSI dip"
-    ALERT "Sentiment BUY entry" LEVEL "info"
-  ENDIF
-CATCH err
-  ALERT "Sentiment analysis failed" LEVEL "error"
-ENDTRY
-```
-
-### Loop with Storage
-
-```clawscript
-DEF count = 0
-LOAD_VAR "trade_count" DEFAULT 0
-SET count = AI_RESULT
-
-LOOP 5 TIMES
-  DEF rsi = RSI(14)
-  IF rsi < 30 THEN
-    BUY 1 AT MARKET STOP 20 REASON "Loop iteration buy"
-    SET count = count + 1
-    STORE_VAR "trade_count" count
-  ENDIF
-  WAIT 1000
-ENDLOOP
-```
-
-### Bloomberg-Style Data Fetch
-
-```clawscript
-DEF hist = FETCH_HISTORICAL "PX_LAST" FROM "2024-01-01" TO "2024-12-31"
-DEF members = FETCH_MEMBERS "SPX Index"
-DEF gdp = ECON_DATA "GDP" COUNTRY "US" DATE "2024-Q4"
-
-IF gdp > 2.5 THEN
-  ALERT "Strong GDP — bullish bias" LEVEL "info"
-ENDIF
-```
-
-### Portfolio Management
-
-```clawscript
-DEF scan = MARKET_SCAN "forex" CRITERIA "rsi < 30" LIMIT 10
-PORTFOLIO_BUILD FROM scan NUM 5 SIZING "equal" MAX_RISK 0.02
-PORTFOLIO_REBALANCE THRESHOLD 10
-
-SCHEDULE "rebalance" AT "09:00" REPEAT "daily"
-```
-
-### PRT Compatibility
-
-```clawscript
-PRT_DEFPARAM CumulateOrders = false
-DEF rsi = PRT_RSI 14 (CLOSE)
-DEF bb = PRT_BOLLINGER 20 2 (CLOSE)
-DEF ich = PRT_ICHIMOKU 9 26 52
-
-IF PRT_CROSS(rsi, 30) THEN
-  PRT_BUY 1 AT MARKET
-ENDIF
-```
+- **82 parser tests**: Lexer, AST, code generation for all command categories
+- **139 pipeline tests**: End-to-end parse → compile → save → load across 21 categories
+- **100% pass rate** including real BTC data integration tests
+- Test runner: `skills/bots/tests/test-clawscript-parser.cjs` and `test-clawscript-pipeline.cjs`
+- Report saved to: `.openclaw/clawscript-pipeline-report.json`

@@ -285,7 +285,7 @@ FlowEngine.prototype.buildToolbox = function(parent) {
     var groupHdr = document.createElement('div');
     groupHdr.className = 'cf-toolbox-group-header';
     groupHdr.style.borderLeftColor = cat.color;
-    groupHdr.innerHTML = '<span>' + cat.label + '</span><span class="cf-tg-arrow">&#9662;</span>';
+    groupHdr.innerHTML = '<span>' + cat.label + '</span><span class="cf-tg-arrow">&#9656;</span>';
     groupHdr.addEventListener('click', function() {
       var list = group.querySelector('.cf-toolbox-items');
       var arrow = groupHdr.querySelector('.cf-tg-arrow');
@@ -296,6 +296,7 @@ FlowEngine.prototype.buildToolbox = function(parent) {
 
     var items = document.createElement('div');
     items.className = 'cf-toolbox-items';
+    items.style.display = 'none';
     cat.items.forEach(function(item) {
       var el = document.createElement('div');
       el.className = 'cf-toolbox-item';
@@ -1440,22 +1441,54 @@ FlowEngine.prototype.autoLayout = function() {
     levelNodes[lv].push(order[i]);
   }
 
-  var gapX = 30;
-  var gapY = 30;
+  var gapX = 40;
+  var gapY = 50;
   var startX = 50;
   var startY = 30;
+  var maxPerRow = 4;
 
-  for (var l = 0; l <= maxLevel + 1; l++) {
-    if (!levelNodes[l]) continue;
-    var nodesInLevel = levelNodes[l];
-    for (var ni = 0; ni < nodesInLevel.length; ni++) {
-      var node = this.nodes[nodesInLevel[ni]];
+  var linearChain = [];
+  var layoutRows = [];
+  var sortedLevels = [];
+  for (var sl = 0; sl <= maxLevel + 1; sl++) {
+    if (levelNodes[sl]) sortedLevels.push(sl);
+  }
+
+  for (var si = 0; si < sortedLevels.length; si++) {
+    var lvl = sortedLevels[si];
+    var nodesInLevel = levelNodes[lvl];
+    if (nodesInLevel.length === 1) {
+      linearChain.push(nodesInLevel[0]);
+      if (linearChain.length >= maxPerRow) {
+        layoutRows.push({ type: 'grid', nodes: linearChain.slice() });
+        linearChain = [];
+      }
+    } else {
+      if (linearChain.length > 0) {
+        layoutRows.push({ type: 'grid', nodes: linearChain.slice() });
+        linearChain = [];
+      }
+      layoutRows.push({ type: 'branch', nodes: nodesInLevel });
+    }
+  }
+  if (linearChain.length > 0) {
+    layoutRows.push({ type: 'grid', nodes: linearChain.slice() });
+  }
+
+  var curY = startY;
+  for (var ri = 0; ri < layoutRows.length; ri++) {
+    var row = layoutRows[ri];
+    var rowMaxH = 0;
+    for (var ni = 0; ni < row.nodes.length; ni++) {
+      var node = this.nodes[row.nodes[ni]];
       if (node) {
         node.x = startX + ni * (NODE_W + gapX);
+        node.y = curY;
         var nh = this.getNodeHeight(node);
-        node.y = startY + l * (nh + gapY + 20);
+        if (nh > rowMaxH) rowMaxH = nh;
       }
     }
+    curY += rowMaxH + gapY + 20;
   }
 };
 

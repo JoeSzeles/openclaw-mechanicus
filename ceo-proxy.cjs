@@ -1193,7 +1193,21 @@ async function handleClawScriptApi(req, res, p) {
         } catch (_) {}
       }
 
-      if (candles.length < 5) return json(res, 400, { error: "Insufficient price data: " + candles.length + " candles for " + epic + " " + res_ });
+      if (candles.length === 0) {
+        try {
+          const inMem = getStreamCurrentCandles(epic, res_, max);
+          if (inMem.length > 0) {
+            candles = inMem.map(c => ({
+              ts: c.ts, time: c.ts,
+              open: c.open, high: c.high, low: c.low, close: c.close,
+              volume: c.volume || 0
+            }));
+            console.log(`[clawscript-backtest] Using ${candles.length} in-memory stream candles for ${epic} ${res_}`);
+          }
+        } catch (_) {}
+      }
+
+      if (candles.length < 5) return json(res, 400, { error: "Insufficient price data: " + candles.length + " candles for " + epic + " " + res_ + ". Try using a tradeable instrument with stream data." });
 
       const trades = [];
       let openTrade = null;

@@ -197,10 +197,10 @@ function buildEditorUI() {
   '.cs-main.cs-mode-code .cs-flow-pane { display:none; }' +
   '.cs-main.cs-mode-flow { grid-template-columns:1fr; }' +
   '.cs-main.cs-mode-flow .cs-code-pane { display:none; }' +
-  '.cs-code-pane { position:relative; background:#0d1117; border:1px solid #30363d; border-radius:6px; overflow:hidden; display:flex; flex-direction:column; }' +
+  '.cs-code-pane { position:relative; background:#0d1117; border:1px solid #30363d; border-radius:6px; overflow:hidden; display:flex; flex-direction:column; min-height:0; }' +
   '.cs-code-header { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:#161b22; border-bottom:1px solid #21262d; font-size:12px; color:#8b949e; }' +
-  '.cs-editor-wrap { display:flex; flex:1; overflow:auto; }' +
-  '.cs-line-numbers { padding:8px 8px 8px 4px; text-align:right; color:#484f58; font:12px/1.6 "Fira Code",monospace; user-select:none; background:#0d1117; border-right:1px solid #21262d; min-width:32px; }' +
+  '.cs-editor-wrap { display:flex; flex:1; overflow:auto; min-height:0; }' +
+  '.cs-line-numbers { padding:8px 8px 8px 4px; text-align:right; color:#484f58; font:12px/1.6 "Fira Code",monospace; user-select:none; background:#0d1117; border-right:1px solid #21262d; min-width:32px; white-space:pre; overflow-y:hidden; }' +
   '.cs-editor { flex:1; padding:8px; font:12px/1.6 "Fira Code",monospace; color:#c9d1d9; background:#0d1117; border:none; outline:none; resize:none; tab-size:2; white-space:pre; overflow:auto; }' +
   '.cs-highlight-layer { position:absolute; top:0; left:0; right:0; bottom:0; padding:8px; font:12px/1.6 "Fira Code",monospace; pointer-events:none; white-space:pre; overflow:hidden; color:transparent; }' +
   '.cs-flow-pane { background:#0d1117; border:1px solid #30363d; border-radius:6px; overflow:hidden; display:flex; flex-direction:column; }' +
@@ -248,16 +248,36 @@ function buildEditorUI() {
   '.cf-port-label { position:absolute; bottom:-20px; font-size:8px; color:#8b949e; white-space:nowrap; text-align:center; width:24px; pointer-events:none; }' +
   '.cf-conn { cursor:pointer; pointer-events:stroke; }' +
   '.cf-conn:hover { stroke-width:3!important; filter:brightness(1.4); }' +
-  '.cs-logs-pane { margin-top:8px; background:#0d1117; border:1px solid #30363d; border-radius:6px; max-height:200px; overflow:auto; }' +
-  '.cs-logs-header { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:#161b22; border-bottom:1px solid #21262d; font-size:12px; color:#8b949e; }' +
+  '.cs-bottom-panels { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }' +
+  '.cs-logs-pane { background:#0d1117; border:1px solid #30363d; border-radius:6px; max-height:220px; overflow:hidden; display:flex; flex-direction:column; }' +
+  '.cs-logs-header { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:#161b22; border-bottom:1px solid #21262d; font-size:12px; color:#8b949e; flex-shrink:0; }' +
   '.cs-logs-header button { padding:2px 8px; border-radius:3px; font-size:11px; cursor:pointer; border:1px solid #30363d; background:#21262d; color:#c9d1d9; }' +
-  '#csLogOutput { padding:6px 10px; font:11px/1.5 "Fira Code",monospace; }' +
+  '#csLogOutput { padding:6px 10px; font:11px/1.5 "Fira Code",monospace; overflow-y:auto; flex:1; }' +
   '.cs-log-line { margin:1px 0; }' +
+  '.cs-ai-pane { background:#0d1117; border:1px solid #30363d; border-radius:6px; max-height:220px; overflow:hidden; display:flex; flex-direction:column; }' +
+  '.cs-ai-header { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:#161b22; border-bottom:1px solid #21262d; font-size:12px; color:#8b949e; flex-shrink:0; gap:6px; }' +
+  '.cs-ai-header select { padding:2px 6px; font-size:10px; background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:3px; }' +
+  '.cs-ai-messages { flex:1; overflow-y:auto; padding:6px 10px; font:11px/1.5 "Fira Code",monospace; }' +
+  '.cs-ai-msg { margin:4px 0; padding:4px 8px; border-radius:4px; max-width:90%; word-wrap:break-word; white-space:pre-wrap; }' +
+  '.cs-ai-msg-user { background:#1f6feb; color:#fff; margin-left:auto; text-align:right; }' +
+  '.cs-ai-msg-assistant { background:#21262d; color:#c9d1d9; }' +
+  '.cs-ai-msg-system { background:#3d2800; color:#f0883e; font-size:10px; font-style:italic; }' +
+  '.cs-ai-input-row { display:flex; gap:4px; padding:6px 8px; border-top:1px solid #21262d; flex-shrink:0; }' +
+  '.cs-ai-input { flex:1; padding:4px 8px; font:11px "Fira Code",monospace; background:#161b22; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; outline:none; }' +
+  '.cs-ai-input:focus { border-color:#58a6ff; }' +
+  '.cs-ai-send { padding:4px 10px; background:#1f6feb; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; }' +
+  '.cs-ai-send:hover { background:#388bfd; }' +
+  '.cs-ai-send:disabled { opacity:0.5; cursor:not-allowed; }' +
   '.cs-log-info { color:#8b949e; }' +
   '.cs-log-success { color:#2dc653; }' +
   '.cs-log-error { color:#f85149; }' +
   '.cs-log-warn { color:#f0883e; }' +
   '.cs-log-trace { color:#79c0ff; }' +
+  '.cs-line-error { background:rgba(248,81,73,0.12); border-left:3px solid #f85149; padding-left:4px; margin-left:-4px; }' +
+  '.cs-line-error-annotation { position:absolute; left:100%; margin-left:8px; color:#f85149; font-size:10px; font-style:italic; pointer-events:none; white-space:nowrap; z-index:5; background:rgba(30,10,10,0.95); padding:1px 6px; border-radius:3px; border:1px solid rgba(248,81,73,0.3); }' +
+  '.cs-error-highlight { position:absolute; pointer-events:none; z-index:1; }' +
+  '.cs-error-highlight-line { background:rgba(248,81,73,0.08); border-bottom:2px wavy #f85149; }' +
+  '.cs-error-gutter-icon { display:inline-block; width:14px; height:14px; border-radius:50%; background:#f85149; color:#fff; font-size:9px; font-weight:700; text-align:center; line-height:14px; margin-right:4px; cursor:help; }' +
   '.cs-tok-trade { color:#2dc653; font-weight:600; }' +
   '.cs-tok-ai { color:#bc8cff; font-weight:600; }' +
   '.cs-tok-data { color:#79c0ff; }' +
@@ -300,6 +320,16 @@ function buildEditorUI() {
   '.cs-paste-inner .cs-paste-btns { display:flex; gap:8px; margin-top:10px; justify-content:flex-end; }' +
   '.cs-paste-inner button { padding:6px 14px; border-radius:4px; font-size:12px; cursor:pointer; border:1px solid #30363d; background:#21262d; color:#c9d1d9; }' +
   '.cs-paste-inner button.cs-primary { background:#1f6feb; border-color:#58a6ff; color:#fff; }' +
+  '.cs-save-modal { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:9999; display:flex; align-items:center; justify-content:center; }' +
+  '.cs-save-inner { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:20px; width:500px; max-width:90vw; }' +
+  '.cs-save-inner h3 { color:#c9d1d9; margin-bottom:14px; font-size:14px; }' +
+  '.cs-save-inner label { display:block; color:#8b949e; font-size:12px; margin:8px 0 4px; }' +
+  '.cs-save-inner input { width:100%; box-sizing:border-box; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:4px; padding:8px; font-size:13px; }' +
+  '.cs-save-inner .cs-save-info { color:#8b949e; font-size:11px; margin-top:4px; }' +
+  '.cs-save-inner .cs-save-btns { display:flex; gap:8px; margin-top:14px; justify-content:flex-end; }' +
+  '.cs-save-inner button { padding:6px 14px; border-radius:4px; font-size:12px; cursor:pointer; border:1px solid #30363d; background:#21262d; color:#c9d1d9; }' +
+  '.cs-save-inner button.cs-primary { background:#1f6feb; border-color:#58a6ff; color:#fff; }' +
+  '.cs-save-inner .cs-save-status { margin-top:8px; font-size:12px; color:#2dc653; min-height:16px; }' +
   '@media (max-width:768px) { .cs-main { grid-template-columns:1fr !important; } .cs-flow-pane { min-height:300px; } }' +
   '</style>' +
 
@@ -307,7 +337,12 @@ function buildEditorUI() {
     '<button id="csBtnNew" title="New Script">New Script</button>' +
     '<button id="csBtnPaste" title="Paste Code">Paste Code</button>' +
     '<button id="csBtnCompile" title="Compile & Save">Compile & Save</button>' +
-    '<button id="csBtnSimulate" title="Run Simulation">Run Simulation</button>' +
+    '<button id="csBtnSimulate" title="Run Simulation" style="background:#1b4332;border-color:#2dc653;color:#2dc653;font-size:14px;padding:4px 12px;">&#9654;</button>' +
+    '<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#8b949e;cursor:pointer;"><input type="checkbox" id="csRealDataCheck" style="cursor:pointer;"> Real Data</label>' +
+    '<input id="csInstrumentInput" type="text" placeholder="Epic (e.g. CS.D.BITCOIN.CFD.IP)" value="CS.D.BITCOIN.CFD.IP" style="width:200px;padding:3px 8px;font-size:11px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;" title="Instrument epic for simulation/backtest">' +
+    '<button id="csBtnBacktest" title="Run Backtest with Real Data" style="background:#0c2d48;border-color:#58a6ff;color:#58a6ff;">&#9654; Backtest</button>' +
+    '<div class="cs-sep"></div>' +
+    '<select id="csTemplateSelect"><option value="">Templates...</option></select>' +
     '<div class="cs-sep"></div>' +
     '<select id="csLoadSelect"><option value="">Load Existing...</option></select>' +
     '<div class="cs-sep"></div>' +
@@ -333,9 +368,28 @@ function buildEditorUI() {
     '</div>' +
   '</div>' +
 
-  '<div class="cs-logs-pane">' +
-    '<div class="cs-logs-header"><span>Output / Logs</span><button id="csBtnClearLog">Clear</button></div>' +
-    '<div id="csLogOutput"></div>' +
+  '<div class="cs-bottom-panels">' +
+    '<div class="cs-logs-pane">' +
+      '<div class="cs-logs-header"><span>Output / Logs</span><button id="csBtnClearLog">Clear</button></div>' +
+      '<div id="csLogOutput"></div>' +
+    '</div>' +
+    '<div class="cs-ai-pane">' +
+      '<div class="cs-ai-header">' +
+        '<span>AI Assistant</span>' +
+        '<select id="csAiModelSelect">' +
+          '<option value="ceo-agent">CEO Agent (default)</option>' +
+          '<option value="grok">Grok</option>' +
+        '</select>' +
+        '<button id="csAiClearBtn" style="padding:2px 8px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid #30363d;background:#21262d;color:#c9d1d9;">Clear</button>' +
+      '</div>' +
+      '<div class="cs-ai-messages" id="csAiMessages">' +
+        '<div class="cs-ai-msg cs-ai-msg-system">AI assistant ready. I can read your code, errors, and logs. Ask me to fix issues, explain syntax, or optimize your strategy.</div>' +
+      '</div>' +
+      '<div class="cs-ai-input-row">' +
+        '<input type="text" class="cs-ai-input" id="csAiInput" placeholder="Ask about your code, errors, or strategy...">' +
+        '<button class="cs-ai-send" id="csAiSendBtn">Send</button>' +
+      '</div>' +
+    '</div>' +
   '</div>';
 
   loadSavedScripts();
@@ -392,7 +446,9 @@ function attachEditorEvents() {
   document.getElementById('csBtnPaste').addEventListener('click', openPasteModal);
   document.getElementById('csBtnCompile').addEventListener('click', compileAndSave);
   document.getElementById('csBtnSimulate').addEventListener('click', runSimulation);
+  document.getElementById('csBtnBacktest').addEventListener('click', runBacktest);
   document.getElementById('csBtnClearLog').addEventListener('click', clearLog);
+  initAiAssistant();
   document.getElementById('csBtnExportCS').addEventListener('click', exportCS);
   document.getElementById('csBtnExportJSON').addEventListener('click', exportJSON);
   document.getElementById('csBtnExportJS').addEventListener('click', exportGenJS);
@@ -403,16 +459,106 @@ function attachEditorEvents() {
     if (this.value) loadScript(this.value);
     this.value = '';
   });
+
+  var tplSelect = document.getElementById('csTemplateSelect');
+  if (tplSelect) {
+    loadTemplatesList(tplSelect);
+    tplSelect.addEventListener('change', function() {
+      if (this.value) loadTemplate(this.value);
+      this.value = '';
+    });
+  }
 }
 
-function updateLineNumbers() {
+var _csErrorLines = {};
+
+function updateLineNumbers(errorLines) {
   var editor = document.getElementById('csCodeEditor');
   var ln = document.getElementById('csLineNumbers');
   if (!editor || !ln) return;
-  var lines = editor.value.split('\n').length;
-  var nums = [];
-  for (var i = 1; i <= lines; i++) nums.push(i);
-  ln.textContent = nums.join('\n');
+  if (errorLines !== undefined) _csErrorLines = errorLines || {};
+  var lines = editor.value.split('\n');
+  var lineCount = lines.length;
+  ln.innerHTML = '';
+  for (var i = 1; i <= lineCount; i++) {
+    var span = document.createElement('div');
+    span.style.position = 'relative';
+    span.style.whiteSpace = 'nowrap';
+    if (_csErrorLines[i]) {
+      span.className = 'cs-line-error';
+      span.title = _csErrorLines[i];
+      var icon = document.createElement('span');
+      icon.className = 'cs-error-gutter-icon';
+      icon.textContent = '\u2716';
+      icon.title = _csErrorLines[i];
+      span.appendChild(icon);
+      span.appendChild(document.createTextNode(i));
+      var ann = document.createElement('span');
+      ann.className = 'cs-line-error-annotation';
+      var errText = _csErrorLines[i];
+      if (errText.length > 60) errText = errText.substring(0, 57) + '...';
+      ann.textContent = errText;
+      span.appendChild(ann);
+    } else {
+      span.textContent = i;
+    }
+    ln.appendChild(span);
+  }
+  updateErrorOverlay(lines);
+}
+
+function updateErrorOverlay(lines) {
+  var wrap = document.querySelector('.cs-editor-wrap');
+  if (!wrap) return;
+  var existing = wrap.querySelector('.cs-error-highlight');
+  if (existing) existing.remove();
+  var hasErrors = false;
+  for (var k in _csErrorLines) { hasErrors = true; break; }
+  if (!hasErrors) return;
+  var overlay = document.createElement('div');
+  overlay.className = 'cs-error-highlight';
+  overlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:1;padding:8px;font:12px/1.6 "Fira Code",monospace;overflow:hidden;';
+  for (var lineNum in _csErrorLines) {
+    var ln = parseInt(lineNum, 10);
+    if (isNaN(ln) || ln < 1) continue;
+    var lineDiv = document.createElement('div');
+    lineDiv.className = 'cs-error-highlight-line';
+    lineDiv.style.cssText = 'position:absolute;left:40px;right:0;height:19.2px;top:' + ((ln - 1) * 19.2 + 8) + 'px;';
+    overlay.appendChild(lineDiv);
+  }
+  wrap.style.position = 'relative';
+  wrap.appendChild(overlay);
+}
+
+function loadTemplatesList(selectEl) {
+  fetch('/__openclaw__/canvas/api/clawscript/templates')
+    .then(function(r) { return r.json(); })
+    .then(function(templates) {
+      if (!Array.isArray(templates) || templates.length === 0) return;
+      for (var i = 0; i < templates.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = templates[i].name;
+        opt.textContent = templates[i].name + (templates[i].description ? ' — ' + templates[i].description : '');
+        selectEl.appendChild(opt);
+      }
+    })
+    .catch(function() {});
+}
+
+function loadTemplate(name) {
+  fetch('/__openclaw__/canvas/api/clawscript/templates/' + encodeURIComponent(name))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data || !data.content) { csLog('Template not found: ' + name, 'error'); return; }
+      var editor = document.getElementById('csCodeEditor');
+      if (!editor) return;
+      editor.value = data.content;
+      updateLineNumbers();
+      saveDraft();
+      autoParse();
+      csLog('Loaded template: ' + name, 'success');
+    })
+    .catch(function(err) { csLog('Failed to load template: ' + err.message, 'error'); });
 }
 
 function setViewMode(mode) {
@@ -466,6 +612,45 @@ function openPasteModal() {
   });
 }
 
+function extractErrorLine(code, errorMsg) {
+  var lineMatch = errorMsg.match(/line\s+(\d+)/i);
+  if (lineMatch) return parseInt(lineMatch[1], 10);
+  var atLine = errorMsg.match(/at\s+line\s+(\d+)/i) || errorMsg.match(/\(line\s*(\d+)\)/i);
+  if (atLine) return parseInt(atLine[1], 10);
+  var colMatch = errorMsg.match(/position\s+(\d+)/i) || errorMsg.match(/index\s+(\d+)/i) || errorMsg.match(/char\s+(\d+)/i);
+  if (colMatch) {
+    var charPos = parseInt(colMatch[1], 10);
+    var lines = code.substring(0, charPos).split('\n');
+    return lines.length;
+  }
+  var tokenMatch = errorMsg.match(/token\s+#?(\d+)/i);
+  if (tokenMatch) {
+    var tokIdx = parseInt(tokenMatch[1], 10);
+    var tokens = csLexer(code);
+    if (tokIdx < tokens.length) {
+      var tokenPos = tokens[tokIdx].index || 0;
+      return code.substring(0, tokenPos).split('\n').length;
+    }
+  }
+  var quotedMatch = errorMsg.match(/['"]([A-Z_]+)['"]/);
+  if (quotedMatch) {
+    var badToken = quotedMatch[1];
+    var codeLines = code.split('\n');
+    for (var i = 0; i < codeLines.length; i++) {
+      if (codeLines[i].toUpperCase().indexOf(badToken) >= 0) return i + 1;
+    }
+  }
+  var unexpMatch = errorMsg.match(/unexpected\s+(?:token\s+)?['"]?(\w+)/i);
+  if (unexpMatch) {
+    var unexpTok = unexpMatch[1];
+    var cLines = code.split('\n');
+    for (var j = 0; j < cLines.length; j++) {
+      if (cLines[j].indexOf(unexpTok) >= 0) return j + 1;
+    }
+  }
+  return null;
+}
+
 function autoParse() {
   var editor = document.getElementById('csCodeEditor');
   var status = document.getElementById('csParseStatus');
@@ -475,6 +660,7 @@ function autoParse() {
     status.textContent = '';
     currentAST = null;
     clearFlowCanvas();
+    updateLineNumbers({});
     return;
   }
   try {
@@ -482,11 +668,25 @@ function autoParse() {
     currentAST = result.ast;
     currentJS = result.js;
     status.innerHTML = '<span style="color:#2dc653">Parsed OK (' + result.ast.body.length + ' statements)</span>';
+    updateLineNumbers({});
     renderFlow(result.ast);
   } catch(e) {
-    status.innerHTML = '<span style="color:#f85149">Parse Error: ' + escapeHtml(e.message) + '</span>';
+    var errMsg = e.message || 'Unknown error';
+    status.innerHTML = '<span style="color:#f85149">Parse Error: ' + escapeHtml(errMsg) + '</span>';
     currentAST = null;
     currentJS = '';
+    var errorLines = {};
+    var errLine = extractErrorLine(code, errMsg);
+    if (errLine) {
+      errorLines[errLine] = errMsg;
+    } else if (e._csTokenIndex !== undefined) {
+      var before = code.substring(0, e._csTokenIndex).split('\n');
+      errorLines[before.length] = errMsg;
+    } else {
+      var codeLines = code.split('\n');
+      errorLines[codeLines.length] = errMsg;
+    }
+    updateLineNumbers(errorLines);
   }
 }
 
@@ -509,16 +709,183 @@ function compileAndSave() {
     for (var i = 0; i < jsLines.length; i++) {
       csLog(jsLines[i], 'trace');
     }
-
-    var name = 'custom_' + Date.now();
-    savedScripts[name] = { code: code, js: result.js, ast: result.ast, date: new Date().toISOString() };
-    localStorage.setItem('clawscript_saved', JSON.stringify(savedScripts));
-    updateLoadDropdown();
-    csLog('Strategy saved as: ' + name, 'success');
     renderFlow(result.ast);
+    showSaveDialog(code, result);
   } catch(e) {
     csLog('Compile Error: ' + e.message, 'error');
   }
+}
+
+function showSaveDialog(code, result) {
+  var existing = document.querySelector('.cs-save-modal');
+  if (existing) existing.remove();
+
+  var defaultName = '';
+  var lines = code.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var m = lines[i].match(/^\/\/\s*(.+)/);
+    if (m && m[1].trim().length > 3) { defaultName = m[1].trim(); break; }
+  }
+  if (!defaultName) defaultName = 'Custom Strategy ' + new Date().toISOString().slice(0, 10);
+
+  function nameToFilename(n) {
+    return 'custom-' + n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-strategy.cjs';
+  }
+
+  var modal = document.createElement('div');
+  modal.className = 'cs-save-modal';
+  modal.innerHTML =
+    '<div class="cs-save-inner">' +
+      '<h3>Save Strategy to Bot Dashboard</h3>' +
+      '<label>Strategy Name</label>' +
+      '<input id="csSaveName" type="text" value="' + escapeHtml(defaultName) + '" placeholder="e.g. BTC RSI Mean Reversion">' +
+      '<label>Filename</label>' +
+      '<input id="csSaveFilename" type="text" value="' + escapeHtml(nameToFilename(defaultName)) + '">' +
+      '<div class="cs-save-info">File will be saved to strategies/ folder for bot auto-discovery</div>' +
+      '<div class="cs-save-btns">' +
+        '<button id="csSaveDraftBtn">Save Draft Only</button>' +
+        '<button id="csSaveBotBtn" class="cs-primary">Save to Bot</button>' +
+        '<button id="csSaveCancelBtn">Cancel</button>' +
+      '</div>' +
+      '<div class="cs-save-status" id="csSaveStatus"></div>' +
+    '</div>';
+  document.body.appendChild(modal);
+
+  var nameInput = document.getElementById('csSaveName');
+  var filenameInput = document.getElementById('csSaveFilename');
+
+  nameInput.addEventListener('input', function() {
+    filenameInput.value = nameToFilename(nameInput.value);
+  });
+
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) modal.remove();
+  });
+
+  document.getElementById('csSaveCancelBtn').addEventListener('click', function() { modal.remove(); });
+
+  document.getElementById('csSaveDraftBtn').addEventListener('click', function() {
+    var name = nameInput.value.trim() || 'custom_' + Date.now();
+    savedScripts[name] = { code: code, js: result.js, ast: result.ast, date: new Date().toISOString() };
+    localStorage.setItem('clawscript_saved', JSON.stringify(savedScripts));
+    updateLoadDropdown();
+    csLog('Draft saved as: ' + name, 'success');
+    modal.remove();
+  });
+
+  document.getElementById('csSaveBotBtn').addEventListener('click', function() {
+    var stratName = nameInput.value.trim();
+    var filename = filenameInput.value.trim();
+    if (!stratName) { document.getElementById('csSaveStatus').textContent = 'Please enter a strategy name'; return; }
+    if (!filename.endsWith('-strategy.cjs')) { document.getElementById('csSaveStatus').textContent = 'Filename must end with -strategy.cjs'; return; }
+    document.getElementById('csSaveStatus').textContent = 'Saving...';
+    document.getElementById('csSaveStatus').style.color = '#8b949e';
+
+    var payload = {
+      name: stratName,
+      filename: filename,
+      code: code,
+      js: result.js,
+      variables: result.variables || [],
+      imports: result.imports || [],
+      metadata: result.metadata || null
+    };
+
+    fetch('/api/clawscript/strategies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        document.getElementById('csSaveStatus').textContent = 'Error: ' + data.error;
+        document.getElementById('csSaveStatus').style.color = '#f85149';
+      } else {
+        savedScripts[stratName] = { code: code, js: result.js, ast: result.ast, date: new Date().toISOString() };
+        localStorage.setItem('clawscript_saved', JSON.stringify(savedScripts));
+        updateLoadDropdown();
+        csLog('Strategy "' + stratName + '" saved to bot as ' + filename, 'success');
+        csLog('Strategy type: ' + (data.entry && data.entry.strategyType || 'custom'), 'info');
+        document.getElementById('csSaveStatus').textContent = 'Saved successfully!';
+        document.getElementById('csSaveStatus').style.color = '#2dc653';
+        setTimeout(function() { modal.remove(); }, 1200);
+      }
+    })
+    .catch(function(err) {
+      document.getElementById('csSaveStatus').textContent = 'Network error: ' + err.message;
+      document.getElementById('csSaveStatus').style.color = '#f85149';
+    });
+  });
+}
+
+function parsePricesToTicks(prices) {
+  return prices.map(function(p) {
+    var om = p.openPrice || {}, cm = p.closePrice || {}, hm = p.highPrice || {}, lm = p.lowPrice || {};
+    var mid = ((cm.bid || 0) + (cm.ask || cm.offer || 0)) / 2;
+    var bid = cm.bid || mid;
+    var offer = cm.ask || cm.offer || mid;
+    var rawTime = p.snapshotTimeUTC || p.snapshotTime || '';
+    if (typeof rawTime === 'string') rawTime = rawTime.replace(/\//g, '-');
+    return { mid: mid, bid: bid, offer: offer, time: new Date(rawTime).getTime() };
+  });
+}
+
+function fetchRealTicks(instrument, resolution, max) {
+  var epic = instrument || 'CS.D.BITCOIN.CFD.IP';
+  var res = resolution || 'MINUTE_5';
+  var count = max || 100;
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/ig/pricehistory/' + encodeURIComponent(epic) + '?resolution=' + res + '&max=' + count, true);
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          if (data && data.prices && data.prices.length > 0) {
+            resolve(parsePricesToTicks(data.prices));
+          } else {
+            reject(new Error('No price data returned for ' + epic));
+          }
+        } catch (e) { reject(e); }
+      } else {
+        reject(new Error('API returned status ' + xhr.status));
+      }
+    };
+    xhr.onerror = function() { reject(new Error('Network error fetching prices')); };
+    xhr.send();
+  });
+}
+
+function fetchStreamCandles(instrument, resolution, max) {
+  var epic = instrument || 'CS.D.BITCOIN.CFD.IP';
+  var res = resolution || 'MINUTE_5';
+  var count = max || 100;
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/ig/stream/candles?epic=' + encodeURIComponent(epic) + '&resolution=' + res + '&max=' + count, true);
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          if (data && data.prices && data.prices.length > 0) {
+            resolve(parsePricesToTicks(data.prices));
+          } else {
+            reject(new Error('No stream candles for ' + epic));
+          }
+        } catch (e) { reject(e); }
+      } else {
+        reject(new Error('Stream candles returned status ' + xhr.status));
+      }
+    };
+    xhr.onerror = function() { reject(new Error('Network error fetching stream candles')); };
+    xhr.send();
+  });
+}
+
+function getSelectedInstrument() {
+  var el = document.getElementById('csInstrumentInput');
+  return (el && el.value.trim()) || 'CS.D.BITCOIN.CFD.IP';
 }
 
 function runSimulation() {
@@ -526,6 +893,8 @@ function runSimulation() {
   if (!editor) return;
   var code = editor.value.trim();
   if (!code) { csLog('No code to simulate.', 'warn'); return; }
+
+  var useRealData = document.getElementById('csRealDataCheck') && document.getElementById('csRealDataCheck').checked;
 
   clearLog();
   csLog('=== SIMULATION START ===', 'info');
@@ -535,24 +904,118 @@ function runSimulation() {
     currentAST = result.ast;
     csLog('Parsed ' + result.ast.body.length + ' statements', 'success');
 
-    var mockTicks = [];
-    for (var i = 0; i < 100; i++) {
-      mockTicks.push({
-        mid: 50000 + Math.sin(i * 0.1) * 2000 + (Math.random() - 0.5) * 500,
-        bid: 49990 + Math.sin(i * 0.1) * 2000,
-        offer: 50010 + Math.sin(i * 0.1) * 2000,
-        time: Date.now() - (100 - i) * 60000
+    if (useRealData) {
+      var simEpic = getSelectedInstrument();
+      csLog('Fetching real price data (' + simEpic + ')...', 'info');
+      fetchRealTicks(simEpic, 'MINUTE_5', 100).then(function(ticks) {
+        csLog('Loaded ' + ticks.length + ' candles from IG API', 'success');
+        runSimWithTicks(result, ticks, 'API');
+      }).catch(function(err) {
+        csLog('IG API failed: ' + err.message + '. Trying DB/stream candles...', 'warn');
+        fetchStreamCandles(simEpic, 'MINUTE_5', 100).then(function(ticks) {
+          csLog('Loaded ' + ticks.length + ' candles from DB/stream cache', 'success');
+          runSimWithTicks(result, ticks, 'DB Cache');
+        }).catch(function(err2) {
+          csLog('DB cache also empty: ' + err2.message + '. Using mock data.', 'warn');
+          runSimulationWithMockData(result);
+        });
       });
+    } else {
+      runSimulationWithMockData(result);
     }
-    csLog('Generated 100 mock ticks (BTC-like prices ~$48k-$52k)', 'info');
-
-    simulateAST(result.ast, mockTicks);
-
-    csLog('=== SIMULATION COMPLETE ===', 'success');
-    renderFlow(result.ast);
   } catch(e) {
     csLog('Simulation Error: ' + e.message, 'error');
   }
+}
+
+function runSimWithTicks(result, ticks, source) {
+  var minP = Infinity, maxP = -Infinity;
+  for (var r = 0; r < ticks.length; r++) {
+    if (ticks[r].mid < minP) minP = ticks[r].mid;
+    if (ticks[r].mid > maxP) maxP = ticks[r].mid;
+  }
+  csLog('Source: ' + source + ' | Price range: $' + Math.round(minP) + ' - $' + Math.round(maxP), 'info');
+  simulateAST(result.ast, ticks);
+  csLog('=== SIMULATION COMPLETE (Real Data via ' + source + ') ===', 'success');
+  renderFlow(result.ast);
+}
+
+function runSimulationWithMockData(result) {
+  var mockTicks = [];
+  for (var i = 0; i < 100; i++) {
+    mockTicks.push({
+      mid: 50000 + Math.sin(i * 0.1) * 2000 + (Math.random() - 0.5) * 500,
+      bid: 49990 + Math.sin(i * 0.1) * 2000,
+      offer: 50010 + Math.sin(i * 0.1) * 2000,
+      time: Date.now() - (100 - i) * 60000
+    });
+  }
+  csLog('Generated 100 mock ticks (BTC-like prices ~$48k-$52k)', 'info');
+  simulateAST(result.ast, mockTicks);
+  csLog('=== SIMULATION COMPLETE ===', 'success');
+  renderFlow(result.ast);
+}
+
+function runBacktest() {
+  var editor = document.getElementById('csCodeEditor');
+  if (!editor) return;
+  var code = editor.value.trim();
+  if (!code) { csLog('No code to backtest.', 'warn'); return; }
+
+  clearLog();
+  csLog('=== BACKTEST START ===', 'info');
+  csLog('Sending strategy to backtest engine with real BTC data...', 'info');
+
+  var btn = document.getElementById('csBtnBacktest');
+  if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
+
+  var backtestEpic = getSelectedInstrument();
+  csLog('Instrument: ' + backtestEpic, 'info');
+  var payload = JSON.stringify({
+    code: code,
+    instrument: backtestEpic,
+    resolution: 'HOUR',
+    candleCount: 200
+  });
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/clawscript/backtest', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Backtest'; }
+    try {
+      var data = JSON.parse(xhr.responseText);
+      if (xhr.status === 200 && data.ok) {
+        csLog('=== BACKTEST RESULTS ===', 'success');
+        csLog('Instrument: ' + data.instrument + ' | Resolution: ' + data.resolution + ' | Candles: ' + data.candlesUsed, 'info');
+        csLog('Total P&L: ' + (data.totalPnl >= 0 ? '+' : '') + data.totalPnl, data.totalPnl >= 0 ? 'success' : 'error');
+        csLog('Trades: ' + data.trades + ' (Wins: ' + data.wins + ', Losses: ' + data.losses + ')', 'info');
+        csLog('Win Rate: ' + data.winRate + '%', data.winRate >= 50 ? 'success' : 'warn');
+        csLog('Max Drawdown: ' + data.maxDrawdown, data.maxDrawdown > 0 ? 'warn' : 'info');
+        csLog('', 'info');
+        if (data.tradeList && data.tradeList.length > 0) {
+          csLog('--- Trade List ---', 'info');
+          for (var t = 0; t < data.tradeList.length; t++) {
+            var tr = data.tradeList[t];
+            var pnlColor = tr.pnl >= 0 ? 'success' : 'error';
+            var entryDate = tr.entryTime ? new Date(tr.entryTime * 1000).toLocaleString() : '?';
+            var exitDate = tr.exitTime ? new Date(tr.exitTime * 1000).toLocaleString() : '?';
+            csLog('#' + (t + 1) + ' ' + tr.direction + ' x' + tr.size + ' | Entry: ' + Math.round(tr.entryPrice * 100) / 100 + ' (' + entryDate + ') → Exit: ' + Math.round(tr.exitPrice * 100) / 100 + ' (' + exitDate + ') | P&L: ' + (tr.pnl >= 0 ? '+' : '') + tr.pnl + (tr.openAtEnd ? ' [still open]' : ''), pnlColor);
+          }
+        }
+        csLog('=== BACKTEST COMPLETE ===', 'success');
+      } else {
+        csLog('Backtest Error: ' + (data.error || 'Unknown error'), 'error');
+      }
+    } catch (e) {
+      csLog('Backtest Error: ' + e.message, 'error');
+    }
+  };
+  xhr.onerror = function() {
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Backtest'; }
+    csLog('Backtest Error: Network error', 'error');
+  };
+  xhr.send(payload);
 }
 
 function simulateAST(ast, ticks) {
@@ -910,6 +1373,60 @@ function mockATR(ticks, period) {
   var sum = 0;
   for (var j = trs.length - period; j < trs.length; j++) sum += trs[j];
   return Math.round((sum / period) * 100) / 100;
+}
+
+function extractClawScriptMetadata(code) {
+  var lines = code.split('\n');
+  var inputs = [];
+  var defs = [];
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    var lineNum = i + 1;
+    var trimmed = line.trim();
+
+    var inlineCommentMatch = trimmed.match(/\/\/\s*(.+)$/);
+    var inlineComment = inlineCommentMatch ? inlineCommentMatch[1].trim() : '';
+    var prevLine = i > 0 ? lines[i - 1].trim() : '';
+    var prevComment = prevLine.indexOf('//') === 0 ? prevLine.slice(2).trim() : '';
+    var comment = inlineComment || prevComment;
+
+    var inputMatch = trimmed.match(/^(INPUT_INT|INPUT_FLOAT|INPUT_BOOL|INPUT_SYMBOL)\s+(\w+)(?:\s+DEFAULT\s+(.+?))?(?:\s*\/\/|$)/i);
+    if (inputMatch) {
+      var cmd = inputMatch[1].toUpperCase();
+      var varName = inputMatch[2];
+      var defaultVal = inputMatch[3] ? inputMatch[3].trim() : null;
+      var schemaType = 'number';
+      if (cmd === 'INPUT_BOOL') schemaType = 'boolean';
+      else if (cmd === 'INPUT_SYMBOL') schemaType = 'string';
+
+      var parsedDefault = defaultVal;
+      if (defaultVal !== null) {
+        if (schemaType === 'number') parsedDefault = parseFloat(defaultVal) || 0;
+        else if (schemaType === 'boolean') parsedDefault = defaultVal === 'true';
+        else parsedDefault = defaultVal.replace(/^["']|["']$/g, '');
+      }
+
+      inputs.push({ key: varName, type: schemaType, inputCmd: cmd, default: parsedDefault, label: comment || varName, tooltip: comment || '', line: lineNum });
+      continue;
+    }
+
+    var defMatch = trimmed.match(/^DEF\s+(\w+)\s*=\s*(.+?)(?:\s*\/\/|$)/i);
+    if (defMatch) {
+      var dVarName = defMatch[1];
+      var rawVal = defMatch[2].trim();
+      var dType = 'string';
+      var dParsed = rawVal;
+      if (/^\d+$/.test(rawVal)) { dType = 'number'; dParsed = parseInt(rawVal, 10); }
+      else if (/^\d+\.\d+$/.test(rawVal)) { dType = 'number'; dParsed = parseFloat(rawVal); }
+      else if (rawVal === 'true' || rawVal === 'false') { dType = 'boolean'; dParsed = rawVal === 'true'; }
+      else { dParsed = rawVal.replace(/^["']|["']$/g, ''); }
+
+      defs.push({ key: dVarName, type: dType, default: dParsed, label: comment || dVarName, tooltip: comment || '', line: lineNum });
+    }
+  }
+
+  return { inputs: inputs, defs: defs };
 }
 
 function parseClawScript(code) {
@@ -1331,8 +1848,21 @@ function parseClawScript(code) {
   }
   function parseFuncCallStmt() { var name = eat().value; var args = []; if (current() && current().value === '(') { eat(); while (current() && current().value !== ')') { args.push(parseExpr()); if (current() && current().value === ',') eat(); } if (current() && current().value === ')') eat(); } return { type: 'FunctionCallStmt', name: name, args: args }; }
 
-  var ast = parseProgram();
-  return { ast: ast, js: generateJSFromAST(ast), imports: Object.keys(imports), variables: Object.keys(variables) };
+  var ast;
+  try {
+    ast = parseProgram();
+  } catch(parseErr) {
+    var tok = tokens[pos] || tokens[tokens.length - 1];
+    if (tok && tok.index !== undefined) {
+      parseErr._csTokenIndex = tok.index;
+      var before = code.substring(0, tok.index);
+      var lineNum = before.split('\n').length;
+      parseErr.message = parseErr.message + ' (line ' + lineNum + ')';
+    }
+    throw parseErr;
+  }
+  var metadata = extractClawScriptMetadata(code);
+  return { ast: ast, js: generateJSFromAST(ast), imports: Object.keys(imports), variables: Object.keys(variables), metadata: metadata };
 }
 
 function generateJSFromAST(ast) {
@@ -1604,6 +2134,124 @@ function exportGenJS() {
   if (!currentJS) { csLog('No generated JS. Compile first.', 'warn'); return; }
   downloadFile('strategy.js', currentJS);
   csLog('Exported generated JavaScript.', 'success');
+}
+
+var _aiChatHistory = [];
+
+function initAiAssistant() {
+  var sendBtn = document.getElementById('csAiSendBtn');
+  var input = document.getElementById('csAiInput');
+  var clearBtn = document.getElementById('csAiClearBtn');
+  if (!sendBtn || !input) return;
+
+  sendBtn.addEventListener('click', function() { sendAiMessage(); });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAiMessage(); }
+  });
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function() {
+      _aiChatHistory = [];
+      var msgs = document.getElementById('csAiMessages');
+      if (msgs) msgs.innerHTML = '<div class="cs-ai-msg cs-ai-msg-system">Chat cleared. Ask me anything about your ClawScript code.</div>';
+    });
+  }
+}
+
+function getEditorContext() {
+  var ctx = '';
+  var editor = document.getElementById('csCodeEditor');
+  if (editor && editor.value.trim()) {
+    var code = editor.value.trim();
+    if (code.length > 2000) code = code.substring(0, 2000) + '\n... (truncated)';
+    ctx += '\n\n[CURRENT CLAWSCRIPT CODE]\n' + code;
+  }
+  var status = document.getElementById('csParseStatus');
+  if (status && status.textContent.trim()) {
+    ctx += '\n\n[PARSE STATUS] ' + status.textContent.trim();
+  }
+  if (Object.keys(_csErrorLines).length > 0) {
+    ctx += '\n\n[ERRORS]';
+    for (var line in _csErrorLines) {
+      ctx += '\nLine ' + line + ': ' + _csErrorLines[line];
+    }
+  }
+  if (simLog.length > 0) {
+    var recentLogs = simLog.slice(-20);
+    ctx += '\n\n[RECENT OUTPUT/LOGS]';
+    for (var i = 0; i < recentLogs.length; i++) {
+      ctx += '\n[' + recentLogs[i].type + '] ' + recentLogs[i].msg;
+    }
+  }
+  return ctx;
+}
+
+function appendAiMessage(role, text) {
+  var msgs = document.getElementById('csAiMessages');
+  if (!msgs) return;
+  var div = document.createElement('div');
+  div.className = 'cs-ai-msg cs-ai-msg-' + role;
+  div.textContent = text;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function sendAiMessage() {
+  var input = document.getElementById('csAiInput');
+  var sendBtn = document.getElementById('csAiSendBtn');
+  if (!input || !input.value.trim()) return;
+
+  var userMsg = input.value.trim();
+  input.value = '';
+  appendAiMessage('user', userMsg);
+
+  var contextMsg = getEditorContext();
+  var fullPrompt = 'You are a ClawScript coding assistant for IG trading strategies. ' +
+    'ClawScript is a DSL that compiles to JavaScript. ' +
+    'Help the user fix errors, improve their strategy code, and answer syntax questions. ' +
+    'Keep responses concise and actionable.' + contextMsg +
+    '\n\nUser question: ' + userMsg;
+
+  _aiChatHistory.push({ role: 'user', content: fullPrompt });
+
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '...'; }
+
+  var loadingDiv = document.createElement('div');
+  loadingDiv.className = 'cs-ai-msg cs-ai-msg-system';
+  loadingDiv.textContent = 'Thinking...';
+  loadingDiv.id = 'csAiLoading';
+  var msgs = document.getElementById('csAiMessages');
+  if (msgs) { msgs.appendChild(loadingDiv); msgs.scrollTop = msgs.scrollHeight; }
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/agent/chat', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+    var loading = document.getElementById('csAiLoading');
+    if (loading) loading.remove();
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+    try {
+      var data = JSON.parse(xhr.responseText);
+      var reply = '';
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        reply = data.choices[0].message.content;
+      } else if (data.error) {
+        reply = 'Error: ' + data.error;
+      } else {
+        reply = xhr.responseText.substring(0, 500);
+      }
+      _aiChatHistory.push({ role: 'assistant', content: reply });
+      appendAiMessage('assistant', reply);
+    } catch (e) {
+      appendAiMessage('assistant', 'Error: ' + e.message);
+    }
+  };
+  xhr.onerror = function() {
+    var loading = document.getElementById('csAiLoading');
+    if (loading) loading.remove();
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+    appendAiMessage('assistant', 'Network error. Make sure the agent is running.');
+  };
+  xhr.send(JSON.stringify({ messages: _aiChatHistory }));
 }
 
 if (document.getElementById('csEditorRoot')) {

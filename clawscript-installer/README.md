@@ -6,16 +6,18 @@ A domain-specific language (DSL) for writing automated trading strategies in [Op
 
 - **80+ commands** across 16 categories: Trading, Variables, Control Flow, AI/Analysis, Data Fetch, Agent Orchestration, Advanced, Functions, TradingView-Style, Bloomberg/Data Access, Time/Schedule, Portfolio, Economic/Political, Scientific/Quantitative, Utility, and PRT Compatibility (40+ ProRealTime commands)
 - **Visual Flow Builder** — drag-and-drop node editor with bidirectional code-to-flow synchronization
-- **Code Editor** — syntax-highlighted editor with live parsing, error highlighting, and line numbers
+- **Code Editor** — syntax-highlighted editor with live parsing, VS Code-style error highlighting with wavy underlines
+- **AI Assistant** — built-in chat panel that reads your code, errors, and logs to help fix issues and optimize strategies
 - **Strategy Compiler** — compiles `.cs` scripts to production-ready `.cjs` strategy modules
 - **Save & Deploy Pipeline** — save dialog with strategy name/filename, auto-deploy to `strategies/` for bot engine discovery
-- **Simulation & Backtest** — test strategies against mock or real IG price data, run backtests with historical candles
+- **Simulation & Backtest** — test strategies with real or cached price data; green play button, instrument selector, multi-tier data fallback (API → DB cache → stream ticks → mock)
 - **AI Integration** — query AI models, generate scripts, analyze logs, and scan sentiment
 - **Agent Orchestration** — spawn agents, manage sessions, mutate configs at runtime
 - **Technical Indicators** — RSI, EMA, SMA, MACD, Bollinger Bands, ATR, ADX, Stochastic, CCI, OBV, VWAP, ROC, and more
 - **Variable Tooltips** — `INPUT_*` declarations and `DEF` comments become editable fields and tooltips in bot dashboard
 - **PRT Compatibility** — 40+ ProRealTime ProBuilder commands (PRT_RSI, PRT_MACD, PRT_BOLLINGER, PRT_ICHIMOKU, etc.)
 - **Export** — `.cs` source, `.json` AST, `.js` compiled output, `.png` flow diagram
+- **221 tests** — 82 parser tests + 139 pipeline tests, 100% pass rate
 
 ## Quick Start
 
@@ -330,6 +332,23 @@ class MyStrategy extends BaseStrategy {
 
 Place compiled `.cjs` files in `strategies/` — the auto-discovery loader picks them up automatically.
 
+## AI Assistant
+
+The editor includes a built-in AI assistant (right panel, next to Output/Logs):
+
+- Automatically reads your current code, parse errors, and recent output logs
+- Ask it to fix errors, explain syntax, optimize strategies, or suggest improvements
+- Model selector: CEO Agent (default, routes to OpenClaw gateway) or Grok
+- Full chat history with send on Enter
+
+## Simulation & Backtest
+
+- **Green play button (▶)** runs simulation with real or mock data
+- **Instrument selector**: Set any IG epic manually (e.g. `CS.D.CFAGOLD.CFA.IP` for weekend markets)
+- **Multi-tier data fallback**: IG REST API → DB-cached candles → in-memory stream ticks → mock data
+- **Server-side backtest**: Full indicator computation with up to 2000 historical candles
+- **Results**: P&L, win rate, max drawdown, individual trade list with timestamps
+
 ## Testing
 
 ```bash
@@ -338,7 +357,7 @@ npm test
 node test/test-clawscript-parser.cjs
 ```
 
-82 tests covering all commands, expressions, operators, edge cases, and code generation.
+221 tests total (82 parser + 139 pipeline) covering all commands, expressions, operators, edge cases, code generation, module integration, stub fallbacks, and real BTC data integration.
 
 ## Sample Strategies
 

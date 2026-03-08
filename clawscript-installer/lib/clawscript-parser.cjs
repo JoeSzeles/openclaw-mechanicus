@@ -132,15 +132,20 @@ const PRT_NOARG_CMDS = new Set([
   'PRT_BARINDEX', 'PRT_DATE', 'PRT_TIME',
 ]);
 
-function lexer(code) {
+function lexer(code, opts) {
   const tokens = [];
+  const comments = [];
   const regex = /\/\/.*|\/\*[\s\S]*?\*\/|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\d+\.?\d*|[a-zA-Z_]\w*|[=><!]=|&&|\|\||[+\-*/%<>=!&|]|[(){}[\];,.:]/g;
   let match;
   while ((match = regex.exec(code))) {
     let value = match[0];
     let type;
+    const offset = match.index;
+    const line = code.substring(0, offset).split('\n').length;
     if (value.startsWith('//') || value.startsWith('/*')) {
       type = TOKEN_TYPES.COMMENT;
+      const text = value.startsWith('//') ? value.slice(2).trim() : value.slice(2, -2).trim();
+      comments.push({ line, text, offset });
     } else if (value.startsWith('"') || value.startsWith("'")) {
       type = TOKEN_TYPES.STRING;
       value = value.slice(1, -1);
@@ -160,10 +165,83 @@ function lexer(code) {
       type = TOKEN_TYPES.PUNCTUATION;
     }
     if (type !== TOKEN_TYPES.COMMENT) {
-      tokens.push({ type, value });
+      tokens.push({ type, value, line });
     }
   }
+  tokens._comments = comments;
   return tokens;
+}
+
+function extractMetadata(code) {
+  const lines = code.split('\n');
+  const inputs = [];
+  const defs = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNum = i + 1;
+    const trimmed = line.trim();
+
+    const inlineCommentMatch = trimmed.match(/\/\/\s*(.+)$/);
+    const inlineComment = inlineCommentMatch ? inlineCommentMatch[1].trim() : '';
+    const prevLine = i > 0 ? lines[i - 1].trim() : '';
+    const prevComment = prevLine.startsWith('//') ? prevLine.slice(2).trim() : '';
+    const comment = inlineComment || prevComment;
+
+    const inputMatch = trimmed.match(/^(INPUT_INT|INPUT_FLOAT|INPUT_BOOL|INPUT_SYMBOL)\s+(\w+)(?:\s+DEFAULT\s+(.+?))?(?:\s*\/\/|$)/i);
+    if (inputMatch) {
+      const cmd = inputMatch[1].toUpperCase();
+      const varName = inputMatch[2];
+      let defaultVal = inputMatch[3] ? inputMatch[3].trim() : null;
+      let schemaType = 'number';
+      if (cmd === 'INPUT_BOOL') schemaType = 'boolean';
+      else if (cmd === 'INPUT_SYMBOL') schemaType = 'string';
+      else if (cmd === 'INPUT_INT') schemaType = 'number';
+      else if (cmd === 'INPUT_FLOAT') schemaType = 'number';
+
+      let parsedDefault = defaultVal;
+      if (defaultVal !== null) {
+        if (schemaType === 'number') parsedDefault = parseFloat(defaultVal) || 0;
+        else if (schemaType === 'boolean') parsedDefault = defaultVal === 'true';
+        else parsedDefault = defaultVal.replace(/^["']|["']$/g, '');
+      }
+
+      inputs.push({
+        key: varName,
+        type: schemaType,
+        inputCmd: cmd,
+        default: parsedDefault,
+        label: comment || varName,
+        tooltip: comment || '',
+        line: lineNum
+      });
+      continue;
+    }
+
+    const defMatch = trimmed.match(/^DEF\s+(\w+)\s*=\s*(.+?)(?:\s*\/\/|$)/i);
+    if (defMatch) {
+      const varName = defMatch[1];
+      let rawVal = defMatch[2].trim();
+      let schemaType = 'string';
+      let parsedVal = rawVal;
+
+      if (/^\d+$/.test(rawVal)) { schemaType = 'number'; parsedVal = parseInt(rawVal, 10); }
+      else if (/^\d+\.\d+$/.test(rawVal)) { schemaType = 'number'; parsedVal = parseFloat(rawVal); }
+      else if (rawVal === 'true' || rawVal === 'false') { schemaType = 'boolean'; parsedVal = rawVal === 'true'; }
+      else { parsedVal = rawVal.replace(/^["']|["']$/g, ''); }
+
+      defs.push({
+        key: varName,
+        type: schemaType,
+        default: parsedVal,
+        label: comment || varName,
+        tooltip: comment || '',
+        line: lineNum
+      });
+    }
+  }
+
+  return { inputs, defs };
 }
 
 class ClawScriptParser {
@@ -1377,7 +1455,7 @@ class ClawScriptParser {
     return { type: 'PrtDraw', cmd: cmdName, params };
   }
 
-  generateJS(ast, strategyName) {
+  generateJS(ast, strategyName, metadata) {
     const safeName = strategyName.replace(/[^a-zA-Z0-9]/g, '');
     let js = `'use strict';\n`;
     js += `const BaseStrategy = require('./base-strategy.cjs');\n`;
@@ -1425,12 +1503,29 @@ class ClawScriptParser {
 
     js += `  getDescription() { return 'Custom ClawScript strategy: ${safeName}'; }\n\n`;
 
+    const schemaEntries = [
+      `      { key: 'enabled', type: 'boolean', default: true, label: 'Enabled' }`,
+      `      { key: 'size', type: 'number', default: 1, label: 'Position Size' }`,
+      `      { key: 'stopDistance', type: 'number', default: 20, label: 'Stop Distance' }`,
+      `      { key: 'limitDistance', type: 'number', default: 40, label: 'Limit Distance' }`
+    ];
+
+    if (metadata && metadata.inputs) {
+      for (const inp of metadata.inputs) {
+        const entry = `      { key: ${JSON.stringify(inp.key)}, type: ${JSON.stringify(inp.type)}, default: ${JSON.stringify(inp.default)}, label: ${JSON.stringify(inp.label)}, tooltip: ${JSON.stringify(inp.tooltip)}, clawscript: true }`;
+        schemaEntries.push(entry);
+      }
+    }
+    if (metadata && metadata.defs) {
+      for (const def of metadata.defs) {
+        const entry = `      { key: ${JSON.stringify(def.key)}, type: ${JSON.stringify(def.type)}, default: ${JSON.stringify(def.default)}, label: ${JSON.stringify(def.label)}, tooltip: ${JSON.stringify(def.tooltip)}, clawscript: true }`;
+        schemaEntries.push(entry);
+      }
+    }
+
     js += `  getConfigSchema() {\n`;
     js += `    return [\n`;
-    js += `      { key: 'enabled', type: 'boolean', default: true, label: 'Enabled' },\n`;
-    js += `      { key: 'size', type: 'number', default: 1, label: 'Position Size' },\n`;
-    js += `      { key: 'stopDistance', type: 'number', default: 20, label: 'Stop Distance' },\n`;
-    js += `      { key: 'limitDistance', type: 'number', default: 40, label: 'Limit Distance' }\n`;
+    js += schemaEntries.join(',\n') + '\n';
     js += `    ];\n`;
     js += `  }\n\n`;
 
@@ -1738,8 +1833,9 @@ function parseAndGenerate(code, strategyName) {
   const tokens = lexer(code);
   const parser = new ClawScriptParser(tokens);
   const ast = parser.parse();
-  const js = parser.generateJS(ast, strategyName || 'Custom');
-  return { ast, js, imports: Array.from(parser.imports), variables: Array.from(parser.variables.keys()) };
+  const metadata = extractMetadata(code);
+  const js = parser.generateJS(ast, strategyName || 'Custom', metadata);
+  return { ast, js, imports: Array.from(parser.imports), variables: Array.from(parser.variables.keys()), metadata };
 }
 
-module.exports = { parseAndGenerate, parseToAST, lexer, ClawScriptParser, TOKEN_TYPES, KEYWORDS };
+module.exports = { parseAndGenerate, parseToAST, extractMetadata, lexer, ClawScriptParser, TOKEN_TYPES, KEYWORDS };
