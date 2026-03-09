@@ -24,6 +24,61 @@ const MIME = {
   '.ico': 'image/x-icon'
 };
 
+function _readOpenClawConfig() {
+  var searchPaths = [
+    path.join(process.cwd(), '.openclaw', 'openclaw.md'),
+    path.join(__dirname, '..', '.openclaw', 'openclaw.md'),
+    path.join(require('os').homedir(), '.openclaw', 'openclaw.md')
+  ];
+  for (var i = 0; i < searchPaths.length; i++) {
+    try {
+      if (!fs.existsSync(searchPaths[i])) continue;
+      var raw = fs.readFileSync(searchPaths[i], 'utf8');
+      var cfg = JSON.parse(raw);
+      var result = { found: true };
+      if (cfg.gateway) {
+        result.gatewayPort = cfg.gateway.port || null;
+        result.gatewayMode = cfg.gateway.mode || null;
+        if (cfg.gateway.auth && cfg.gateway.auth.token) {
+          result.gatewayToken = cfg.gateway.auth.token;
+        }
+        if (cfg.gateway.http && cfg.gateway.http.endpoints && cfg.gateway.http.endpoints.chatCompletions) {
+          result.chatCompletionsEnabled = cfg.gateway.http.endpoints.chatCompletions.enabled || false;
+        }
+      }
+      if (cfg.models && cfg.models.providers) {
+        var providers = cfg.models.providers;
+        var providerNames = Object.keys(providers);
+        if (providerNames.length > 0) {
+          var pName = providerNames[0];
+          var p = providers[pName];
+          result.provider = pName;
+          result.baseUrl = p.baseUrl || null;
+          if (p.models && p.models.length > 0) {
+            result.model = pName + '/' + p.models[0].id;
+            result.modelName = p.models[0].name || p.models[0].id;
+          }
+        }
+      }
+      if (cfg.agents && cfg.agents.defaults && cfg.agents.defaults.model) {
+        result.primaryModel = cfg.agents.defaults.model.primary || null;
+      }
+      if (cfg.auth && cfg.auth.profiles) {
+        var profileKeys = Object.keys(cfg.auth.profiles);
+        if (profileKeys.length > 0) {
+          var prof = cfg.auth.profiles[profileKeys[0]];
+          result.authProvider = prof.provider || null;
+          result.authMode = prof.mode || null;
+        }
+      }
+      return result;
+    } catch(e) {
+      continue;
+    }
+  }
+  return { found: false };
+}
+
 const server = http.createServer(function(req, res) {
   const url = req.url.split('?')[0];
 
@@ -34,6 +89,13 @@ const server = http.createServer(function(req, res) {
 
   if (url === '/api/clawscript/ai/chat' && aiHandler) {
     aiHandler.handleClawScriptAiChat(req, res);
+    return;
+  }
+
+  if (url === '/api/clawscript/ai/config') {
+    var cfgResult = _readOpenClawConfig();
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+    res.end(JSON.stringify(cfgResult));
     return;
   }
 

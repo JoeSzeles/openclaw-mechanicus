@@ -3478,6 +3478,8 @@ function initAiAssistant() {
     settingsBtn.addEventListener('click', function() { _showAiSettings(); });
   }
 
+  _autoDetectOpenClawConfig();
+
   var resizeHandle = document.getElementById('csAiResizeHandle');
   var aiPane = document.getElementById('csAiPane');
   if (resizeHandle && aiPane) {
@@ -3663,6 +3665,8 @@ function requestImplementFix(callback) {
 }
 
 var _csAiConfig = null;
+var _csAutoDetectedConfig = null;
+
 function _getAiConfig() {
   if (_csAiConfig) return _csAiConfig;
   try {
@@ -3670,6 +3674,40 @@ function _getAiConfig() {
     if (stored) { _csAiConfig = JSON.parse(stored); return _csAiConfig; }
   } catch(_e) {}
   return null;
+}
+
+function _autoDetectOpenClawConfig() {
+  var isStandalone = document.getElementById('csEditorRoot') && document.getElementById('csEditorRoot').classList.contains('cs-standalone');
+  if (!isStandalone) return;
+  if (_getAiConfig()) return;
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/api/clawscript/ai/config', true);
+  xhr.timeout = 5000;
+  xhr.onload = function() {
+    if (xhr.status >= 200 && xhr.status < 300) {
+      try {
+        var cfg = JSON.parse(xhr.responseText);
+        if (cfg.found) {
+          _csAutoDetectedConfig = cfg;
+          var modelName = cfg.primaryModel || cfg.model || 'unknown';
+          var providerName = (cfg.provider || 'auto').toUpperCase();
+          csLog('Auto-detected OpenClaw AI: ' + providerName + ' (' + modelName + ')', 'success');
+          var modelSel = document.getElementById('csAiModelSelect');
+          if (modelSel) {
+            var opt = document.createElement('option');
+            opt.value = 'openclaw-local';
+            opt.textContent = providerName + ' (Local)';
+            modelSel.insertBefore(opt, modelSel.firstChild);
+            modelSel.value = 'openclaw-local';
+          }
+        }
+      } catch(_e) {}
+    }
+  };
+  xhr.onerror = function() {};
+  xhr.ontimeout = function() {};
+  xhr.send();
 }
 function _saveAiConfig(cfg) {
   _csAiConfig = cfg;
@@ -3768,8 +3806,18 @@ function _sendAiRequest(messages, callback) {
     return;
   }
 
+  if (mode === 'openclaw-local' && _csAutoDetectedConfig) {
+    _sendToLocalGateway(_csAutoDetectedConfig, messages, callback);
+    return;
+  }
+
   if (cfg && cfg.apiUrl) {
     _sendToDirectApi(cfg, messages, callback);
+    return;
+  }
+
+  if (_csAutoDetectedConfig) {
+    _sendToLocalGateway(_csAutoDetectedConfig, messages, callback);
     return;
   }
 
@@ -3782,6 +3830,51 @@ function _sendAiRequest(messages, callback) {
     });
   }
   tryNext(0);
+}
+
+function _sendToLocalGateway(autoConfig, messages, callback) {
+  var port = autoConfig.gatewayPort;
+  var gatewayToken = autoConfig.gatewayToken;
+  var model = autoConfig.primaryModel || autoConfig.model || 'grok-4';
+
+  if (port && autoConfig.chatCompletionsEnabled) {
+    var url = 'http://localhost:' + port + '/v1/chat/completions';
+    var headers = { 'Content-Type': 'application/json' };
+    if (gatewayToken) headers['Authorization'] = 'Bearer ' + gatewayToken;
+    var body = { model: model, messages: messages, max_tokens: 4096, temperature: 0.3 };
+    _xhrPost(url, headers, body, function(text) {
+      var reply = _parseAiResponse(text);
+      callback(reply);
+    }, function(status, text) {
+      if (autoConfig.baseUrl) {
+        _sendToProviderDirect(autoConfig, messages, callback);
+      } else {
+        callback('Error: Local gateway at port ' + port + ' returned HTTP ' + status + '.');
+      }
+    });
+  } else if (autoConfig.baseUrl) {
+    _sendToProviderDirect(autoConfig, messages, callback);
+  } else {
+    callback(null);
+  }
+}
+
+function _sendToProviderDirect(autoConfig, messages, callback) {
+  var url = autoConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions';
+  var model = autoConfig.primaryModel || autoConfig.model || 'grok-4';
+  var headers = { 'Content-Type': 'application/json' };
+  if (autoConfig.gatewayToken) {
+    headers['Authorization'] = 'Bearer ' + autoConfig.gatewayToken;
+  }
+  var body = { model: model.replace(/^[^/]+\//, ''), messages: messages, max_tokens: 4096, temperature: 0.3 };
+  _xhrPost(url, headers, body, function(text) {
+    var reply = _parseAiResponse(text);
+    callback(reply);
+  }, function(status, text) {
+    var errMsg = status ? 'HTTP ' + status : 'Network error';
+    try { var d = JSON.parse(text); if (d.error) errMsg = d.error.message || errMsg; } catch(_) {}
+    callback('Error: ' + errMsg);
+  });
 }
 
 function _sendToServerEndpoint(url, token, messages, callback) {
