@@ -429,6 +429,21 @@ function buildEditorUI() {
   '.cs-results-trace-trace { color:#79c0ff; }' +
   '.cs-results-fetch-btn { padding:4px 10px; background:#21262d; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; cursor:pointer; font-size:11px; margin-top:8px; }' +
   '.cs-results-fetch-btn:hover { border-color:#58a6ff; }' +
+  '.cs-runner-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.6); z-index:9999; display:flex; align-items:center; justify-content:center; }' +
+  '.cs-runner-popup { background:#161b22; border:1px solid #30363d; border-radius:8px; width:560px; max-width:92vw; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 8px 32px rgba(0,0,0,.5); }' +
+  '.cs-runner-popup__header { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; border-bottom:1px solid #21262d; }' +
+  '.cs-runner-popup__title { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#c9d1d9; }' +
+  '.cs-runner-badge { font-size:10px; padding:2px 8px; border-radius:10px; font-weight:600; text-transform:uppercase; }' +
+  '.cs-runner-badge-starting { background:#9e6a03; color:#fff; }' +
+  '.cs-runner-badge-running { background:#238636; color:#fff; }' +
+  '.cs-runner-badge-stopped { background:#da3633; color:#fff; }' +
+  '.cs-runner-popup__actions { display:flex; gap:6px; padding:8px 14px; border-bottom:1px solid #21262d; }' +
+  '.cs-runner-popup__actions button { padding:3px 10px; font-size:10px; }' +
+  '.cs-runner-popup__logs { flex:1; overflow-y:auto; padding:8px 14px; font:10px/1.6 "Fira Code",Consolas,monospace; color:#8b949e; min-height:150px; max-height:400px; background:#0d1117; }' +
+  '.cs-runner-popup__logs .cs-log-info { color:#58a6ff; }' +
+  '.cs-runner-popup__logs .cs-log-warn { color:#f0883e; }' +
+  '.cs-runner-popup__logs .cs-log-error { color:#f85149; }' +
+  '.cs-runner-popup__logs .cs-log-trade { color:#2dc653; font-weight:700; }' +
   '</style>' +
 
   '<div class="cs-toolbar">' +
@@ -447,6 +462,7 @@ function buildEditorUI() {
     '<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#8b949e;cursor:pointer;"><input type="checkbox" id="csRealDataCheck" style="cursor:pointer;"> Real Data</label>' +
     '<input id="csInstrumentInput" type="text" placeholder="Epic (e.g. CS.D.BITCOIN.CFD.IP)" value="CS.D.BITCOIN.CFD.IP" style="width:200px;padding:3px 8px;font-size:11px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;" title="Instrument epic for simulation/backtest">' +
     '<button id="csBtnBacktest" title="Run Backtest with Real Data" style="background:#0c2d48;border-color:#58a6ff;color:#58a6ff;">&#9654; Backtest</button>' +
+    '<button id="csBtnRunLive" title="Run script live as a persistent process" style="background:#238636;border-color:#2ea043;color:#fff;">&#128640; Run Live</button>' +
     '<div class="cs-sep"></div>' +
     '<select id="csTemplateSelect"><option value="">Templates...</option></select>' +
     '<div class="cs-sep"></div>' +
@@ -629,6 +645,7 @@ function attachEditorEvents() {
   document.getElementById('csBtnCompile').addEventListener('click', compileAndSave);
   document.getElementById('csBtnSimulate').addEventListener('click', runSimulation);
   document.getElementById('csBtnBacktest').addEventListener('click', runBacktest);
+  document.getElementById('csBtnRunLive').addEventListener('click', runLive);
   document.getElementById('csBtnClearLog').addEventListener('click', clearLog);
   initSpeedControls();
   initAiAssistant();
@@ -1243,6 +1260,169 @@ function runBacktest() {
     csLog('Backtest Error: Network error', 'error');
   };
   xhr.send(payload);
+}
+
+var _csRunnerLogTimer = null;
+var _csRunnerStatusTimer = null;
+
+function runLive() {
+  var code = document.getElementById('csCodeEditor').value.trim();
+  if (!code) { csLog('No code to run.', 'error'); return; }
+  var btn = document.getElementById('csBtnRunLive');
+  if (btn) { btn.disabled = true; btn.textContent = 'Starting...'; }
+  csLog('Starting live script...', 'info');
+  var ts = Date.now().toString(36);
+  var payload = JSON.stringify({ code: code, name: 'editor-' + ts });
+  var token = _getAuthToken();
+  var headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  _xhrPost('/api/clawscript/run', headers, payload, function(text) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '&#128640; Run Live'; }
+    try {
+      var data = JSON.parse(text);
+      if (data.error) {
+        csLog('Run Error: ' + data.error, 'error');
+        return;
+      }
+      var scriptId = data.scriptId || data.name || ('editor-' + ts);
+      csLog('Script started: ' + scriptId, 'info');
+      _openRunnerPopup(data.name || scriptId, scriptId);
+    } catch(e) {
+      csLog('Run Error: ' + e.message, 'error');
+    }
+  }, function(status, text) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '&#128640; Run Live'; }
+    csLog('Run Live failed (HTTP ' + status + '). Ensure server has /api/clawscript/run endpoint.', 'error');
+  });
+}
+
+function _escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _openRunnerPopup(name, scriptId) {
+  _closeRunnerPopup();
+  var fullId = scriptId || name;
+  var shortId = fullId.replace(/^cs-script-/, '');
+  var overlay = document.createElement('div');
+  overlay.className = 'cs-runner-overlay';
+  overlay.id = 'csRunnerOverlay';
+  overlay.innerHTML =
+    '<div class="cs-runner-popup">' +
+      '<div class="cs-runner-popup__header">' +
+        '<div class="cs-runner-popup__title">' +
+          '<span>\uD83E\uDD80 ' + _escHtml(shortId) + '</span>' +
+          '<span class="cs-runner-badge cs-runner-badge-starting" id="csRpBadge">STARTING</span>' +
+        '</div>' +
+        '<button style="padding:2px 8px;font-size:14px;background:#21262d;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;cursor:pointer;" id="csRpClose" title="Close">\u2715</button>' +
+      '</div>' +
+      '<div class="cs-runner-popup__actions">' +
+        '<button style="padding:3px 10px;font-size:10px;background:#da3633;border:1px solid #da3633;border-radius:4px;color:#fff;cursor:pointer;" id="csRpStop">\u25A0 Stop</button>' +
+        '<button style="padding:3px 10px;font-size:10px;background:#1f6feb;border:1px solid #1f6feb;border-radius:4px;color:#fff;cursor:pointer;" id="csRpRestart">\u21BB Restart</button>' +
+        '<button style="padding:3px 10px;font-size:10px;background:#9e6a03;border:1px solid #9e6a03;border-radius:4px;color:#fff;cursor:pointer;" id="csRpPause">\u23F8 Pause</button>' +
+        '<button style="padding:3px 10px;font-size:10px;background:#238636;border:1px solid #238636;border-radius:4px;color:#fff;cursor:pointer;display:none;" id="csRpResume">\u25B6 Resume</button>' +
+      '</div>' +
+      '<div class="cs-runner-popup__logs" id="csRpLogs">Waiting for logs...</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) _closeRunnerPopup(); });
+  document.getElementById('csRpClose').addEventListener('click', _closeRunnerPopup);
+  var token = _getAuthToken();
+  var authHdr = token ? { 'Authorization': 'Bearer ' + token } : {};
+  document.getElementById('csRpStop').addEventListener('click', function() {
+    _xhrPost('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/stop', Object.assign({ 'Content-Type': 'application/json' }, authHdr), '{}', function(){}, function(){});
+  });
+  document.getElementById('csRpRestart').addEventListener('click', function() {
+    _xhrPost('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/restart', Object.assign({ 'Content-Type': 'application/json' }, authHdr), '{}', function(){}, function(){});
+  });
+  document.getElementById('csRpPause').addEventListener('click', function() {
+    _xhrPost('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/pause', Object.assign({ 'Content-Type': 'application/json' }, authHdr), '{}', function(){}, function(){});
+    document.getElementById('csRpPause').style.display = 'none';
+    document.getElementById('csRpResume').style.display = '';
+  });
+  document.getElementById('csRpResume').addEventListener('click', function() {
+    _xhrPost('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/resume', Object.assign({ 'Content-Type': 'application/json' }, authHdr), '{}', function(){}, function(){});
+    document.getElementById('csRpResume').style.display = 'none';
+    document.getElementById('csRpPause').style.display = '';
+  });
+
+  _pollRunnerLogs(shortId, authHdr);
+  _pollRunnerStatus(fullId, authHdr);
+}
+
+function _pollRunnerLogs(shortId, authHdr) {
+  if (_csRunnerLogTimer) clearInterval(_csRunnerLogTimer);
+  var logsEl = document.getElementById('csRpLogs');
+  function fetch_() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/logs', true);
+    for (var k in authHdr) { xhr.setRequestHeader(k, authHdr[k]); }
+    xhr.onload = function() {
+      if (xhr.status >= 200 && xhr.status < 300 && logsEl) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          if (data.lines) {
+            var html = data.lines.map(function(l) {
+              var cls = '';
+              if (l.indexOf('[ERROR]') > -1) cls = 'cs-log-error';
+              else if (l.indexOf('[WARN]') > -1) cls = 'cs-log-warn';
+              else if (l.indexOf('[TRADE]') > -1) cls = 'cs-log-trade';
+              else if (l.indexOf('[INFO]') > -1) cls = 'cs-log-info';
+              return '<div class="' + cls + '">' + _escHtml(l) + '</div>';
+            }).join('');
+            logsEl.innerHTML = html || '<div style="color:#484f58">No logs yet</div>';
+            logsEl.scrollTop = logsEl.scrollHeight;
+          }
+        } catch(_) {}
+      }
+    };
+    xhr.onerror = function() {};
+    xhr.send();
+  }
+  fetch_();
+  _csRunnerLogTimer = setInterval(fetch_, 2000);
+}
+
+function _pollRunnerStatus(fullId, authHdr) {
+  if (_csRunnerStatusTimer) clearInterval(_csRunnerStatusTimer);
+  function fetch_() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/clawscript/scripts', true);
+    for (var k in authHdr) { xhr.setRequestHeader(k, authHdr[k]); }
+    xhr.onload = function() {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          var scripts = data.scripts || [];
+          var s = scripts.find(function(x) { return x.id === fullId; });
+          var badge = document.getElementById('csRpBadge');
+          if (!badge) return;
+          if (!s) {
+            badge.className = 'cs-runner-badge cs-runner-badge-stopped';
+            badge.textContent = 'NOT FOUND';
+          } else if (s.running) {
+            badge.className = 'cs-runner-badge cs-runner-badge-running';
+            badge.textContent = 'RUNNING';
+          } else {
+            badge.className = 'cs-runner-badge cs-runner-badge-stopped';
+            badge.textContent = 'STOPPED';
+          }
+        } catch(_) {}
+      }
+    };
+    xhr.onerror = function() {};
+    xhr.send();
+  }
+  fetch_();
+  _csRunnerStatusTimer = setInterval(fetch_, 3000);
+}
+
+function _closeRunnerPopup() {
+  if (_csRunnerLogTimer) { clearInterval(_csRunnerLogTimer); _csRunnerLogTimer = null; }
+  if (_csRunnerStatusTimer) { clearInterval(_csRunnerStatusTimer); _csRunnerStatusTimer = null; }
+  var overlay = document.getElementById('csRunnerOverlay');
+  if (overlay) overlay.remove();
 }
 
 var _csAnimSpeed = 600;
