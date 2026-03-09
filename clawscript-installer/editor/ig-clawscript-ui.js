@@ -527,16 +527,24 @@ function initResizeBar() {
   try { saved = localStorage.getItem(storageKey); } catch(e) {}
 
   if (isStandalone) {
-    if (saved) {
-      var h = parseInt(saved, 10);
-      if (h >= 80 && h <= 600) bottom.style.height = h + 'px';
+    mainPanel.style.flex = 'none';
+    var mh = saved ? parseInt(saved, 10) : 0;
+    if (mh >= 150 && mh <= 2000) {
+      mainPanel.style.height = mh + 'px';
     } else {
-      bottom.style.height = '220px';
+      var rootH = root.offsetHeight;
+      var toolbarH = root.querySelector('.cs-toolbar') ? root.querySelector('.cs-toolbar').offsetHeight : 80;
+      var barH = bar.offsetHeight || 10;
+      var bottomH = 220;
+      bottom.style.height = bottomH + 'px';
+      mainPanel.style.height = (rootH - toolbarH - barH - bottomH - 20) + 'px';
     }
+    mainPanel.style.minHeight = '0';
+    if (!bottom.style.height) bottom.style.height = '220px';
   } else {
-    var mh = saved ? parseInt(saved, 10) : 500;
-    if (mh < 150 || mh > 900) mh = 500;
-    mainPanel.style.height = mh + 'px';
+    var mh2 = saved ? parseInt(saved, 10) : 500;
+    if (mh2 < 150 || mh2 > 900) mh2 = 500;
+    mainPanel.style.height = mh2 + 'px';
     mainPanel.style.minHeight = '0';
     mainPanel.style.maxHeight = 'none';
   }
@@ -549,7 +557,7 @@ function initResizeBar() {
     e.preventDefault();
     dragging = true;
     startY = e.clientY;
-    startH = isStandalone ? bottom.offsetHeight : mainPanel.offsetHeight;
+    startH = mainPanel.offsetHeight;
     bar.classList.add('cs-dragging');
     document.body.style.cursor = 'ns-resize';
     document.body.style.userSelect = 'none';
@@ -557,15 +565,9 @@ function initResizeBar() {
 
   document.addEventListener('mousemove', function(e) {
     if (!dragging) return;
-    if (isStandalone) {
-      var delta = startY - e.clientY;
-      var newH = Math.max(80, Math.min(600, startH + delta));
-      bottom.style.height = newH + 'px';
-    } else {
-      var delta2 = e.clientY - startY;
-      var newMH = Math.max(150, Math.min(900, startH + delta2));
-      mainPanel.style.height = newMH + 'px';
-    }
+    var delta = e.clientY - startY;
+    var newH = Math.max(150, Math.min(isStandalone ? 2000 : 900, startH + delta));
+    mainPanel.style.height = newH + 'px';
   });
 
   document.addEventListener('mouseup', function() {
@@ -574,7 +576,7 @@ function initResizeBar() {
     bar.classList.remove('cs-dragging');
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
-    var val = isStandalone ? bottom.offsetHeight : mainPanel.offsetHeight;
+    var val = mainPanel.offsetHeight;
     try { localStorage.setItem(storageKey, val); } catch(e) {}
   });
 }
