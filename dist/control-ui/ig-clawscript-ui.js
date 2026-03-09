@@ -1334,7 +1334,7 @@ function _showBacktestConfigPopup() {
         '</div>' +
         '<label style="font-size:11px;color:#8b949e;">Bars</label>' +
         '<select id="csBtCount" style="padding:6px 10px;font-size:12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;">' +
-          [[100,'100'],[250,'250'],[500,'500'],[1000,'1K'],[2500,'2.5K'],[5000,'5K'],[10000,'10K']].map(function(o) {
+          [[100,'100'],[250,'250'],[500,'500'],[1000,'1K'],[2500,'2.5K'],[5000,'5K'],[10000,'10K'],[100000,'100K'],[200000,'200K'],[1000000,'1M']].map(function(o) {
             return '<option value="' + o[0] + '"' + ((savedCfg.count || 1000) == o[0] ? ' selected' : '') + '>' + o[1] + ' bars</option>';
           }).join('') +
         '</select>' +
