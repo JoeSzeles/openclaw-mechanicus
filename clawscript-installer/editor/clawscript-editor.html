@@ -3,25 +3,72 @@
 <head>
 <meta charset="utf-8">
 <title>ClawScript Editor</title>
+<meta http-equiv="X-Content-Type-Options" content="">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0d1117; color: #c9d1d9; overflow: hidden; }
 #csEditorRoot { width: 100%; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+#csLoadError { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#161b22; border:1px solid #f85149; border-radius:8px; padding:24px; color:#f85149; font:14px/1.6 system-ui; max-width:500px; z-index:99999; }
+#csLoadError h3 { margin:0 0 8px 0; }
+#csLoadError code { background:#0d1117; padding:2px 6px; border-radius:3px; font-size:12px; }
 </style>
 </head>
 <body>
 <div id="csEditorRoot" class="cs-standalone"></div>
-<script src="ig-clawscript-flow.js"></script>
-<script src="ig-clawscript-ui.js"></script>
+<div id="csLoadError">
+  <h3>Script Load Error</h3>
+  <p>The server is blocking JavaScript files due to MIME type. Run the standalone server instead:</p>
+  <p style="margin:10px 0;"><code>node .openclaw/serve-clawscript.cjs</code></p>
+  <p style="color:#8b949e;font-size:12px;">Then open <code>http://localhost:3000</code></p>
+</div>
 <script>
 (function() {
-  var root = document.getElementById('csEditorRoot');
-  if (root && root.classList.contains('cs-standalone')) return;
-  var s = document.createElement('script');
-  s.src = '/nav-inject.js';
-  s.onerror = function() {};
-  document.body.appendChild(s);
+  var base = '';
+  var scripts = document.querySelectorAll('script[src]');
+  for (var i = 0; i < scripts.length; i++) {
+    var s = scripts[i].getAttribute('src') || '';
+    if (s.indexOf('ig-clawscript') > -1) {
+      base = s.substring(0, s.lastIndexOf('/') + 1);
+      break;
+    }
+  }
+  if (!base) {
+    var loc = window.location.pathname;
+    var lastSlash = loc.lastIndexOf('/');
+    if (lastSlash > 0) base = loc.substring(0, lastSlash + 1);
+  }
+
+  var flowSrc = base + 'ig-clawscript-flow.js';
+  var uiSrc = base + 'ig-clawscript-ui.js';
+
+  function loadScript(src, cb) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = function() { cb(null); };
+    s.onerror = function() {
+      fetch(src).then(function(r) { return r.text(); }).then(function(code) {
+        try {
+          var fn = new Function(code);
+          fn();
+          cb(null);
+        } catch(e) { cb(e); }
+      }).catch(function(e) { cb(e); });
+    };
+    document.body.appendChild(s);
+  }
+
+  loadScript(flowSrc, function(err1) {
+    if (err1) {
+      document.getElementById('csLoadError').style.display = 'block';
+      return;
+    }
+    loadScript(uiSrc, function(err2) {
+      if (err2) {
+        document.getElementById('csLoadError').style.display = 'block';
+      }
+    });
+  });
 })();
 </script>
 </body>
