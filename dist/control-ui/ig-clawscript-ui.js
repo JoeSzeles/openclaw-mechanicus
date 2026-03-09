@@ -503,9 +503,7 @@ function buildEditorUI() {
       '<div class="cs-ai-header">' +
         '<span>AI Assistant</span>' +
         '<select id="csAiModelSelect">' +
-          '<option value="auto">ClawScript AI (default)</option>' +
-          '<option value="ceo-agent">CEO Agent</option>' +
-          '<option value="grok">Grok</option>' +
+          '<option value="auto">Auto-detect</option>' +
         '</select>' +
         '<button id="csAiSettingsBtn" title="AI Settings" style="padding:2px 6px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid #30363d;background:#21262d;color:#c9d1d9;">⚙</button>' +
         '<button id="csAiClearBtn" style="padding:2px 8px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid #30363d;background:#21262d;color:#c9d1d9;">Clear</button>' +
@@ -3782,18 +3780,34 @@ function _saveAiConfig(cfg) {
 }
 function _showAiSettings() {
   var cfg = _getAiConfig() || {};
+  var isStandalone = document.getElementById('csEditorRoot') && document.getElementById('csEditorRoot').classList.contains('cs-standalone');
   var overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+
+  var statusHtml = '';
+  if (_csAutoDetectedConfig && _csAutoDetectedConfig.found) {
+    var src = _csAutoDetectedConfig.useAgentChat ? 'Agent Chat' : _csAutoDetectedConfig.useOrigin ? 'Gateway' : (_csAutoDetectedConfig.provider || 'Unknown').toUpperCase();
+    var mdl = _csAutoDetectedConfig.primaryModel || _csAutoDetectedConfig.model || '';
+    statusHtml = '<div style="background:#0a2a0a;border:1px solid #2ea043;border-radius:4px;padding:8px 10px;margin:0 0 12px 0;font-size:12px;color:#2ea043;">&#10004; Connected: ' + src + (mdl ? ' (' + mdl + ')' : '') + '</div>';
+  }
+
   overlay.innerHTML =
-    '<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;width:400px;color:#c9d1d9;font-family:system-ui;">' +
+    '<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;width:460px;max-width:95vw;color:#c9d1d9;font-family:system-ui;max-height:90vh;overflow-y:auto;">' +
       '<h3 style="margin:0 0 12px 0;color:#58a6ff;">AI Assistant Settings</h3>' +
-      '<p style="font-size:12px;color:#8b949e;margin:0 0 12px 0;">Configure a direct AI endpoint for local installations. Leave blank to auto-detect. Supports Groq, OpenAI, xAI, Ollama (no key needed), and any OpenAI-compatible API.</p>' +
+      statusHtml +
+      (isStandalone ?
+        '<div style="margin:0 0 14px 0;">' +
+          '<button id="csAiAutoFind" style="padding:8px 16px;border-radius:6px;border:2px solid #2ea043;background:#0a2a0a;color:#2ea043;cursor:pointer;font-size:13px;font-weight:600;width:100%;">&#128269; Auto-Find Agents</button>' +
+          '<div id="csAiProbeLog" style="margin-top:8px;max-height:180px;overflow-y:auto;font:11px/1.6 monospace;background:#0d1117;border:1px solid #21262d;border-radius:4px;padding:6px 8px;display:none;"></div>' +
+        '</div>' +
+        '<div style="border-top:1px solid #21262d;margin:0 0 12px 0;padding-top:12px;font-size:11px;color:#484f58;">Or configure manually:</div>'
+      : '') +
       '<label style="font-size:12px;color:#8b949e;">API Base URL (OpenAI-compatible)</label>' +
-      '<input id="csAiCfgUrl" type="text" placeholder="https://api.groq.com/openai/v1 or http://localhost:11434/v1" value="' + (cfg.apiUrl || '') + '" style="width:100%;box-sizing:border-box;padding:6px 8px;margin:4px 0 10px 0;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;">' +
-      '<label style="font-size:12px;color:#8b949e;">API Key</label>' +
-      '<input id="csAiCfgKey" type="password" placeholder="sk-... or gsk_..." value="' + (cfg.apiKey || '') + '" style="width:100%;box-sizing:border-box;padding:6px 8px;margin:4px 0 10px 0;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;">' +
+      '<input id="csAiCfgUrl" type="text" placeholder="e.g. http://localhost:18789/v1" value="' + (cfg.apiUrl || '') + '" style="width:100%;box-sizing:border-box;padding:6px 8px;margin:4px 0 10px 0;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;">' +
+      '<label style="font-size:12px;color:#8b949e;">API Key / Token</label>' +
+      '<input id="csAiCfgKey" type="password" placeholder="Bearer token or API key" value="' + (cfg.apiKey || '') + '" style="width:100%;box-sizing:border-box;padding:6px 8px;margin:4px 0 10px 0;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;">' +
       '<label style="font-size:12px;color:#8b949e;">Model</label>' +
-      '<input id="csAiCfgModel" type="text" placeholder="llama-3.3-70b-versatile" value="' + (cfg.model || '') + '" style="width:100%;box-sizing:border-box;padding:6px 8px;margin:4px 0 16px 0;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;">' +
+      '<input id="csAiCfgModel" type="text" placeholder="e.g. grok-4, gpt-4o-mini" value="' + (cfg.model || '') + '" style="width:100%;box-sizing:border-box;padding:6px 8px;margin:4px 0 16px 0;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:13px;">' +
       '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
         '<button id="csAiCfgClear" style="padding:6px 14px;border-radius:4px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;cursor:pointer;">Clear</button>' +
         '<button id="csAiCfgCancel" style="padding:6px 14px;border-radius:4px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;cursor:pointer;">Cancel</button>' +
@@ -3805,9 +3819,15 @@ function _showAiSettings() {
   overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
   document.getElementById('csAiCfgClear').onclick = function() {
     _csAiConfig = null;
+    _csAutoDetectedConfig = null;
     try { localStorage.removeItem('clawscript.ai.config'); } catch(_e) {}
+    var modelSel = document.getElementById('csAiModelSelect');
+    if (modelSel) {
+      while (modelSel.options.length > 1) modelSel.remove(0);
+      modelSel.value = 'auto';
+    }
     overlay.remove();
-    csLog('AI settings cleared. Will auto-detect endpoint.', 'success');
+    csLog('AI settings cleared.', 'success');
   };
   document.getElementById('csAiCfgSave').onclick = function() {
     var url = document.getElementById('csAiCfgUrl').value.trim();
@@ -3817,6 +3837,177 @@ function _showAiSettings() {
     overlay.remove();
     csLog('AI settings saved.' + (url ? ' Using: ' + url : ' Auto-detect mode.'), 'success');
   };
+
+  var autoFindBtn = document.getElementById('csAiAutoFind');
+  if (autoFindBtn) {
+    autoFindBtn.onclick = function() {
+      _runAutoFindWithLog();
+    };
+  }
+}
+
+function _runAutoFindWithLog() {
+  var logEl = document.getElementById('csAiProbeLog');
+  if (!logEl) return;
+  logEl.style.display = 'block';
+  logEl.innerHTML = '';
+  var token = _getAuthToken();
+
+  function log(msg, color) {
+    var div = document.createElement('div');
+    div.style.color = color || '#8b949e';
+    div.textContent = msg;
+    logEl.appendChild(div);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  log('Starting agent discovery...', '#58a6ff');
+
+  log('[1/4] Probing /api/clawscript/ai/config ...');
+  var xhr1 = new XMLHttpRequest();
+  xhr1.open('GET', '/api/clawscript/ai/config', true);
+  xhr1.timeout = 3000;
+  if (token) xhr1.setRequestHeader('Authorization', 'Bearer ' + token);
+  xhr1.onload = function() {
+    if (xhr1.status >= 200 && xhr1.status < 300) {
+      try {
+        var cfg = JSON.parse(xhr1.responseText);
+        if (cfg.found) {
+          log('FOUND config: ' + (cfg.provider || '?').toUpperCase() + ' / ' + (cfg.primaryModel || cfg.model || '?'), '#2ea043');
+          _csAutoDetectedConfig = cfg;
+          _addLocalModelOption((cfg.provider || 'Agent').toUpperCase());
+          _populateSettingsFromConfig(cfg);
+          return;
+        }
+      } catch(e) { log('Parse error: ' + e.message, '#f85149'); }
+    }
+    log('  Not found (HTTP ' + xhr1.status + ')', '#f0883e');
+    step2();
+  };
+  xhr1.onerror = function() { log('  Network error', '#f85149'); step2(); };
+  xhr1.ontimeout = function() { log('  Timeout', '#f85149'); step2(); };
+  xhr1.send();
+
+  function step2() {
+    log('[2/4] Probing /v1/models ...');
+    var xhr2 = new XMLHttpRequest();
+    xhr2.open('GET', '/v1/models', true);
+    xhr2.timeout = 3000;
+    if (token) xhr2.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr2.onload = function() {
+      if (xhr2.status >= 200 && xhr2.status < 300) {
+        try {
+          var data = JSON.parse(xhr2.responseText);
+          var models = data.data || data.models || [];
+          if (models.length > 0) {
+            log('FOUND ' + models.length + ' model(s):', '#2ea043');
+            models.forEach(function(m) { log('  - ' + (m.id || m), '#2ea043'); });
+            var firstModel = models[0].id || models[0];
+            _csAutoDetectedConfig = {
+              found: true, chatCompletionsEnabled: true,
+              gatewayPort: null, gatewayToken: token,
+              primaryModel: firstModel, useOrigin: true
+            };
+            _addLocalModelOption('Gateway');
+            var urlInput = document.getElementById('csAiCfgUrl');
+            var modelInput = document.getElementById('csAiCfgModel');
+            if (urlInput) urlInput.value = window.location.origin + '/v1';
+            if (modelInput) modelInput.value = firstModel;
+            return;
+          }
+        } catch(e) { log('Parse error: ' + e.message, '#f85149'); }
+      }
+      log('  Not found (HTTP ' + xhr2.status + ')', '#f0883e');
+      step3();
+    };
+    xhr2.onerror = function() { log('  Network error', '#f85149'); step3(); };
+    xhr2.ontimeout = function() { log('  Timeout', '#f85149'); step3(); };
+    xhr2.send();
+  }
+
+  function step3() {
+    log('[3/4] Probing /api/agent/chat ...');
+    var xhr3 = new XMLHttpRequest();
+    xhr3.open('POST', '/api/agent/chat', true);
+    xhr3.timeout = 8000;
+    xhr3.setRequestHeader('Content-Type', 'application/json');
+    if (token) xhr3.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr3.onload = function() {
+      log('  Response: HTTP ' + xhr3.status, xhr3.status < 400 ? '#2ea043' : '#f0883e');
+      if (xhr3.status < 500) {
+        log('FOUND Agent Chat endpoint', '#2ea043');
+        _csAutoDetectedConfig = { found: true, useAgentChat: true, gatewayToken: token };
+        _addLocalModelOption('Agent');
+        step4();
+        return;
+      }
+      log('  Server error', '#f85149');
+      step4();
+    };
+    xhr3.onerror = function() { log('  Network error — is OpenClaw gateway running?', '#f85149'); step4(); };
+    xhr3.ontimeout = function() { log('  Timeout', '#f85149'); step4(); };
+    xhr3.send(JSON.stringify({ messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 }));
+  }
+
+  function step4() {
+    log('[4/4] Probing /v1/chat/completions ...');
+    var xhr4 = new XMLHttpRequest();
+    xhr4.open('POST', '/v1/chat/completions', true);
+    xhr4.timeout = 8000;
+    xhr4.setRequestHeader('Content-Type', 'application/json');
+    if (token) xhr4.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr4.onload = function() {
+      log('  Response: HTTP ' + xhr4.status, xhr4.status < 400 ? '#2ea043' : '#f0883e');
+      if (xhr4.status < 500) {
+        try {
+          var data = JSON.parse(xhr4.responseText);
+          if (data.choices || data.model) {
+            log('FOUND Chat Completions endpoint (model: ' + (data.model || '?') + ')', '#2ea043');
+            if (!_csAutoDetectedConfig || !_csAutoDetectedConfig.found) {
+              _csAutoDetectedConfig = {
+                found: true, chatCompletionsEnabled: true,
+                gatewayPort: null, gatewayToken: token,
+                primaryModel: data.model || 'default', useOrigin: true
+              };
+              _addLocalModelOption('Gateway');
+            }
+          }
+        } catch(_e) {}
+      }
+      finish();
+    };
+    xhr4.onerror = function() { log('  Network error', '#f85149'); finish(); };
+    xhr4.ontimeout = function() { log('  Timeout', '#f85149'); finish(); };
+    xhr4.send(JSON.stringify({ model: 'default', messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 }));
+  }
+
+  function finish() {
+    log('');
+    if (_csAutoDetectedConfig && _csAutoDetectedConfig.found) {
+      log('Discovery complete — agent found and configured.', '#2ea043');
+      csLog('AI agent auto-discovered and connected.', 'success');
+    } else {
+      log('No agents found. Make sure OpenClaw gateway is running.', '#f85149');
+      log('Check: is the editor served by the gateway? (not opened as a file)', '#8b949e');
+    }
+  }
+}
+
+function _populateSettingsFromConfig(cfg) {
+  var urlInput = document.getElementById('csAiCfgUrl');
+  var keyInput = document.getElementById('csAiCfgKey');
+  var modelInput = document.getElementById('csAiCfgModel');
+  if (cfg.gatewayPort && urlInput) {
+    urlInput.value = 'http://localhost:' + cfg.gatewayPort + '/v1';
+  } else if (cfg.baseUrl && urlInput) {
+    urlInput.value = cfg.baseUrl;
+  }
+  if (cfg.gatewayToken && keyInput) {
+    keyInput.value = cfg.gatewayToken;
+  }
+  if ((cfg.primaryModel || cfg.model) && modelInput) {
+    modelInput.value = cfg.primaryModel || cfg.model;
+  }
 }
 
 function _getAuthToken() {
@@ -3867,11 +4058,6 @@ function _sendAiRequest(messages, callback) {
   var mode = modelSel ? modelSel.value : 'auto';
   var cfg = _getAiConfig();
   var token = _getAuthToken();
-
-  if (mode === 'ceo-agent') {
-    _sendToServerEndpoint('/api/agent/chat', token, messages, callback);
-    return;
-  }
 
   if (mode === 'openclaw-local' && _csAutoDetectedConfig) {
     _sendToLocalGateway(_csAutoDetectedConfig, messages, callback);
