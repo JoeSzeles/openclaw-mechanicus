@@ -3704,7 +3704,7 @@ function sendAiMessage() {
       _aiChatHistory.push({ role: 'assistant', content: reply });
       appendAiMessage('assistant', reply);
     } else {
-      appendAiMessage('assistant', 'Could not reach AI endpoint. Click ⚙ to configure a direct API (Groq, OpenAI, or local), or ensure your server has /api/clawscript/ai available.');
+      appendAiMessage('assistant', 'Could not reach AI endpoint. If running locally, start the editor with: GROQ_API_KEY=your_key node serve.cjs — or click ⚙ to configure a direct API (Groq, OpenAI, Ollama).');
     }
   });
 }
