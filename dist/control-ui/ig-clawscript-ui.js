@@ -1324,18 +1324,21 @@ function _showBacktestConfigPopup() {
         '<label style="font-size:11px;color:#8b949e;">Instrument (Epic)</label>' +
         '<input id="csBtEpic" type="text" value="' + (savedCfg.epic || getSelectedInstrument()) + '" style="padding:6px 10px;font-size:12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;">' +
         '<label style="font-size:11px;color:#8b949e;">Timeframe / Resolution</label>' +
-        '<select id="csBtResolution" style="padding:6px 10px;font-size:12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;">' +
-          '<option value="MINUTE">1 Minute</option>' +
-          '<option value="MINUTE_5">5 Minutes</option>' +
-          '<option value="MINUTE_15">15 Minutes</option>' +
-          '<option value="MINUTE_30">30 Minutes</option>' +
-          '<option value="HOUR" selected>1 Hour</option>' +
-          '<option value="HOUR_4">4 Hours</option>' +
-          '<option value="DAY">Daily</option>' +
-          '<option value="WEEK">Weekly</option>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;" id="csBtTfBtns">' +
+          [['SECOND','1s'],['SECOND_2','2s'],['SECOND_5','5s'],['SECOND_10','10s'],['SECOND_20','20s'],['SECOND_30','30s'],['SECOND_40','40s'],
+           ['MINUTE','1M'],['MINUTE_5','5M'],['MINUTE_15','15M'],['HOUR','1H'],['HOUR_4','4H'],['DAY','1D'],['WEEK','1W']]
+          .map(function(tf) {
+            var sel = (savedCfg.resolution || 'HOUR') === tf[0];
+            return '<button type="button" data-tf="' + tf[0] + '" class="cs-tf-btn" style="padding:4px 8px;font-size:11px;font-weight:600;border-radius:4px;cursor:pointer;border:1px solid ' + (sel ? '#58a6ff' : '#30363d') + ';background:' + (sel ? '#1f6feb' : '#21262d') + ';color:' + (sel ? '#fff' : '#8b949e') + ';">' + tf[1] + '</button>';
+          }).join('') +
+        '</div>' +
+        '<label style="font-size:11px;color:#8b949e;">Bars</label>' +
+        '<select id="csBtCount" style="padding:6px 10px;font-size:12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;">' +
+          [[100,'100'],[250,'250'],[500,'500'],[1000,'1K'],[2500,'2.5K'],[5000,'5K'],[10000,'10K']].map(function(o) {
+            return '<option value="' + o[0] + '"' + ((savedCfg.count || 1000) == o[0] ? ' selected' : '') + '>' + o[1] + ' bars</option>';
+          }).join('') +
         '</select>' +
-        '<label style="font-size:11px;color:#8b949e;">Candle Count (max 2000)</label>' +
-        '<input id="csBtCount" type="number" value="' + (savedCfg.count || 200) + '" min="10" max="2000" style="padding:6px 10px;font-size:12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;">' +
+        '<div id="csBtTfNote" style="font-size:10px;color:#6e7681;display:none;">Sub-minute timeframes use stream candle data (built from live ticks)</div>' +
         '<div style="display:flex;gap:8px;margin-top:6px;">' +
           '<button id="csBtRunBtn" style="flex:1;padding:8px 16px;font-size:13px;font-weight:600;background:#2a1a00;border:2px solid #e8a317;color:#e8a317;border-radius:6px;cursor:pointer;">Run Backtest</button>' +
           '<button id="csBtCancelBtn" style="padding:8px 16px;font-size:13px;background:#21262d;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;cursor:pointer;">Cancel</button>' +
@@ -1343,18 +1346,33 @@ function _showBacktestConfigPopup() {
       '</div>' +
     '</div>';
   document.body.appendChild(overlay);
-  if (savedCfg.resolution) {
-    var sel = document.getElementById('csBtResolution');
-    for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === savedCfg.resolution) { sel.selectedIndex = i; break; } }
+  var _selectedTf = savedCfg.resolution || 'HOUR';
+  var tfBtns = overlay.querySelectorAll('.cs-tf-btn');
+  function _updateTfNote() {
+    var note = document.getElementById('csBtTfNote');
+    if (note) note.style.display = _selectedTf.indexOf('SECOND') === 0 ? 'block' : 'none';
   }
+  _updateTfNote();
+  tfBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      _selectedTf = this.getAttribute('data-tf');
+      tfBtns.forEach(function(b) {
+        var act = b.getAttribute('data-tf') === _selectedTf;
+        b.style.background = act ? '#1f6feb' : '#21262d';
+        b.style.borderColor = act ? '#58a6ff' : '#30363d';
+        b.style.color = act ? '#fff' : '#8b949e';
+      });
+      _updateTfNote();
+    });
+  });
   function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
   overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
   document.getElementById('csBtCfgClose').addEventListener('click', close);
   document.getElementById('csBtCancelBtn').addEventListener('click', close);
   document.getElementById('csBtRunBtn').addEventListener('click', function() {
     var epic = document.getElementById('csBtEpic').value.trim();
-    var resolution = document.getElementById('csBtResolution').value;
-    var count = parseInt(document.getElementById('csBtCount').value) || 200;
+    var resolution = _selectedTf;
+    var count = parseInt(document.getElementById('csBtCount').value) || 1000;
     localStorage.setItem('cs_backtest_cfg', JSON.stringify({ epic: epic, resolution: resolution, count: count }));
     close();
     _executeBacktest(code, epic, resolution, count);

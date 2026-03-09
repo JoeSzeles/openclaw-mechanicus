@@ -152,14 +152,14 @@ const server = http.createServer(function(req, res) {
       var code = body.code || '';
       var epic = body.instrument || 'CS.D.BITCOIN.CFD.IP';
       var resolution = body.resolution || 'HOUR';
-      var maxCandles = Math.min(body.candleCount || 200, 2000);
+      var maxCandles = body.candleCount || 1000;
       try {
         var parsed = parser.parseAndGenerate(code);
         if (!parsed || !parsed.ast) { _jsonRes(res, 400, { error: 'Parse error' }); return; }
         var ast = parsed.ast;
         var basePrice = epic.toLowerCase().indexOf('bitcoin') > -1 ? 50000 : epic.toLowerCase().indexOf('ether') > -1 ? 3000 : epic.toLowerCase().indexOf('gold') > -1 ? 2000 : 100;
         var now = Math.floor(Date.now() / 1000);
-        var resMap = { MINUTE:60,MINUTE_5:300,MINUTE_15:900,MINUTE_30:1800,HOUR:3600,HOUR_4:14400,DAY:86400,WEEK:604800 };
+        var resMap = { SECOND:1,SECOND_2:2,SECOND_5:5,SECOND_10:10,SECOND_20:20,SECOND_30:30,SECOND_40:40,MINUTE:60,MINUTE_5:300,MINUTE_15:900,MINUTE_30:1800,HOUR:3600,HOUR_4:14400,DAY:86400,WEEK:604800 };
         var interval = resMap[resolution] || 3600;
         var candles = [];
         for (var i = 0; i < maxCandles; i++) {

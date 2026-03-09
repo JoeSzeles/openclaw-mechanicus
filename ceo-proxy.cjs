@@ -1150,7 +1150,8 @@ async function handleClawScriptApi(req, res, p) {
     if (!code) return json(res, 400, { error: "Missing code (ClawScript source)" });
     const epic = instrument || "CS.D.BITCOIN.CFD.IP";
     const res_ = resolution || "HOUR";
-    const max = Math.min(candleCount || 200, 2000);
+    const max = candleCount || 1000;
+    const isSubMinute = res_.startsWith("SECOND");
 
     try {
       const parser = require("./skills/bots/clawscript-parser.cjs");
@@ -1163,52 +1164,7 @@ async function handleClawScriptApi(req, res, p) {
       let candles = [];
       let dataSource = "none";
 
-      try {
-        const session = await igAuth();
-        const igR = await igRequest("GET", "/prices/" + epic + "?resolution=" + res_ + "&max=" + max + "&pageSize=" + max, igHeaders(session));
-        if (igR.status === 200) {
-          const data = safeParseIgBody(igR.body);
-          if (data && data.prices) {
-            candles = data.prices.map(p => {
-              let rawTime = p.snapshotTimeUTC || p.snapshotTime || "";
-              if (typeof rawTime === "string") rawTime = rawTime.replace(/\//g, "-");
-              const dt = new Date(rawTime);
-              const om = p.openPrice || {}, hm = p.highPrice || {}, lm = p.lowPrice || {}, cm = p.closePrice || {};
-              return {
-                ts: Math.floor(dt.getTime() / 1000),
-                time: Math.floor(dt.getTime() / 1000),
-                open: ((om.bid || 0) + (om.ask || om.offer || 0)) / 2,
-                high: ((hm.bid || 0) + (hm.ask || hm.offer || 0)) / 2,
-                low: ((lm.bid || 0) + (lm.ask || lm.offer || 0)) / 2,
-                close: ((cm.bid || 0) + (cm.ask || cm.offer || 0)) / 2,
-                volume: p.lastTradedVolume || 0
-              };
-            }).sort((a, b) => a.ts - b.ts);
-            if (candles.length > 0) dataSource = "ig-api";
-          }
-        }
-      } catch (igErr) {
-        console.log(`[clawscript-backtest] IG API unavailable: ${igErr.message}`);
-      }
-
-      if (candles.length === 0) {
-        try {
-          const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
-          const stored = await scalperDb.getStoredCandles(epic, res_, max);
-          if (stored.length > 0) {
-            candles = stored.map(r => ({
-              ts: parseInt(r.ts), time: parseInt(r.ts),
-              open: parseFloat(r.open), high: parseFloat(r.high),
-              low: parseFloat(r.low), close: parseFloat(r.close),
-              volume: parseInt(r.volume) || 0
-            }));
-            dataSource = "db-cache";
-            console.log(`[clawscript-backtest] Using ${candles.length} DB-cached candles for ${epic} ${res_}`);
-          }
-        } catch (_) {}
-      }
-
-      if (candles.length === 0) {
+      if (isSubMinute) {
         try {
           const inMem = getStreamCurrentCandles(epic, res_, max);
           if (inMem.length > 0) {
@@ -1218,15 +1174,91 @@ async function handleClawScriptApi(req, res, p) {
               volume: c.volume || 0
             }));
             dataSource = "stream";
-            console.log(`[clawscript-backtest] Using ${candles.length} in-memory stream candles for ${epic} ${res_}`);
+            console.log(`[clawscript-backtest] Using ${candles.length} stream candles for ${epic} ${res_}`);
           }
         } catch (_) {}
+        if (candles.length === 0) {
+          try {
+            const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+            const stored = await scalperDb.getStoredCandles(epic, res_, max);
+            if (stored.length > 0) {
+              candles = stored.map(r => ({
+                ts: parseInt(r.ts), time: parseInt(r.ts),
+                open: parseFloat(r.open), high: parseFloat(r.high),
+                low: parseFloat(r.low), close: parseFloat(r.close),
+                volume: parseInt(r.volume) || 0
+              }));
+              dataSource = "db-cache";
+              console.log(`[clawscript-backtest] Using ${candles.length} DB-cached stream candles for ${epic} ${res_}`);
+            }
+          } catch (_) {}
+        }
+      } else {
+        try {
+          const session = await igAuth();
+          const igR = await igRequest("GET", "/prices/" + epic + "?resolution=" + res_ + "&max=" + max + "&pageSize=" + max, igHeaders(session));
+          if (igR.status === 200) {
+            const data = safeParseIgBody(igR.body);
+            if (data && data.prices) {
+              candles = data.prices.map(p => {
+                let rawTime = p.snapshotTimeUTC || p.snapshotTime || "";
+                if (typeof rawTime === "string") rawTime = rawTime.replace(/\//g, "-");
+                const dt = new Date(rawTime);
+                const om = p.openPrice || {}, hm = p.highPrice || {}, lm = p.lowPrice || {}, cm = p.closePrice || {};
+                return {
+                  ts: Math.floor(dt.getTime() / 1000),
+                  time: Math.floor(dt.getTime() / 1000),
+                  open: ((om.bid || 0) + (om.ask || om.offer || 0)) / 2,
+                  high: ((hm.bid || 0) + (hm.ask || hm.offer || 0)) / 2,
+                  low: ((lm.bid || 0) + (lm.ask || lm.offer || 0)) / 2,
+                  close: ((cm.bid || 0) + (cm.ask || cm.offer || 0)) / 2,
+                  volume: p.lastTradedVolume || 0
+                };
+              }).sort((a, b) => a.ts - b.ts);
+              if (candles.length > 0) dataSource = "ig-api";
+            }
+          }
+        } catch (igErr) {
+          console.log(`[clawscript-backtest] IG API unavailable: ${igErr.message}`);
+        }
+
+        if (candles.length === 0) {
+          try {
+            const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+            const stored = await scalperDb.getStoredCandles(epic, res_, max);
+            if (stored.length > 0) {
+              candles = stored.map(r => ({
+                ts: parseInt(r.ts), time: parseInt(r.ts),
+                open: parseFloat(r.open), high: parseFloat(r.high),
+                low: parseFloat(r.low), close: parseFloat(r.close),
+                volume: parseInt(r.volume) || 0
+              }));
+              dataSource = "db-cache";
+              console.log(`[clawscript-backtest] Using ${candles.length} DB-cached candles for ${epic} ${res_}`);
+            }
+          } catch (_) {}
+        }
+
+        if (candles.length === 0) {
+          try {
+            const inMem = getStreamCurrentCandles(epic, res_, max);
+            if (inMem.length > 0) {
+              candles = inMem.map(c => ({
+                ts: c.ts, time: c.ts,
+                open: c.open, high: c.high, low: c.low, close: c.close,
+                volume: c.volume || 0
+              }));
+              dataSource = "stream";
+              console.log(`[clawscript-backtest] Using ${candles.length} in-memory stream candles for ${epic} ${res_}`);
+            }
+          } catch (_) {}
+        }
       }
 
       if (candles.length < 5) {
         const basePrice = epic.toLowerCase().includes("bitcoin") ? 50000 : epic.toLowerCase().includes("ether") ? 3000 : epic.toLowerCase().includes("gold") ? 2000 : 100;
         const now = Math.floor(Date.now() / 1000);
-        const resSeconds = { "MINUTE": 60, "MINUTE_2": 120, "MINUTE_3": 180, "MINUTE_5": 300, "MINUTE_10": 600, "MINUTE_15": 900, "MINUTE_30": 1800, "HOUR": 3600, "HOUR_2": 7200, "HOUR_3": 10800, "HOUR_4": 14400, "DAY": 86400, "WEEK": 604800, "MONTH": 2592000 };
+        const resSeconds = { "SECOND": 1, "SECOND_2": 2, "SECOND_5": 5, "SECOND_10": 10, "SECOND_20": 20, "SECOND_30": 30, "SECOND_40": 40, "MINUTE": 60, "MINUTE_2": 120, "MINUTE_3": 180, "MINUTE_5": 300, "MINUTE_10": 600, "MINUTE_15": 900, "MINUTE_30": 1800, "HOUR": 3600, "HOUR_2": 7200, "HOUR_3": 10800, "HOUR_4": 14400, "DAY": 86400, "WEEK": 604800, "MONTH": 2592000 };
         const interval = resSeconds[res_] || 3600;
         candles = [];
         for (let i = 0; i < max; i++) {
