@@ -3400,13 +3400,13 @@ function renderBatchResults() {
   var html = '';
   for (var i = 0; i < batches.length; i++) {
     var b = batches[i];
-    var dt = b.createdAt ? new Date(b.createdAt).toLocaleString() : '';
+    var dt = b.started ? new Date(b.started).toLocaleString() : (b.createdAt ? new Date(b.createdAt).toLocaleString() : '');
     html += '<div style="border:1px solid #30363d;border-radius:6px;margin-bottom:10px;background:#0d1117">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer" onclick="toggleBatchExpand(\'' + b.batchId + '\')">';
     html += '<div><span style="color:#58a6ff;font-weight:600">Batch #' + (b.batchId || i) + '</span>';
-    html += ' <span style="color:#8b949e;font-size:11px;margin-left:8px">' + (b.instrument || '') + '</span>';
     html += ' <span style="color:#8b949e;font-size:11px;margin-left:8px">' + dt + '</span>';
-    html += ' <span class="badge badge-spike" style="margin-left:6px">' + (b.resultCount || 0) + ' results</span></div>';
+    html += ' <span class="badge badge-spike" style="margin-left:6px">' + (b.runCount || 0) + ' results</span>';
+    html += ' <span style="color:#8b949e;font-size:11px;margin-left:6px">P&L: <span class="' + ((b.totalPnl || 0) >= 0 ? 'pos' : 'neg') + '">' + ((b.totalPnl || 0) >= 0 ? '+' : '') + (b.totalPnl || 0).toFixed(2) + '</span></span></div>';
     html += '<div style="display:flex;gap:6px;align-items:center">';
     html += '<button class="btn-sm btn-danger" onclick="event.stopPropagation();deleteBatch(\'' + b.batchId + '\')">Delete</button>';
     html += '<span style="color:#8b949e;font-size:12px">▼</span></div>';
@@ -3443,7 +3443,7 @@ function renderBatchExpandTable(batchId) {
   var results = el._results.slice();
   var filterStrat = (document.getElementById('batchResultFilterStrat') || {}).value || '';
   var filterTf = (document.getElementById('batchResultFilterTf') || {}).value || '';
-  if (filterStrat) results = results.filter(function(r) { return (r.strategyType || '').toLowerCase().indexOf(filterStrat.toLowerCase()) !== -1; });
+  if (filterStrat) results = results.filter(function(r) { return (r.strategyTypeKey || r.strategyType || '').toLowerCase().indexOf(filterStrat.toLowerCase()) !== -1; });
   if (filterTf) results = results.filter(function(r) { return (r.timeframe || '').toLowerCase().indexOf(filterTf.toLowerCase()) !== -1; });
   if (el._sortCol) {
     var col = el._sortCol;
@@ -3457,13 +3457,13 @@ function renderBatchExpandTable(batchId) {
   }
   var html = '<div style="overflow-x:auto"><table style="font-size:11px;width:100%">';
   var cols = [
-    { key: 'strategyType', label: 'Strategy Type' },
+    { key: 'strategyTypeKey', label: 'Strategy Type' },
     { key: 'timeframe', label: 'Timeframe' },
-    { key: 'trades', label: 'Trades' },
+    { key: 'totalTrades', label: 'Trades' },
     { key: 'winRate', label: 'Win Rate' },
-    { key: 'pnl', label: 'P&L' },
+    { key: 'totalPnl', label: 'P&L' },
     { key: 'maxDrawdown', label: 'Max DD' },
-    { key: 'sharpe', label: 'Sharpe' }
+    { key: 'sharpeRatio', label: 'Sharpe' }
   ];
   html += '<tr>';
   for (var c = 0; c < cols.length; c++) {
@@ -3473,17 +3473,18 @@ function renderBatchExpandTable(batchId) {
   html += '<th>Actions</th></tr>';
   for (var i = 0; i < results.length; i++) {
     var r = results[i];
-    var pnlVal = r.pnl != null ? r.pnl : 0;
+    var pnlVal = r.totalPnl != null ? parseFloat(r.totalPnl) : 0;
     var pnlClass = pnlVal >= 0 ? 'pos' : 'neg';
-    var winPct = r.winRate != null ? (r.winRate * 100).toFixed(1) + '%' : '--';
+    var wr = r.winRate != null ? parseFloat(r.winRate) : null;
+    var winPct = wr != null ? wr.toFixed(1) + '%' : '--';
     html += '<tr>';
-    html += '<td>' + (r.strategyType || '--') + '</td>';
+    html += '<td>' + (r.strategyTypeKey || r.strategyType || '--') + '</td>';
     html += '<td>' + (r.timeframe || '--') + '</td>';
-    html += '<td>' + (r.trades != null ? r.trades : '--') + '</td>';
+    html += '<td>' + (r.totalTrades != null ? r.totalTrades : '--') + '</td>';
     html += '<td>' + winPct + '</td>';
     html += '<td class="' + pnlClass + '">' + (pnlVal >= 0 ? '+' : '') + pnlVal.toFixed(2) + '</td>';
-    html += '<td class="neg">' + (r.maxDrawdown != null ? r.maxDrawdown.toFixed(2) : '--') + '</td>';
-    html += '<td>' + (r.sharpe != null ? r.sharpe.toFixed(2) : '--') + '</td>';
+    html += '<td class="neg">' + (r.maxDrawdown != null ? parseFloat(r.maxDrawdown).toFixed(2) : '--') + '</td>';
+    html += '<td>' + (r.sharpeRatio != null ? parseFloat(r.sharpeRatio).toFixed(2) : '--') + '</td>';
     html += '<td style="white-space:nowrap">';
     html += '<button class="btn-sm btn-edit" onclick="viewBatchDetail(\'' + (r.id || r.backtestId || '') + '\')">Details</button> ';
     html += '<button class="btn-sm" onclick="downloadBatchResultJSON(' + i + ',\'' + batchId + '\')">JSON</button> ';
@@ -3535,10 +3536,13 @@ async function viewBatchDetail(backtestId) {
   var trades = data.trades || [];
   var html = '<div style="margin-bottom:10px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;font-size:11px">';
   html += '<div class="stat" style="padding:4px"><div class="value" style="font-size:16px">' + trades.length + '</div><div class="label">Trades</div></div>';
-  html += '<div class="stat" style="padding:4px"><div class="value ' + (data.pnl >= 0 ? 'pos' : 'neg') + '" style="font-size:16px">' + (data.pnl != null ? data.pnl.toFixed(2) : '--') + '</div><div class="label">P&L</div></div>';
-  html += '<div class="stat" style="padding:4px"><div class="value" style="font-size:16px">' + (data.winRate != null ? (data.winRate * 100).toFixed(1) + '%' : '--') + '</div><div class="label">Win Rate</div></div>';
-  html += '<div class="stat" style="padding:4px"><div class="value neg" style="font-size:16px">' + (data.maxDrawdown != null ? data.maxDrawdown.toFixed(2) : '--') + '</div><div class="label">Max DD</div></div>';
-  html += '<div class="stat" style="padding:4px"><div class="value" style="font-size:16px">' + (data.sharpe != null ? data.sharpe.toFixed(2) : '--') + '</div><div class="label">Sharpe</div></div>';
+  var detPnl = data.totalPnl != null ? parseFloat(data.totalPnl) : (data.pnl != null ? parseFloat(data.pnl) : 0);
+  html += '<div class="stat" style="padding:4px"><div class="value ' + (detPnl >= 0 ? 'pos' : 'neg') + '" style="font-size:16px">' + detPnl.toFixed(2) + '</div><div class="label">P&L</div></div>';
+  var detWr = data.winRate != null ? parseFloat(data.winRate) : null;
+  html += '<div class="stat" style="padding:4px"><div class="value" style="font-size:16px">' + (detWr != null ? detWr.toFixed(1) + '%' : '--') + '</div><div class="label">Win Rate</div></div>';
+  html += '<div class="stat" style="padding:4px"><div class="value neg" style="font-size:16px">' + (data.maxDrawdown != null ? parseFloat(data.maxDrawdown).toFixed(2) : '--') + '</div><div class="label">Max DD</div></div>';
+  var detSharpe = data.sharpeRatio != null ? data.sharpeRatio : (data.sharpe != null ? data.sharpe : null);
+  html += '<div class="stat" style="padding:4px"><div class="value" style="font-size:16px">' + (detSharpe != null ? parseFloat(detSharpe).toFixed(2) : '--') + '</div><div class="label">Sharpe</div></div>';
   html += '</div>';
   if (trades.length > 0) {
     html += '<div style="max-height:400px;overflow-y:auto;border:1px solid #21262d;border-radius:4px"><table style="font-size:11px;width:100%">';
@@ -3569,7 +3573,7 @@ function downloadBatchResultJSON(resultIndex, batchId) {
   var blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'backtest-' + (r.strategyType || 'result') + '-' + (r.timeframe || '') + '.json';
+  a.download = 'backtest-' + (r.strategyTypeKey || r.strategyType || 'result') + '-' + (r.timeframe || '') + '.json';
   a.click();
 }
 
@@ -3577,11 +3581,12 @@ async function applyBatchResult(resultIndex, batchId) {
   var el = document.getElementById('batchExpand_' + batchId);
   if (!el || !el._results || !el._results[resultIndex]) return;
   var r = el._results[resultIndex];
+  var stKey = r.strategyTypeKey || r.strategyType || 'scalper';
   var body = {
     instrument: r.instrument || document.getElementById('batchBtInstrument').value || '',
     instrumentName: r.instrumentName || '',
-    strategyType: r.strategyType || 'claw-trader',
-    name: (r.strategyType || 'backtest') + ' ' + (r.timeframe || ''),
+    strategyType: stKey,
+    name: stKey + ' ' + (r.timeframe || ''),
     direction: r.direction || 'BOTH',
     timeframe: r.timeframe || 'MINUTE',
     size: r.size || 0.5,
