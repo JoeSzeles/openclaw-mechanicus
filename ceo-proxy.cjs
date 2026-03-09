@@ -3076,6 +3076,16 @@ async function handleIgApi(req, res, p) {
       const sl = require("./skills/bots/strategies/index.cjs");
       return json(res, 200, sl.getStrategySchemas());
     }
+    if (req.method === "GET" && p === "/api/ig/scalper/backtests") {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const list = await scalperDb.getAllBacktests(50);
+      return json(res, 200, { backtests: list });
+    }
+    if (req.method === "DELETE" && p === "/api/ig/scalper/backtests") {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const result = await scalperDb.deleteAllBacktests();
+      return json(res, 200, result);
+    }
     const backtestDetailMatch = p.match(/^\/api\/ig\/scalper\/backtests\/(\d+)$/);
     if (req.method === "GET" && backtestDetailMatch) {
       const scalperDb = require("./skills/bots/ig-scalper-db.cjs");

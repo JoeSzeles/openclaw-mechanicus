@@ -289,7 +289,10 @@ async function runBacktest(strategyId, options = {}) {
     ? Math.max(stratInstance.getRequiredBufferSize(), 10)
     : Math.max(tickWindow, strat.macdEnabled ? ((strat.macdSlow || 26) + (strat.macdSignal || 9) + 5) : 0, strat.emaEnabled ? ((strat.emaLong || 21) + 5) : 0, strat.rsiEnabled ? ((strat.rsiPeriod || 14) + 5) : 0);
 
-  console.log(`[backtest] Running with strategy="${strategyType}" warmup=${warmupBars} candles=${candles.length}`);
+  const hasExitParams = stopDist > 0 || limitDist > 0 || trailingStop > 0 || profitTarget > 0;
+  console.log(`[backtest] Running strategy="${strategyType}" warmup=${warmupBars} candles=${candles.length} stop=${stopDist} limit=${limitDist} trail=${trailingStop} pt=${profitTarget} momentum=${minMom} tw=${tickWindow} dir=${strat.direction || "BOTH"} hasExitParams=${hasExitParams}`);
+
+  let _debugSignals = 0, _debugNoMom = 0, _debugNoExit = 0, _debugCooldown = 0, _debugIndBlock = 0;
 
   for (let i = warmupBars; i < candles.length; i++) {
     const c = candles[i];
@@ -325,12 +328,14 @@ async function runBacktest(strategyId, options = {}) {
       }
 
       if (!reason && profitTarget > 0) {
-        const rawPnl = dir === "BUY" ? (c.close - entryPrice) * size * cs : (entryPrice - c.close) * size * cs;
+        const tSize = openTrade.size || size;
+        const rawPnl = dir === "BUY" ? (c.close - entryPrice) * tSize * cs : (entryPrice - c.close) * tSize * cs;
         if (rawPnl >= profitTarget) { exitPrice = c.close; reason = "PT"; }
       }
 
       if (exitPrice !== null) {
-        const pnl = dir === "BUY" ? (exitPrice - entryPrice) * size * cs : (entryPrice - exitPrice) * size * cs;
+        const tSize = openTrade.size || size;
+        const pnl = dir === "BUY" ? (exitPrice - entryPrice) * tSize * cs : (entryPrice - exitPrice) * tSize * cs;
         const roundedPnl = Math.round(pnl * 100) / 100;
         trades.push({
           entryTime: openTrade.entryTime,
@@ -341,7 +346,8 @@ async function runBacktest(strategyId, options = {}) {
           exitPrice,
           direction: dir,
           pnl: roundedPnl,
-          reason
+          reason,
+          size: openTrade.size || size
         });
         const cumPnl = trades.reduce((s, t) => s + t.pnl, 0);
         equityCurve.push({ time: c.time, pnl: roundedPnl, cumPnl: Math.round(cumPnl * 100) / 100, bar: i });
@@ -352,7 +358,7 @@ async function runBacktest(strategyId, options = {}) {
       continue;
     }
 
-    if (i - lastEntryBar < cooldownBars) continue;
+    if (i - lastEntryBar < cooldownBars) { _debugCooldown++; continue; }
 
     let direction = null;
     let signalStopDist = stopDist;
@@ -366,12 +372,16 @@ async function runBacktest(strategyId, options = {}) {
       }));
       const spread = c.high - c.low;
       const context = { htfBias: null, accountBalance: 0, accountMargin: 0, spread, epic: strat.instrument, config: strat, breakEvenBuffer: 1.5 };
-      const signal = stratInstance.safeEvaluateEntry(pseudoTicks, context);
+      let signal = stratInstance.safeEvaluateEntry(pseudoTicks, context);
+      if (signal && typeof signal.then === "function") {
+        try { signal = await signal; } catch (e) { signal = null; }
+      }
       if (signal && signal.signal && signal.direction) {
         direction = signal.direction;
         if (signal.stopDist) signalStopDist = signal.stopDist;
         if (signal.limitDist) signalLimitDist = signal.limitDist;
         if (signal.size) signalSize = signal.size;
+        _debugSignals++;
       }
     } else {
       const windowStart = Math.max(0, i - tickWindow);
@@ -380,7 +390,7 @@ async function runBacktest(strategyId, options = {}) {
       const momentumPct = ((lastClose - firstClose) / firstClose) * 100;
       const absMomentum = Math.abs(momentumPct);
 
-      if (absMomentum < minMom) continue;
+      if (absMomentum < minMom) { _debugNoMom++; continue; }
 
       if (strat.direction === "BUY") {
         if (momentumPct > 0) direction = "BUY";
@@ -393,23 +403,36 @@ async function runBacktest(strategyId, options = {}) {
 
       if (direction) {
         const closePrices = candles.slice(Math.max(0, i - 60), i + 1).map(x => x.close);
-        if (!checkIndicators(closePrices, direction, strat)) direction = null;
+        if (!checkIndicators(closePrices, direction, strat)) { _debugIndBlock++; direction = null; }
+        else _debugSignals++;
       }
     }
 
     if (!direction) continue;
 
-    if (signalStopDist <= 0 && signalLimitDist <= 0 && trailingStop <= 0 && profitTarget <= 0) continue;
+    if (signalStopDist <= 0 && signalLimitDist <= 0 && trailingStop <= 0 && profitTarget <= 0) {
+      const spread = c.high - c.low;
+      if (spread > 0) {
+        signalStopDist = spread * 3;
+        signalLimitDist = spread * 4;
+      } else {
+        signalStopDist = c.close * 0.005;
+        signalLimitDist = c.close * 0.007;
+      }
+    }
 
-    openTrade = { direction, entryPrice: c.close, entryTime: c.time, entryBar: i, stopDist: signalStopDist, limitDist: signalLimitDist };
+    openTrade = { direction, entryPrice: c.close, entryTime: c.time, entryBar: i, stopDist: signalStopDist, limitDist: signalLimitDist, size: signalSize };
     peakPnl = 0;
   }
 
+  console.log(`[backtest] Diagnostics: signals=${_debugSignals} noMomentum=${_debugNoMom} indBlocked=${_debugIndBlock} cooldown=${_debugCooldown} trades=${trades.length}`);
+
   if (openTrade) {
     const lastCandle = candles[candles.length - 1];
+    const tSize = openTrade.size || size;
     const pnl = openTrade.direction === "BUY"
-      ? (lastCandle.close - openTrade.entryPrice) * size * cs
-      : (openTrade.entryPrice - lastCandle.close) * size * cs;
+      ? (lastCandle.close - openTrade.entryPrice) * tSize * cs
+      : (openTrade.entryPrice - lastCandle.close) * tSize * cs;
     const roundedPnl = Math.round(pnl * 100) / 100;
     trades.push({
       entryTime: openTrade.entryTime,

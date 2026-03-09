@@ -667,6 +667,24 @@ async function deleteBacktests(strategyId) {
   return { ok: true, deleted: res.rowCount };
 }
 
+async function getAllBacktests(limit = 50) {
+  const res = await query(
+    `SELECT b.id, b.strategy_id, b.timeframe, b.candle_count, b.total_trades, b.win_count, b.loss_count,
+            b.win_rate, b.total_pnl, b.max_drawdown, b.sharpe_ratio, b.avg_win, b.avg_loss, b.created_at,
+            s.name as strategy_name, s.instrument, s.strategy_type
+     FROM scalper_backtests b
+     LEFT JOIN scalper_strategies s ON b.strategy_id = s.id
+     ORDER BY b.created_at DESC LIMIT $1`,
+    [limit]
+  );
+  return res.rows.map(camel);
+}
+
+async function deleteAllBacktests() {
+  await query("DELETE FROM scalper_backtests");
+  return { ok: true };
+}
+
 async function close() {
   await pool.end();
 }
@@ -675,7 +693,7 @@ module.exports = {
   getConfig, updateConfig,
   getStrategies, getStrategy, addStrategy, updateStrategy, deleteStrategy, toggleStrategy,
   logTrade, getTrades, getTradeStats, clearTrades,
-  saveBacktest, getBacktests, getBacktest, deleteBacktests,
+  saveBacktest, getBacktests, getBacktest, deleteBacktests, getAllBacktests, deleteAllBacktests,
   ensurePriceCandlesTable, getStoredCandles, getLatestCandleTs, getCandleCount, storeCandles, getStoredCandlesRange,
   ensureNewColumns,
   backupAgent, listAgentBackups, restoreAgentBackup, deleteAgentBackup,

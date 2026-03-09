@@ -23,7 +23,14 @@ class BaseStrategy {
 
   safeEvaluateEntry(ticks, context) {
     try {
-      return this.evaluateEntry(ticks, context);
+      const result = this.evaluateEntry(ticks, context);
+      if (result && typeof result.then === "function") {
+        return result.catch(e => {
+          console.log(`[strategy] [ERROR] ${this.getName()}.evaluateEntry async crashed: ${e.message}`);
+          return null;
+        });
+      }
+      return result;
     } catch (e) {
       const name = this.getName();
       console.log(`[strategy] [ERROR] ${name}.evaluateEntry crashed: ${e.message}`);
