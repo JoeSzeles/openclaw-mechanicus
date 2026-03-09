@@ -461,8 +461,8 @@ function buildEditorUI() {
     '</div>' +
     '<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#8b949e;cursor:pointer;"><input type="checkbox" id="csRealDataCheck" style="cursor:pointer;"> Real Data</label>' +
     '<input id="csInstrumentInput" type="text" placeholder="Epic (e.g. CS.D.BITCOIN.CFD.IP)" value="CS.D.BITCOIN.CFD.IP" style="width:200px;padding:3px 8px;font-size:11px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;" title="Instrument epic for simulation/backtest">' +
-    '<button id="csBtnBacktest" title="Run Backtest with Real Data" style="background:#0c2d48;border-color:#58a6ff;color:#58a6ff;">&#9654; Backtest</button>' +
-    '<button id="csBtnRunLive" title="Run script live as a persistent process" style="background:#238636;border-color:#2ea043;color:#fff;">&#128640; Run Live</button>' +
+    '<button id="csBtnBacktest" title="Run Backtest with Real Data" style="background:#0c2d48;border:2px solid #58a6ff;color:#58a6ff;padding:6px 16px;border-radius:6px;font-size:13px;font-weight:600;">&#9654; Backtest</button>' +
+    '<button id="csBtnRunLive" title="Run script live as a persistent process" style="background:#1a2e0a;border:2px solid #8b8000;color:#c8c878;padding:6px 16px;border-radius:6px;font-size:13px;font-weight:600;">&#9998; Run Live</button>' +
     '<div class="cs-sep"></div>' +
     '<select id="csTemplateSelect"><option value="">Templates...</option></select>' +
     '<div class="cs-sep"></div>' +
@@ -1277,7 +1277,7 @@ function runLive() {
   var headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
   _xhrPost('/api/clawscript/run', headers, payload, function(text) {
-    if (btn) { btn.disabled = false; btn.innerHTML = '&#128640; Run Live'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '&#9998; Run Live'; }
     try {
       var data = JSON.parse(text);
       if (data.error) {
@@ -1291,7 +1291,7 @@ function runLive() {
       csLog('Run Error: ' + e.message, 'error');
     }
   }, function(status, text) {
-    if (btn) { btn.disabled = false; btn.innerHTML = '&#128640; Run Live'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '&#9998; Run Live'; }
     csLog('Run Live failed (HTTP ' + status + '). Ensure server has /api/clawscript/run endpoint.', 'error');
   });
 }
