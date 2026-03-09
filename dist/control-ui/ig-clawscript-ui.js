@@ -537,6 +537,10 @@ function buildEditorUI() {
     '<button id="csBtnExportCS" title="Export ClawScript">Export .cs</button>' +
     '<button id="csBtnExportJSON" title="Export Flow JSON">Export JSON</button>' +
     '<button id="csBtnExportJS" title="Export Generated JS">Export .js</button>' +
+    '<div class="cs-sep"></div>' +
+    '<button id="csBtnDocsDocs" title="ClawScript Language Docs" style="background:#1a1a2e;border-color:#7c3aed;color:#a78bfa;font-size:11px;">&#128214; Docs</button>' +
+    '<button id="csBtnDocsRulebook" title="Trading Bot Rulebook" style="background:#1a1a2e;border-color:#7c3aed;color:#a78bfa;font-size:11px;">&#128218; Rulebook</button>' +
+    '<button id="csBtnDocsExamples" title="Example Strategies" style="background:#1a1a2e;border-color:#7c3aed;color:#a78bfa;font-size:11px;">&#128161; Examples</button>' +
   '</div>' +
 
   '<div class="cs-main" id="csMainPanel">' +
@@ -712,6 +716,9 @@ function attachEditorEvents() {
   document.getElementById('csBtnExportCS').addEventListener('click', exportCS);
   document.getElementById('csBtnExportJSON').addEventListener('click', exportJSON);
   document.getElementById('csBtnExportJS').addEventListener('click', exportGenJS);
+  document.getElementById('csBtnDocsDocs').addEventListener('click', function() { window.open('/__openclaw__/canvas/clawscript-docs.html', '_blank'); });
+  document.getElementById('csBtnDocsRulebook').addEventListener('click', function() { openRulebookPopup(); });
+  document.getElementById('csBtnDocsExamples').addEventListener('click', function() { openExamplesPopup(); });
   document.getElementById('csBtnModeCode').addEventListener('click', function() { setViewMode('code'); });
   document.getElementById('csBtnModeSplit').addEventListener('click', function() { setViewMode('split'); });
   document.getElementById('csBtnModeFlow').addEventListener('click', function() { setViewMode('flow'); });
@@ -1054,13 +1061,34 @@ function compileAndSave() {
     csLog('Parse successful: ' + result.ast.body.length + ' statements', 'success');
     csLog('Imports: ' + result.imports.join(', '), 'info');
     csLog('Variables: ' + result.variables.join(', '), 'info');
+    var hasValidationErrors = false;
+    if (result.validation) {
+      if (result.validation.errors && result.validation.errors.length > 0) {
+        hasValidationErrors = true;
+        for (var vi = 0; vi < result.validation.errors.length; vi++) {
+          csLog('VALIDATION ERROR: ' + result.validation.errors[vi], 'error');
+        }
+      }
+      if (result.validation.warnings && result.validation.warnings.length > 0) {
+        for (var wi = 0; wi < result.validation.warnings.length; wi++) {
+          csLog('VALIDATION WARNING: ' + result.validation.warnings[wi], 'warn');
+        }
+      }
+      if (result.validation.valid) {
+        csLog('Validation passed', 'success');
+      }
+    }
     csLog('--- Generated JavaScript ---', 'info');
     var jsLines = result.js.split('\n');
     for (var i = 0; i < jsLines.length; i++) {
       csLog(jsLines[i], 'trace');
     }
     renderFlow(result.ast);
-    showSaveDialog(code, result);
+    if (hasValidationErrors) {
+      csLog('Cannot save: fix validation errors above before saving.', 'error');
+    } else {
+      showSaveDialog(code, result);
+    }
   } catch(e) {
     csLog('Compile Error: ' + e.message, 'error');
   }
@@ -2902,6 +2930,85 @@ function postResultsToServer() {
   } catch(e) {}
 }
 
+function openRulebookPopup() {
+  var existing = document.getElementById('csRulebookOverlay');
+  if (existing) { existing.remove(); return; }
+  var overlay = document.createElement('div');
+  overlay.id = 'csRulebookOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  var popup = document.createElement('div');
+  popup.style.cssText = 'background:#0d1117;border:1px solid #30363d;border-radius:12px;width:700px;max-height:80vh;overflow-y:auto;padding:24px;color:#c9d1d9;font-family:monospace;';
+  popup.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+      '<h2 style="margin:0;color:#a78bfa;">Trading Bot Rulebook</h2>' +
+      '<button onclick="this.closest(\'#csRulebookOverlay\').remove()" style="background:none;border:none;color:#8b949e;font-size:20px;cursor:pointer;">&#10005;</button>' +
+    '</div>' +
+    '<div style="font-size:13px;line-height:1.6;">' +
+      '<h3 style="color:#58a6ff;">Required Structure</h3>' +
+      '<ul><li>At least one <code style="color:#2dc653;">BUY</code> or <code style="color:#f47067;">SELL</code> with conditions</li>' +
+      '<li>Use at least one indicator (RSI, EMA, MACD, etc.)</li>' +
+      '<li>Define <code>stopDistance</code> and <code>limitDistance</code> &gt; 0</li>' +
+      '<li>Null-check all indicators before use</li></ul>' +
+      '<h3 style="color:#58a6ff;">Risk Management</h3>' +
+      '<ul><li>Every strategy MUST have a stop loss (stopDistance &gt; 0)</li>' +
+      '<li>Every strategy MUST have a take profit (limitDistance &gt; 0)</li>' +
+      '<li>Recommended risk:reward ratio &ge; 1:1.5</li></ul>' +
+      '<h3 style="color:#58a6ff;">Validation Checklist</h3>' +
+      '<ul><li>Has conditional BUY/SELL commands</li>' +
+      '<li>Uses technical indicators</li>' +
+      '<li>Null checks for all indicators</li>' +
+      '<li>stopDistance and limitDistance defined</li>' +
+      '<li>Compiles without errors</li>' +
+      '<li>Backtest shows &gt; 0 trades</li></ul>' +
+      '<h3 style="color:#58a6ff;">Common Mistakes</h3>' +
+      '<ul><li style="color:#f47067;">No BUY/SELL commands &rarr; strategy does nothing</li>' +
+      '<li style="color:#f47067;">Missing null checks &rarr; crashes on startup</li>' +
+      '<li style="color:#f47067;">No stop loss &rarr; unbounded risk</li>' +
+      '<li style="color:#f47067;">Unconditional BUY/SELL &rarr; trades every tick</li></ul>' +
+    '</div>';
+  overlay.appendChild(popup);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+function openExamplesPopup() {
+  var existing = document.getElementById('csExamplesOverlay');
+  if (existing) { existing.remove(); return; }
+  var overlay = document.createElement('div');
+  overlay.id = 'csExamplesOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  var popup = document.createElement('div');
+  popup.style.cssText = 'background:#0d1117;border:1px solid #30363d;border-radius:12px;width:750px;max-height:80vh;overflow-y:auto;padding:24px;color:#c9d1d9;font-family:monospace;';
+  var examples = [
+    { name: 'RSI Mean Reversion', code: '// RSI Mean Reversion Strategy\nINPUT_INT rsiPeriod = 14 "RSI Period"\nINPUT_INT rsiOversold = 30 "RSI Oversold"\nINPUT_INT rsiOverbought = 70 "RSI Overbought"\nINPUT_INT stopDistance = 20 "Stop Distance"\nINPUT_INT limitDistance = 40 "Limit Distance"\nINPUT_INT size = 1 "Position Size"\n\nDEF rsi = RSI(prices, rsiPeriod)\n\nIF rsi != null\n  IF rsi < rsiOversold\n    BUY MARKET SIZE size\n  ENDIF\n  IF rsi > rsiOverbought\n    SELL MARKET SIZE size\n  ENDIF\nENDIF' },
+    { name: 'EMA Crossover + MACD', code: '// EMA Crossover with MACD Confirmation\nINPUT_INT emaFast = 9 "EMA Fast"\nINPUT_INT emaSlow = 21 "EMA Slow"\nINPUT_INT stopDistance = 30 "Stop Distance"\nINPUT_INT limitDistance = 60 "Limit Distance"\n\nDEF ema_fast = EMA(prices, emaFast)\nDEF ema_slow = EMA(prices, emaSlow)\nDEF macd = MACD(prices, 12, 26, 9)\n\nIF ema_fast != null AND ema_slow != null\n  IF ema_fast > ema_slow AND macd > 0\n    BUY MARKET SIZE 1\n  ENDIF\n  IF ema_fast < ema_slow AND macd < 0\n    SELL MARKET SIZE 1\n  ENDIF\nENDIF' },
+    { name: 'Bollinger Band Bounce', code: '// Bollinger Band Bounce Strategy\nINPUT_INT bbPeriod = 20 "BB Period"\nINPUT_FLOAT bbStdDev = 2.0 "BB Std Dev"\nINPUT_INT rsiPeriod = 14 "RSI Period"\nINPUT_INT stopDistance = 25 "Stop Distance"\nINPUT_INT limitDistance = 50 "Limit Distance"\n\nDEF bb = BOLLINGER(prices, bbPeriod, bbStdDev)\nDEF rsi = RSI(prices, rsiPeriod)\nDEF price = prices[prices.length - 1]\n\nIF bb != null AND rsi != null\n  IF price < bb.lower AND rsi < 30\n    BUY MARKET SIZE 1\n  ENDIF\n  IF price > bb.upper AND rsi > 70\n    SELL MARKET SIZE 1\n  ENDIF\nENDIF' }
+  ];
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+    '<h2 style="margin:0;color:#a78bfa;">Example Strategies</h2>' +
+    '<button onclick="this.closest(\'#csExamplesOverlay\').remove()" style="background:none;border:none;color:#8b949e;font-size:20px;cursor:pointer;">&#10005;</button></div>';
+  for (var i = 0; i < examples.length; i++) {
+    html += '<div style="margin-bottom:16px;border:1px solid #30363d;border-radius:8px;padding:12px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+        '<strong style="color:#58a6ff;">' + examples[i].name + '</strong>' +
+        '<button data-idx="' + i + '" class="cs-example-use" style="padding:4px 12px;background:#1f6feb;border:1px solid #58a6ff;color:#fff;border-radius:4px;font-size:11px;cursor:pointer;">Use This</button>' +
+      '</div>' +
+      '<pre style="background:#161b22;padding:10px;border-radius:6px;font-size:11px;overflow-x:auto;white-space:pre-wrap;color:#c9d1d9;margin:0;">' + examples[i].code.replace(/</g, '&lt;') + '</pre></div>';
+  }
+  popup.innerHTML = html;
+  popup.querySelectorAll('.cs-example-use').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var idx = parseInt(this.getAttribute('data-idx'));
+      var editor = document.getElementById('csCodeEditor');
+      if (editor && examples[idx]) { editor.value = examples[idx].code; editor.dispatchEvent(new Event('input')); }
+      overlay.remove();
+    });
+  });
+  overlay.appendChild(popup);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
 function openResultsPopup() {
   var existing = document.getElementById('csResultsOverlay');
   if (existing) existing.remove();
@@ -3711,7 +3818,24 @@ function parseClawScript(code) {
     throw parseErr;
   }
   var metadata = extractClawScriptMetadata(code);
-  return { ast: ast, js: generateJSFromAST(ast), imports: Object.keys(imports), variables: Object.keys(variables), metadata: metadata, warnings: _parseWarnings };
+  var js = generateJSFromAST(ast);
+  var validation = validateStrategyJSClient(js);
+  return { ast: ast, js: js, imports: Object.keys(imports), variables: Object.keys(variables), metadata: metadata, warnings: _parseWarnings, validation: validation };
+}
+
+function validateStrategyJSClient(js) {
+  var warnings = [];
+  var errors = [];
+  if (js.indexOf('static get STRATEGY_TYPE()') === -1) errors.push('Missing static STRATEGY_TYPE getter');
+  if (js.indexOf('evaluateEntry(') === -1) errors.push('Missing evaluateEntry method — strategy cannot generate trade signals');
+  if (js.indexOf('evaluateExit(') === -1) warnings.push('Missing evaluateExit method');
+  if (js.indexOf('getRequiredBufferSize()') === -1) warnings.push('Missing getRequiredBufferSize');
+  if (js.indexOf('getConfigSchema()') === -1) warnings.push('Missing getConfigSchema');
+  if (js.indexOf('extends BaseStrategy') === -1) errors.push('Strategy does not extend BaseStrategy');
+  if (js.indexOf('signal: true') === -1) errors.push('Strategy never returns { signal: true } — will never generate trades');
+  if (js.indexOf('stopDist') === -1 && js.indexOf('stopDistance') === -1) warnings.push('No stopDist/stopDistance — trades may lack stop loss');
+  if (js.indexOf('limitDist') === -1 && js.indexOf('limitDistance') === -1) warnings.push('No limitDist/limitDistance — trades may lack take profit');
+  return { valid: errors.length === 0, errors: errors, warnings: warnings };
 }
 
 function generateJSFromAST(ast) {

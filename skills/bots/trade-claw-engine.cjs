@@ -166,14 +166,14 @@ function getStrategyInstance(strat) {
   const type = strat.strategyType || "scalper";
   const key = `${strat.id}_${type}`;
   if (!strategyInstances[key]) {
-    strategyInstances[key] = strategyLoader.createInstance(type, strat);
-    if (strategyInstances[key]) {
+    try {
+      strategyInstances[key] = strategyLoader.createInstance(type, strat);
       log("DEBUG", `Strategy instance created: ${type} for "${strat.name}" (id=${strat.id})`);
-    } else {
-      log("WARN", `Unknown strategy type "${type}" for "${strat.name}", falling back to scalper`);
-      strategyInstances[key] = strategyLoader.createInstance("scalper", strat);
+    } catch (e) {
+      log("ERROR", `STRATEGY LOAD FAILED: "${type}" for "${strat.name}" (id=${strat.id}): ${e.message}. Strategy will be SKIPPED — no silent fallback.`);
+      strategyInstances[key] = null;
     }
-  } else {
+  } else if (strategyInstances[key]) {
     strategyInstances[key].config = strat;
   }
   return strategyInstances[key];

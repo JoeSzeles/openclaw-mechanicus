@@ -1060,6 +1060,13 @@ async function handleClawScriptApi(req, res, p) {
     try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
     const { name, filename, code, js, variables, imports, metadata } = body;
     if (!name || !filename || !js) return json(res, 400, { error: "Missing name, filename, or js" });
+    try {
+      const { validateStrategyJS } = require("./skills/bots/clawscript-parser.cjs");
+      const validation = validateStrategyJS(js);
+      if (!validation.valid) {
+        return json(res, 400, { error: "Strategy validation failed: " + validation.errors.join("; "), validation });
+      }
+    } catch (_) {}
     const safeFilename = filename.replace(/[^a-zA-Z0-9_\-.]/g, "");
     if (!safeFilename.endsWith("-strategy.cjs")) return json(res, 400, { error: "Filename must end with -strategy.cjs" });
     const filePath = path.join(CLAWSCRIPT_STRATEGIES_DIR, safeFilename);
@@ -1688,7 +1695,8 @@ EXPRESSION SYNTAX: Use standard comparison (<, >, <=, >=, ==, !=) and arithmetic
       if (!parsed || !parsed.ast) {
         return json(res, 400, { error: "Parse error: " + (parsed ? parsed.error : "unknown") });
       }
-      return json(res, 200, { ok: true, ast: parsed.ast, js: parsed.js, variables: parsed.variables || [], imports: parsed.imports || [] });
+      const validation = parsed.validation || { valid: true, errors: [], warnings: [] };
+      return json(res, 200, { ok: true, ast: parsed.ast, js: parsed.js, variables: parsed.variables || [], imports: parsed.imports || [], validation });
     } catch (e) {
       return json(res, 500, { error: "Compile failed: " + e.message });
     }

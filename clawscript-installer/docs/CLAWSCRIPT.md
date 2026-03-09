@@ -24,9 +24,22 @@ ENDIF
 - **Flow Builder**: `ig-clawscript-flow.js` (visual node editor)
 - **Templates**: `.openclaw/canvas/clawscript-templates/` (7 sample strategies)
 - **Full Docs**: `/__openclaw__/canvas/clawscript-docs.html`
+- **Trading Bot Rulebook**: `skills/clawscript/TRADING-BOT-RULEBOOK.md` — **MANDATORY reading before creating trading strategies**
 - **Compiled Strategies**: `skills/bots/strategies/` (`.cjs` files extending `BaseStrategy`)
 - **GitHub Repo**: https://github.com/JoeSzeles/clawscript
 - **Handbook (this file)**: `clawscript-installer/docs/CLAWSCRIPT.md`
+
+## Trading Bot Creation Rules
+
+**IMPORTANT**: When creating trading strategies via ClawScript, follow the Trading Bot Rulebook (`skills/clawscript/TRADING-BOT-RULEBOOK.md`). Key rules:
+
+1. Every strategy MUST have conditional BUY/SELL commands (never unconditional)
+2. Every strategy MUST use at least one indicator (RSI, EMA, MACD, etc.)
+3. Every strategy MUST specify stopDistance and limitDistance > 0
+4. Every strategy MUST check for null indicator values before using them
+5. After compiling, always run a backtest to verify the strategy generates trades
+6. The engine does NOT silently fall back to scalper — if a strategy type is invalid, it shows an error
+7. Generated strategy files MUST have: `static get STRATEGY_TYPE()`, `evaluateEntry()`, `evaluateExit()`, `getRequiredBufferSize()`, `getConfigSchema()`
 
 ## Editor Features
 

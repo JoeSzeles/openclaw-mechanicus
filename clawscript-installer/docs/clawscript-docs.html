@@ -1546,6 +1546,43 @@ IF price < bb_lower AND cci_val < -100
 </ul>
 <p>The standalone editor loads the same JavaScript files as the embedded dashboard editor, ensuring feature parity.</p>
 
+<h2 id="trading-bot-rules">Trading Bot Rules</h2>
+<p>Every ClawScript trading strategy must follow these mandatory rules to generate valid, tradeable bots:</p>
+
+<h3>Required Elements</h3>
+<ul>
+  <li><strong>Entry signals</strong>: At least one conditional <code>BUY</code> or <code>SELL</code> command (never unconditional)</li>
+  <li><strong>Indicators</strong>: Use at least one technical indicator (RSI, EMA, MACD, etc.)</li>
+  <li><strong>Risk management</strong>: Define <code>INPUT_INT stopDistance</code> and <code>INPUT_INT limitDistance</code> with values &gt; 0</li>
+  <li><strong>Null checks</strong>: Always check <code>IF indicator != null</code> before using indicator values</li>
+</ul>
+
+<h3>Validation</h3>
+<p>After compiling, the system validates your strategy and reports:</p>
+<ul>
+  <li><strong style="color:#f47067;">Errors</strong> (strategy will not work): Missing STRATEGY_TYPE, missing evaluateEntry, no trade signals, not extending BaseStrategy</li>
+  <li><strong style="color:#e3b341;">Warnings</strong> (strategy may work but suboptimally): Missing evaluateExit, missing stop/limit distances, missing config schema</li>
+</ul>
+
+<h3>Common Mistakes</h3>
+<table class="cmd-table">
+  <tr><th>Mistake</th><th>Result</th><th>Fix</th></tr>
+  <tr><td>No BUY/SELL commands</td><td>Strategy generates 0 trades</td><td>Add conditional BUY/SELL with indicators</td></tr>
+  <tr><td>Missing null checks</td><td>Crashes when insufficient data</td><td>Store in variable, check <code>!= null</code></td></tr>
+  <tr><td>No stopDistance</td><td>Trades have no stop loss protection</td><td>Add <code>INPUT_INT stopDistance = 20</code></td></tr>
+  <tr><td>Unconditional trading</td><td>Trades on every single tick</td><td>Wrap BUY/SELL inside IF blocks</td></tr>
+</table>
+
+<h3>Testing</h3>
+<ol>
+  <li>Compile in the ClawScript Editor (Compile &amp; Save)</li>
+  <li>Run a Backtest with your target instrument and timeframe</li>
+  <li>Verify backtest shows &gt; 0 trades</li>
+  <li>If 0 trades: loosen indicator thresholds or check conditions</li>
+</ol>
+
+<p>For the complete rulebook, see <code>skills/clawscript/TRADING-BOT-RULEBOOK.md</code>.</p>
+
 </main>
 </div>
 

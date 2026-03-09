@@ -31,7 +31,9 @@ function loadStrategies(force) {
 
 function getStrategy(type) {
   loadStrategies();
-  return registry[type] || registry["scalper"] || null;
+  if (registry[type]) return registry[type];
+  console.log(`[strategy-loader] ERROR: Strategy type "${type}" not found in registry. Available: ${Object.keys(registry).join(", ")}`);
+  return null;
 }
 
 function listStrategies() {
@@ -66,8 +68,13 @@ function getStrategySchemas() {
 
 function createInstance(type, config) {
   loadStrategies();
-  const Cls = registry[type] || registry["scalper"];
-  if (!Cls) return null;
+  const Cls = registry[type];
+  if (!Cls) {
+    const available = Object.keys(registry).join(", ");
+    const errMsg = `Strategy type "${type}" not found in registry. Available types: ${available}`;
+    console.log(`[strategy-loader] ERROR: ${errMsg}`);
+    throw new Error(errMsg);
+  }
   return new Cls(config);
 }
 

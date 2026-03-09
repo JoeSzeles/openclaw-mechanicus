@@ -172,6 +172,9 @@
 - **GitHub**: https://github.com/JoeSzeles/clawscript (separate repo, not main app git).
 - **Naming**: UI says "Claw Trader" (not "Scalper"); API endpoints remain `/api/ig/scalper/...` for compatibility.
 - **Test suite**: 82 parser tests + 139 pipeline tests = 221 total, 100% pass rate.
+- **Trading Bot Rulebook**: `skills/clawscript/TRADING-BOT-RULEBOOK.md` — mandatory rules for creating valid trading bots. Every ClawScript strategy MUST: (1) have conditional BUY/SELL, (2) use indicators, (3) define stopDistance/limitDistance > 0, (4) null-check indicators, (5) pass post-compile validation. Read this rulebook BEFORE writing any trading strategy.
+- **Strategy validation**: `parseAndGenerate()` returns a `validation` object with `errors` (fatal) and `warnings`. The compile API surfaces these. Strategies missing `STRATEGY_TYPE`, `evaluateEntry`, or `extends BaseStrategy` will be rejected.
+- **No silent fallback**: The engine does NOT silently fall back to scalper. If a strategy type is unknown, `createInstance()` throws and the error is surfaced to the user via toast/popup.
 
 ## Agent-Specific Notes
 

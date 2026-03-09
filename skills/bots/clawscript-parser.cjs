@@ -1651,6 +1651,8 @@ class ClawScriptParser {
 
     js += `  getDescription() { return 'Custom ClawScript strategy: ${safeName}'; }\n\n`;
 
+    js += `  getTimeframeHint() { return 'MINUTE'; }\n\n`;
+
     const schemaEntries = [
       `      { key: 'enabled', type: 'boolean', default: true, label: 'Enabled' }`,
       `      { key: 'size', type: 'number', default: 1, label: 'Position Size' }`,
@@ -2050,13 +2052,51 @@ function parseToAST(code) {
   return parser.parse();
 }
 
+function validateStrategyJS(js) {
+  const warnings = [];
+  const errors = [];
+
+  if (!js.includes('static get STRATEGY_TYPE()')) {
+    errors.push('Missing static STRATEGY_TYPE getter — strategy will not be loadable by the engine');
+  }
+  if (!js.includes('evaluateEntry(')) {
+    errors.push('Missing evaluateEntry method — strategy cannot generate trade signals');
+  }
+  if (!js.includes('evaluateExit(')) {
+    warnings.push('Missing evaluateExit method — strategy will use default (never exit)');
+  }
+  if (!js.includes('getRequiredBufferSize()')) {
+    warnings.push('Missing getRequiredBufferSize — will use default warmup period');
+  }
+  if (!js.includes('getConfigSchema()')) {
+    warnings.push('Missing getConfigSchema — strategy will have no configurable parameters');
+  }
+  if (!js.includes('extends BaseStrategy')) {
+    errors.push('Strategy class does not extend BaseStrategy — will not integrate with trading engine');
+  }
+
+  const hasTradeSignal = js.includes('signal: true') || js.includes("signal: true");
+  if (!hasTradeSignal) {
+    errors.push('Strategy never returns { signal: true } — will never generate any trades. Add BUY or SELL commands with conditions.');
+  }
+
+  const hasStopDist = js.includes('stopDist') || js.includes('stopDistance');
+  const hasLimitDist = js.includes('limitDist') || js.includes('limitDistance');
+  if (!hasStopDist || !hasLimitDist) {
+    warnings.push('Strategy does not specify stopDist/limitDist — trades may use default exit parameters');
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
 function parseAndGenerate(code, strategyName) {
   const tokens = lexer(code);
   const parser = new ClawScriptParser(tokens);
   const ast = parser.parse();
   const metadata = extractMetadata(code);
   const js = parser.generateJS(ast, strategyName || 'Custom', metadata);
-  return { ast, js, imports: Array.from(parser.imports), variables: Array.from(parser.variables.keys()), metadata };
+  const validation = validateStrategyJS(js);
+  return { ast, js, imports: Array.from(parser.imports), variables: Array.from(parser.variables.keys()), metadata, validation };
 }
 
-module.exports = { parseAndGenerate, parseToAST, extractMetadata, lexer, ClawScriptParser, TOKEN_TYPES, KEYWORDS };
+module.exports = { parseAndGenerate, parseToAST, extractMetadata, validateStrategyJS, lexer, ClawScriptParser, TOKEN_TYPES, KEYWORDS };
