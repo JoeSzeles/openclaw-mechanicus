@@ -3216,13 +3216,63 @@ async function handleIgApi(req, res, p) {
           instrument: body.instrument,
           strategies: body.strategies || [],
           timeframes: body.timeframes || ["MINUTE"],
-          candleCount: parseInt(body.candleCount, 10) || 500
+          candleCount: parseInt(body.candleCount, 10) || 500,
+          useClawTraderConfigs: body.useClawTraderConfigs !== false
         });
         return json(res, 200, { ok: true, ...result });
       } catch (e) {
         var code = /required|invalid|missing/i.test(e.message) ? 400 : 500;
         return json(res, code, { error: e.message });
       }
+    }
+
+    if (req.method === "POST" && p === "/api/ig/scalper/optimize") {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      try {
+        const backtestEngine = require("./skills/bots/ig-scalper-backtest.cjs");
+        const result = await backtestEngine.runOptimizationBatch({
+          instrument: body.instrument,
+          strategies: body.strategies || [],
+          timeframes: body.timeframes || ["MINUTE"],
+          candleCount: parseInt(body.candleCount, 10) || 500,
+          iterations: parseInt(body.iterations, 10) || 5,
+          cycles: parseInt(body.cycles, 10) || 3,
+          fixedKeys: body.fixedKeys || undefined,
+          useClawTraderConfigs: body.useClawTraderConfigs !== false,
+          useAiCalibration: !!body.useAiCalibration
+        });
+        return json(res, 200, { ok: true, ...result });
+      } catch (e) {
+        var errCode = /required|invalid|missing/i.test(e.message) ? 400 : 500;
+        return json(res, errCode, { error: e.message });
+      }
+    }
+
+    const optResultsMatch = p.match(/^\/api\/ig\/scalper\/optimize\/([\w-]+)$/);
+    if (req.method === "GET" && optResultsMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const results = await scalperDb.getOptimizationResults(optResultsMatch[1]);
+      return json(res, 200, { optimizationBatchId: optResultsMatch[1], results });
+    }
+
+    const optBestMatch = p.match(/^\/api\/ig\/scalper\/optimize\/([\w-]+)\/best$/);
+    if (req.method === "GET" && optBestMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const results = await scalperDb.getBestOptimizationResults(optBestMatch[1], 10);
+      return json(res, 200, { optimizationBatchId: optBestMatch[1], best: results });
+    }
+
+    if (req.method === "GET" && p === "/api/ig/scalper/optimization-memory") {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const memories = await scalperDb.getAllOptimizationMemories();
+      return json(res, 200, { memories });
+    }
+
+    const optMemInstrMatch = p.match(/^\/api\/ig\/scalper\/optimization-memory\/([\w.]+)$/);
+    if (req.method === "GET" && optMemInstrMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const memories = await scalperDb.getAllOptimizationMemories(decodeURIComponent(optMemInstrMatch[1]));
+      return json(res, 200, { memories });
     }
     if (req.method === "GET" && p === "/api/ig/scalper/batch-backtest") {
       const scalperDb = require("./skills/bots/ig-scalper-db.cjs");

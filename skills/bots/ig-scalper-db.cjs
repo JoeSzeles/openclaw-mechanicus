@@ -694,25 +694,134 @@ async function ensureBatchColumns() {
   const cols = [
     ["batch_id", "VARCHAR(40)"],
     ["instrument", "VARCHAR(60)"],
-    ["strategy_type_key", "VARCHAR(120)"]
+    ["strategy_type_key", "VARCHAR(120)"],
+    ["cycle_number", "INTEGER"],
+    ["iteration_number", "INTEGER"],
+    ["optimization_batch_id", "VARCHAR(40)"]
   ];
   for (const [col, def] of cols) {
     try { await query(`ALTER TABLE scalper_backtests ADD COLUMN IF NOT EXISTS ${col} ${def}`); } catch (_) {}
   }
   try { await query(`CREATE INDEX IF NOT EXISTS idx_backtests_batch ON scalper_backtests (batch_id)`); } catch (_) {}
+  try { await query(`CREATE INDEX IF NOT EXISTS idx_backtests_opt ON scalper_backtests (optimization_batch_id)`); } catch (_) {}
+}
+
+let _optMemoryReady = false;
+async function ensureOptimizationMemory() {
+  if (_optMemoryReady) return;
+  await query(`CREATE TABLE IF NOT EXISTS optimization_memory (
+    id SERIAL PRIMARY KEY,
+    instrument VARCHAR(60) NOT NULL,
+    strategy_type VARCHAR(40) NOT NULL,
+    timeframe VARCHAR(20) NOT NULL,
+    best_config JSONB,
+    score NUMERIC DEFAULT 0,
+    cycle_count INTEGER DEFAULT 0,
+    total_iterations INTEGER DEFAULT 0,
+    patterns TEXT DEFAULT '',
+    agent_analysis TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(instrument, strategy_type, timeframe)
+  )`);
+  _optMemoryReady = true;
+}
+
+async function saveOptimizationMemory(record) {
+  await ensureOptimizationMemory();
+  const res = await query(
+    `INSERT INTO optimization_memory (instrument, strategy_type, timeframe, best_config, score, cycle_count, total_iterations, patterns, agent_analysis)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     ON CONFLICT (instrument, strategy_type, timeframe) DO UPDATE SET
+       best_config = EXCLUDED.best_config, score = EXCLUDED.score, cycle_count = EXCLUDED.cycle_count,
+       total_iterations = EXCLUDED.total_iterations, patterns = EXCLUDED.patterns, agent_analysis = EXCLUDED.agent_analysis,
+       updated_at = NOW()
+     RETURNING *`,
+    [record.instrument, record.strategyType, record.timeframe,
+     JSON.stringify(record.bestConfig), record.score || 0, record.cycleCount || 0,
+     record.totalIterations || 0, record.patterns || '', record.agentAnalysis || '']
+  );
+  return camel(res.rows[0]);
+}
+
+async function getOptimizationMemory(instrument, strategyType, timeframe) {
+  await ensureOptimizationMemory();
+  const res = await query(
+    "SELECT * FROM optimization_memory WHERE instrument = $1 AND strategy_type = $2 AND timeframe = $3",
+    [instrument, strategyType, timeframe]
+  );
+  const row = camel(res.rows[0]);
+  if (row && row.bestConfig && typeof row.bestConfig === 'string') {
+    try { row.bestConfig = JSON.parse(row.bestConfig); } catch (_) {}
+  }
+  return row;
+}
+
+async function getAllOptimizationMemories(instrument) {
+  await ensureOptimizationMemory();
+  const q = instrument
+    ? "SELECT * FROM optimization_memory WHERE instrument = $1 ORDER BY score DESC"
+    : "SELECT * FROM optimization_memory ORDER BY score DESC";
+  const res = await query(q, instrument ? [instrument] : []);
+  return res.rows.map(r => {
+    const row = camel(r);
+    if (row.bestConfig && typeof row.bestConfig === 'string') {
+      try { row.bestConfig = JSON.parse(row.bestConfig); } catch (_) {}
+    }
+    return row;
+  });
 }
 
 async function saveBatchBacktest(data) {
   await ensureBatchColumns();
   const res = await query(
-    `INSERT INTO scalper_backtests (strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl, max_drawdown, sharpe_ratio, avg_win, avg_loss, trades, config_snapshot, batch_id, instrument, strategy_type_key)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+    `INSERT INTO scalper_backtests (strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl, max_drawdown, sharpe_ratio, avg_win, avg_loss, trades, config_snapshot, batch_id, instrument, strategy_type_key, cycle_number, iteration_number, optimization_batch_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
     [data.strategyId || 0, data.timeframe, data.candleCount, data.totalTrades, data.winCount, data.lossCount,
      data.winRate, data.totalPnl, data.maxDrawdown, data.sharpeRatio, data.avgWin, data.avgLoss,
      JSON.stringify(data.trades), JSON.stringify(data.configSnapshot),
-     data.batchId, data.instrument, data.strategyTypeKey]
+     data.batchId, data.instrument, data.strategyTypeKey,
+     data.cycleNumber || null, data.iterationNumber || null, data.optimizationBatchId || null]
   );
   return camel(res.rows[0]);
+}
+
+async function getOptimizationResults(optBatchId) {
+  await ensureBatchColumns();
+  const res = await query(
+    `SELECT id, strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl,
+            max_drawdown, sharpe_ratio, avg_win, avg_loss, created_at, batch_id, instrument, strategy_type_key,
+            config_snapshot, cycle_number, iteration_number, optimization_batch_id
+     FROM scalper_backtests WHERE optimization_batch_id = $1 ORDER BY cycle_number ASC, total_pnl DESC`,
+    [optBatchId]
+  );
+  return res.rows.map(r => {
+    const row = camel(r);
+    if (row.configSnapshot && typeof row.configSnapshot === 'string') {
+      try { row.configSnapshot = JSON.parse(row.configSnapshot); } catch (_) {}
+    }
+    return row;
+  });
+}
+
+async function getBestOptimizationResults(optBatchId, topN = 5) {
+  await ensureBatchColumns();
+  const res = await query(
+    `SELECT id, strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl,
+            max_drawdown, sharpe_ratio, avg_win, avg_loss, created_at, batch_id, instrument, strategy_type_key,
+            config_snapshot, cycle_number, iteration_number, optimization_batch_id
+     FROM scalper_backtests WHERE optimization_batch_id = $1 AND total_trades > 0
+     ORDER BY (total_pnl * 0.4 + (win_rate / 100.0) * total_pnl * 0.3 + sharpe_ratio * 10 * 0.3) DESC
+     LIMIT $2`,
+    [optBatchId, topN]
+  );
+  return res.rows.map(r => {
+    const row = camel(r);
+    if (row.configSnapshot && typeof row.configSnapshot === 'string') {
+      try { row.configSnapshot = JSON.parse(row.configSnapshot); } catch (_) {}
+    }
+    return row;
+  });
 }
 
 async function getBatchResults(batchId) {
@@ -761,6 +870,8 @@ module.exports = {
   logTrade, getTrades, getTradeStats, clearTrades,
   saveBacktest, getBacktests, getBacktest, deleteBacktests, getAllBacktests, deleteAllBacktests,
   ensureBatchColumns, saveBatchBacktest, getBatchResults, listBatches, deleteBatch,
+  getOptimizationResults, getBestOptimizationResults,
+  ensureOptimizationMemory, saveOptimizationMemory, getOptimizationMemory, getAllOptimizationMemories,
   ensurePriceCandlesTable, getStoredCandles, getLatestCandleTs, getCandleCount, storeCandles, getStoredCandlesRange,
   ensureNewColumns,
   backupAgent, listAgentBackups, restoreAgentBackup, deleteAgentBackup,

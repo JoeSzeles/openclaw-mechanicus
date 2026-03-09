@@ -541,7 +541,7 @@ async function runAndSave(strategyId, options = {}) {
   return { id: saved.id, summary: s, trades: result.trades };
 }
 
-async function runStandaloneBacktest(instrument, strategyType, config, timeframe, candleCount) {
+async function runStandaloneBacktest(instrument, strategyType, config, timeframe, candleCount, engineConfig) {
   const fetchResolution = igResolution(timeframe);
   const candles = await fetchCandles(instrument, fetchResolution, candleCount);
   if (candles.length < 20) throw new Error("Insufficient candle data: " + candles.length);
@@ -568,11 +568,16 @@ async function runStandaloneBacktest(instrument, strategyType, config, timeframe
   let openTrade = null;
   let lastEntryBar = -cooldownBars;
   let peakPnl = 0;
+  let ddKillTripped = false;
+  let equityPeak = 0;
+  const engineMaxDD = engineConfig && engineConfig.maxDrawdown ? parseFloat(engineConfig.maxDrawdown) : 0;
 
   const warmupBars = Math.max(stratInstance.getRequiredBufferSize(), 10);
 
   for (let i = warmupBars; i < candles.length; i++) {
     const c = candles[i];
+
+    if (ddKillTripped && !openTrade) continue;
 
     if (openTrade) {
       const dir = openTrade.direction;
@@ -609,6 +614,12 @@ async function runStandaloneBacktest(instrument, strategyType, config, timeframe
         const pnl = Math.round((dir === "BUY" ? (exitPrice - entryPrice) * tSize * cs : (entryPrice - exitPrice) * tSize * cs) * 100) / 100;
         trades.push({ entryTime: openTrade.entryTime, entryBar: openTrade.entryBar, entryPrice, exitTime: c.time, exitBar: i, exitPrice, direction: dir, pnl, reason, size: tSize });
         openTrade = null; peakPnl = 0; lastEntryBar = i;
+        if (engineMaxDD > 0) {
+          const runningPnl = trades.reduce((s, t) => s + t.pnl, 0);
+          if (runningPnl > equityPeak) equityPeak = runningPnl;
+          const drawdown = equityPeak - runningPnl;
+          if (drawdown >= engineMaxDD) { ddKillTripped = true; }
+        }
       }
       continue;
     }
@@ -669,11 +680,35 @@ async function runStandaloneBacktest(instrument, strategyType, config, timeframe
   };
 }
 
+async function resolveStrategyConfigs(instrument, strategies, useClawTraderConfigs) {
+  if (!useClawTraderConfigs) return strategies;
+  const allStrats = await db.getStrategies();
+  const matched = allStrats.filter(s => s.instrument === instrument);
+  return strategies.map(strat => {
+    const dbMatch = matched.find(s => (s.strategyType || "scalper") === strat.type);
+    if (dbMatch) {
+      const dbConfig = { ...dbMatch };
+      delete dbConfig.id; delete dbConfig.createdAt; delete dbConfig.updatedAt;
+      delete dbConfig.enabled; delete dbConfig.name; delete dbConfig.dealId;
+      return { type: strat.type, config: { ...dbConfig, ...strat.config } };
+    }
+    return strat;
+  });
+}
+
+async function getEngineConfig() {
+  try { return await db.getConfig(); } catch (e) { return {}; }
+}
+
 async function runBatchBacktest(options) {
-  const { instrument, strategies, timeframes, candleCount = 500 } = options;
+  const { instrument, timeframes, candleCount = 500, useClawTraderConfigs = false, engineConfig: providedEngine } = options;
+  let { strategies } = options;
   if (!instrument) throw new Error("instrument is required");
   if (!strategies || strategies.length === 0) throw new Error("at least one strategy is required");
   if (!timeframes || timeframes.length === 0) throw new Error("at least one timeframe is required");
+
+  strategies = await resolveStrategyConfigs(instrument, strategies, useClawTraderConfigs);
+  const engineConfig = providedEngine || await getEngineConfig();
 
   const batchId = "batch-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
   const results = [];
@@ -681,14 +716,16 @@ async function runBatchBacktest(options) {
   let completed = 0;
   const total = strategies.length * timeframes.length;
 
-  console.log(`[batch-backtest] Starting batch ${batchId}: ${strategies.length} strategies × ${timeframes.length} timeframes = ${total} runs on ${instrument}`);
+  console.log(`[batch-backtest] Starting batch ${batchId}: ${strategies.length} strategies × ${timeframes.length} timeframes = ${total} runs on ${instrument} (clawTrader=${useClawTraderConfigs})`);
 
   for (const strat of strategies) {
     for (const tf of timeframes) {
       completed++;
       try {
         console.log(`[batch-backtest] [${completed}/${total}] ${strat.type} @ ${tf}`);
-        const result = await runStandaloneBacktest(instrument, strat.type, strat.config || {}, tf, candleCount);
+        const result = await runStandaloneBacktest(instrument, strat.type, strat.config || {}, tf, candleCount, engineConfig);
+        const configSnapshot = result.configUsed || { instrument, strategyType: strat.type, ...(strat.config || {}) };
+        if (engineConfig) configSnapshot._engine = { budget: engineConfig.budget, maxDrawdown: engineConfig.maxDrawdown, maxMarginPct: engineConfig.maxMarginPct, breakEvenBuffer: engineConfig.breakEvenBuffer };
         const saved = await db.saveBatchBacktest({
           strategyId: 0, timeframe: tf, candleCount: result.summary.candleCount,
           totalTrades: result.summary.totalTrades, winCount: result.summary.winCount,
@@ -696,8 +733,7 @@ async function runBatchBacktest(options) {
           totalPnl: result.summary.totalPnl, maxDrawdown: result.summary.maxDrawdown,
           sharpeRatio: result.summary.sharpeRatio, avgWin: result.summary.avgWin,
           avgLoss: result.summary.avgLoss, trades: result.trades,
-          configSnapshot: result.configUsed || { instrument, strategyType: strat.type, ...(strat.config || {}) },
-          batchId, instrument, strategyTypeKey: strat.type
+          configSnapshot, batchId, instrument, strategyTypeKey: strat.type
         });
         results.push({ id: saved.id, strategyType: strat.type, timeframe: tf, summary: result.summary });
       } catch (e) {
@@ -712,4 +748,130 @@ async function runBatchBacktest(options) {
   return { batchId, instrument, total, completed: results.length, failed: errors.length, results, errors };
 }
 
-module.exports = { runBacktest, runAndSave, runStandaloneBacktest, runBatchBacktest };
+async function runOptimizationBatch(options) {
+  const {
+    instrument, strategies, timeframes, candleCount = 500,
+    iterations = 5, cycles = 3, fixedKeys, useClawTraderConfigs = true,
+    useAiCalibration = false
+  } = options;
+
+  if (!instrument) throw new Error("instrument is required");
+  if (!strategies || strategies.length === 0) throw new Error("at least one strategy is required");
+  if (!timeframes || !Array.isArray(timeframes) || timeframes.length === 0) throw new Error("at least one timeframe is required");
+  if (iterations < 1 || iterations > 50) throw new Error("iterations must be 1-50");
+  if (cycles < 1 || cycles > 20) throw new Error("cycles must be 1-20");
+  if (candleCount < 50 || candleCount > 10000) throw new Error("candleCount must be 50-10000");
+  const maxRuns = strategies.length * timeframes.length * iterations * cycles;
+  if (maxRuns > 2000) throw new Error("total optimization runs (" + maxRuns + ") exceeds maximum of 2000");
+
+  const optAgent = require("./ig-optimization-agent.cjs");
+  const engineConfig = await getEngineConfig();
+  const resolvedStrats = await resolveStrategyConfigs(instrument, strategies, useClawTraderConfigs);
+  const fixed = fixedKeys || optAgent.FIXED_KEYS_DEFAULT;
+  const schemas = strategyLoader.getStrategySchemas ? strategyLoader.getStrategySchemas() : {};
+
+  const optBatchId = "opt-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
+  const allResults = [];
+  const cycleAnalysis = [];
+  let currentConfigs = {};
+
+  for (const strat of resolvedStrats) {
+    const schema = schemas[strat.type] && schemas[strat.type].configSchema ? schemas[strat.type].configSchema : [];
+    const baseConfig = strat.config || {};
+    currentConfigs[strat.type] = {};
+    for (const tf of timeframes) {
+      const mem = await db.getOptimizationMemory(instrument, strat.type, tf);
+      const startConfig = mem && mem.bestConfig ? { ...mem.bestConfig, ...baseConfig } : baseConfig;
+      currentConfigs[strat.type][tf] = [startConfig];
+    }
+  }
+
+  console.log(`[optimization] Starting ${optBatchId}: ${resolvedStrats.length} strategies × ${timeframes.length} TFs, ${iterations} iters × ${cycles} cycles`);
+
+  for (let cycle = 1; cycle <= cycles; cycle++) {
+    console.log(`[optimization] === Cycle ${cycle}/${cycles} ===`);
+    const cycleResults = [];
+
+    for (const strat of resolvedStrats) {
+      const schema = schemas[strat.type] && schemas[strat.type].configSchema ? schemas[strat.type].configSchema : [];
+
+      for (const tf of timeframes) {
+        let configs;
+        if (cycle === 1) {
+          const tfConfigs = currentConfigs[strat.type] && currentConfigs[strat.type][tf];
+          const base = tfConfigs ? tfConfigs[0] : (strat.config || {});
+          configs = optAgent.generateVariations(base, schema, fixed, iterations, 0.3);
+          configs.unshift(base);
+        } else {
+          const calCfg = currentConfigs[strat.type];
+          configs = Array.isArray(calCfg) ? calCfg : (calCfg && calCfg[tf] ? calCfg[tf] : [strat.config || {}]);
+        }
+
+        for (let iterIdx = 0; iterIdx < configs.length; iterIdx++) {
+          const cfg = configs[iterIdx];
+          try {
+            console.log(`[optimization] C${cycle} I${iterIdx + 1} ${strat.type}@${tf}`);
+            const result = await runStandaloneBacktest(instrument, strat.type, cfg, tf, candleCount, engineConfig);
+            const configSnapshot = result.configUsed || { ...cfg, instrument, strategyType: strat.type };
+            if (engineConfig) configSnapshot._engine = { budget: engineConfig.budget, maxDrawdown: engineConfig.maxDrawdown };
+
+            const saved = await db.saveBatchBacktest({
+              strategyId: 0, timeframe: tf, candleCount: result.summary.candleCount,
+              totalTrades: result.summary.totalTrades, winCount: result.summary.winCount,
+              lossCount: result.summary.lossCount, winRate: result.summary.winRate,
+              totalPnl: result.summary.totalPnl, maxDrawdown: result.summary.maxDrawdown,
+              sharpeRatio: result.summary.sharpeRatio, avgWin: result.summary.avgWin,
+              avgLoss: result.summary.avgLoss, trades: result.trades,
+              configSnapshot, batchId: optBatchId, instrument, strategyTypeKey: strat.type,
+              cycleNumber: cycle, iterationNumber: iterIdx + 1, optimizationBatchId: optBatchId
+            });
+
+            const r = { id: saved.id, strategyTypeKey: strat.type, timeframe: tf, cycleNumber: cycle, iterationNumber: iterIdx + 1, ...result.summary, configSnapshot };
+            cycleResults.push(r);
+            allResults.push(r);
+          } catch (e) {
+            console.log(`[optimization] ERROR C${cycle} I${iterIdx + 1} ${strat.type}@${tf}: ${e.message}`);
+          }
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+    }
+
+    const analysis = optAgent.analyzeOptimizationRun(cycleResults);
+    let aiText = null;
+    if (useAiCalibration) {
+      aiText = await optAgent.aiAnalyze(cycleResults, process.env.GROQ_API_KEY);
+    }
+    cycleAnalysis.push({ cycle, resultCount: cycleResults.length, analysis: analysis.summary, patterns: analysis.patterns, aiAnalysis: aiText });
+    console.log(`[optimization] Cycle ${cycle} done: ${cycleResults.length} runs. ${analysis.summary}`);
+
+    if (cycle < cycles) {
+      currentConfigs = optAgent.calibrateVariables(cycleResults, schemas, fixed, iterations);
+      console.log(`[optimization] Calibrated ${Object.keys(currentConfigs).length} strategy types for cycle ${cycle + 1}`);
+    }
+  }
+
+  const finalAnalysis = optAgent.analyzeOptimizationRun(allResults);
+  for (const [key, best] of Object.entries(finalAnalysis.bestPerCombo)) {
+    if (best.bestConfig) {
+      try {
+        await db.saveOptimizationMemory({
+          instrument, strategyType: best.strategyType, timeframe: best.timeframe,
+          bestConfig: best.bestConfig, score: best.score,
+          cycleCount: cycles, totalIterations: allResults.length,
+          patterns: (finalAnalysis.patterns || []).join("\n"),
+          agentAnalysis: cycleAnalysis.map(c => c.aiAnalysis || '').filter(Boolean).join("\n---\n")
+        });
+      } catch (e) { console.log(`[optimization] Memory save error: ${e.message}`); }
+    }
+  }
+
+  console.log(`[optimization] ${optBatchId} complete: ${allResults.length} total runs, ${cycles} cycles`);
+  return {
+    optimizationBatchId: optBatchId, instrument, cycles, iterations,
+    totalRuns: allResults.length, cycleAnalysis, finalAnalysis,
+    bestResults: Object.values(finalAnalysis.bestPerCombo)
+  };
+}
+
+module.exports = { runBacktest, runAndSave, runStandaloneBacktest, runBatchBacktest, runOptimizationBatch };
