@@ -3220,7 +3220,8 @@ async function handleIgApi(req, res, p) {
         });
         return json(res, 200, { ok: true, ...result });
       } catch (e) {
-        return json(res, 500, { error: e.message });
+        var code = /required|invalid|missing/i.test(e.message) ? 400 : 500;
+        return json(res, code, { error: e.message });
       }
     }
     if (req.method === "GET" && p === "/api/ig/scalper/batch-backtest") {
