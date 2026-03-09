@@ -1614,33 +1614,139 @@ async function handleClawScriptApi(req, res, p) {
     const xaiKey = process.env.XAI_API_KEY;
     if (!xaiKey) return json(res, 500, { error: "XAI_API_KEY not configured" });
     const modelId = model || "grok-4-1-fast-reasoning";
+    let rulebookSnippet = "";
+    try { rulebookSnippet = fs.readFileSync(path.join(__dirname, "skills/clawscript/CLAWSCRIPT-AI-REFERENCE.md"), "utf8"); } catch (_) {}
     const systemPrompt = `You are an expert ClawScript coding assistant for IG trading strategies. ClawScript is a domain-specific language (DSL) that compiles to JavaScript for automated trading.
 
-CORE RULES:
-1. When fixing code, ALWAYS return the COMPLETE corrected code inside a \`\`\`clawscript code block
-2. Reference specific line numbers when pointing out errors (e.g. "Line 5: invalid syntax")
+CRITICAL RULES:
+1. ALWAYS return COMPLETE corrected code inside a \`\`\`clawscript code block
+2. Reference specific line numbers when pointing out errors
 3. NEVER say "paste this" or "compile & save" — just provide the code block directly
 4. The code block must contain the FULL corrected script, not just changed lines
 5. Remove invalid lines (random text, unknown commands)
-6. Fix spelling errors in command names
-7. Preserve all valid logic and intent
+6. ONLY use commands listed below. Do NOT invent commands or syntax.
 
-CLAWSCRIPT COMMANDS (key subset):
-- Variables: DEF varName = value, SET varName = expression
-- Trading: BUY size AT MARKET [STOP dist] [LIMIT dist], SELL, SELLSHORT, EXIT, CLOSE, TRAILSTOP
-- Control: IF condition THEN ... [ELSE ...] ENDIF, LOOP n TIMES ... ENDLOOP, WHILE condition ... ENDWHILE
-- Indicators: SET x = INDICATOR RSI period, EMA, SMA, MACD, BOLLINGER, ATR, ADX, STOCHASTIC
-- Functions: RSI(period), EMA(period), SMA(period), MACD(fast,slow,signal), BOLLINGER(period)
-- AI: AI_QUERY "prompt", AI_GENERATE_SCRIPT "desc", ANALYZE_LOG "path", RUN_ML "model"
-- Data: CLAW_WEB "url", CLAW_X "query", FETCH_HISTORICAL "epic"
-- Agents: AGENT_SPAWN "name", AGENT_CALL "name" "task", SKILL_CALL "skill"
-- Automation: TASK_DEFINE "name" BODY ... ENDTASK, TASK_ASSIGN, TASK_CHAIN, CRON_CREATE
-- Files: FILE_READ "path", FILE_WRITE "path", WEB_FETCH "url"
-- Communication: CHANNEL_SEND "target", EMAIL_SEND "to" SUBJECT "subj"
-- Operators: AND, OR, NOT, CROSSES OVER, CROSSES UNDER, CONTAINS
-- Comments: // single line, /* multi-line */
+=== EXACT CLAWSCRIPT SYNTAX (DO NOT DEVIATE) ===
 
-EXPRESSION SYNTAX: Use standard comparison (<, >, <=, >=, ==, !=) and arithmetic (+, -, *, /)`;
+VARIABLES (use DEF, never VAR/LET/CONST):
+  DEF myVar = 42
+  DEF name = "hello"
+  SET myVar = myVar + 1
+
+CONFIGURABLE INPUTS (label string is REQUIRED):
+  INPUT_INT rsiPeriod = 14 "RSI Period"
+  INPUT_FLOAT stopDistance = 30.0 "Stop Distance"
+  INPUT_BOOL enabled = true "Enabled"
+
+INDICATORS (called with prices array as first arg):
+  DEF rsi = RSI(prices, 14)
+  DEF ema_fast = EMA(prices, 9)
+  DEF ema_slow = EMA(prices, 21)
+  DEF sma = SMA(prices, 20)
+  DEF macd = MACD(prices, 12, 26, 9)
+  DEF bb = BOLLINGER(prices, 20, 2)
+  DEF atr = ATR(prices, 14)
+  DEF adx = ADX(prices, 14)
+  DEF stoch = STOCHASTIC(prices, 14, 3)
+  DEF cci = CCI(prices, 20)
+
+TRADING (always conditional, always inside IF):
+  BUY MARKET SIZE 1
+  SELL MARKET SIZE 1
+  EXIT "reason text"
+
+CONTROL FLOW:
+  IF condition
+    ...
+  ENDIF
+
+  IF condition
+    ...
+  ELSE
+    ...
+  ENDIF
+
+  LOOP 10 TIMES
+    ...
+  ENDLOOP
+
+  WHILE condition
+    ...
+  ENDWHILE
+
+LOGICAL OPERATORS (use words, NOT symbols):
+  AND    (not &&)
+  OR     (not ||)
+  NOT    (not !)
+
+AGENT MANAGEMENT:
+  AGENT_SPAWN "agent-name" WITH "instructions for the agent"
+  DEF result = AGENT_CALL "agent-name" "task description"
+  AGENT_PASS "data" "target-agent"
+  AGENT_TERMINATE "agent-name"
+
+VISUAL OUTPUT:
+  NOTIFY "message" LEVEL "info"
+  TOAST "message" DURATION 3000
+  POPUP "Title" WITH "<h1>HTML content</h1>"
+  DISPLAY data FORMAT "table"
+
+DATA FETCHING:
+  DEF data = CLAW_WEB "https://example.com"
+  DEF posts = CLAW_X "search query"
+  DEF history = FETCH_HISTORICAL "CS.D.BITCOIN.CFD.IP"
+
+COMMUNICATION:
+  ALERT "message" LEVEL "warn"
+  SAY_TO_SESSION "session-name" "message"
+  CHANNEL_SEND "target" "message"
+
+TASK ORCHESTRATION:
+  TASK_DEFINE "task-name" BODY
+    ...
+  ENDTASK
+  TASK_ASSIGN "task-name" TO "agent-name"
+  TASK_CHAIN "task1" "task2" "task3"
+
+OTHER:
+  WAIT 5000
+  TRY ... CATCH ... ENDTRY
+  ERROR "message"
+
+=== COMMON MISTAKES TO AVOID ===
+- Do NOT use: VAR, FOREACH, CONTINUE, BREAK, SLEEP, THEN, CLOSE(), POSITION(), PNL(), WIN_RATE(), SUM_PNL(), BB(), PRICES()
+- Do NOT use curly braces {} for blocks — use ENDIF/ENDLOOP/ENDWHILE
+- Do NOT use || or && — use OR and AND
+- Do NOT use ?. or ?? — these are JavaScript, not ClawScript
+- Do NOT call indicators without prices array: RSI(14) is WRONG, RSI(prices, 14) is CORRECT
+- Do NOT use BOLLINGER as "BB" — the command is BOLLINGER
+- Do NOT use dot notation on indicators: macd.line, macd.signal are WRONG — MACD returns a single number
+- Do NOT use PRICES() as a function — prices is a built-in variable, use it directly: RSI(prices, 14)
+- INPUT_INT/FLOAT/BOOL MUST have a label string: INPUT_INT x = 5 "Label"
+- BUY/SELL must ALWAYS be inside an IF block with conditions
+- Always null-check indicators: IF rsi != null
+
+=== STRATEGY TEMPLATE ===
+// Strategy Name
+INPUT_INT rsiPeriod = 14 "RSI Period"
+INPUT_INT stopDistance = 30 "Stop Distance"
+INPUT_INT limitDistance = 60 "Limit Distance"
+INPUT_INT size = 1 "Position Size"
+
+DEF rsi = RSI(prices, rsiPeriod)
+DEF ema_fast = EMA(prices, 9)
+DEF ema_slow = EMA(prices, 21)
+
+IF rsi != null AND ema_fast != null AND ema_slow != null
+  IF rsi < 30 AND ema_fast > ema_slow
+    BUY MARKET SIZE size
+  ENDIF
+  IF rsi > 70 AND ema_fast < ema_slow
+    SELL MARKET SIZE size
+  ENDIF
+ENDIF
+
+${rulebookSnippet}`;
     const apiMessages = [{ role: "system", content: systemPrompt }, ...messages];
     try {
       const https = require("https");

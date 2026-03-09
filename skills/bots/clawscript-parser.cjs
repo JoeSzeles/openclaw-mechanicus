@@ -217,11 +217,30 @@ function extractMetadata(code) {
     const prevComment = prevLine.startsWith('//') ? prevLine.slice(2).trim() : '';
     const comment = inlineComment || prevComment;
 
-    const inputMatch = trimmed.match(/^(INPUT_INT|INPUT_FLOAT|INPUT_BOOL|INPUT_SYMBOL)\s+(\w+)(?:\s+DEFAULT\s+(.+?))?(?:\s*\/\/|$)/i);
+    const inputMatch = trimmed.match(/^(INPUT_INT|INPUT_FLOAT|INPUT_BOOL|INPUT_SYMBOL)\s+(\w+)(?:\s*=\s*([^\s"]+))?(?:\s+"([^"]*)")?(?:\s+DEFAULT\s+("[^"]*"|[^\s"]+))?(?:\s*\/\/|$)/i);
+    if (!inputMatch) {
+      const altMatch = trimmed.match(/^(INPUT_INT|INPUT_FLOAT|INPUT_BOOL|INPUT_SYMBOL)\s+(\w+)\s+DEFAULT\s+("[^"]*"|[^\s]+)(?:\s*\/\/|$)/i);
+      if (altMatch) {
+        const cmd2 = altMatch[1].toUpperCase();
+        const vn2 = altMatch[2];
+        let dv2 = altMatch[3] ? altMatch[3].replace(/^["']|["']$/g, '') : null;
+        let st2 = 'number';
+        if (cmd2 === 'INPUT_BOOL') st2 = 'boolean';
+        else if (cmd2 === 'INPUT_SYMBOL') st2 = 'string';
+        let pd2 = dv2;
+        if (dv2 !== null) {
+          if (st2 === 'number') pd2 = parseFloat(dv2) || 0;
+          else if (st2 === 'boolean') pd2 = dv2 === 'true';
+        }
+        inputs.push({ key: vn2, type: st2, inputCmd: cmd2, default: pd2, label: inlineComment || prevComment || vn2, tooltip: inlineComment || prevComment || '', line: lineNum });
+        continue;
+      }
+    }
     if (inputMatch) {
       const cmd = inputMatch[1].toUpperCase();
       const varName = inputMatch[2];
-      let defaultVal = inputMatch[3] ? inputMatch[3].trim() : null;
+      let defaultVal = inputMatch[3] || inputMatch[5] || null;
+      const labelFromQuotes = inputMatch[4] || null;
       let schemaType = 'number';
       if (cmd === 'INPUT_BOOL') schemaType = 'boolean';
       else if (cmd === 'INPUT_SYMBOL') schemaType = 'string';
@@ -240,8 +259,8 @@ function extractMetadata(code) {
         type: schemaType,
         inputCmd: cmd,
         default: parsedDefault,
-        label: comment || varName,
-        tooltip: comment || '',
+        label: labelFromQuotes || comment || varName,
+        tooltip: labelFromQuotes || comment || '',
         line: lineNum
       });
       continue;
@@ -251,6 +270,9 @@ function extractMetadata(code) {
     if (defMatch) {
       const varName = defMatch[1];
       let rawVal = defMatch[2].trim();
+
+      if (/^[A-Z_]+\s*\(/.test(rawVal)) continue;
+
       let schemaType = 'string';
       let parsedVal = rawVal;
 
@@ -729,17 +751,26 @@ class ClawScriptParser {
   }
 
   parseTradeCommand(cmdType) {
+    const tradeLine = this.current() ? this.current().line : null;
     this.pos++; // BUY/SELL/SELLSHORT
-    let size = null;
-    if (this.current() && this.current().type === TOKEN_TYPES.NUMBER) {
-      size = this.parseExpression();
-    } else if (this.current() && this.current().type === TOKEN_TYPES.IDENTIFIER && !this.isCurrentOneOf(['AT', 'IF', 'STOP', 'LIMIT', 'REASON'])) {
-      size = this.parseExpression();
-    }
 
     let orderType = 'MARKET';
     let price = null;
-    if (this.isCurrentKeyword('AT')) {
+    let size = null;
+
+    if (this.isCurrentKeyword('MARKET')) {
+      orderType = 'MARKET';
+      this.pos++;
+    } else if (this.current() && this.current().type === TOKEN_TYPES.NUMBER) {
+      size = this.parseExpression();
+    } else if (this.current() && this.current().type === TOKEN_TYPES.IDENTIFIER && !this.isCurrentOneOf(['AT', 'IF', 'STOP', 'LIMIT', 'REASON', 'SIZE', 'ENDIF', 'MARKET'])) {
+      size = this.parseExpression();
+    }
+
+    if (this.isCurrentKeyword('MARKET')) {
+      orderType = 'MARKET';
+      this.pos++;
+    } else if (this.isCurrentKeyword('AT')) {
       this.pos++;
       if (this.isCurrentKeyword('MARKET')) {
         orderType = 'MARKET';
@@ -754,10 +785,15 @@ class ClawScriptParser {
         } else {
           price = this.parseExpression();
         }
-      } else {
+      } else if (this.current()) {
         orderType = this.current().value;
         this.pos++;
       }
+    }
+
+    if (this.isCurrentOneOf(['SIZE']) && !size) {
+      this.pos++;
+      size = this.parseExpression();
     }
 
     let condition = null;
@@ -788,14 +824,23 @@ class ClawScriptParser {
     return { type: 'Trade', command: cmdType, size, orderType, price, condition, stop, limit, reason };
   }
 
-  parseConditionUntil(stopWords) {
+  parseConditionUntil(stopWords, conditionLine) {
     const startPos = this.pos;
     let depth = 0;
     const condTokens = [];
+    const condOperators = new Set(['AND', 'OR', 'NOT', 'CONTAINS', 'CROSSES', 'OVER', 'UNDER', 'THEN',
+      'AT', 'MARKET', 'LIMIT', 'STOP', 'REASON', 'DEFAULT', 'PART', 'ALL', 'TIMES', 'FOREVER',
+      'WITH', 'TO', 'LEVEL', 'OPTIONS', 'TIMEOUT', 'FILTER', 'SOURCES', 'ON', 'OFF', 'GLOBAL',
+      'ACCEL', 'MAX', 'FROM', 'STEP', 'USING', 'SIZING', 'NUM', 'PAGES', 'TOOL', 'ARG', 'INSTRUCT',
+      'MODE', 'QUERY', 'FORMAT', 'DURATION', 'SIZE']);
 
     while (this.current()) {
       const val = this.current().value.toString().toUpperCase();
       if (depth === 0 && stopWords.includes(val)) break;
+      if (conditionLine != null && this.current().line != null && this.current().line > conditionLine && depth === 0
+          && this.current().type === 'keyword' && !condOperators.has(val)) break;
+      if (conditionLine != null && this.current().line != null && this.current().line > conditionLine && depth === 0
+          && KEYWORDS.has(val) && !condOperators.has(val)) break;
       if (this.current().value === '(') depth++;
       if (this.current().value === ')') depth--;
       condTokens.push(this.current());
@@ -863,8 +908,9 @@ class ClawScriptParser {
   }
 
   parseIfStatement() {
+    const ifLine = this.current() ? this.current().line : null;
     this.pos++; // IF
-    const condition = this.parseConditionUntil(['THEN']);
+    const condition = this.parseConditionUntil(['THEN'], ifLine);
     if (this.isCurrentKeyword('THEN')) this.pos++;
 
     const thenBody = [];
@@ -1754,8 +1800,13 @@ class ClawScriptParser {
         return `${indent}// INCLUDE ${this.generateExpr(stmt.scriptName)}\n`;
       case 'Optimize':
         return `${indent}// OPTIMIZE ${stmt.varName} from ${stmt.fromVal ? this.generateExpr(stmt.fromVal) : '?'} to ${stmt.toVal ? this.generateExpr(stmt.toVal) : '?'}\n`;
-      case 'IndicatorCall':
-        return `${indent}const _ind = indicators.calc${stmt.name}(prices${stmt.params.map(p => ', ' + this.generateExpr(p)).join('')});\n`;
+      case 'IndicatorCall': {
+        let stmtIndParams = stmt.params;
+        if (stmtIndParams.length > 0 && stmtIndParams[0].type === 'Identifier' && stmtIndParams[0].value === 'prices') {
+          stmtIndParams = stmtIndParams.slice(1);
+        }
+        return `${indent}const _ind = indicators.calc${stmt.name}(prices${stmtIndParams.map(p => ', ' + this.generateExpr(p)).join('')});\n`;
+      }
       case 'CrashScan':
         return `${indent}this._crashScanEnabled = ${stmt.state === 'ON'};\n`;
       case 'MarketNomad':
@@ -1789,6 +1840,24 @@ class ClawScriptParser {
       case 'CronCreate':
         return `${indent}await automation.cronCreate(${this.generateExpr(stmt.name)}, ${stmt.schedule ? this.generateExpr(stmt.schedule) : 'null'}, ${stmt.run ? this.generateExpr(stmt.run) : 'null'});\n`;
       case 'GenericCmd': {
+        const upperCmd = (stmt.cmd || '').toUpperCase();
+        if (upperCmd === 'INPUT_INT' || upperCmd === 'INPUT_FLOAT' || upperCmd === 'INPUT_BOOL') {
+          const arg = stmt.posArgs && stmt.posArgs[0];
+          if (arg && arg.type === 'BinaryExpr' && arg.left && arg.left.type === 'Identifier') {
+            const cfgKey = arg.left.value;
+            const defaultVal = this.generateExpr(arg.right);
+            return `${indent}const ${cfgKey} = config.${cfgKey} !== undefined ? config.${cfgKey} : ${defaultVal};\n`;
+          } else if (arg && arg.type === 'Identifier') {
+            const cfgKey = arg.value;
+            const defMap = { 'INPUT_INT': '0', 'INPUT_FLOAT': '0.0', 'INPUT_BOOL': 'true' };
+            let defVal = defMap[upperCmd];
+            if (stmt.kwargs && stmt.kwargs.DEFAULT) {
+              defVal = this.generateExpr(stmt.kwargs.DEFAULT);
+            }
+            return `${indent}const ${cfgKey} = config.${cfgKey} !== undefined ? config.${cfgKey} : ${defVal};\n`;
+          }
+          return `${indent}// INPUT: ${arg ? this.generateExpr(arg) : 'unknown'}\n`;
+        }
         const fn = stmt.cmd.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
         const mod = stmt.mod || 'ext';
         const allArgs = (stmt.posArgs || []).map(a => this.generateExpr(a));
@@ -1935,7 +2004,11 @@ class ClawScriptParser {
         return `(${this.generateExpr(expr.left)} < ${this.generateExpr(expr.right)})`;
       case 'FunctionCall': {
         const _fn = expr.name.toUpperCase();
-        const _args = expr.args.map(a => ', ' + this.generateExpr(a)).join('');
+        let _filteredArgs = expr.args;
+        if (_filteredArgs.length > 0 && _filteredArgs[0].type === 'Identifier' && _filteredArgs[0].value === 'prices') {
+          _filteredArgs = _filteredArgs.slice(1);
+        }
+        const _args = _filteredArgs.map(a => ', ' + this.generateExpr(a)).join('');
         const _simpleIndicators = {
           'RSI': 'calcRSI', 'EMA': 'calcEMA', 'SMA': 'calcSMA', 'ATR': 'calcATRFromTicks',
           'MACD': 'calcMACD', 'BOLLINGER': 'calcBollinger', 'ROC': 'calcROC',
@@ -2020,8 +2093,13 @@ class ClawScriptParser {
         return `await nomad.scan(${this.generateExpr(expr.category)}, { limit: ${expr.limit ? this.generateExpr(expr.limit) : '10'} })`;
       case 'RumorScan':
         return `await tools.rumorScan(${this.generateExpr(expr.topic)}, { sources: ${expr.sources ? this.generateExpr(expr.sources) : '"both"'}, limit: ${expr.limit ? this.generateExpr(expr.limit) : '10'} })`;
-      case 'IndicatorCall':
-        return `indicators.calc${expr.name}(prices${expr.params.map(p => ', ' + this.generateExpr(p)).join('')})`;
+      case 'IndicatorCall': {
+        let indParams = expr.params;
+        if (indParams.length > 0 && indParams[0].type === 'Identifier' && indParams[0].value === 'prices') {
+          indParams = indParams.slice(1);
+        }
+        return `indicators.calc${expr.name}(prices${indParams.map(p => ', ' + this.generateExpr(p)).join('')})`;
+      }
       case 'TaskDefine':
         return `await automation.taskDefine(${this.generateExpr(expr.name)}, ${expr.description ? this.generateExpr(expr.description) : 'null'}, null)`;
       case 'CronCreate':

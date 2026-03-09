@@ -383,9 +383,9 @@ ENDIF`;
   });
 
   await test('TradingView', 'INPUT_INT parses and extracts metadata', () => {
-    const code = `INPUT_INT rsi_period DEFAULT 14 // RSI lookback period`;
+    const code = `INPUT_INT rsi_period = 14 "RSI lookback period"`;
     const r = parseOk(code, 'InputInt');
-    assertIncludes(r.js, 'ext.inputInt');
+    assertIncludes(r.js, 'config.rsi_period');
     assert(r.metadata, 'Should have metadata');
     assert(r.metadata.inputs.length > 0, 'Should have input metadata');
     assert(r.metadata.inputs[0].key === 'rsi_period', 'Key should be rsi_period');
@@ -625,7 +625,7 @@ ENDIF
     assert(result.js, 'JS should exist');
     assert(result.metadata, 'Metadata should exist');
     assert(result.metadata.inputs.length === 3, `Expected 3 inputs, got ${result.metadata.inputs.length}`);
-    assert(result.metadata.defs.length === 5, `Expected 5 defs, got ${result.metadata.defs.length}`);
+    assert(result.metadata.defs.length === 3, `Expected 3 defs (literals only, not indicator calls), got ${result.metadata.defs.length}`);
 
     assertIncludes(result.js, 'class BtcRsiMeanReversionStrategy extends BaseStrategy');
     assertIncludes(result.js, "static get STRATEGY_TYPE() { return 'custom-btcrsimeanreversion'; }");

@@ -87,6 +87,7 @@ OpenClaw Cloud employs a "CEO Proxy + Gateway" architecture, where two component
 -   **Sync workflow**: Edit canonical files → run `bash .openclaw/canvas/sync-clawscript.sh` to sync to installer → run `bash clawscript-installer/sync-and-push.sh` to bump version and push to GitHub
 -   **Version tracker**: `clawscript-installer/VERSION` file tracks current version; auto-bumped on each push. GitHub repo also has `VERSION` for remote comparison.
 -   **Current version**: 1.1.6 (pushed 2026-03-09)
+-   **Parser fixes (v1.1.7-dev)**: INPUT_INT/FLOAT/BOOL generates `config.varName` pattern (not `ext.inputInt()`); indicator double-prices bug fixed (RSI(prices,14) no longer emits `prices, prices`); nested IF body parsing fixed via line-aware `parseConditionUntil`; `BUY MARKET SIZE n` format supported; metadata extractor skips indicator DEFs from config schema; `INPUT_* DEFAULT` syntax generates correct default values; AI system prompt updated with expanded common-mistakes list
 
 ## External Dependencies
 -   **xAI/Grok API**: Primary AI model provider (e.g., `grok-4-1-fast-reasoning`, `grok-4`, `grok-2`). Used for `web_search` tool.

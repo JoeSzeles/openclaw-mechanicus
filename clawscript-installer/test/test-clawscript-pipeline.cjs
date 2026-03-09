@@ -383,9 +383,9 @@ ENDIF`;
   });
 
   await test('TradingView', 'INPUT_INT parses and extracts metadata', () => {
-    const code = `INPUT_INT rsi_period DEFAULT 14 // RSI lookback period`;
+    const code = `INPUT_INT rsi_period = 14 "RSI lookback period"`;
     const r = parseOk(code, 'InputInt');
-    assertIncludes(r.js, 'ext.inputInt');
+    assertIncludes(r.js, 'config.rsi_period');
     assert(r.metadata, 'Should have metadata');
     assert(r.metadata.inputs.length > 0, 'Should have input metadata');
     assert(r.metadata.inputs[0].key === 'rsi_period', 'Key should be rsi_period');
@@ -625,7 +625,7 @@ ENDIF
     assert(result.js, 'JS should exist');
     assert(result.metadata, 'Metadata should exist');
     assert(result.metadata.inputs.length === 3, `Expected 3 inputs, got ${result.metadata.inputs.length}`);
-    assert(result.metadata.defs.length === 5, `Expected 5 defs, got ${result.metadata.defs.length}`);
+    assert(result.metadata.defs.length === 3, `Expected 3 defs (literals only, not indicator calls), got ${result.metadata.defs.length}`);
 
     assertIncludes(result.js, 'class BtcRsiMeanReversionStrategy extends BaseStrategy');
     assertIncludes(result.js, "static get STRATEGY_TYPE() { return 'custom-btcrsimeanreversion'; }");
@@ -1304,6 +1304,101 @@ AGENT_TERMINATE "researcher"
     assert(typeof automation.publishCanvas === 'function', 'publishCanvas should be a function');
     assert(typeof automation.cronCreate === 'function', 'cronCreate should be a function');
     assert(typeof automation.dataTransform === 'function', 'dataTransform should be a function');
+  });
+
+  // ─── 7. Automation Templates ─────────────────────────────────────────
+  log('\n── 7. Automation Templates ──────────────────────────────');
+
+  const TEMPLATES_DIR = path.join(__dirname, '..', '..', '.openclaw', 'canvas', 'clawscript-templates');
+  const automationTemplates = [
+    { file: 'trade-self-improve.cs', expectedCmds: ['TaskDefine', 'GenericCmd'], minStmts: 5 },
+    { file: 'multi-agent-ops.cs', expectedCmds: ['TaskDefine'], minStmts: 1 },
+    { file: 'cron-monitor.cs', expectedCmds: ['CronCreate', 'TaskDefine', 'GenericCmd'], minStmts: 3 },
+    { file: 'data-pipeline.cs', expectedCmds: ['TaskDefine'], minStmts: 1 },
+    { file: 'full-operations.cs', expectedCmds: ['TaskDefine', 'CronCreate'], minStmts: 3 },
+  ];
+
+  for (const tpl of automationTemplates) {
+    test('Automation Templates', `${tpl.file} parses without errors`, () => {
+      const code = fs.readFileSync(path.join(TEMPLATES_DIR, tpl.file), 'utf8');
+      const result = parseAndGenerate(code);
+      assert(result && result.ast, `${tpl.file} should produce AST`);
+      assert(result.ast.body.length >= tpl.minStmts, `${tpl.file} should have at least ${tpl.minStmts} statements, got ${result.ast.body.length}`);
+    });
+
+    test('Automation Templates', `${tpl.file} generates valid JS`, () => {
+      const code = fs.readFileSync(path.join(TEMPLATES_DIR, tpl.file), 'utf8');
+      const result = parseAndGenerate(code);
+      assert(result.js, `${tpl.file} should produce JS`);
+      assert(result.js.length > 200, `${tpl.file} JS should be substantial (got ${result.js.length} bytes)`);
+      assert(result.js.includes('automation.'), `${tpl.file} JS should call automation module`);
+      assert(result.imports.includes('automation'), `${tpl.file} should import automation`);
+    });
+
+    test('Automation Templates', `${tpl.file} contains expected AST node types`, () => {
+      const code = fs.readFileSync(path.join(TEMPLATES_DIR, tpl.file), 'utf8');
+      const result = parseAndGenerate(code);
+      const types = new Set();
+      function collectTypes(node) {
+        if (!node) return;
+        if (node.type) types.add(node.type);
+        if (node.body) node.body.forEach(collectTypes);
+        if (node.then) node.then.forEach(collectTypes);
+        if (node.elseBody) node.elseBody.forEach(collectTypes);
+      }
+      result.ast.body.forEach(collectTypes);
+      for (const cmd of tpl.expectedCmds) {
+        assert(types.has(cmd), `${tpl.file} AST should contain ${cmd} node, found: [${[...types].join(',')}]`);
+      }
+    });
+
+    test('Automation Templates', `${tpl.file} JS is syntactically valid`, () => {
+      const code = fs.readFileSync(path.join(TEMPLATES_DIR, tpl.file), 'utf8');
+      const result = parseAndGenerate(code);
+      try {
+        new Function(result.js);
+      } catch (e) {
+        assert(false, `${tpl.file} JS has syntax errors: ${e.message}`);
+      }
+    });
+  }
+
+  test('Automation Templates', 'All 22 automation commands covered across templates', () => {
+    const allCmds = new Set();
+    for (const tpl of automationTemplates) {
+      const code = fs.readFileSync(path.join(TEMPLATES_DIR, tpl.file), 'utf8');
+      const result = parseAndGenerate(code);
+      const jsCode = result.js;
+      const cmdMatches = jsCode.match(/automation\.(\w+)\(/g) || [];
+      cmdMatches.forEach(m => allCmds.add(m.replace('automation.', '').replace('(', '')));
+    }
+    const expected22 = [
+      'taskDefine', 'taskAssign', 'taskChain', 'taskParallel', 'taskShowFlow', 'taskLog',
+      'agentSpawn', 'agentCall', 'agentPass', 'agentTerminate',
+      'skillCall', 'cronCreate', 'cronCall',
+      'webFetch', 'webSerial',
+      'fileRead', 'fileWrite', 'fileExecute',
+      'dataTransform',
+      'channelSend', 'emailSend', 'publishCanvas'
+    ];
+    const missing = expected22.filter(c => !allCmds.has(c));
+    assert(missing.length === 0, `Templates missing commands: [${missing.join(', ')}]. Found: [${[...allCmds].join(', ')}]`);
+  });
+
+  test('Automation Templates', 'automation module functions all callable without crash', () => {
+    const automation = require('./openclaw-automation.cjs');
+    const fns = [
+      'taskDefine', 'taskAssign', 'taskChain', 'taskParallel', 'taskShowFlow', 'taskLog',
+      'agentSpawn', 'agentCall', 'agentPass', 'agentTerminate',
+      'skillCall', 'cronCreate', 'cronCall',
+      'webFetch', 'webSerial',
+      'fileRead', 'fileWrite', 'fileExecute',
+      'dataTransform',
+      'channelSend', 'emailSend', 'publishCanvas'
+    ];
+    for (const fn of fns) {
+      assert(typeof automation[fn] === 'function', `automation.${fn} should be a function`);
+    }
   });
 
   log('\n══════════════════════════════════════════════════════════');
