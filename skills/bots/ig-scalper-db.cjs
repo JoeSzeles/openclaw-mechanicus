@@ -772,6 +772,16 @@ async function getAllOptimizationMemories(instrument) {
   });
 }
 
+async function deleteOptimizationMemory(instrument) {
+  await ensureOptimizationMemory();
+  if (instrument) {
+    await query("DELETE FROM optimization_memory WHERE instrument = $1", [instrument]);
+  } else {
+    await query("DELETE FROM optimization_memory");
+  }
+  return { ok: true };
+}
+
 async function saveBatchBacktest(data) {
   await ensureBatchColumns();
   const res = await query(
@@ -871,7 +881,7 @@ module.exports = {
   saveBacktest, getBacktests, getBacktest, deleteBacktests, getAllBacktests, deleteAllBacktests,
   ensureBatchColumns, saveBatchBacktest, getBatchResults, listBatches, deleteBatch,
   getOptimizationResults, getBestOptimizationResults,
-  ensureOptimizationMemory, saveOptimizationMemory, getOptimizationMemory, getAllOptimizationMemories,
+  ensureOptimizationMemory, saveOptimizationMemory, getOptimizationMemory, getAllOptimizationMemories, deleteOptimizationMemory,
   ensurePriceCandlesTable, getStoredCandles, getLatestCandleTs, getCandleCount, storeCandles, getStoredCandlesRange,
   ensureNewColumns,
   backupAgent, listAgentBackups, restoreAgentBackup, deleteAgentBackup,

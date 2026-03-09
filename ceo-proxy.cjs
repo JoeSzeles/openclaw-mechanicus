@@ -3274,6 +3274,16 @@ async function handleIgApi(req, res, p) {
       const memories = await scalperDb.getAllOptimizationMemories(decodeURIComponent(optMemInstrMatch[1]));
       return json(res, 200, { memories });
     }
+    if (req.method === "DELETE" && p === "/api/ig/scalper/optimization-memory") {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const result = await scalperDb.deleteOptimizationMemory(null);
+      return json(res, 200, result);
+    }
+    if (req.method === "DELETE" && optMemInstrMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const result = await scalperDb.deleteOptimizationMemory(decodeURIComponent(optMemInstrMatch[1]));
+      return json(res, 200, result);
+    }
     if (req.method === "GET" && p === "/api/ig/scalper/batch-backtest") {
       const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
       const batches = await scalperDb.listBatches(20);
