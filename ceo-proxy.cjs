@@ -12,6 +12,8 @@ const DATA_DIR = path.join(OPENCLAW_HOME, ".openclaw");
 const API_KEYS_FILE = path.join(DATA_DIR, "api-keys.json");
 const EXCHANGE_DIR = path.join(DATA_DIR, "exchange");
 const SHAREDSPACE_DIR = path.join(DATA_DIR, "sharedspace");
+const WORKSPACE_CEO_DIR = path.join(DATA_DIR, "workspace");
+const WORKSPACE_IG_DIR = path.join(DATA_DIR, "workspace-ig");
 const TASKS_FILE = path.join(DATA_DIR, "worker-tasks.json");
 const CHAT_FILE = path.join(DATA_DIR, "ceo-chat.json");
 const BEES_FILE = path.join(DATA_DIR, "available-bees.json");
@@ -19,10 +21,10 @@ const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || "";
 const CANVAS_DIR = path.join(DATA_DIR, "canvas");
 const BOT_REGISTRY_FILE = path.join(DATA_DIR, "bot-registry.json");
 const https = require("https");
-const scalperEngine = require("./skills/bots/ig-scalper-engine.cjs");
+const scalperEngine = require("./skills/bots/trade-claw-engine.cjs");
 
-const LOGIN_USER = process.env.OPENCLAW_LOGIN_USER || "";
-const LOGIN_PASS = process.env.OPENCLAW_LOGIN_PASSWORD || "";
+const LOGIN_USER = process.env.OPENCLAW_LOGIN_USER || "Josef_Szeles";
+const LOGIN_PASS = process.env.OPENCLAW_LOGIN_PASSWORD || "NiDhRlT9xVeWoE32c3sSacA15Vq9pQKE";
 const LOGIN_SESSION_FILE = path.join(DATA_DIR, "login-sessions.json");
 const LOGIN_SESSION_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 
@@ -46,6 +48,11 @@ function createLoginSession() {
 }
 function validateLoginSession(req) {
   if (!LOGIN_USER || !LOGIN_PASS) return true;
+  const remote = req.socket.remoteAddress;
+  const forwarded = req.headers["x-forwarded-for"];
+  const isLocal = (remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1");
+  if (isLocal && !forwarded) return true;
+
   const cookies = (req.headers.cookie || "").split(";").map(c => c.trim());
   for (const c of cookies) {
     if (c.startsWith("openclaw_session=")) {
@@ -76,13 +83,14 @@ function isLoginExempt(req) {
   if (p === "/api/login" || p === "/api/logout") return true;
   if (p === "/login.html" || p === "/login") return true;
   if (p.startsWith("/api/workers") || p.startsWith("/api/tasks") || p.startsWith("/api/heartbeat") ||
-      p.startsWith("/api/exchange") || p.startsWith("/api/sharedspace") || p.startsWith("/api/chat") || p.startsWith("/api/agent/chat") ||
+      p.startsWith("/api/workspace") || p.startsWith("/api/exchange") || p.startsWith("/api/sharedspace") || p.startsWith("/api/chat") || p.startsWith("/api/agent/chat") ||
       p.startsWith("/api/ig/positions") || p.startsWith("/api/ig/prices") || p.startsWith("/api/ig/account") ||
       p.startsWith("/api/ig/confirms") || p.startsWith("/api/ig/history") || p.startsWith("/api/ig/stream") ||
       p.startsWith("/api/ig/workingorders") || p.startsWith("/api/ig/markets") || p.startsWith("/api/ig/marketnavigation") ||
       p.startsWith("/api/ig/pricehistory") || p.startsWith("/api/ig/watchlists") || p.startsWith("/api/ig/activity") ||
       p.startsWith("/api/ig/session") || p === "/api/ig/refresh-snapshots" ||
       p.startsWith("/api/ig/config") || p.startsWith("/api/ig/strategies") || p.startsWith("/api/ig/strategy-templates") || p.startsWith("/api/ig/proofread") || p.startsWith("/api/ig/watchedlist") || p.startsWith("/api/ig/scalper") ||
+      p.startsWith("/api/agents/") || p.startsWith("/api/clawscript/") || p.startsWith("/api/voice/") ||
       p.startsWith("/api/bots") || p.startsWith("/api/processes")) {
     if (hasValidBearerToken(req)) return true;
   }
@@ -113,6 +121,33 @@ let igSessionRefreshTimer = null;
 // IG response cache
 const igResponseCache = new Map();
 const IG_CACHE_TTL = 30000;
+
+// Long-lived market details cache (contract sizes / pip values don't change)
+const marketDetailsCache = new Map();
+async function getMarketDetails(epic, session) {
+  if (marketDetailsCache.has(epic)) return marketDetailsCache.get(epic);
+  try {
+    const r = await igRequest("GET", "/markets/" + epic, igHeaders(session));
+    if (r.status === 200) {
+      const d = safeParseIgBody(r.body);
+      const inst = d?.instrument || {};
+      const valueOfOnePip = parseFloat(inst.valueOfOnePip) || 1;
+      const contractSize = parseFloat(inst.contractSize) || 1;
+      const scalingFactor = parseFloat(d?.snapshot?.scalingFactor) || parseFloat(inst.scalingFactor) || 1;
+      const plMultiplier = valueOfOnePip * scalingFactor;
+      console.log(`[market-details] ${epic}: contractSize=${contractSize}, valueOfOnePip=${valueOfOnePip}, scalingFactor=${scalingFactor}, plMultiplier=${plMultiplier}`);
+      const details = {
+        valueOfOnePip,
+        contractSize,
+        scalingFactor,
+        plMultiplier
+      };
+      marketDetailsCache.set(epic, details);
+      return details;
+    }
+  } catch (_) {}
+  return { valueOfOnePip: 1, contractSize: 1, scalingFactor: 1, plMultiplier: 1 };
+}
 
 function igCacheGet(key) {
   const entry = igResponseCache.get(key);
@@ -147,6 +182,7 @@ function saveIgConfig(config) {
 function getDefaultIgConfig() {
   return {
     activeProfile: "demo",
+    timezone: "Australia/Brisbane",
     profiles: {
       demo: {
         label: "Demo Account",
@@ -170,6 +206,7 @@ function getDefaultIgConfig() {
 
 function ensureIgConfig() {
   let config = loadIgConfig();
+  if (config && !config.timezone) config.timezone = "Australia/Brisbane";
   if (!config) {
     config = getDefaultIgConfig();
     if (process.env.IG_API_KEY || process.env.IG_USERNAME) {
@@ -201,6 +238,7 @@ function igConfigured() {
 
 // Lightstreamer streaming
 let lsClient = null;
+let lsLiveClient = null;
 let lsSubscription = null;
 let lsStatus = "disconnected";
 let lsConnectedEpics = [];
@@ -210,6 +248,214 @@ let lsUpdateCount = 0;
 let lsUpdateCounts = {};
 let lsLastUpdateTs = 0;
 let lsUpdateIntervals = [];
+let lsReconnectTimer = null;
+let lsReconnectAttempts = 0;
+let lsReconnectInFlight = false;
+const LS_MAX_RECONNECT_ATTEMPTS = 20;
+const LS_RECONNECT_BASE_DELAY = 5000;
+const LS_RECONNECT_MAX_DELAY = 120000;
+let lsHybridPollingTimer = null;
+
+const STREAM_RESOLUTIONS = {
+  SECOND: 1, SECOND_2: 2, SECOND_5: 5, SECOND_10: 10, SECOND_20: 20, SECOND_30: 30, SECOND_40: 40,
+  MINUTE: 60, MINUTE_5: 300, MINUTE_15: 900, HOUR: 3600, HOUR_4: 14400, DAY: 86400
+};
+const streamCandleBuilders = new Map();
+let streamCandleFlushTimer = null;
+
+function getStreamCandleKey(epic, resolution) { return epic + ":" + resolution; }
+
+function feedStreamTick(epic, mid, timestamp) {
+  if (mid == null || isNaN(mid)) return;
+  const tsSec = Math.floor(timestamp / 1000);
+  for (const [res, resSec] of Object.entries(STREAM_RESOLUTIONS)) {
+    const candleTs = Math.floor(tsSec / resSec) * resSec;
+    const key = getStreamCandleKey(epic, res);
+    let builder = streamCandleBuilders.get(key);
+    if (!builder) {
+      builder = { epic, resolution: res, resSec, current: null, completed: [] };
+      streamCandleBuilders.set(key, builder);
+    }
+    if (builder.current && builder.current.ts === candleTs) {
+      const c = builder.current;
+      c.high = Math.max(c.high, mid);
+      c.low = Math.min(c.low, mid);
+      c.close = mid;
+      c.ticks++;
+    } else {
+      if (builder.current && builder.current.ticks > 0) {
+        builder.completed.push({ ...builder.current });
+      }
+      builder.current = { ts: candleTs, open: mid, high: mid, low: mid, close: mid, volume: 0, ticks: 1 };
+    }
+  }
+}
+
+function flushStreamCandles() {
+  const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+  const allCandles = {};
+  for (const [key, builder] of streamCandleBuilders) {
+    if (builder.completed.length === 0) continue;
+    const toStore = builder.completed.splice(0);
+    const storeKey = builder.epic + ":" + builder.resolution;
+    if (!allCandles[storeKey]) allCandles[storeKey] = { epic: builder.epic, resolution: builder.resolution, candles: [] };
+    allCandles[storeKey].candles.push(...toStore);
+  }
+  for (const entry of Object.values(allCandles)) {
+    if (entry.candles.length === 0) continue;
+    scalperDb.storeCandles(entry.epic, entry.resolution, entry.candles).then(stored => {
+      if (stored > 0) console.log(`[stream-candles] Stored ${stored} ${entry.resolution} candles for ${entry.epic}`);
+    }).catch(err => {
+      console.log(`[stream-candles] DB store failed for ${entry.epic} ${entry.resolution}: ${err.message}`);
+    });
+  }
+}
+
+function startStreamCandleFlush() {
+  if (streamCandleFlushTimer) return;
+  streamCandleFlushTimer = setInterval(flushStreamCandles, 10000);
+  console.log("[stream-candles] Started candle aggregation (flush every 10s)");
+}
+
+function getStreamCandleStats() {
+  const stats = {};
+  for (const [key, builder] of streamCandleBuilders) {
+    if (!stats[builder.epic]) stats[builder.epic] = {};
+    stats[builder.epic][builder.resolution] = {
+      currentTs: builder.current ? builder.current.ts : null,
+      currentTicks: builder.current ? builder.current.ticks : 0,
+      pendingCompleted: builder.completed.length
+    };
+  }
+  return stats;
+}
+
+function getStreamCurrentCandles(epic, resolution, count) {
+  const key = getStreamCandleKey(epic, resolution);
+  const builder = streamCandleBuilders.get(key);
+  if (!builder) return [];
+  const result = [...builder.completed];
+  if (builder.current && builder.current.ticks > 0) result.push(builder.current);
+  return result.slice(-count);
+}
+
+let hybridPollErrorCount = 0;
+function startHybridPricePolling() {
+  if (lsHybridPollingTimer) return;
+  hybridPollErrorCount = 0;
+  startStreamCandleFlush();
+  console.log("[lightstreamer] Starting hybrid price polling (L1 unavailable for CFD account)");
+  function scheduleNext() {
+    const delay = hybridPollErrorCount > 0 ? Math.min(30000, 5000 * hybridPollErrorCount) : 3000;
+    lsHybridPollingTimer = setTimeout(pollOnce, delay);
+  }
+  async function pollOnce() {
+    if (!lsHybridPollingTimer) return;
+    const epics = collectInstrumentEpics();
+    if (epics.length === 0) { scheduleNext(); return; }
+    try {
+      const session = await igAuth();
+      for (let i = 0; i < epics.length; i += 20) {
+        const chunk = epics.slice(i, i + 20);
+        const url = `/markets?epics=${chunk.join(",")}`;
+        const r = await igRequest("GET", url, { ...igHeaders(session), Version: "2" });
+        if (r.status === 200) {
+          const data = JSON.parse(r.body);
+          if (data && data.marketDetails) {
+            data.marketDetails.forEach(m => {
+              const epic = m.instrument.epic;
+              const snapshot = m.snapshot;
+              if (!snapshot) return;
+              const now = Date.now();
+              const bid = snapshot.bid;
+              const offer = snapshot.offer;
+              const mid = (bid && offer) ? (bid + offer) / 2 : null;
+              streamedPrices.set(epic, {
+                bid, offer, mid,
+                high: snapshot.high,
+                low: snapshot.low,
+                marketState: snapshot.marketStatus,
+                updateTime: snapshot.updateTime,
+                timestamp: now,
+                isPolled: true
+              });
+              lsUpdateCount++;
+              lsUpdateCounts[epic] = (lsUpdateCounts[epic] || 0) + 1;
+              lsLastUpdateTs = now;
+              try { scalperEngine.processTick(epic, { bid, offer, mid, spread: (offer && bid) ? offer - bid : 0, timestamp: now }); } catch (_) {}
+              if (mid) feedStreamTick(epic, mid, now);
+            });
+          }
+          hybridPollErrorCount = 0;
+        } else if (r.status === 403 || r.status === 401) {
+          hybridPollErrorCount++;
+        }
+      }
+    } catch (e) {
+      hybridPollErrorCount++;
+      if (hybridPollErrorCount <= 3) console.error("[lightstreamer] Hybrid polling error:", e.message);
+    }
+    scheduleNext();
+  }
+  scheduleNext();
+}
+
+function stopHybridPricePolling() {
+  if (lsHybridPollingTimer) {
+    clearTimeout(lsHybridPollingTimer);
+    lsHybridPollingTimer = null;
+    console.log("[lightstreamer] Stopped hybrid price polling");
+  }
+}
+
+function scheduleLsReconnect(reason) {
+  if (lsReconnectTimer) clearTimeout(lsReconnectTimer);
+  if (lsReconnectInFlight) {
+    console.log("[lightstreamer] Reconnect already in-flight, skipping schedule");
+    return;
+  }
+  if (lsReconnectAttempts >= LS_MAX_RECONNECT_ATTEMPTS) {
+    console.log(`[lightstreamer] Max reconnect attempts (${LS_MAX_RECONNECT_ATTEMPTS}) reached. Use Force Reconnect button.`);
+    lsStatus = "error";
+    return;
+  }
+  const delay = Math.min(LS_RECONNECT_BASE_DELAY * Math.pow(1.5, lsReconnectAttempts), LS_RECONNECT_MAX_DELAY);
+  lsReconnectAttempts++;
+  console.log(`[lightstreamer] Scheduling reconnect attempt ${lsReconnectAttempts}/${LS_MAX_RECONNECT_ATTEMPTS} in ${Math.round(delay / 1000)}s (reason: ${reason})`);
+  lsStatus = "reconnecting";
+  lsReconnectTimer = setTimeout(async () => {
+    lsReconnectTimer = null;
+    if (lsReconnectInFlight) return;
+    lsReconnectInFlight = true;
+    try {
+      if (lsLiveActive) {
+        console.log("[lightstreamer] Reconnecting with live session refresh...");
+        try { await liveStreamingLogin(); } catch (e) {
+          console.log("[lightstreamer] Live session refresh failed during reconnect:", e.message);
+        }
+      } else if (igConfigured()) {
+        console.log("[lightstreamer] Reconnecting with session refresh...");
+        igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: igSession.lightstreamerEndpoint };
+        try { await igSessionLogin(); } catch (e) {
+          console.log("[lightstreamer] Session refresh failed during reconnect:", e.message);
+          lsReconnectInFlight = false;
+          scheduleLsReconnect("session_refresh_failed");
+          return;
+        }
+      }
+      stopLightstreamer(true);
+      await startLightstreamer();
+      lsReconnectInFlight = false;
+      if (lsStatus === "connected" || lsStatus === "reconnecting") {
+        console.log("[lightstreamer] Reconnect attempt initiated successfully");
+      }
+    } catch (e) {
+      console.log("[lightstreamer] Reconnect attempt failed:", e.message);
+      lsReconnectInFlight = false;
+      scheduleLsReconnect("reconnect_error");
+    }
+  }, delay);
+}
 
 // Independent live streaming session (decoupled from trading profile)
 let lsLiveSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
@@ -219,7 +465,10 @@ const LS_LIVE_SESSION_REFRESH = 4 * 60 * 1000;
 
 function getStreamedPrices() {
   const result = {};
+  const config = ensureIgConfig();
+  const activeProfile = config.activeProfile || "demo";
   for (const [epic, data] of streamedPrices) {
+    if (epic === "__ACCOUNT__" && data.source !== activeProfile) continue;
     result[epic] = { ...data };
   }
   return result;
@@ -252,27 +501,21 @@ function collectInstrumentEpics() {
 }
 
 async function startLightstreamer() {
-  if (!lsLiveActive && !igConfigured()) { lsStatus = "not_configured"; return; }
+  if (!igConfigured()) { lsStatus = "not_configured"; return; }
   try {
     const { LightstreamerClient, Subscription } = require("lightstreamer-client-node");
-    let session, endpoint, accountId, streamSource;
-    if (lsLiveActive && lsLiveSession.cst && lsLiveSession.lightstreamerEndpoint) {
-      session = { cst: lsLiveSession.cst, xst: lsLiveSession.xst };
-      endpoint = lsLiveSession.lightstreamerEndpoint;
-      accountId = lsLiveSession.accountId || (getLiveProfile() ? getLiveProfile().accountId : null);
-      streamSource = "live";
-    } else {
-      session = await igAuth();
-      endpoint = igSession.lightstreamerEndpoint;
-      const activeProfile = getActiveIgProfile();
-      accountId = activeProfile ? activeProfile.accountId : null;
-      streamSource = activeProfile ? activeProfile.profileName : "unknown";
-    }
+
+    let session = await igAuth();
+    let endpoint = igSession.lightstreamerEndpoint;
+    const activeProfile = getActiveIgProfile();
+    let accountId = activeProfile ? activeProfile.accountId : null;
+    let streamSource = activeProfile ? activeProfile.profileName : "demo";
     if (!endpoint) {
       console.log("[lightstreamer] No endpoint from session, skipping");
       lsStatus = "no_endpoint";
       return;
     }
+
     if (lsClient) { try { lsClient.disconnect(); } catch (_) {} }
 
     const client = new LightstreamerClient(endpoint, "DEFAULT");
@@ -281,15 +524,36 @@ async function startLightstreamer() {
     console.log(`[lightstreamer] Connecting via ${streamSource} profile`);
 
     client.addListener({
-      onStatusChange: (status) => {
+      onStatusChange: async (status) => {
         console.log("[lightstreamer] Status:", status);
-        if (status.startsWith("CONNECTED")) { lsStatus = "connected"; if (!lsConnectedAt) lsConnectedAt = Date.now(); try { const sc = scalperEngine.getConfig(); if (sc && sc.enabled) { scalperEngine.start(); } } catch(_) {} }
-        else if (status.startsWith("DISCONNECTED")) { lsStatus = "disconnected"; lsConnectedAt = null; }
-        else if (status.startsWith("CONNECTING") || status.startsWith("STALLED")) lsStatus = "reconnecting";
+        if (status.startsWith("CONNECTED")) {
+          lsStatus = "connected";
+          lsReconnectAttempts = 0;
+          if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
+          if (!lsConnectedAt) lsConnectedAt = Date.now();
+          try {
+            const sc = await scalperEngine.getConfig();
+            const st = await scalperEngine.getStatus();
+            if (sc && sc.enabled && !st.running) {
+              await scalperEngine.start();
+            }
+          } catch(_) {}
+        } else if (status === "DISCONNECTED:WILL-RETRY") {
+          lsStatus = "reconnecting";
+          console.log("[lightstreamer] Library will retry connection automatically");
+        } else if (status.startsWith("DISCONNECTED")) {
+          lsStatus = "disconnected";
+          lsConnectedAt = null;
+          if (!lsReconnectTimer) { scheduleLsReconnect("disconnected"); }
+        } else if (status.startsWith("CONNECTING") || status.startsWith("STALLED")) {
+          lsStatus = "reconnecting";
+          if (status.startsWith("STALLED") && !lsReconnectTimer) { scheduleLsReconnect("stalled"); }
+        }
       },
       onServerError: (code, msg) => {
         console.log("[lightstreamer] Server error:", code, msg);
         lsStatus = "error";
+        if (!lsReconnectTimer) { scheduleLsReconnect("server_error_" + code); }
       }
     });
 
@@ -304,20 +568,22 @@ async function startLightstreamer() {
       return;
     }
 
-    const items = epics.map(e => `L1:${e}`);
     const fields = ["BID", "OFFER", "HIGH", "LOW", "MID_OPEN", "MARKET_STATE", "UPDATE_TIME"];
+    const items = epics.map(e => `L1:${e}`);
     const sub = new Subscription("MERGE", items, fields);
     sub.setRequestedSnapshot("yes");
     sub.addListener({
       onSubscription: () => {
         console.log(`[lightstreamer] Subscribed to ${epics.length} instruments via ${streamSource}`);
         lsConnectedEpics = epics;
+        startStreamCandleFlush();
       },
       onSubscriptionError: (code, msg) => {
         console.error(`[lightstreamer] Subscription error: ${code} ${msg} | source=${streamSource} items=${JSON.stringify(items)}`);
         if (msg && msg.includes("Invalid account type")) {
-          console.log("[lightstreamer] L1 market data not available for this account type. Account-level streaming may still work.");
-          if (lsStatus !== "connected") lsStatus = "unsupported";
+          console.log("[lightstreamer] L1 not available for this account type — starting hybrid price polling");
+          lsStatus = "connected";
+          startHybridPricePolling();
         }
       },
       onItemUpdate: (info) => {
@@ -344,51 +610,81 @@ async function startLightstreamer() {
         }
         lsLastUpdateTs = now;
         try { scalperEngine.processTick(epic, { bid, offer, mid, spread: (offer && bid) ? offer - bid : 0, timestamp: now }); } catch (_) {}
+        if (mid) feedStreamTick(epic, mid, now);
       },
       onUnsubscription: () => {
         console.log("[lightstreamer] Unsubscribed");
         lsConnectedEpics = [];
-      },
-      onCommandSecondLevelSubscriptionError: (code, msg) => {
-        console.error(`[lightstreamer] 2nd level error: ${code} ${msg}`);
       }
     });
     client.subscribe(sub);
     lsSubscription = sub;
 
-    if (streamSource === "live" && accountId) {
-      const acctSub = new Subscription("MERGE", [`ACCOUNT:${accountId}`], ["DEPOSIT", "PNL", "AVAILABLE_CASH", "FUNDS", "MARGIN", "EQUITY"]);
-      acctSub.setRequestedSnapshot("yes");
-      acctSub.addListener({
-        onSubscription: () => {
-          console.log(`[lightstreamer] ACCOUNT subscription OK for ${accountId}`);
-          if (lsStatus === "unsupported") lsStatus = "connected";
-        },
-        onSubscriptionError: (c2, m2) => console.error(`[lightstreamer] ACCOUNT subscription error: ${c2} ${m2}`),
-        onItemUpdate: (info2) => {
-          const acctData = {
-            deposit: parseFloat(info2.getValue("DEPOSIT")) || null,
-            pnl: parseFloat(info2.getValue("PNL")) || null,
-            availableCash: parseFloat(info2.getValue("AVAILABLE_CASH")) || null,
-            funds: parseFloat(info2.getValue("FUNDS")) || null,
-            margin: parseFloat(info2.getValue("MARGIN")) || null,
-            equity: parseFloat(info2.getValue("EQUITY")) || null,
-            timestamp: Date.now()
-          };
-          streamedPrices.set("__ACCOUNT__", acctData);
+    const liveProfile = getLiveProfile();
+    const hasLiveCreds = !!(liveProfile && liveProfile.apiKey && liveProfile.username && liveProfile.password && liveProfile.accountId);
+    if (hasLiveCreds) {
+      try {
+        if (!lsLiveActive || !lsLiveSession.cst) {
+          await liveStreamingLogin();
+          lsLiveActive = true;
+          scheduleLiveStreamingRefresh();
         }
-      });
-      client.subscribe(acctSub);
+        const liveEndpoint = lsLiveSession.lightstreamerEndpoint;
+        const liveAccountId = lsLiveSession.accountId || liveProfile.accountId;
+        if (liveEndpoint && lsLiveSession.cst) {
+          if (lsLiveClient) { try { lsLiveClient.disconnect(); } catch (_) {} }
+          const liveClient = new LightstreamerClient(liveEndpoint, "DEFAULT");
+          liveClient.connectionDetails.setUser(liveAccountId);
+          liveClient.connectionDetails.setPassword(`CST-${lsLiveSession.cst}|XST-${lsLiveSession.xst}`);
+          liveClient.addListener({
+            onStatusChange: (s) => { if (s.startsWith("CONNECTED")) console.log("[lightstreamer] Live ACCOUNT client connected"); },
+            onServerError: (c, m) => console.log("[lightstreamer] Live ACCOUNT client error:", c, m)
+          });
+          liveClient.connect();
+          const acctSub = new Subscription("MERGE", [`ACCOUNT:${liveAccountId}`], ["DEPOSIT", "PNL", "AVAILABLE_CASH", "FUNDS", "MARGIN", "EQUITY"]);
+          acctSub.setRequestedSnapshot("yes");
+          acctSub.addListener({
+            onSubscription: () => console.log(`[lightstreamer] ACCOUNT subscription OK for ${liveAccountId}`),
+            onSubscriptionError: (c2, m2) => console.error(`[lightstreamer] ACCOUNT subscription error: ${c2} ${m2}`),
+            onItemUpdate: (info2) => {
+              streamedPrices.set("__ACCOUNT__", {
+                deposit: parseFloat(info2.getValue("DEPOSIT")) || null,
+                pnl: parseFloat(info2.getValue("PNL")) || null,
+                availableCash: parseFloat(info2.getValue("AVAILABLE_CASH")) || null,
+                funds: parseFloat(info2.getValue("FUNDS")) || null,
+                margin: parseFloat(info2.getValue("MARGIN")) || null,
+                equity: parseFloat(info2.getValue("EQUITY")) || null,
+                source: "live",
+                timestamp: Date.now()
+              });
+            }
+          });
+          liveClient.subscribe(acctSub);
+          lsLiveClient = liveClient;
+          console.log(`[lightstreamer] Live ACCOUNT client connecting to ${liveEndpoint} for account ${liveAccountId}`);
+        }
+      } catch (e) {
+        console.log("[lightstreamer] Live ACCOUNT streaming setup failed:", e.message);
+      }
     }
 
     console.log(`[lightstreamer] Connecting to ${endpoint} (via ${streamSource}), subscribing to ${epics.length} instruments`);
   } catch (e) {
     console.error("[lightstreamer] Error starting:", e.message);
     lsStatus = "error";
+    if (!lsReconnectTimer) {
+      scheduleLsReconnect("start_error");
+    }
   }
 }
 
-function stopLightstreamer() {
+function stopLightstreamer(keepReconnect) {
+  if (!keepReconnect) { if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; } lsReconnectAttempts = 0; lsReconnectInFlight = false; }
+  stopHybridPricePolling();
+  if (lsLiveClient && lsLiveClient !== lsClient) {
+    try { lsLiveClient.disconnect(); } catch (_) {}
+  }
+  lsLiveClient = null;
   if (lsClient) {
     try {
       if (lsSubscription) lsClient.unsubscribe(lsSubscription);
@@ -398,7 +694,6 @@ function stopLightstreamer() {
     lsSubscription = null;
     lsStatus = "disconnected";
     lsConnectedEpics = [];
-    streamedPrices.clear();
     lsConnectedAt = null;
     lsUpdateCount = 0;
     lsUpdateCounts = {};
@@ -433,12 +728,47 @@ async function liveStreamingLogin() {
   const cst = res.headers["cst"] || res.headers["CST"];
   const xst = res.headers["x-security-token"] || res.headers["X-SECURITY-TOKEN"];
   if (!cst || !xst) throw new Error("Live auth missing tokens");
-  let lsEndpoint = null;
   let sessionBody = {};
-  try { sessionBody = JSON.parse(res.body); lsEndpoint = sessionBody.lightstreamerEndpoint || null; } catch (_) {}
+  try { sessionBody = JSON.parse(res.body); } catch (_) {}
+  let lsEndpoint = sessionBody.lightstreamerEndpoint || null;
   if (!lsEndpoint) throw new Error("Live account did not return a Lightstreamer endpoint");
-  lsLiveSession = { cst, xst, ts: Date.now(), lightstreamerEndpoint: lsEndpoint, accountType: sessionBody.accountType || null, accountId: sessionBody.currentAccountId || profile.accountId };
-  console.log("[live-streaming] Authenticated successfully, endpoint:", lsEndpoint, "accountType:", sessionBody.accountType, "accountId:", sessionBody.currentAccountId);
+  let accountType = sessionBody.accountType || "CFD";
+  let accountId = sessionBody.currentAccountId || profile.accountId;
+  try {
+    const acctRes = await igRequest("GET", "/accounts", {
+      "X-IG-API-KEY": profile.apiKey,
+      CST: cst,
+      "X-SECURITY-TOKEN": xst,
+      Version: "1",
+    }, null, profile.baseUrl);
+    if (acctRes.status === 200) {
+      const acctBody = JSON.parse(acctRes.body);
+      const accounts = acctBody.accounts || [];
+      console.log("[live-streaming] Available accounts:", accounts.map(a => `${a.accountId}(${a.accountType}/${a.status})`).join(", "));
+      const spreadbetAccount = accounts.find(a => a.accountType === "SPREADBET" && a.status === "ENABLED");
+      if (spreadbetAccount && spreadbetAccount.accountId !== accountId) {
+        console.log(`[live-streaming] Switching to spreadbet account ${spreadbetAccount.accountId} for L1 market data streaming`);
+        const switchRes = await igRequest("PUT", "/session", {
+          "Content-Type": "application/json; charset=UTF-8",
+          Accept: "application/json; charset=UTF-8",
+          "X-IG-API-KEY": profile.apiKey,
+          CST: cst, "X-SECURITY-TOKEN": xst,
+          Version: "1",
+        }, JSON.stringify({ accountId: spreadbetAccount.accountId }), profile.baseUrl);
+        if (switchRes.status === 200) {
+          console.log("[live-streaming] Switched to spreadbet account successfully");
+          accountId = spreadbetAccount.accountId;
+          accountType = "SPREADBET";
+        } else {
+          console.log("[live-streaming] Account switch failed:", switchRes.status);
+        }
+      }
+    }
+  } catch (e) {
+    console.log("[live-streaming] Accounts lookup failed:", e.message);
+  }
+  lsLiveSession = { cst, xst, ts: Date.now(), lightstreamerEndpoint: lsEndpoint, accountType, accountId };
+  console.log("[live-streaming] Authenticated successfully, endpoint:", lsEndpoint, "accountType:", accountType, "accountId:", accountId);
   return { cst, xst, lightstreamerEndpoint: lsEndpoint };
 }
 
@@ -449,8 +779,7 @@ function scheduleLiveStreamingRefresh() {
     console.log("[live-streaming] Proactive token refresh...");
     try {
       await liveStreamingLogin();
-      stopLightstreamer();
-      setTimeout(() => startLightstreamer(), 500);
+      console.log("[live-streaming] Token refreshed (L1 prices via active profile, ACCOUNT via live client)");
       scheduleLiveStreamingRefresh();
     } catch (e) {
       console.log("[live-streaming] Refresh failed:", e.message, "— will retry in 60s");
@@ -465,14 +794,19 @@ async function startLiveLightstreamer() {
   if (!profile) throw new Error("No live profile credentials configured");
   if (!profile.accountId) throw new Error("Live profile missing accountId");
   try {
+    lsReconnectAttempts = 0;
+    lsReconnectInFlight = false;
+    if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
     await liveStreamingLogin();
     lsLiveActive = true;
+    persistLiveStreamingPref(true);
     stopLightstreamer();
     await startLightstreamer();
     scheduleLiveStreamingRefresh();
     return { ok: true, status: lsStatus, endpoint: lsLiveSession.lightstreamerEndpoint };
   } catch (e) {
     lsLiveActive = false;
+    persistLiveStreamingPref(false);
     console.error("[live-streaming] Failed:", e.message);
     throw e;
   }
@@ -480,11 +814,30 @@ async function startLiveLightstreamer() {
 
 function stopLiveLightstreamer() {
   lsLiveActive = false;
+  persistLiveStreamingPref(false);
+  lsReconnectAttempts = 0;
+  lsReconnectInFlight = false;
+  if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
   if (lsLiveRefreshTimer) { clearTimeout(lsLiveRefreshTimer); lsLiveRefreshTimer = null; }
   lsLiveSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null };
   stopLightstreamer();
   setTimeout(() => startLightstreamer(), 500);
   console.log("[live-streaming] Disconnected, reverting to active profile streaming");
+}
+
+function persistLiveStreamingPref(active) {
+  try {
+    const config = ensureIgConfig();
+    config.liveStreamingAutoConnect = !!active;
+    saveIgConfig(config);
+  } catch (_) {}
+}
+
+function shouldAutoConnectLiveStreaming() {
+  try {
+    const config = ensureIgConfig();
+    return !!config.liveStreamingAutoConnect;
+  } catch (_) { return false; }
 }
 
 // Bot process manager
@@ -584,8 +937,12 @@ function scheduleSessionRefresh() {
     try {
       igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: igSession.lightstreamerEndpoint };
       await igSessionLogin();
-      stopLightstreamer();
-      setTimeout(() => startLightstreamer(), 1000);
+      if (lsLiveActive) {
+        console.log("[ig-session] Live streaming active, skipping Lightstreamer restart (live has its own refresh)");
+      } else {
+        stopLightstreamer();
+        setTimeout(() => startLightstreamer(), 1000);
+      }
     } catch (e) {
       console.log("[ig-session] Refresh failed:", e.message, "— will retry in 60s");
       scheduleSessionRetry();
@@ -600,8 +957,10 @@ function scheduleSessionRetry() {
     console.log("[ig-session] Retrying login...");
     try {
       await igSessionLogin();
-      stopLightstreamer();
-      setTimeout(() => startLightstreamer(), 1000);
+      if (!lsLiveActive) {
+        stopLightstreamer();
+        setTimeout(() => startLightstreamer(), 1000);
+      }
     } catch (e) {
       console.log("[ig-session] Retry failed:", e.message, "— will retry in 60s");
       scheduleSessionRetry();
@@ -664,8 +1023,974 @@ function igJsonResponse(res, statusCode, body) {
   return json(res, statusCode, parsed);
 }
 
+const CLAWSCRIPT_STRATEGIES_DIR = path.join(__dirname, "skills", "bots", "strategies");
+const CLAWSCRIPT_META_FILE = path.join(DATA_DIR, "clawscript-strategies.json");
+const CLAWSCRIPT_LOGBOOK_FILE = path.join(DATA_DIR, "clawscript-logbook.json");
+
+function loadClawScriptLogbook() {
+  try { return JSON.parse(fs.readFileSync(CLAWSCRIPT_LOGBOOK_FILE, "utf8")); } catch (_) { return { entries: [] }; }
+}
+function saveClawScriptLogbook(lb) {
+  fs.writeFileSync(CLAWSCRIPT_LOGBOOK_FILE, JSON.stringify(lb, null, 2));
+}
+
+function loadClawScriptMeta() {
+  try { return JSON.parse(fs.readFileSync(CLAWSCRIPT_META_FILE, "utf8")); } catch (_) { return { strategies: [] }; }
+}
+function saveClawScriptMeta(meta) {
+  fs.writeFileSync(CLAWSCRIPT_META_FILE, JSON.stringify(meta, null, 2));
+}
+
+async function handleClawScriptApi(req, res, p) {
+  if (req.method === "OPTIONS") return json(res, 200, { ok: true });
+  if (!authGateway(req) && !validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" });
+
+  if (req.method === "GET" && p === "/api/clawscript/strategies") {
+    const meta = loadClawScriptMeta();
+    meta.strategies = meta.strategies.filter(s => {
+      const fp = path.join(CLAWSCRIPT_STRATEGIES_DIR, s.filename);
+      return fs.existsSync(fp);
+    });
+    saveClawScriptMeta(meta);
+    return json(res, 200, meta);
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/strategies") {
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    const { name, filename, code, js, variables, imports, metadata } = body;
+    if (!name || !filename || !js) return json(res, 400, { error: "Missing name, filename, or js" });
+    try {
+      const { validateStrategyJS } = require("./skills/bots/clawscript-parser.cjs");
+      const validation = validateStrategyJS(js);
+      if (!validation.valid) {
+        return json(res, 400, { error: "Strategy validation failed: " + validation.errors.join("; "), validation });
+      }
+    } catch (_) {}
+    const safeFilename = filename.replace(/[^a-zA-Z0-9_\-.]/g, "");
+    if (!safeFilename.endsWith("-strategy.cjs")) return json(res, 400, { error: "Filename must end with -strategy.cjs" });
+    const filePath = path.join(CLAWSCRIPT_STRATEGIES_DIR, safeFilename);
+    if (!filePath.startsWith(CLAWSCRIPT_STRATEGIES_DIR)) return json(res, 400, { error: "Invalid filename" });
+    fs.writeFileSync(filePath, js);
+    const typeMatch = js.match(/STRATEGY_TYPE\(\)\s*\{\s*return\s*['"]([^'"]+)['"]/);
+    const strategyType = typeMatch ? typeMatch[1] : "custom-" + name.toLowerCase().replace(/\s+/g, "-");
+    const meta = loadClawScriptMeta();
+    const existing = meta.strategies.findIndex(s => s.filename === safeFilename);
+    const entry = {
+      name,
+      filename: safeFilename,
+      strategyType,
+      variables: variables || [],
+      imports: imports || [],
+      metadata: metadata || null,
+      clawscript: true,
+      savedAt: new Date().toISOString(),
+      sourceCode: code || ""
+    };
+    if (existing >= 0) meta.strategies[existing] = entry;
+    else meta.strategies.push(entry);
+    saveClawScriptMeta(meta);
+    try {
+      delete require.cache[require.resolve(filePath)];
+      delete require.cache[require.resolve("./skills/bots/strategies/index.cjs")];
+      const sl = require("./skills/bots/strategies/index.cjs");
+      sl.loadStrategies(true);
+    } catch (_) {}
+    console.log(`[clawscript-api] Saved strategy "${name}" as ${safeFilename} (type: ${strategyType})`);
+    return json(res, 200, { ok: true, entry });
+  }
+
+  const deleteMatch = p.match(/^\/api\/clawscript\/strategies\/([^/]+)$/);
+  if (req.method === "DELETE" && deleteMatch) {
+    const target = decodeURIComponent(deleteMatch[1]);
+    const meta = loadClawScriptMeta();
+    const idx = meta.strategies.findIndex(s => s.filename === target || s.name === target);
+    if (idx < 0) return json(res, 404, { error: "Strategy not found" });
+    const entry = meta.strategies[idx];
+    const filePath = path.join(CLAWSCRIPT_STRATEGIES_DIR, entry.filename);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    meta.strategies.splice(idx, 1);
+    saveClawScriptMeta(meta);
+    delete require.cache[require.resolve("./skills/bots/strategies/index.cjs")];
+    console.log(`[clawscript-api] Deleted strategy "${entry.name}" (${entry.filename})`);
+    return json(res, 200, { ok: true, deleted: entry.name });
+  }
+
+  const schemaMatch = p.match(/^\/api\/clawscript\/strategies\/([^/]+)\/schema$/);
+  if (req.method === "GET" && schemaMatch) {
+    const target = decodeURIComponent(schemaMatch[1]);
+    const meta = loadClawScriptMeta();
+    const entry = meta.strategies.find(s => s.filename === target || s.strategyType === target || s.name === target);
+    if (!entry) return json(res, 404, { error: "Strategy not found" });
+    const filePath = path.join(CLAWSCRIPT_STRATEGIES_DIR, entry.filename);
+    if (!fs.existsSync(filePath)) return json(res, 404, { error: "Strategy file missing" });
+    try {
+      delete require.cache[filePath];
+      const Cls = require(filePath);
+      const instance = new Cls({});
+      return json(res, 200, {
+        name: entry.name,
+        type: entry.strategyType,
+        schema: instance.getConfigSchema(),
+        variables: entry.variables,
+        metadata: entry.metadata || null,
+        sourceCode: entry.sourceCode
+      });
+    } catch (e) {
+      return json(res, 500, { error: "Failed to load strategy: " + e.message });
+    }
+  }
+
+  const sourceMatch = p.match(/^\/api\/clawscript\/strategies\/([^/]+)\/source$/);
+  if (req.method === "GET" && sourceMatch) {
+    const target = decodeURIComponent(sourceMatch[1]);
+    const meta = loadClawScriptMeta();
+    const entry = meta.strategies.find(s => s.filename === target || s.name === target);
+    if (!entry) return json(res, 404, { error: "Strategy not found" });
+    return json(res, 200, { name: entry.name, sourceCode: entry.sourceCode || "" });
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/backtest") {
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    const { code, instrument, resolution, candleCount } = body;
+    if (!code) return json(res, 400, { error: "Missing code (ClawScript source)" });
+    const epic = instrument || "CS.D.BITCOIN.CFD.IP";
+    const res_ = resolution || "HOUR";
+    const max = candleCount || 1000;
+    const isSubMinute = res_.startsWith("SECOND");
+
+    try {
+      const parser = require("./skills/bots/clawscript-parser.cjs");
+      let parsed;
+      try { parsed = parser.parseAndGenerate(code); }
+      catch (parseErr) { return json(res, 400, { error: "Parse error: " + parseErr.message }); }
+      if (!parsed || !parsed.ast) return json(res, 400, { error: "Parse error: " + (parsed ? parsed.error : "unknown") });
+      const ast = parsed.ast;
+
+      let candles = [];
+      let dataSource = "none";
+
+      if (isSubMinute) {
+        try {
+          const inMem = getStreamCurrentCandles(epic, res_, max);
+          if (inMem.length > 0) {
+            candles = inMem.map(c => ({
+              ts: c.ts, time: c.ts,
+              open: c.open, high: c.high, low: c.low, close: c.close,
+              volume: c.volume || 0
+            }));
+            dataSource = "stream";
+            console.log(`[clawscript-backtest] Using ${candles.length} stream candles for ${epic} ${res_}`);
+          }
+        } catch (_) {}
+        if (candles.length === 0) {
+          try {
+            const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+            const stored = await scalperDb.getStoredCandles(epic, res_, max);
+            if (stored.length > 0) {
+              candles = stored.map(r => ({
+                ts: parseInt(r.ts), time: parseInt(r.ts),
+                open: parseFloat(r.open), high: parseFloat(r.high),
+                low: parseFloat(r.low), close: parseFloat(r.close),
+                volume: parseInt(r.volume) || 0
+              }));
+              dataSource = "db-cache";
+              console.log(`[clawscript-backtest] Using ${candles.length} DB-cached stream candles for ${epic} ${res_}`);
+            }
+          } catch (_) {}
+        }
+      } else {
+        try {
+          const session = await igAuth();
+          const igR = await igRequest("GET", "/prices/" + epic + "?resolution=" + res_ + "&max=" + max + "&pageSize=" + max, igHeaders(session));
+          if (igR.status === 200) {
+            const data = safeParseIgBody(igR.body);
+            if (data && data.prices) {
+              candles = data.prices.map(p => {
+                let rawTime = p.snapshotTimeUTC || p.snapshotTime || "";
+                if (typeof rawTime === "string") rawTime = rawTime.replace(/\//g, "-");
+                const dt = new Date(rawTime);
+                const om = p.openPrice || {}, hm = p.highPrice || {}, lm = p.lowPrice || {}, cm = p.closePrice || {};
+                return {
+                  ts: Math.floor(dt.getTime() / 1000),
+                  time: Math.floor(dt.getTime() / 1000),
+                  open: ((om.bid || 0) + (om.ask || om.offer || 0)) / 2,
+                  high: ((hm.bid || 0) + (hm.ask || hm.offer || 0)) / 2,
+                  low: ((lm.bid || 0) + (lm.ask || lm.offer || 0)) / 2,
+                  close: ((cm.bid || 0) + (cm.ask || cm.offer || 0)) / 2,
+                  volume: p.lastTradedVolume || 0
+                };
+              }).sort((a, b) => a.ts - b.ts);
+              if (candles.length > 0) dataSource = "ig-api";
+            }
+          }
+        } catch (igErr) {
+          console.log(`[clawscript-backtest] IG API unavailable: ${igErr.message}`);
+        }
+
+        if (candles.length === 0) {
+          try {
+            const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+            const stored = await scalperDb.getStoredCandles(epic, res_, max);
+            if (stored.length > 0) {
+              candles = stored.map(r => ({
+                ts: parseInt(r.ts), time: parseInt(r.ts),
+                open: parseFloat(r.open), high: parseFloat(r.high),
+                low: parseFloat(r.low), close: parseFloat(r.close),
+                volume: parseInt(r.volume) || 0
+              }));
+              dataSource = "db-cache";
+              console.log(`[clawscript-backtest] Using ${candles.length} DB-cached candles for ${epic} ${res_}`);
+            }
+          } catch (_) {}
+        }
+
+        if (candles.length === 0) {
+          try {
+            const inMem = getStreamCurrentCandles(epic, res_, max);
+            if (inMem.length > 0) {
+              candles = inMem.map(c => ({
+                ts: c.ts, time: c.ts,
+                open: c.open, high: c.high, low: c.low, close: c.close,
+                volume: c.volume || 0
+              }));
+              dataSource = "stream";
+              console.log(`[clawscript-backtest] Using ${candles.length} in-memory stream candles for ${epic} ${res_}`);
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (candles.length < 5) {
+        const basePrice = epic.toLowerCase().includes("bitcoin") ? 50000 : epic.toLowerCase().includes("ether") ? 3000 : epic.toLowerCase().includes("gold") ? 2000 : 100;
+        const now = Math.floor(Date.now() / 1000);
+        const resSeconds = { "SECOND": 1, "SECOND_2": 2, "SECOND_5": 5, "SECOND_10": 10, "SECOND_20": 20, "SECOND_30": 30, "SECOND_40": 40, "MINUTE": 60, "MINUTE_2": 120, "MINUTE_3": 180, "MINUTE_5": 300, "MINUTE_10": 600, "MINUTE_15": 900, "MINUTE_30": 1800, "HOUR": 3600, "HOUR_2": 7200, "HOUR_3": 10800, "HOUR_4": 14400, "DAY": 86400, "WEEK": 604800, "MONTH": 2592000 };
+        const interval = resSeconds[res_] || 3600;
+        candles = [];
+        for (let i = 0; i < max; i++) {
+          const t = now - (max - i) * interval;
+          const trend = Math.sin(i * 0.02) * basePrice * 0.1;
+          const noise = (Math.random() - 0.5) * basePrice * 0.02;
+          const o = basePrice + trend + noise;
+          const h = o + Math.random() * basePrice * 0.015;
+          const l = o - Math.random() * basePrice * 0.015;
+          const c = o + (Math.random() - 0.5) * basePrice * 0.01;
+          candles.push({ ts: t, time: t, open: Math.round(o * 100) / 100, high: Math.round(h * 100) / 100, low: Math.round(l * 100) / 100, close: Math.round(c * 100) / 100, volume: Math.floor(Math.random() * 1000) + 100 });
+        }
+        dataSource = "demo";
+        console.log(`[clawscript-backtest] Using ${candles.length} generated demo candles for ${epic} ${res_}`);
+      }
+
+      const trades = [];
+      let openTrade = null;
+      let vars = {};
+      const closePrices = candles.map(c => c.close);
+      let totalPnl = 0;
+      let peakEquity = 0;
+      let maxDrawdown = 0;
+      const equityCurve = [];
+
+      function calcRSI(prices, period) {
+        if (prices.length < period + 1) return 50;
+        let avgGain = 0, avgLoss = 0;
+        for (let i = prices.length - period; i < prices.length; i++) {
+          const diff = prices[i] - prices[i - 1];
+          if (diff > 0) avgGain += diff; else avgLoss -= diff;
+        }
+        if (avgLoss === 0) return 100;
+        return 100 - (100 / (1 + (avgGain / period) / (avgLoss / period)));
+      }
+
+      function calcEMA(prices, period) {
+        if (prices.length < period) return prices[prices.length - 1] || 0;
+        const k = 2 / (period + 1);
+        let ema = prices.slice(0, period).reduce((s, v) => s + v, 0) / period;
+        for (let i = period; i < prices.length; i++) ema = prices[i] * k + ema * (1 - k);
+        return ema;
+      }
+
+      function calcSMA(prices, period) {
+        if (prices.length < period) return prices[prices.length - 1] || 0;
+        let sum = 0;
+        for (let i = prices.length - period; i < prices.length; i++) sum += prices[i];
+        return sum / period;
+      }
+
+      function calcMACD(prices, fast, slow, sig) {
+        fast = fast || 12; slow = slow || 26; sig = sig || 9;
+        if (prices.length < slow) return 0;
+        const emaF = calcEMA(prices, fast), emaS = calcEMA(prices, slow);
+        return emaF - emaS;
+      }
+
+      function calcATR(prices, period) {
+        if (prices.length < period + 1) return 0;
+        let sum = 0;
+        for (let i = prices.length - period; i < prices.length; i++) sum += Math.abs(prices[i] - prices[i-1]);
+        return sum / period;
+      }
+
+      function calcADX(prices, period) {
+        if (prices.length < period * 2) return 25;
+        let plusDM = 0, minusDM = 0, tr = 0;
+        for (let i = prices.length - period; i < prices.length; i++) {
+          const diff = prices[i] - prices[i-1];
+          if (diff > 0) plusDM += diff; else minusDM += Math.abs(diff);
+          tr += Math.abs(prices[i] - prices[i-1]);
+        }
+        if (tr === 0) return 0;
+        const pdi = (plusDM / tr) * 100, ndi = (minusDM / tr) * 100;
+        const dxSum = pdi + ndi;
+        return dxSum > 0 ? Math.abs(pdi - ndi) / dxSum * 100 : 0;
+      }
+
+      function calcBollinger(prices, period, dev) {
+        period = period || 20; dev = dev || 2;
+        const sma = calcSMA(prices, period);
+        if (prices.length < period) return { upper: sma, lower: sma, mid: sma };
+        let variance = 0;
+        for (let i = prices.length - period; i < prices.length; i++) variance += Math.pow(prices[i] - sma, 2);
+        const std = Math.sqrt(variance / period);
+        return { upper: sma + dev * std, lower: sma - dev * std, mid: sma };
+      }
+
+      function calcStochastic(prices, kPeriod) {
+        kPeriod = kPeriod || 14;
+        if (prices.length < kPeriod) return 50;
+        const slice = prices.slice(-kPeriod);
+        const high = Math.max(...slice), low = Math.min(...slice);
+        return high === low ? 50 : ((prices[prices.length-1] - low) / (high - low)) * 100;
+      }
+
+      function calcROC(prices, period) {
+        period = period || 12;
+        if (prices.length < period + 1) return 0;
+        const old = prices[prices.length - period - 1];
+        return old !== 0 ? ((prices[prices.length-1] - old) / old) * 100 : 0;
+      }
+
+      function calcCCI(prices, period) {
+        period = period || 20;
+        const sma = calcSMA(prices, period);
+        if (prices.length < period) return 0;
+        let meanDev = 0;
+        for (let i = prices.length - period; i < prices.length; i++) meanDev += Math.abs(prices[i] - sma);
+        meanDev /= period;
+        return meanDev !== 0 ? (prices[prices.length-1] - sma) / (0.015 * meanDev) : 0;
+      }
+
+      function calcWilliamsR(prices, period) {
+        period = period || 14;
+        if (prices.length < period) return -50;
+        const slice = prices.slice(-period);
+        const high = Math.max(...slice), low = Math.min(...slice);
+        return high === low ? -50 : ((high - prices[prices.length-1]) / (high - low)) * -100;
+      }
+
+      function evalIndicator(name, args, pricesSlice) {
+        const indicators = require("./skills/bots/indicators.cjs");
+        if (name === 'RSI') return calcRSI(pricesSlice, args[0] || 14);
+        if (name === 'EMA') return calcEMA(pricesSlice, args[0] || 20);
+        if (name === 'SMA') return calcSMA(pricesSlice, args[0] || 20);
+        if (name === 'MACD') return calcMACD(pricesSlice, args[0] || 12, args[1] || 26, args[2] || 9);
+        if (name === 'ATR') return calcATR(pricesSlice, args[0] || 14);
+        if (name === 'ADX') return calcADX(pricesSlice, args[0] || 14);
+        if (name === 'BOLLINGER') return calcBollinger(pricesSlice, args[0] || 20, args[1] || 2);
+        if (name === 'BOLLINGER_UPPER') { const bb = calcBollinger(pricesSlice, args[0] || 20, args[1] || 2); return bb.upper; }
+        if (name === 'BOLLINGER_LOWER') { const bb = calcBollinger(pricesSlice, args[0] || 20, args[1] || 2); return bb.lower; }
+        if (name === 'STOCHASTIC' || name === 'STOCHASTIC_K') return indicators.calcStochasticFromPrices(pricesSlice, args[0] || 14, args[1] || 3).k;
+        if (name === 'STOCHASTIC_D') return indicators.calcStochasticFromPrices(pricesSlice, args[0] || 14, args[1] || 3).d;
+        if (name === 'ROC') return calcROC(pricesSlice, args[0] || 12);
+        if (name === 'CCI') return indicators.calcCCIFromPrices(pricesSlice, args[0] || 20);
+        if (name === 'WILLIAMS_R') return indicators.calcWilliamsRFromPrices(pricesSlice, args[0] || 14);
+        if (name === 'AROON_UP') { const ar = indicators.calcAroonFromPrices(pricesSlice, args[0] || 25); return ar.up; }
+        if (name === 'AROON_DOWN') { const ar = indicators.calcAroonFromPrices(pricesSlice, args[0] || 25); return ar.down; }
+        if (name === 'ICHIMOKU_TENKAN') { const ich = indicators.calcIchimokuFromPrices(pricesSlice, args[0] || 9, args[1] || 26, args[2] || 52); return ich.tenkan; }
+        if (name === 'ICHIMOKU_KIJUN') { const ich = indicators.calcIchimokuFromPrices(pricesSlice, args[0] || 9, args[1] || 26, args[2] || 52); return ich.kijun; }
+        if (name === 'PARABOLIC_SAR') return indicators.calcParabolicSARFromPrices(pricesSlice, args[0] || 0.02, args[1] || 0.2);
+        if (name === 'KELTNER_UPPER') { const k = indicators.calcKeltner(pricesSlice, args[0] || 20, args[1] || 1.5, args[2] || 10); return k.upper; }
+        if (name === 'KELTNER_LOWER') { const k = indicators.calcKeltner(pricesSlice, args[0] || 20, args[1] || 1.5, args[2] || 10); return k.lower; }
+        if (name === 'DONCHIAN_HIGH') { const d = indicators.calcDonchianFromPrices(pricesSlice, args[0] || 20); return d.high; }
+        if (name === 'DONCHIAN_LOW') { const d = indicators.calcDonchianFromPrices(pricesSlice, args[0] || 20); return d.low; }
+        if (name === 'OBV') return 0;
+        if (name === 'VWAP') return pricesSlice.length > 0 ? pricesSlice[pricesSlice.length - 1] : 0;
+        if (name === 'CMF') return 0;
+        if (name === 'ZSCORE') return indicators.calcZScore(pricesSlice, args[0] || 20);
+        if (name === 'FIBONACCI') { const fib = indicators.calcFibonacci(pricesSlice, args[0] || 20); return fib.level_50 || 0; }
+        if (name === 'SUPERTREND') return pricesSlice.length > 0 ? pricesSlice[pricesSlice.length - 1] : 0;
+        if (name === 'ULTIMATE_OSC') return 50;
+        if (name === 'CHAIKIN_VOL') return 0;
+        if (name === 'LAST_PRICE') return pricesSlice.length > 0 ? pricesSlice[pricesSlice.length - 1] : 0;
+        if (name === 'VOLUME') return 0;
+        console.log(`[clawscript-backtest] Unknown indicator: ${name}, returning 0`);
+        return 0;
+      }
+
+      function evalExpr(expr, pricesSlice) {
+        if (!expr) return null;
+        switch (expr.type) {
+          case 'NumberLiteral': return expr.value;
+          case 'StringLiteral': return expr.value;
+          case 'BooleanLiteral': return expr.value;
+          case 'NullLiteral': return null;
+          case 'Identifier': return vars[expr.value] !== undefined ? vars[expr.value] : expr.value;
+          case 'BinaryExpr': {
+            const l = evalExpr(expr.left, pricesSlice), r = evalExpr(expr.right, pricesSlice);
+            switch (expr.op) {
+              case '+': return (typeof l === 'string' || typeof r === 'string') ? String(l) + String(r) : l + r;
+              case '-': return l - r; case '*': return l * r;
+              case '/': return r !== 0 ? l / r : 0; case '%': return l % r;
+              case '>': return l > r; case '<': return l < r;
+              case '>=': return l >= r; case '<=': return l <= r;
+              case '==': return l == r; case '!=': return l != r;
+              case '&&': return l && r; case '||': return l || r;
+              default: return null;
+            }
+          }
+          case 'UnaryExpr': { const v = evalExpr(expr.expr, pricesSlice); return expr.op === '-' ? -v : !v; }
+          case 'ContainsExpr': return String(evalExpr(expr.left, pricesSlice)).includes(String(evalExpr(expr.right, pricesSlice)));
+          case 'CrossesExpr': return expr.direction === 'OVER' ? evalExpr(expr.left, pricesSlice) > evalExpr(expr.right, pricesSlice) : evalExpr(expr.left, pricesSlice) < evalExpr(expr.right, pricesSlice);
+          case 'FunctionCall': {
+            const name = expr.name.toUpperCase();
+            const args = expr.args.map(a => evalExpr(a, pricesSlice));
+            return evalIndicator(name, args, pricesSlice);
+          }
+          case 'IndicatorCall': {
+            const iname = expr.name.toUpperCase();
+            const iparams = expr.params.map(a => evalExpr(a, pricesSlice));
+            return evalIndicator(iname, iparams, pricesSlice);
+          }
+          case 'MemberExpr': { const obj = evalExpr(expr.object, pricesSlice); return obj && typeof obj === 'object' ? obj[expr.property] : null; }
+          case 'LoopCount': return evalExpr(expr.num, pricesSlice);
+          default: return null;
+        }
+      }
+
+      function execStmt(stmt, pricesSlice, depth) {
+        if (!stmt || depth > 50) return;
+        switch (stmt.type) {
+          case 'VarDecl': vars[stmt.name] = evalExpr(stmt.value, pricesSlice); break;
+          case 'Assignment': vars[stmt.name] = evalExpr(stmt.value, pricesSlice); break;
+          case 'Trade': {
+            const cond = stmt.condition ? evalExpr(stmt.condition, pricesSlice) : true;
+            if (cond) {
+              const sz = stmt.size ? evalExpr(stmt.size, pricesSlice) : 1;
+              const dir = stmt.command;
+              const price = pricesSlice[pricesSlice.length - 1];
+              if (!openTrade) {
+                openTrade = { direction: dir, size: sz, entryPrice: price, entryTime: candles[Math.min(pricesSlice.length - 1, candles.length - 1)].ts };
+              }
+            }
+            break;
+          }
+          case 'Exit': {
+            const econd = stmt.condition ? evalExpr(stmt.condition, pricesSlice) : true;
+            if (econd && openTrade) {
+              const exitPrice = pricesSlice[pricesSlice.length - 1];
+              const pnl = openTrade.direction === 'BUY' ? (exitPrice - openTrade.entryPrice) * openTrade.size : (openTrade.entryPrice - exitPrice) * openTrade.size;
+              totalPnl += pnl;
+              trades.push({ direction: openTrade.direction, size: openTrade.size, entryPrice: openTrade.entryPrice, exitPrice, pnl: Math.round(pnl * 100) / 100, entryTime: openTrade.entryTime, exitTime: candles[Math.min(pricesSlice.length - 1, candles.length - 1)].ts });
+              openTrade = null;
+            }
+            break;
+          }
+          case 'IfStatement': {
+            const ifCond = evalExpr(stmt.condition, pricesSlice);
+            const body = ifCond ? stmt.thenBody : stmt.elseBody;
+            for (let i = 0; i < body.length; i++) execStmt(body[i], pricesSlice, depth + 1);
+            break;
+          }
+          case 'Loop': {
+            if (stmt.condition && stmt.condition.type === 'LoopCount') {
+              const count = Math.min(evalExpr(stmt.condition.num, pricesSlice) || 0, 10);
+              for (let i = 0; i < count; i++) { vars['i'] = i; for (let j = 0; j < stmt.body.length; j++) execStmt(stmt.body[j], pricesSlice, depth + 1); }
+            }
+            break;
+          }
+          default: break;
+        }
+      }
+
+      for (let i = 20; i < candles.length; i++) {
+        const pricesSlice = closePrices.slice(0, i + 1);
+        vars['price'] = closePrices[i];
+        vars['close'] = closePrices[i];
+        vars['open'] = candles[i].open;
+        vars['high'] = candles[i].high;
+        vars['low'] = candles[i].low;
+        vars['volume'] = candles[i].volume;
+        vars['bar'] = i;
+
+        for (let s = 0; s < ast.body.length; s++) {
+          execStmt(ast.body[s], pricesSlice, 0);
+        }
+
+        if (openTrade) {
+          const unrealized = openTrade.direction === 'BUY' ? (closePrices[i] - openTrade.entryPrice) * openTrade.size : (openTrade.entryPrice - closePrices[i]) * openTrade.size;
+          const equity = totalPnl + unrealized;
+          if (equity > peakEquity) peakEquity = equity;
+          const dd = peakEquity - equity;
+          if (dd > maxDrawdown) maxDrawdown = dd;
+          equityCurve.push({ ts: candles[i].ts, equity: Math.round(equity * 100) / 100 });
+        } else {
+          if (totalPnl > peakEquity) peakEquity = totalPnl;
+          const dd = peakEquity - totalPnl;
+          if (dd > maxDrawdown) maxDrawdown = dd;
+          equityCurve.push({ ts: candles[i].ts, equity: Math.round(totalPnl * 100) / 100 });
+        }
+      }
+
+      if (openTrade) {
+        const lastPrice = closePrices[closePrices.length - 1];
+        const pnl = openTrade.direction === 'BUY' ? (lastPrice - openTrade.entryPrice) * openTrade.size : (openTrade.entryPrice - lastPrice) * openTrade.size;
+        totalPnl += pnl;
+        trades.push({ direction: openTrade.direction, size: openTrade.size, entryPrice: openTrade.entryPrice, exitPrice: lastPrice, pnl: Math.round(pnl * 100) / 100, entryTime: openTrade.entryTime, exitTime: candles[candles.length - 1].ts, openAtEnd: true });
+        openTrade = null;
+      }
+
+      const wins = trades.filter(t => t.pnl > 0).length;
+      const losses = trades.filter(t => t.pnl <= 0).length;
+      const winRate = trades.length > 0 ? Math.round((wins / trades.length) * 10000) / 100 : 0;
+
+      console.log(`[clawscript-backtest] ${epic} ${res_}: ${trades.length} trades, P&L=${Math.round(totalPnl * 100) / 100}, winRate=${winRate}%, maxDD=${Math.round(maxDrawdown * 100) / 100}`);
+
+      const btResult = {
+        ok: true,
+        instrument: epic,
+        resolution: res_,
+        candlesUsed: candles.length,
+        dataSource,
+        totalPnl: Math.round(totalPnl * 100) / 100,
+        trades: trades.length,
+        wins,
+        losses,
+        winRate,
+        maxDrawdown: Math.round(maxDrawdown * 100) / 100,
+        tradeList: trades.slice(-100),
+        equityCurve: equityCurve.length > 200 ? equityCurve.filter((_, i) => i % Math.ceil(equityCurve.length / 200) === 0) : equityCurve,
+        timestamp: Date.now()
+      };
+      global._csLastResults = btResult;
+      return json(res, 200, btResult);
+    } catch (e) {
+      console.log(`[clawscript-backtest] Error: ${e.message}`);
+      return json(res, 500, { error: "Backtest failed: " + e.message });
+    }
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/sync") {
+    try {
+      const { execSync } = require("child_process");
+      const syncScript = require("path").join(__dirname, ".openclaw/canvas/sync-clawscript.sh");
+      const out = execSync(`bash "${syncScript}"`, { cwd: __dirname, timeout: 10000 }).toString();
+      return json(res, 200, { ok: true, output: out });
+    } catch (e) {
+      return json(res, 500, { error: "Sync failed: " + e.message });
+    }
+  }
+
+  if (req.method === "GET" && p === "/api/clawscript/results") {
+    return json(res, 200, { results: global._csLastResults || null });
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/results") {
+    try {
+      const body = JSON.parse((await readBody(req)).toString() || "{}");
+      if (body.backtest) global._csLastResults = body.backtest;
+      else if (body.simulation) global._csLastResults = body.simulation;
+      global._csAllResults = body;
+      return json(res, 200, { ok: true });
+    } catch (e) {
+      return json(res, 400, { error: "Invalid JSON" });
+    }
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/ai") {
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    const { messages, model } = body;
+    if (!messages || !Array.isArray(messages) || messages.length === 0) return json(res, 400, { error: "Missing messages array" });
+    const xaiKey = process.env.XAI_API_KEY;
+    if (!xaiKey) return json(res, 500, { error: "XAI_API_KEY not configured" });
+    const modelId = model || "grok-4-1-fast-reasoning";
+    let rulebookSnippet = "";
+    try { rulebookSnippet = fs.readFileSync(path.join(__dirname, "skills/clawscript/CLAWSCRIPT-AI-REFERENCE.md"), "utf8"); } catch (_) {}
+    const systemPrompt = `You are an expert ClawScript coding assistant for IG trading strategies. ClawScript is a domain-specific language (DSL) that compiles to JavaScript for automated trading.
+
+CRITICAL RULES:
+1. ALWAYS return COMPLETE corrected code inside a \`\`\`clawscript code block
+2. Reference specific line numbers when pointing out errors
+3. NEVER say "paste this" or "compile & save" — just provide the code block directly
+4. The code block must contain the FULL corrected script, not just changed lines
+5. Remove invalid lines (random text, unknown commands)
+6. ONLY use commands listed below. Do NOT invent commands or syntax.
+
+=== EXACT CLAWSCRIPT SYNTAX (DO NOT DEVIATE) ===
+
+VARIABLES (use DEF, never VAR/LET/CONST):
+  DEF myVar = 42
+  DEF name = "hello"
+  SET myVar = myVar + 1
+
+CONFIGURABLE INPUTS (label string is REQUIRED):
+  INPUT_INT rsiPeriod = 14 "RSI Period"
+  INPUT_FLOAT stopDistance = 30.0 "Stop Distance"
+  INPUT_BOOL enabled = true "Enabled"
+
+INDICATORS (called with prices array as first arg):
+  DEF rsi = RSI(prices, 14)
+  DEF ema_fast = EMA(prices, 9)
+  DEF ema_slow = EMA(prices, 21)
+  DEF sma = SMA(prices, 20)
+  DEF macd = MACD(prices, 12, 26, 9)
+  DEF bb = BOLLINGER(prices, 20, 2)
+  DEF atr = ATR(prices, 14)
+  DEF adx = ADX(prices, 14)
+  DEF stoch = STOCHASTIC(prices, 14, 3)
+  DEF cci = CCI(prices, 20)
+
+TRADING (always conditional, always inside IF):
+  BUY MARKET SIZE 1
+  SELL MARKET SIZE 1
+  EXIT "reason text"
+
+CONTROL FLOW:
+  IF condition
+    ...
+  ENDIF
+
+  IF condition
+    ...
+  ELSE
+    ...
+  ENDIF
+
+  LOOP 10 TIMES
+    ...
+  ENDLOOP
+
+  WHILE condition
+    ...
+  ENDWHILE
+
+LOGICAL OPERATORS (use words, NOT symbols):
+  AND    (not &&)
+  OR     (not ||)
+  NOT    (not !)
+
+AGENT MANAGEMENT:
+  AGENT_SPAWN "agent-name" WITH "instructions for the agent"
+  DEF result = AGENT_CALL "agent-name" "task description"
+  AGENT_PASS "data" "target-agent"
+  AGENT_TERMINATE "agent-name"
+
+VISUAL OUTPUT:
+  NOTIFY "message" LEVEL "info"
+  TOAST "message" DURATION 3000
+  POPUP "Title" WITH "<h1>HTML content</h1>"
+  DISPLAY data FORMAT "table"
+
+DATA FETCHING:
+  DEF data = CLAW_WEB "https://example.com"
+  DEF posts = CLAW_X "search query"
+  DEF history = FETCH_HISTORICAL "CS.D.BITCOIN.CFD.IP"
+
+COMMUNICATION:
+  ALERT "message" LEVEL "warn"
+  SAY_TO_SESSION "session-name" "message"
+  CHANNEL_SEND "target" "message"
+
+TASK ORCHESTRATION:
+  TASK_DEFINE "task-name" BODY
+    ...
+  ENDTASK
+  TASK_ASSIGN "task-name" TO "agent-name"
+  TASK_CHAIN "task1" "task2" "task3"
+
+OTHER:
+  WAIT 5000
+  TRY ... CATCH ... ENDTRY
+  ERROR "message"
+
+=== COMMON MISTAKES TO AVOID ===
+- Do NOT use: VAR, FOREACH, CONTINUE, BREAK, SLEEP, THEN, CLOSE(), POSITION(), PNL(), WIN_RATE(), SUM_PNL(), BB(), PRICES()
+- Do NOT use curly braces {} for blocks — use ENDIF/ENDLOOP/ENDWHILE
+- Do NOT use || or && — use OR and AND
+- Do NOT use ?. or ?? — these are JavaScript, not ClawScript
+- Do NOT call indicators without prices array: RSI(14) is WRONG, RSI(prices, 14) is CORRECT
+- Do NOT use BOLLINGER as "BB" — the command is BOLLINGER
+- Do NOT use dot notation on indicators: macd.line, macd.signal are WRONG — MACD returns a single number
+- Do NOT use PRICES() as a function — prices is a built-in variable, use it directly: RSI(prices, 14)
+- INPUT_INT/FLOAT/BOOL MUST have a label string: INPUT_INT x = 5 "Label"
+- BUY/SELL must ALWAYS be inside an IF block with conditions
+- Always null-check indicators: IF rsi != null
+
+=== STRATEGY TEMPLATE ===
+// Strategy Name
+INPUT_INT rsiPeriod = 14 "RSI Period"
+INPUT_INT stopDistance = 30 "Stop Distance"
+INPUT_INT limitDistance = 60 "Limit Distance"
+INPUT_INT size = 1 "Position Size"
+
+DEF rsi = RSI(prices, rsiPeriod)
+DEF ema_fast = EMA(prices, 9)
+DEF ema_slow = EMA(prices, 21)
+
+IF rsi != null AND ema_fast != null AND ema_slow != null
+  IF rsi < 30 AND ema_fast > ema_slow
+    BUY MARKET SIZE size
+  ENDIF
+  IF rsi > 70 AND ema_fast < ema_slow
+    SELL MARKET SIZE size
+  ENDIF
+ENDIF
+
+${rulebookSnippet}`;
+    const apiMessages = [{ role: "system", content: systemPrompt }, ...messages];
+    try {
+      const https = require("https");
+      const postData = JSON.stringify({ model: modelId, messages: apiMessages, max_tokens: 4096, temperature: 0.3 });
+      const result = await new Promise((resolve, reject) => {
+        const req2 = https.request({
+          hostname: "api.x.ai", port: 443, path: "/v1/chat/completions",
+          method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + xaiKey, "Content-Length": Buffer.byteLength(postData) },
+          timeout: 120000,
+        }, (resp) => {
+          const chunks = [];
+          resp.on("data", (c) => chunks.push(c));
+          resp.on("end", () => {
+            try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+            catch (e) { reject(new Error("Invalid API response")); }
+          });
+        });
+        req2.on("error", reject);
+        req2.on("timeout", () => { req2.destroy(); reject(new Error("API timeout")); });
+        req2.write(postData);
+        req2.end();
+      });
+      if (result.error) return json(res, 502, { error: result.error.message || "API error" });
+      const reply = result.choices?.[0]?.message?.content || "";
+      return json(res, 200, {
+        id: result.id || "cs-ai-" + Date.now(),
+        object: "chat.completion",
+        choices: [{ index: 0, message: { role: "assistant", content: reply }, finish_reason: "stop" }],
+        model: modelId,
+      });
+    } catch (e) {
+      console.error("[clawscript-ai] Error:", e.message);
+      return json(res, 502, { error: "AI request failed: " + e.message });
+    }
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/compile") {
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    const { code } = body;
+    if (!code) return json(res, 400, { error: "Missing code (ClawScript source)" });
+    try {
+      const parser = require("./skills/bots/clawscript-parser.cjs");
+      let parsed;
+      try { parsed = parser.parseAndGenerate(code); }
+      catch (parseErr) {
+        const lb = loadClawScriptLogbook();
+        lb.entries.push({ id: "log-" + Date.now(), timestamp: new Date().toISOString(), type: "error", message: "Parse error: " + parseErr.message, details: { code: code.slice(0, 500) }, resolved: false });
+        saveClawScriptLogbook(lb);
+        return json(res, 400, { error: "Parse error: " + parseErr.message });
+      }
+      if (!parsed || !parsed.ast) {
+        return json(res, 400, { error: "Parse error: " + (parsed ? parsed.error : "unknown") });
+      }
+      const validation = parsed.validation || { valid: true, errors: [], warnings: [] };
+      return json(res, 200, { ok: true, ast: parsed.ast, js: parsed.js, variables: parsed.variables || [], imports: parsed.imports || [], validation });
+    } catch (e) {
+      return json(res, 500, { error: "Compile failed: " + e.message });
+    }
+  }
+
+  if (req.method === "GET" && p === "/api/clawscript/logbook") {
+    const lb = loadClawScriptLogbook();
+    return json(res, 200, lb);
+  }
+
+  if (req.method === "POST" && p === "/api/clawscript/logbook") {
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    const { type, epic, strategy, message, details } = body;
+    if (!message) return json(res, 400, { error: "Missing message" });
+    const lb = loadClawScriptLogbook();
+    const entry = {
+      id: "log-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+      timestamp: new Date().toISOString(),
+      type: type || "error",
+      epic: epic || null,
+      strategy: strategy || null,
+      message,
+      details: details || null,
+      resolved: false
+    };
+    lb.entries.push(entry);
+    saveClawScriptLogbook(lb);
+    console.log(`[clawscript-logbook] Added ${entry.type}: ${message.slice(0, 80)}`);
+    return json(res, 200, { ok: true, entry });
+  }
+
+  const logbookPatchMatch = p.match(/^\/api\/clawscript\/logbook\/([^/]+)$/);
+  if (req.method === "PATCH" && logbookPatchMatch) {
+    const targetId = decodeURIComponent(logbookPatchMatch[1]);
+    const lb = loadClawScriptLogbook();
+    const entry = lb.entries.find(e => e.id === targetId);
+    if (!entry) return json(res, 404, { error: "Logbook entry not found" });
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    if (body.resolved !== undefined) entry.resolved = !!body.resolved;
+    if (body.message) entry.message = body.message;
+    if (body.details) entry.details = body.details;
+    entry.updatedAt = new Date().toISOString();
+    saveClawScriptLogbook(lb);
+    return json(res, 200, { ok: true, entry });
+  }
+
+  const CS_SCRIPTS_DIR = path.join(DATA_DIR, "clawscript-scripts");
+  const CS_LOGS_DIR = path.join(DATA_DIR, "clawscript-logs");
+  try { fs.mkdirSync(CS_SCRIPTS_DIR, { recursive: true }); } catch (_) {}
+  try { fs.mkdirSync(CS_LOGS_DIR, { recursive: true }); } catch (_) {}
+
+  if (req.method === "POST" && p === "/api/clawscript/run") {
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch (_) { return json(res, 400, { error: "Invalid JSON" }); }
+    const { code, name, file } = body;
+    if (!code && !file) return json(res, 400, { error: "Missing code or file" });
+    const scriptName = (name || "script-" + Date.now()).replace(/[^a-zA-Z0-9_-]/g, "-").toLowerCase();
+    const scriptId = "cs-script-" + scriptName;
+    const scriptFile = path.join(CS_SCRIPTS_DIR, scriptName + ".cs");
+    if (code) {
+      fs.writeFileSync(scriptFile, code, "utf8");
+    } else if (file) {
+      const resolvedFile = path.resolve(process.cwd(), file);
+      const allowedDirs = [path.resolve(process.cwd(), ".openclaw"), path.resolve(process.cwd(), "skills")];
+      if (!allowedDirs.some(d => resolvedFile.startsWith(d + path.sep))) {
+        return json(res, 400, { error: "File path must be within .openclaw/ or skills/" });
+      }
+      if (!fs.existsSync(resolvedFile)) return json(res, 400, { error: "File not found: " + file });
+      fs.copyFileSync(resolvedFile, scriptFile);
+    } else {
+      return json(res, 400, { error: "Missing code or file" });
+    }
+    const relPath = path.relative(process.cwd(), scriptFile);
+    const botCmd = `node skills/bots/clawscript-runner.cjs ${relPath}`;
+    const registry = loadBotRegistry();
+    let existing = registry.find(b => b.id === scriptId);
+    if (existing) {
+      stopBot(scriptId);
+      existing.cmd = botCmd;
+      existing.enabled = true;
+    } else {
+      existing = { id: scriptId, cmd: botCmd, enabled: true, addedBy: "clawscript-editor", addedAt: new Date().toISOString(), scriptFile: relPath, isClawScript: true };
+      registry.push(existing);
+    }
+    existing.env = { CS_SCRIPT_ID: scriptName };
+    saveBotRegistry(registry);
+    spawnBot(existing);
+    const entry = botProcesses.get(scriptId);
+    const pid = entry && entry.proc ? entry.proc.pid : null;
+    console.log(`[cs-runner] Started script: ${scriptId} (PID ${pid})`);
+    return json(res, 200, { ok: true, scriptId, pid, name: scriptName });
+  }
+
+  if (req.method === "GET" && p === "/api/clawscript/scripts") {
+    const registry = loadBotRegistry();
+    const scripts = registry.filter(b => b.id.startsWith("cs-script-") || b.isClawScript).map(b => {
+      const entry = botProcesses.get(b.id);
+      const running = !!(entry && entry.proc && !entry.proc.killed);
+      return {
+        id: b.id,
+        name: b.id.replace(/^cs-script-/, ""),
+        cmd: b.cmd,
+        enabled: b.enabled,
+        running,
+        pid: running ? entry.proc.pid : null,
+        restarts: entry ? entry.restarts : 0,
+        scriptFile: b.scriptFile || null,
+        addedAt: b.addedAt,
+      };
+    });
+    return json(res, 200, { scripts });
+  }
+
+  const csScriptMatch = p.match(/^\/api\/clawscript\/scripts\/([^/]+)\/(stop|start|restart|pause|resume|logs)$/);
+  if (csScriptMatch) {
+    const scriptId = decodeURIComponent(csScriptMatch[1]);
+    const fullId = scriptId.startsWith("cs-script-") ? scriptId : "cs-script-" + scriptId;
+    const action = csScriptMatch[2];
+
+    if (req.method === "GET" && action === "logs") {
+      const logName = fullId.replace(/^cs-script-/, "");
+      const logFile = path.join(CS_LOGS_DIR, logName + ".log");
+      try {
+        const content = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : "";
+        const lines = content.split("\n").filter(Boolean);
+        const tail = lines.slice(-200);
+        return json(res, 200, { scriptId: fullId, lines: tail, total: lines.length });
+      } catch (e) {
+        return json(res, 200, { scriptId: fullId, lines: [], total: 0 });
+      }
+    }
+
+    if (req.method === "POST" && action === "stop") {
+      stopBot(fullId);
+      const registry = loadBotRegistry();
+      const bot = registry.find(b => b.id === fullId);
+      if (bot) { bot.enabled = false; saveBotRegistry(registry); }
+      return json(res, 200, { ok: true, stopped: fullId });
+    }
+
+    if (req.method === "POST" && action === "start") {
+      const registry = loadBotRegistry();
+      const bot = registry.find(b => b.id === fullId);
+      if (!bot) return json(res, 404, { error: "Script not found" });
+      bot.enabled = true;
+      saveBotRegistry(registry);
+      spawnBot(bot);
+      return json(res, 200, { ok: true, started: fullId });
+    }
+
+    if (req.method === "POST" && action === "restart") {
+      stopBot(fullId);
+      await new Promise(r => setTimeout(r, 500));
+      const registry = loadBotRegistry();
+      const bot = registry.find(b => b.id === fullId);
+      if (!bot) return json(res, 404, { error: "Script not found" });
+      bot.enabled = true;
+      saveBotRegistry(registry);
+      spawnBot(bot);
+      return json(res, 200, { ok: true, restarted: fullId });
+    }
+
+    if (req.method === "POST" && action === "pause") {
+      const entry = botProcesses.get(fullId);
+      if (entry && entry.proc && !entry.proc.killed) {
+        try { entry.proc.kill("SIGUSR1"); } catch (_) {}
+        return json(res, 200, { ok: true, paused: fullId });
+      }
+      return json(res, 404, { error: "Script not running" });
+    }
+
+    if (req.method === "POST" && action === "resume") {
+      const entry = botProcesses.get(fullId);
+      if (entry && entry.proc && !entry.proc.killed) {
+        try { entry.proc.kill("SIGUSR2"); } catch (_) {}
+        return json(res, 200, { ok: true, resumed: fullId });
+      }
+      return json(res, 404, { error: "Script not running" });
+    }
+  }
+
+  return json(res, 404, { error: "Unknown ClawScript API endpoint" });
+}
+
 async function handleIgApi(req, res, p) {
-  if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" });
+  if (!authGateway(req) && !validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" });
 
   try {
     if (req.method === "GET" && p === "/api/ig/config") {
@@ -678,7 +2003,7 @@ async function handleIgApi(req, res, p) {
         pr.password = maskSecret(pr.password);
         pr.hasCredentials = !!(config.profiles[key].apiKey && config.profiles[key].username && config.profiles[key].password);
       }
-      masked.streaming = { status: lsStatus, connectedEpics: lsConnectedEpics, priceCount: streamedPrices.size, liveStreamingActive: lsLiveActive, streamingSource: lsLiveActive ? "live" : config.activeProfile };
+      masked.streaming = { status: lsStatus, connectedEpics: lsConnectedEpics, priceCount: streamedPrices.size, liveStreamingActive: !!lsLiveClient, streamingSource: lsLiveClient ? "live" : config.activeProfile, priceSource: lsLiveClient ? "live-api" : (lsConnectedEpics.length > 0 ? "active-profile" : "hybrid-polling"), reconnectAttempts: lsReconnectAttempts, reconnectPending: !!lsReconnectTimer };
       masked.session = getIgSessionInfo();
       return json(res, 200, masked);
     }
@@ -686,6 +2011,9 @@ async function handleIgApi(req, res, p) {
     if (req.method === "POST" && p === "/api/ig/config") {
       const body = JSON.parse((await readBody(req)).toString() || "{}");
       const config = ensureIgConfig();
+      if (body.timezone) {
+        config.timezone = body.timezone;
+      }
       if (body.activeProfile && config.profiles[body.activeProfile]) {
         const oldProfile = config.activeProfile;
         config.activeProfile = body.activeProfile;
@@ -806,7 +2134,9 @@ async function handleIgApi(req, res, p) {
 
     if (req.method === "GET" && p === "/api/ig/stream/prices") {
       const prices = getStreamedPrices();
-      return json(res, 200, { streaming: lsStatus === "connected", prices });
+      const isL1Streaming = lsStatus === "connected" && lsConnectedEpics.length > 0;
+      const isHybridPolling = !!lsHybridPollingTimer;
+      return json(res, 200, { streaming: isL1Streaming, polling: isHybridPolling, method: isL1Streaming ? "lightstreamer" : isHybridPolling ? "rest-polling" : "none", prices });
     }
 
     if (req.method === "GET" && p === "/api/ig/stream/status") {
@@ -817,6 +2147,7 @@ async function handleIgApi(req, res, p) {
       const updatesPerSec = uptimeMs && uptimeMs > 5000 ? Math.round((lsUpdateCount / (uptimeMs / 1000)) * 100) / 100 : null;
       const epicStats = {};
       for (const [epic, data] of streamedPrices) {
+        if (epic === "__ACCOUNT__") continue;
         epicStats[epic] = { bid: data.bid, offer: data.offer, mid: data.mid, marketState: data.marketState, updateTime: data.updateTime, lastUpdate: data.timestamp, ageMs: Date.now() - data.timestamp, updates: lsUpdateCounts[epic] || 0 };
       }
       return json(res, 200, {
@@ -824,9 +2155,17 @@ async function handleIgApi(req, res, p) {
         connectedEpics: lsConnectedEpics,
         priceCount: streamedPrices.size,
         activeProfile: getActiveIgProfile()?.profileName || null,
-        lightstreamerEndpoint: lsLiveActive ? lsLiveSession.lightstreamerEndpoint : (igSession.lightstreamerEndpoint || null),
-        liveStreamingActive: lsLiveActive,
-        streamingSource: lsLiveActive ? "live" : (getActiveIgProfile()?.profileName || null),
+        lightstreamerEndpoint: igSession.lightstreamerEndpoint || null,
+        liveAccountClient: !!lsLiveClient,
+        hybridPolling: !!lsHybridPollingTimer,
+        streamingSource: getActiveIgProfile()?.profileName || "demo",
+        priceSource: lsConnectedEpics.length > 0 ? "lightstreamer-" + (getActiveIgProfile()?.profileName || "demo") : (lsHybridPollingTimer ? "rest-polling" : "none"),
+        priceMethod: lsConnectedEpics.length > 0 ? "LIGHTSTREAMER L1" : (lsHybridPollingTimer ? "REST POLLING (every 3s)" : "DISCONNECTED"),
+        reconnect: {
+          attempts: lsReconnectAttempts,
+          maxAttempts: LS_MAX_RECONNECT_ATTEMPTS,
+          pending: !!lsReconnectTimer
+        },
         metrics: {
           connectedAt: lsConnectedAt,
           uptimeMs,
@@ -839,6 +2178,41 @@ async function handleIgApi(req, res, p) {
         },
         instruments: epicStats
       });
+    }
+
+    if (req.method === "GET" && p === "/api/ig/stream/candles") {
+      const u = new URL(req.url, "http://localhost");
+      const epic = u.searchParams.get("epic");
+      const resolution = u.searchParams.get("resolution") || "MINUTE";
+      const max = parseInt(u.searchParams.get("max") || "100", 10);
+      if (!epic) return json(res, 400, { error: "Missing ?epic= parameter" });
+      const inMemory = getStreamCurrentCandles(epic, resolution, max);
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      try {
+        const stored = await scalperDb.getStoredCandles(epic, resolution, max);
+        const storedMap = new Map();
+        for (const c of stored) storedMap.set(c.ts, c);
+        for (const c of inMemory) storedMap.set(c.ts, c);
+        const merged = Array.from(storedMap.values()).sort((a, b) => a.ts - b.ts).slice(-max);
+        function candleToIgPrice(c) {
+          const mid = (v) => ({ bid: v, ask: v, lastTraded: null });
+          const t = new Date(c.ts * 1000);
+          return { snapshotTime: t.toISOString().replace("T", " ").replace(/\.\d+Z$/, ""), snapshotTimeUTC: t.toISOString(), openPrice: mid(c.open), highPrice: mid(c.high), lowPrice: mid(c.low), closePrice: mid(c.close), lastTradedVolume: c.volume || 0 };
+        }
+        const prices = merged.map(candleToIgPrice);
+        return json(res, 200, { prices, instrumentType: "CURRENCIES", metadata: { size: prices.length, source: "stream", storedCount: stored.length, inMemoryCount: inMemory.length } });
+      } catch (err) {
+        const prices = inMemory.map(c => {
+          const mid = (v) => ({ bid: v, ask: v, lastTraded: null });
+          const t = new Date(c.ts * 1000);
+          return { snapshotTime: t.toISOString(), snapshotTimeUTC: t.toISOString(), openPrice: mid(c.open), highPrice: mid(c.high), lowPrice: mid(c.low), closePrice: mid(c.close), lastTradedVolume: 0 };
+        });
+        return json(res, 200, { prices, instrumentType: "CURRENCIES", metadata: { size: prices.length, source: "stream-memory", error: err.message } });
+      }
+    }
+
+    if (req.method === "GET" && p === "/api/ig/stream/candle-stats") {
+      return json(res, 200, { stats: getStreamCandleStats(), resolutions: Object.keys(STREAM_RESOLUTIONS) });
     }
 
     if (req.method === "POST" && p === "/api/ig/stream/connect-live") {
@@ -862,6 +2236,9 @@ async function handleIgApi(req, res, p) {
     if (req.method === "POST" && p === "/api/ig/session/refresh") {
       if (!igConfigured()) return json(res, 400, { error: "No credentials configured for active profile" });
       try {
+        lsReconnectAttempts = 0;
+        lsReconnectInFlight = false;
+        if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
         igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: igSession.lightstreamerEndpoint };
         igCacheInvalidate();
         await igSessionLogin();
@@ -883,6 +2260,21 @@ async function handleIgApi(req, res, p) {
       if (r.status !== 200) return json(res, r.status, { error: "IG API error", detail: r.body });
       const data = safeParseIgBody(r.body);
       if (data._parseError) return json(res, 502, { error: "IG returned non-JSON", detail: data._raw });
+      const positions = data.positions || data;
+      if (Array.isArray(positions)) {
+        const epics = [...new Set(positions.map(p => p?.market?.epic).filter(Boolean))];
+        const detailsMap = {};
+        await Promise.all(epics.map(async epic => { detailsMap[epic] = await getMarketDetails(epic, session); }));
+        for (const pos of positions) {
+          const epic = pos?.market?.epic;
+          if (epic && detailsMap[epic]) {
+            pos.market.valueOfOnePip = detailsMap[epic].valueOfOnePip;
+            pos.market.contractSize = detailsMap[epic].contractSize;
+            pos.market.scalingFactor = detailsMap[epic].scalingFactor;
+            pos.market.plMultiplier = detailsMap[epic].plMultiplier;
+          }
+        }
+      }
       igCacheSet("positions", data);
       return json(res, 200, data);
     }
@@ -1289,16 +2681,159 @@ async function handleIgApi(req, res, p) {
       if (!epic) return json(res, 400, { error: "Missing epic" });
       const url = new URL("http://localhost" + req.url);
       const resolution = url.searchParams.get("resolution") || "HOUR";
-      const max = url.searchParams.get("max") || "50";
+      const max = parseInt(url.searchParams.get("max") || "50", 10);
       const from = url.searchParams.get("from") || "";
       const to = url.searchParams.get("to") || "";
-      let qs = `?resolution=${resolution}&max=${max}`;
-      if (from) qs += `&from=${from}`;
-      if (to) qs += `&to=${to}`;
+      const priceCacheKey = `prices:${epic}:${resolution}:${max}:${from}:${to}`;
+      const priceCached = igCacheGet(priceCacheKey);
+      if (priceCached) return json(res, 200, priceCached);
+
+      const RESOLUTION_SECONDS = { SECOND: 1, MINUTE: 60, MINUTE_2: 120, MINUTE_3: 180, MINUTE_5: 300, MINUTE_10: 600, MINUTE_15: 900, MINUTE_30: 1800, HOUR: 3600, HOUR_2: 7200, HOUR_3: 10800, HOUR_4: 14400, DAY: 86400, WEEK: 604800, MONTH: 2592000 };
+      const resSec = RESOLUTION_SECONDS[resolution] || 3600;
+
+      function igPriceToCandle(p) {
+        let rawTime = p.snapshotTimeUTC || p.snapshotTime || "";
+        if (typeof rawTime === "string") rawTime = rawTime.replace(/\//g, "-");
+        const dt = new Date(rawTime);
+        const ts = Math.floor(dt.getTime() / 1000);
+        const om = p.openPrice || {}, hm = p.highPrice || {}, lm = p.lowPrice || {}, cm = p.closePrice || {};
+        return {
+          ts,
+          open: ((om.bid || 0) + (om.ask || om.offer || 0)) / 2,
+          high: ((hm.bid || 0) + (hm.ask || hm.offer || 0)) / 2,
+          low: ((lm.bid || 0) + (lm.ask || lm.offer || 0)) / 2,
+          close: ((cm.bid || 0) + (cm.ask || cm.offer || 0)) / 2,
+          volume: p.lastTradedVolume || 0
+        };
+      }
+      function candleToIgPrice(c) {
+        const mid = (v) => ({ bid: v, ask: v, lastTraded: null });
+        const t = new Date(c.ts * 1000);
+        return { snapshotTime: t.toISOString().replace("T", " ").replace(/\.\d+Z$/, ""), snapshotTimeUTC: t.toISOString(), openPrice: mid(c.open), highPrice: mid(c.high), lowPrice: mid(c.low), closePrice: mid(c.close), lastTradedVolume: c.volume || 0 };
+      }
+
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      let source = "ig";
+
+      if (!from && !to) {
+        try {
+          const stored = await scalperDb.getStoredCandles(epic, resolution, max);
+          if (stored.length >= max) {
+            const latestTs = stored.length > 0 ? stored[stored.length - 1].ts : 0;
+            const nowSec = Math.floor(Date.now() / 1000);
+            const staleThreshold = resSec * 2;
+            if (nowSec - latestTs < staleThreshold) {
+              const prices = stored.slice(-max).map(candleToIgPrice);
+              const result = { prices, instrumentType: "CURRENCIES", metadata: { size: prices.length, source: "db", storedCount: stored.length } };
+              igCacheSet(priceCacheKey, result);
+              return json(res, 200, result);
+            }
+          }
+        } catch (dbErr) {
+          console.log(`[ig-prices] DB cache read failed: ${dbErr.message}`);
+        }
+      }
+
       const session = await igAuth();
-      const r = await igRequest("GET", "/prices/" + epic + qs, { ...igHeaders(session), Version: "3" });
-      if (r.status !== 200) return json(res, r.status, { error: "IG API error", detail: r.body });
-      return igJsonResponse(res, 200, r.body);
+      let allPrices = [];
+
+      if (from || to) {
+        let pageNum = 1;
+        const maxPages = Math.ceil(max / 20) + 1;
+        while (pageNum <= maxPages && allPrices.length < max) {
+          let qs = `?resolution=${resolution}&max=${max}&pageNumber=${pageNum}`;
+          if (from) qs += `&from=${encodeURIComponent(from)}`;
+          if (to) qs += `&to=${encodeURIComponent(to)}`;
+          const r = await igRequest("GET", "/prices/" + epic + qs, { ...igHeaders(session), Version: "3" });
+          if (r.status !== 200) {
+            if (allPrices.length > 0) break;
+            return json(res, r.status, { error: "IG API error", detail: r.body });
+          }
+          const body = safeParseIgBody(r.body);
+          if (body._parseError) {
+            if (allPrices.length > 0) break;
+            return json(res, 502, { error: "IG returned non-JSON", detail: body._raw });
+          }
+          const prices = body.prices || [];
+          allPrices = allPrices.concat(prices);
+          const pd = body.metadata && body.metadata.pageData;
+          if (!pd || pageNum >= pd.totalPages) break;
+          pageNum++;
+          if (pageNum <= maxPages) await new Promise(r => setTimeout(r, 200));
+        }
+      } else {
+        let fetchMax = max;
+        let latestStoredTs = null;
+        let storedCandleCount = 0;
+        try {
+          latestStoredTs = await scalperDb.getLatestCandleTs(epic, resolution);
+          if (latestStoredTs) storedCandleCount = await scalperDb.getCandleCount(epic, resolution);
+        } catch (_) {}
+
+        if (latestStoredTs && storedCandleCount >= max) {
+          const gapCandles = Math.ceil((Date.now() / 1000 - latestStoredTs) / resSec) + 5;
+          fetchMax = Math.min(Math.max(gapCandles, 20), max);
+        }
+
+        const igPath = `/prices/${epic}/${resolution}/${fetchMax}`;
+        const r = await igRequest("GET", igPath, { ...igHeaders(session), Version: "2" });
+        if (r.status !== 200) {
+          console.log(`[ig-prices] Path-based request failed (${r.status}): ${igPath} — ${(r.body || "").substring(0, 200)}`);
+          try {
+            const fallback = await scalperDb.getStoredCandles(epic, resolution, max);
+            const inMemStream = getStreamCurrentCandles(epic, resolution, max);
+            const mergedMap = new Map();
+            for (const c of fallback) mergedMap.set(c.ts, c);
+            for (const c of inMemStream) mergedMap.set(c.ts, c);
+            const merged = Array.from(mergedMap.values()).sort((a, b) => a.ts - b.ts).slice(-max);
+            if (merged.length > 0) {
+              const prices = merged.map(candleToIgPrice);
+              const result = { prices, instrumentType: "CURRENCIES", metadata: { size: prices.length, source: "stream-fallback", storedCount: fallback.length, streamCount: inMemStream.length } };
+              return json(res, 200, result);
+            }
+          } catch (_) {}
+          return json(res, r.status, { error: "IG API error", detail: r.body });
+        }
+        const body = safeParseIgBody(r.body);
+        if (body._parseError) {
+          return json(res, 502, { error: "IG returned non-JSON", detail: body._raw });
+        }
+        allPrices = body.prices || [];
+        source = (latestStoredTs && storedCandleCount >= max && fetchMax < max) ? "mixed" : "ig";
+      }
+
+      const freshCandles = allPrices.map(igPriceToCandle).filter(c => c.ts > 0);
+      try {
+        if (freshCandles.length > 0) {
+          const stored = await scalperDb.storeCandles(epic, resolution, freshCandles);
+          if (stored > 0) console.log(`[ig-prices] Stored ${stored} new candles for ${epic} ${resolution}`);
+        }
+      } catch (storeErr) {
+        console.log(`[ig-prices] DB store failed: ${storeErr.message}`);
+      }
+
+      let finalPrices = allPrices.map(p => {
+        if (!p.snapshotTimeUTC && p.snapshotTime) {
+          const normalized = String(p.snapshotTime).replace(/\//g, "-").replace(" ", "T") + "Z";
+          return { ...p, snapshotTimeUTC: new Date(normalized).toISOString() };
+        }
+        return p;
+      });
+      let storedCount = allPrices.length;
+      if (!from && !to && source === "mixed") {
+        try {
+          const allStored = await scalperDb.getStoredCandles(epic, resolution, max);
+          finalPrices = allStored.slice(-max).map(candleToIgPrice);
+          storedCount = allStored.length;
+          source = "mixed";
+        } catch (_) {
+          source = "ig";
+        }
+      }
+
+      const result = { prices: finalPrices, instrumentType: "CURRENCIES", metadata: { size: finalPrices.length, source, storedCount } };
+      igCacheSet(priceCacheKey, result);
+      return json(res, 200, result);
     }
 
     if (req.method === "GET" && p === "/api/ig/watchlists") {
@@ -1570,34 +3105,34 @@ async function handleIgApi(req, res, p) {
     }
 
     if (req.method === "GET" && p === "/api/ig/scalper") {
-      return json(res, 200, scalperEngine.getConfig());
+      return json(res, 200, await scalperEngine.getConfig());
     }
     if (req.method === "PUT" && p === "/api/ig/scalper") {
       let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
-      const cfg = scalperEngine.updateConfig(body);
+      const cfg = await scalperEngine.updateConfig(body);
       return json(res, 200, { ok: true, ...cfg });
     }
     if (req.method === "GET" && p === "/api/ig/scalper/status") {
-      return json(res, 200, scalperEngine.getStatus());
+      return json(res, 200, await scalperEngine.getStatus());
     }
     if (req.method === "POST" && p === "/api/ig/scalper/start") {
-      scalperEngine.start();
+      await scalperEngine.start();
       return json(res, 200, { ok: true, running: true });
     }
     if (req.method === "POST" && p === "/api/ig/scalper/stop") {
-      scalperEngine.stop();
+      await scalperEngine.stop();
       return json(res, 200, { ok: true, running: false });
     }
     if (req.method === "POST" && p === "/api/ig/scalper/reset") {
-      return json(res, 200, scalperEngine.resetStats());
+      return json(res, 200, await scalperEngine.resetStats());
     }
     if (req.method === "GET" && p === "/api/ig/scalper/strategies") {
-      const cfg = scalperEngine.getConfig();
+      const cfg = await scalperEngine.getConfig();
       return json(res, 200, { strategies: cfg.strategies || [] });
     }
     if (req.method === "POST" && p === "/api/ig/scalper/strategies") {
       let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
-      const result = scalperEngine.addStrategy(body);
+      const result = await scalperEngine.addStrategy(body);
       if (result.error) return json(res, 400, result);
       if (body.instrument && lsClient) {
         const currentEpics = new Set(lsConnectedEpics || []);
@@ -1610,51 +3145,311 @@ async function handleIgApi(req, res, p) {
     const scalperStratMatch = p.match(/^\/api\/ig\/scalper\/strategies\/(\d+)$/);
     const scalperToggleMatch = p.match(/^\/api\/ig\/scalper\/strategies\/(\d+)\/toggle$/);
     if (req.method === "POST" && scalperToggleMatch) {
-      const result = scalperEngine.toggleStrategy(parseInt(scalperToggleMatch[1], 10));
+      const result = await scalperEngine.toggleStrategy(parseInt(scalperToggleMatch[1], 10));
       if (result.error) return json(res, 400, result);
       return json(res, 200, result);
     }
     if (req.method === "PUT" && scalperStratMatch) {
       let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
-      const result = scalperEngine.updateStrategy(parseInt(scalperStratMatch[1], 10), body);
+      const result = await scalperEngine.updateStrategy(parseInt(scalperStratMatch[1], 10), body);
       if (result.error) return json(res, 400, result);
       return json(res, 200, result);
     }
     if (req.method === "DELETE" && scalperStratMatch) {
-      const result = scalperEngine.deleteStrategy(parseInt(scalperStratMatch[1], 10));
+      const result = await scalperEngine.deleteStrategy(parseInt(scalperStratMatch[1], 10));
       if (result.error) return json(res, 400, result);
       return json(res, 200, result);
     }
 
-    return json(res, 404, { error: "Unknown IG endpoint. Available: GET positions, POST positions/open, POST positions/close, PUT positions/update, GET workingorders, POST workingorders/create, PUT workingorders/update, DELETE workingorders/delete, GET account, GET prices, GET markets, GET markets/{epic}, GET marketnavigation, GET pricehistory/{epic}, GET watchlists, GET history, GET activity, GET confirms/{ref}, GET session, POST session/refresh, GET stream/prices, GET stream/status, GET/POST strategies, PUT strategies/:i, DELETE strategies/:i, POST strategies/:i/toggle, POST strategies/:i/attach, POST strategies/:i/detach, POST strategies/:i/pause, POST strategies/global, GET/POST/DELETE watchedlist, GET/PUT scalper, GET scalper/status, POST scalper/start, POST scalper/stop, POST scalper/reset, GET/POST scalper/strategies, PUT/DELETE scalper/strategies/:i, POST scalper/strategies/:i/toggle" });
+    const backtestRunMatch = p.match(/^\/api\/ig\/scalper\/strategies\/(\d+)\/backtest$/);
+    if (req.method === "POST" && backtestRunMatch) {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      try {
+        const backtestEngine = require("./skills/bots/ig-scalper-backtest.cjs");
+        const result = await backtestEngine.runAndSave(parseInt(backtestRunMatch[1], 10), {
+          timeframe: body.timeframe,
+          candleCount: parseInt(body.candleCount, 10) || 500
+        });
+        return json(res, 200, { ok: true, ...result });
+      } catch (e) {
+        return json(res, 500, { error: e.message });
+      }
+    }
+    const backtestListMatch = p.match(/^\/api\/ig\/scalper\/strategies\/(\d+)\/backtests$/);
+    if (req.method === "GET" && backtestListMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const list = await scalperDb.getBacktests(parseInt(backtestListMatch[1], 10));
+      return json(res, 200, { backtests: list });
+    }
+    if (req.method === "DELETE" && backtestListMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const result = await scalperDb.deleteBacktests(parseInt(backtestListMatch[1], 10));
+      return json(res, 200, result);
+    }
+    if (req.method === "GET" && p === "/api/ig/scalper/strategy-schemas") {
+      const sl = require("./skills/bots/strategies/index.cjs");
+      return json(res, 200, sl.getStrategySchemas());
+    }
+    if (req.method === "GET" && p === "/api/ig/scalper/backtests") {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const list = await scalperDb.getAllBacktests(50);
+      return json(res, 200, { backtests: list });
+    }
+    if (req.method === "DELETE" && p === "/api/ig/scalper/backtests") {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const result = await scalperDb.deleteAllBacktests();
+      return json(res, 200, result);
+    }
+    const backtestDetailMatch = p.match(/^\/api\/ig\/scalper\/backtests\/(\d+)$/);
+    if (req.method === "GET" && backtestDetailMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const bt = await scalperDb.getBacktest(parseInt(backtestDetailMatch[1], 10));
+      if (!bt) return json(res, 404, { error: "Backtest not found" });
+      return json(res, 200, bt);
+    }
+
+    if (req.method === "POST" && p === "/api/ig/scalper/batch-backtest") {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      try {
+        const backtestEngine = require("./skills/bots/ig-scalper-backtest.cjs");
+        const result = await backtestEngine.runBatchBacktest({
+          instrument: body.instrument,
+          strategies: body.strategies || [],
+          timeframes: body.timeframes || ["MINUTE"],
+          candleCount: parseInt(body.candleCount, 10) || 500
+        });
+        return json(res, 200, { ok: true, ...result });
+      } catch (e) {
+        return json(res, 500, { error: e.message });
+      }
+    }
+    if (req.method === "GET" && p === "/api/ig/scalper/batch-backtest") {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const batches = await scalperDb.listBatches(20);
+      return json(res, 200, { batches });
+    }
+    const batchDetailMatch = p.match(/^\/api\/ig\/scalper\/batch-backtest\/([^/]+)$/);
+    if (req.method === "GET" && batchDetailMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const results = await scalperDb.getBatchResults(batchDetailMatch[1]);
+      return json(res, 200, { batchId: batchDetailMatch[1], results });
+    }
+    if (req.method === "DELETE" && batchDetailMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const result = await scalperDb.deleteBatch(batchDetailMatch[1]);
+      return json(res, 200, result);
+    }
+
+    return json(res, 404, { error: "Unknown IG endpoint" });
   } catch (e) {
     return json(res, 500, { error: e.message });
   }
 }
 
-function writeConfigSnapshots() {
+async function handleAgentsApi(req, res, p) {
+  const agentBackupMatch = p.match(/^\/api\/agents\/([^/]+)\/backup$/);
+  const agentBackupsMatch = p.match(/^\/api\/agents\/([^/]+)\/backups$/);
+  const agentRestoreMatch = p.match(/^\/api\/agents\/([^/]+)\/restore\/(\d+)$/);
+  const agentBackupDelMatch = p.match(/^\/api\/agents\/([^/]+)\/backup\/(\d+)$/);
+  const agentMemoryMatch = p.match(/^\/api\/agents\/([^/]+)\/memory$/);
+  const agentDailyListMatch = p.match(/^\/api\/agents\/([^/]+)\/memory\/daily$/);
+  const agentDailyMatch = p.match(/^\/api\/agents\/([^/]+)\/memory\/daily\/(\d{4}-\d{2}-\d{2})$/);
+  const agentMemSearchMatch = p.match(/^\/api\/agents\/([^/]+)\/memory\/search$/);
+  const agentSubAllMatch = p.match(/^\/api\/agents\/([^/]+)\/subconscious$/);
+  const agentSubReflectMatch = p.match(/^\/api\/agents\/([^/]+)\/subconscious\/reflect$/);
+  const agentSubCatMatch = p.match(/^\/api\/agents\/([^/]+)\/subconscious\/([^/]+)$/);
+  const agentSubEntryMatch = p.match(/^\/api\/agents\/([^/]+)\/subconscious\/([^/]+)\/(.+)$/);
+
+  const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+  try {
+    if (req.method === "POST" && agentBackupMatch) {
+      let body = {}; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) {}
+      return json(res, 200, await scalperDb.backupAgent(agentBackupMatch[1], body.name));
+    }
+    if (req.method === "GET" && agentBackupsMatch) {
+      return json(res, 200, { backups: await scalperDb.listAgentBackups(agentBackupsMatch[1]) });
+    }
+    if (req.method === "POST" && agentRestoreMatch) {
+      return json(res, 200, await scalperDb.restoreAgentBackup(parseInt(agentRestoreMatch[2], 10)));
+    }
+    if (req.method === "DELETE" && agentBackupDelMatch) {
+      return json(res, 200, await scalperDb.deleteAgentBackup(parseInt(agentBackupDelMatch[2], 10)));
+    }
+    if (req.method === "GET" && agentMemoryMatch) {
+      return json(res, 200, await scalperDb.getAgentMemory(agentMemoryMatch[1]));
+    }
+    if (req.method === "PUT" && agentMemoryMatch) {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      return json(res, 200, await scalperDb.setAgentMemory(agentMemoryMatch[1], body.content || ""));
+    }
+    if (req.method === "GET" && agentDailyListMatch) {
+      return json(res, 200, { entries: await scalperDb.listDailyMemories(agentDailyListMatch[1]) });
+    }
+    if (req.method === "GET" && agentDailyMatch) {
+      return json(res, 200, await scalperDb.getDailyMemory(agentDailyMatch[1], agentDailyMatch[2]));
+    }
+    if (req.method === "PUT" && agentDailyMatch) {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      return json(res, 200, await scalperDb.setDailyMemory(agentDailyMatch[1], agentDailyMatch[2], body.content || ""));
+    }
+    if (req.method === "GET" && agentMemSearchMatch) {
+      const searchUrl = new URL(req.url, "http://localhost");
+      const q = searchUrl.searchParams.get("q") || "";
+      if (!q) return json(res, 400, { error: "Missing ?q= search term" });
+      return json(res, 200, { results: await scalperDb.searchMemory(agentMemSearchMatch[1], q) });
+    }
+    if (req.method === "GET" && agentSubReflectMatch) {
+      return json(res, 200, { reflection: await scalperDb.reflectSubconscious(agentSubReflectMatch[1]) });
+    }
+    if (req.method === "GET" && agentSubAllMatch) {
+      return json(res, 200, await scalperDb.getAllSubconscious(agentSubAllMatch[1]));
+    }
+    if (req.method === "GET" && agentSubCatMatch) {
+      return json(res, 200, { entries: await scalperDb.getSubconscious(agentSubCatMatch[1], agentSubCatMatch[2]) });
+    }
+    if (req.method === "PUT" && agentSubEntryMatch) {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      return json(res, 200, await scalperDb.setSubconscious(agentSubEntryMatch[1], agentSubEntryMatch[2], decodeURIComponent(agentSubEntryMatch[3]), body.value || ""));
+    }
+    if (req.method === "DELETE" && agentSubEntryMatch) {
+      return json(res, 200, await scalperDb.deleteSubconscious(agentSubEntryMatch[1], agentSubEntryMatch[2], decodeURIComponent(agentSubEntryMatch[3])));
+    }
+    return json(res, 404, { error: "Unknown agent endpoint" });
+  } catch (e) {
+    return json(res, 500, { error: e.message });
+  }
+}
+
+async function writeConfigSnapshots() {
   try {
     if (!fs.existsSync(CANVAS_DIR)) fs.mkdirSync(CANVAS_DIR, { recursive: true });
-    const monitorCfg = path.join(DATA_DIR, "ig-monitor-config.json");
-    if (fs.existsSync(monitorCfg)) {
-      fs.writeFileSync(path.join(CANVAS_DIR, "ig-monitor-config-snapshot.json"), fs.readFileSync(monitorCfg));
+    const filesToCopy = [
+      ["ig-monitor-config.json", "ig-monitor-config-snapshot.json"],
+      ["ig-strategy.json", "ig-strategy-snapshot.json"],
+      ["ig-alerts.json", "ig-alerts-snapshot.json"],
+      ["ig-bot-log.json", "ig-bot-log-snapshot.json"],
+    ];
+    for (const [src, dst] of filesToCopy) {
+      const srcPath = path.join(DATA_DIR, src);
+      if (fs.existsSync(srcPath)) {
+        fs.writeFileSync(path.join(CANVAS_DIR, dst), fs.readFileSync(srcPath));
+      }
     }
-    const strategyCfg = path.join(DATA_DIR, "ig-strategy.json");
-    if (fs.existsSync(strategyCfg)) {
-      fs.writeFileSync(path.join(CANVAS_DIR, "ig-strategy-snapshot.json"), fs.readFileSync(strategyCfg));
+    try {
+      const scalperConfig = await scalperEngine.getConfigExport();
+      if (scalperConfig) {
+        fs.writeFileSync(path.join(CANVAS_DIR, "ig-scalper-config-snapshot.json"), JSON.stringify(scalperConfig, null, 2));
+      }
+      const scalperStatus = await scalperEngine.getStatus();
+      if (scalperStatus && scalperStatus.allTrades) {
+        fs.writeFileSync(path.join(CANVAS_DIR, "all-scalper-trades-data.json"), JSON.stringify(scalperStatus.allTrades, null, 2));
+      }
+    } catch (dbErr) {
+      const fallbackConfig = path.join(DATA_DIR, "ig-scalper-config.json");
+      if (fs.existsSync(fallbackConfig)) fs.writeFileSync(path.join(CANVAS_DIR, "ig-scalper-config-snapshot.json"), fs.readFileSync(fallbackConfig));
+      const fallbackTrades = path.join(DATA_DIR, "ig-scalper-trades.json");
+      if (fs.existsSync(fallbackTrades)) fs.writeFileSync(path.join(CANVAS_DIR, "all-scalper-trades-data.json"), fs.readFileSync(fallbackTrades));
     }
-    const alerts = path.join(DATA_DIR, "ig-alerts.json");
-    if (fs.existsSync(alerts)) {
-      fs.writeFileSync(path.join(CANVAS_DIR, "ig-alerts-snapshot.json"), fs.readFileSync(alerts));
-    }
-    const botLog = path.join(DATA_DIR, "ig-bot-log.json");
-    if (fs.existsSync(botLog)) {
-      fs.writeFileSync(path.join(CANVAS_DIR, "ig-bot-log-snapshot.json"), fs.readFileSync(botLog));
-    }
+    writeDashboardSnapshot();
     console.log("[ceo-proxy] Config snapshots written to canvas");
   } catch (e) {
     console.error("[ceo-proxy] Snapshot write error:", e.message);
   }
+}
+
+let _snapshotAccountCache = null;
+let _snapshotAccountCacheTs = 0;
+let _snapshotAccountProfile = null;
+
+async function fetchAccountForSnapshot() {
+  const ic = loadIgConfig();
+  const profileId = (ic && ic.activeProfile) || "demo";
+  if (_snapshotAccountCache && _snapshotAccountProfile === profileId && Date.now() - _snapshotAccountCacheTs < 60000) return _snapshotAccountCache;
+  try {
+    const session = await igAuth();
+    const r = await igRequest("GET", "/accounts", igHeaders(session));
+    if (r.status === 200) {
+      const data = safeParseIgBody(r.body);
+      if (data && data.accounts) {
+        const profiles = (ic && ic.profiles) || {};
+        const prof = profiles[profileId] || {};
+        const targetAccountId = prof.accountId || process.env.IG_ACCOUNT_ID || "Z3MJKY";
+        const acct = data.accounts.find(a => a.accountId === targetAccountId) || data.accounts[0];
+        if (acct) {
+          _snapshotAccountCache = {
+            accountId: acct.accountId,
+            accountName: acct.accountName,
+            accountType: acct.accountType,
+            currency: acct.currency,
+            balance: acct.balance ? acct.balance.balance : null,
+            available: acct.balance ? acct.balance.available : null,
+            deposit: acct.balance ? acct.balance.deposit : null,
+            profitLoss: acct.balance ? acct.balance.profitLoss : null,
+          };
+          _snapshotAccountCacheTs = Date.now();
+          _snapshotAccountProfile = profileId;
+          return _snapshotAccountCache;
+        }
+      }
+    }
+  } catch (_) {}
+  return _snapshotAccountCache;
+}
+
+function writeDashboardSnapshot() {
+  writeDashboardSnapshotAsync().catch(e => console.error("[ceo-proxy] Dashboard snapshot error:", e.message));
+}
+
+async function writeDashboardSnapshotAsync() {
+  if (!fs.existsSync(CANVAS_DIR)) fs.mkdirSync(CANVAS_DIR, { recursive: true });
+  const prices = {};
+  for (const [epic, data] of streamedPrices) {
+    if (epic === "__ACCOUNT__") continue;
+    prices[epic] = { bid: data.bid, offer: data.offer, mid: data.mid, status: data.marketState, timestamp: data.timestamp };
+  }
+  let scalperStatus;
+  try { scalperStatus = await scalperEngine.getStatus(); } catch (_) { scalperStatus = {}; }
+  let activeProfile = "unknown";
+  try { const ic = loadIgConfig(); activeProfile = (ic && ic.activeProfile) || "unknown"; } catch (_) {}
+
+  const acctData = await fetchAccountForSnapshot();
+
+  const snapshot = {
+    timestamp: new Date().toISOString(),
+    account: {
+      profile: activeProfile,
+      accountId: acctData ? acctData.accountId : (process.env.IG_ACCOUNT_ID || "Z3MJKY"),
+      accountType: acctData ? acctData.accountType : null,
+      currency: acctData ? acctData.currency : null,
+      balance: acctData ? acctData.balance : null,
+      available: acctData ? acctData.available : null,
+      deposit: acctData ? acctData.deposit : null,
+      pnl: acctData ? acctData.profitLoss : null,
+      source: activeProfile + "-rest-api",
+    },
+    streaming: {
+      status: lsStatus,
+      method: lsConnectedEpics.length > 0 ? "LIGHTSTREAMER" : (lsHybridPollingTimer ? "REST_POLLING" : "DISCONNECTED"),
+      connectedEpics: lsConnectedEpics,
+      priceCount: streamedPrices.size - (streamedPrices.has("__ACCOUNT__") ? 1 : 0),
+    },
+    prices,
+    scalper: {
+      running: scalperStatus.running,
+      enabled: scalperStatus.enabled,
+      realizedPnl: scalperStatus.realizedPnl,
+      unrealizedPnl: scalperStatus.unrealizedPnl,
+      tradeCount: scalperStatus.tradeCount,
+      winCount: scalperStatus.winCount,
+      lossCount: scalperStatus.lossCount,
+      winRate: scalperStatus.winRate,
+      openPositions: scalperStatus.openPositions,
+      positions: scalperStatus.positions,
+      drawdownTripped: scalperStatus.drawdownTripped,
+      strategies: scalperStatus.strategies,
+    },
+  };
+  fs.writeFileSync(path.join(CANVAS_DIR, "ig-dashboard-snapshot.json"), JSON.stringify(snapshot, null, 2));
 }
 
 // === Bot Process Manager ===
@@ -1681,7 +3476,7 @@ function spawnBot(bot) {
   const proc = spawn(cmd, args, {
     cwd: OPENCLAW_HOME,
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env },
+    env: { ...process.env, ...(bot.env || {}) },
     detached: false,
   });
   const entry = { proc, bot, restarts: 0, lastStart: Date.now(), backoff: 5000 };
@@ -1738,7 +3533,7 @@ function autoRegisterBotScripts() {
   const registry = loadBotRegistry();
   const newBots = [];
   try {
-    const SKIP_BOTS = new Set(["ig-scalper-engine"]);
+    const SKIP_BOTS = new Set(["ig-scalper-engine", "ig-scalper-db", "ig-scalper-backtest", "trade-claw-engine", "indicators", "clawscript-runner"]);
     const files = fs.readdirSync(BOTS_DIR).filter(f => f.endsWith(".cjs") && !SKIP_BOTS.has(f.replace(/\.cjs$/, "")));
     for (const file of files) {
       const id = file.replace(/\.cjs$/, "");
@@ -2735,6 +4530,156 @@ async function handleSharedspace(req, res, p) {
   return json(res, 404, { error: "Not found" });
 }
 
+function getWorkspaceAgents() {
+  const agents = [];
+  try {
+    for (const e of fs.readdirSync(DATA_DIR, { withFileTypes: true })) {
+      if (e.isDirectory() && e.name === "workspace") {
+        agents.push({ id: "ceo", name: "CEO", dir: path.join(DATA_DIR, "workspace") });
+      } else if (e.isDirectory() && e.name.startsWith("workspace-")) {
+        const agentId = e.name.slice("workspace-".length);
+        agents.push({ id: agentId, name: agentId.toUpperCase(), dir: path.join(DATA_DIR, e.name) });
+      }
+    }
+  } catch {}
+  if (!agents.find(a => a.id === "ceo")) {
+    fs.mkdirSync(path.join(DATA_DIR, "workspace"), { recursive: true });
+    agents.unshift({ id: "ceo", name: "CEO", dir: path.join(DATA_DIR, "workspace") });
+  }
+  return agents;
+}
+
+function resolveAgentDir(agentId) {
+  const agents = getWorkspaceAgents();
+  const agent = agents.find(a => a.id === agentId);
+  return agent ? agent.dir : null;
+}
+
+async function handleWorkspace(req, res, p) {
+  if (req.method === "GET" && p === "/api/workspace/agents") {
+    const agents = getWorkspaceAgents();
+    return json(res, 200, { agents: agents.map(a => ({ id: a.id, name: a.name })) });
+  }
+
+  const dlMatch = p.match(/^\/api\/workspace\/([^/]+)\/download\/(.+)$/);
+  if (req.method === "GET" && dlMatch) {
+    const agentId = decodeURIComponent(dlMatch[1]);
+    const filePath = decodeURIComponent(dlMatch[2]);
+    const agentDir = resolveAgentDir(agentId);
+    if (!agentDir) return json(res, 404, { error: "Agent not found" });
+    const fp = path.normalize(filePath);
+    const full = path.resolve(agentDir, fp);
+    if (!isInsideDir(full, agentDir)) return json(res, 403, { error: "Forbidden" });
+    try {
+      const d = fs.readFileSync(full);
+      res.writeHead(200, {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${path.basename(fp)}"`,
+        "Access-Control-Allow-Origin": "*",
+      });
+      return res.end(d);
+    } catch { return json(res, 404, { error: "File not found" }); }
+  }
+
+  const isGw = authGateway(req);
+  const apiKey = authWorker(req);
+  if (!isGw && !apiKey) {
+    return json(res, 401, { error: "Unauthorized" });
+  }
+
+  const listMatch = p.match(/^\/api\/workspace\/([^/]+)$/);
+  if (req.method === "GET" && listMatch) {
+    const agentId = decodeURIComponent(listMatch[1]);
+    const agentDir = resolveAgentDir(agentId);
+    if (!agentDir) return json(res, 404, { error: "Agent not found" });
+    const files = [];
+    function walk(dir, prefix) {
+      try {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (e.name.startsWith(".")) continue;
+          const rel = prefix ? prefix + "/" + e.name : e.name;
+          if (e.isDirectory()) {
+            files.push({ name: rel, size: 0, modified: "", isDir: true });
+            walk(path.join(dir, e.name), rel);
+          } else {
+            const st = fs.statSync(path.join(dir, e.name));
+            files.push({ name: rel, size: st.size, modified: st.mtime.toISOString(), isDir: false });
+          }
+        }
+      } catch {}
+    }
+    walk(agentDir, "");
+    return json(res, 200, { agent: agentId, files });
+  }
+
+  const uploadMatch = p.match(/^\/api\/workspace\/([^/]+)\/upload$/);
+  if (req.method === "POST" && uploadMatch) {
+    const agentId = decodeURIComponent(uploadMatch[1]);
+    const agentDir = resolveAgentDir(agentId);
+    if (!agentDir) return json(res, 404, { error: "Agent not found" });
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString()); }
+    catch { return json(res, 400, { error: "Invalid JSON body" }); }
+    const results = [];
+    const items = Array.isArray(body) ? body : [body];
+    for (const item of items) {
+      if (!item.path) { results.push({ error: "path is required" }); continue; }
+      const fp = path.normalize(item.path);
+      const full = path.resolve(agentDir, fp);
+      if (!isInsideDir(full, agentDir)) { results.push({ path: fp, error: "Forbidden" }); continue; }
+      try {
+        fs.mkdirSync(path.dirname(full), { recursive: true });
+        if (item.encoding === "base64") {
+          fs.writeFileSync(full, Buffer.from(item.content || "", "base64"));
+        } else {
+          fs.writeFileSync(full, item.content || "", "utf-8");
+        }
+        const st = fs.statSync(full);
+        results.push({ path: fp, size: st.size, ok: true });
+      } catch (err) { results.push({ path: fp, error: err.message }); }
+    }
+    return json(res, 201, { ok: true, results });
+  }
+
+  const mkdirMatch = p.match(/^\/api\/workspace\/([^/]+)\/mkdir$/);
+  if (req.method === "POST" && mkdirMatch) {
+    const agentId = decodeURIComponent(mkdirMatch[1]);
+    const agentDir = resolveAgentDir(agentId);
+    if (!agentDir) return json(res, 404, { error: "Agent not found" });
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString()); }
+    catch { return json(res, 400, { error: "Invalid JSON body" }); }
+    if (!body.path) return json(res, 400, { error: "path is required" });
+    const fp = path.normalize(body.path);
+    const full = path.resolve(agentDir, fp);
+    if (!isInsideDir(full, agentDir)) return json(res, 403, { error: "Forbidden" });
+    fs.mkdirSync(full, { recursive: true });
+    return json(res, 201, { ok: true, path: fp });
+  }
+
+  const delMatch = p.match(/^\/api\/workspace\/([^/]+)\/delete$/);
+  if (req.method === "POST" && delMatch) {
+    const agentId = decodeURIComponent(delMatch[1]);
+    const agentDir = resolveAgentDir(agentId);
+    if (!agentDir) return json(res, 404, { error: "Agent not found" });
+    let body;
+    try { body = JSON.parse((await readBody(req)).toString()); }
+    catch { return json(res, 400, { error: "Invalid JSON body" }); }
+    if (!body.path) return json(res, 400, { error: "path is required" });
+    const fp = path.normalize(body.path);
+    const full = path.resolve(agentDir, fp);
+    if (!isInsideDir(full, agentDir)) return json(res, 403, { error: "Forbidden" });
+    try {
+      const st = fs.statSync(full);
+      if (st.isDirectory()) fs.rmSync(full, { recursive: true });
+      else fs.unlinkSync(full);
+      return json(res, 200, { ok: true });
+    } catch { return json(res, 404, { error: "File not found" }); }
+  }
+
+  return json(res, 404, { error: "Not found" });
+}
+
 async function handleChat(req, res, p) {
   const url = new URL(req.url, "http://localhost");
 
@@ -3046,13 +4991,127 @@ async function handleApi(req, res) {
     return json(res, 201, { ok: true, taskId: task.id, workerName: w.name }), true;
   }
 
-  if (p.startsWith("/api/ig/")) { await handleIgApi(req, res, p); return true; }
+  async function handleVoiceApi(req, res, p) {
+    if (req.method === "POST" && p === "/api/voice/transcribe") {
+      const groqKey = process.env.GROQ_API_KEY;
+      if (!groqKey) return json(res, 500, { error: "GROQ_API_KEY not configured" });
+      const contentType = req.headers["content-type"] || "";
+      if (!contentType.includes("multipart/form-data")) return json(res, 400, { error: "Expected multipart/form-data" });
+      const contentLength = parseInt(req.headers["content-length"] || "0", 10);
+      const MAX_AUDIO_SIZE = 10 * 1024 * 1024;
+      if (contentLength > MAX_AUDIO_SIZE) return json(res, 413, { error: "Audio file too large (max 10MB)" });
+      try {
+        const raw = await readBody(req, MAX_AUDIO_SIZE);
+        if (raw.length > MAX_AUDIO_SIZE) return json(res, 413, { error: "Audio file too large (max 10MB)" });
+        const boundary = contentType.split("boundary=")[1];
+        if (!boundary) return json(res, 400, { error: "Missing boundary" });
+        const parts = parseMultipart(raw, boundary);
+        const audioPart = parts.find(p => p.name === "file");
+        if (!audioPart || !audioPart.data || audioPart.data.length === 0) return json(res, 400, { error: "Missing audio file" });
+        const https = require("https");
+        const formBoundary = "----VoiceBoundary" + Date.now();
+        const filename = audioPart.filename || "audio.webm";
+        const mimeType = audioPart.contentType || "audio/webm";
+        const header = Buffer.from(
+          `--${formBoundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`
+        );
+        const modelField = Buffer.from(
+          `\r\n--${formBoundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-large-v3-turbo\r\n--${formBoundary}--\r\n`
+        );
+        const postBody = Buffer.concat([header, audioPart.data, modelField]);
+        const result = await new Promise((resolve, reject) => {
+          const r = https.request({
+            hostname: "api.groq.com", port: 443, path: "/openai/v1/audio/transcriptions",
+            method: "POST",
+            headers: {
+              "Authorization": "Bearer " + groqKey,
+              "Content-Type": "multipart/form-data; boundary=" + formBoundary,
+              "Content-Length": postBody.length,
+            },
+            timeout: 30000,
+          }, (resp) => {
+            const chunks = [];
+            resp.on("data", c => chunks.push(c));
+            resp.on("end", () => {
+              try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+              catch (e) { reject(new Error("Invalid Groq response")); }
+            });
+          });
+          r.on("error", reject);
+          r.on("timeout", () => { r.destroy(); reject(new Error("Groq timeout")); });
+          r.write(postBody);
+          r.end();
+        });
+        if (result.error) return json(res, 502, { error: result.error.message || "Groq API error" });
+        return json(res, 200, { text: result.text || "", ok: true });
+      } catch (e) {
+        console.error("[voice] Transcribe error:", e.message);
+        return json(res, 500, { error: "Transcription failed: " + e.message });
+      }
+    }
+    return json(res, 404, { error: "Not found" });
+  }
+
+  function parseMultipart(buf, boundary) {
+    const parts = [];
+    const boundaryBuf = Buffer.from("--" + boundary);
+    let start = 0;
+    const indices = [];
+    for (let i = 0; i <= buf.length - boundaryBuf.length; i++) {
+      if (buf.slice(i, i + boundaryBuf.length).equals(boundaryBuf)) indices.push(i);
+    }
+    for (let idx = 0; idx < indices.length - 1; idx++) {
+      const partStart = indices[idx] + boundaryBuf.length + 2;
+      const partEnd = indices[idx + 1];
+      const partBuf = buf.slice(partStart, partEnd);
+      const headerEnd = partBuf.indexOf("\r\n\r\n");
+      if (headerEnd === -1) continue;
+      const headerStr = partBuf.slice(0, headerEnd).toString();
+      const data = partBuf.slice(headerEnd + 4, partBuf.length - 2);
+      const nameMatch = headerStr.match(/name="([^"]+)"/);
+      const filenameMatch = headerStr.match(/filename="([^"]+)"/);
+      const ctMatch = headerStr.match(/Content-Type:\s*(.+)/i);
+      parts.push({
+        name: nameMatch ? nameMatch[1] : "",
+        filename: filenameMatch ? filenameMatch[1] : null,
+        contentType: ctMatch ? ctMatch[1].trim() : null,
+        data,
+      });
+    }
+    return parts;
+  }
+
+  if (p.startsWith("/api/ig/")) {
+    if (p === "/api/ig/logs/scalper-trades") {
+      try {
+        const status = await scalperEngine.getStatus();
+        const trades = status.allTrades || [];
+        return json(res, 200, trades), true;
+      } catch (_) {
+        const filePath = path.join(DATA_DIR, "ig-scalper-trades.json");
+        if (!fs.existsSync(filePath)) { res.writeHead(404); return res.end("Not found"), true; }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return fs.createReadStream(filePath).pipe(res), true;
+      }
+    }
+    if (p === "/api/ig/logs/bot-log") {
+      const filePath = path.join(DATA_DIR, "ig-bot-log.json");
+      if (!fs.existsSync(filePath)) { res.writeHead(404); return res.end("Not found"), true; }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return fs.createReadStream(filePath).pipe(res), true;
+    }
+    await handleIgApi(req, res, p); return true;
+  }
+  if (p.startsWith("/api/clawscript/")) { await handleClawScriptApi(req, res, p); return true; }
+  if (p.startsWith("/api/voice/")) { await handleVoiceApi(req, res, p); return true; }
+  if (p.startsWith("/api/agents/")) { await handleAgentsApi(req, res, p); return true; }
   if (p.startsWith("/api/bots")) { await handleBotsApi(req, res, p); return true; }
   if (p.startsWith("/api/processes")) { await handleProcesses(req, res, p); return true; }
   if (p.startsWith("/api/canvas")) { await handleCanvasApi(req, res, p); return true; }
   if (p.startsWith("/api/keys")) { await handleApiKeys(req, res, p); return true; }
   if (p.startsWith("/api/workers")) { await handleWorkers(req, res, p); return true; }
   if (p.startsWith("/api/tasks")) { await handleTasks(req, res, p); return true; }
+  if (p.startsWith("/api/workspace")) { await handleWorkspace(req, res, p); return true; }
   if (p.startsWith("/api/exchange")) { await handleExchange(req, res, p); return true; }
   if (p.startsWith("/api/sharedspace")) { await handleSharedspace(req, res, p); return true; }
   if (p === "/api/agent/chat" || p === "/api/agent/chat/") { await handleAgentChat(req, res); return true; }
@@ -3061,11 +5120,9 @@ async function handleApi(req, res) {
 }
 
 const LOADING_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>OpenClaw Cloud</title>
-<meta http-equiv="refresh" content="3">
 <style>body{background:#1a1a2e;color:#e0e0e0;font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
-.c{text-align:center}.s{font-size:48px;animation:spin 1s linear infinite;display:inline-block}
-@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style></head>
-<body><div class="c"><div class="s">🦞</div><h2>OpenClaw Gateway Starting...</h2><p>This page will auto-refresh in a few seconds.</p></div></body></html>`;
+.c{text-align:center}h2{margin-bottom:8px}</style></head>
+<body><div class="c"><h2>OpenClaw Cloud</h2><p style="color:#8b949e">Gateway is starting up. <a href="/" style="color:#58a6ff">Reload</a></p></div></body></html>`;
 
 function proxyReq(req, res, retries = 3) {
   const opts = {
@@ -3173,10 +5230,138 @@ function buildCanvasManifest() {
   return manifest;
 }
 
+async function handleCanvasApiRoutes(req, res) {
+  const url = new URL(req.url, "http://localhost");
+  const p = url.pathname;
+  if (!p.startsWith("/__openclaw__/canvas/api/")) return false;
+  const route = p.slice("/__openclaw__/canvas/api/".length);
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, X-Api-Key, Authorization" });
+    res.end();
+    return true;
+  }
+
+  if (req.method !== "GET") {
+    const apiKey = process.env.CANVAS_API_KEY;
+    if (apiKey) {
+      const provided = req.headers["x-api-key"] || url.searchParams.get("key") || (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+      if (provided !== apiKey) {
+        json(res, 403, { error: "Invalid or missing API key. Provide via X-Api-Key header, ?key= param, or Authorization: Bearer token." });
+        return true;
+      }
+    }
+  }
+
+  const configMap = {
+    "scalper-config": "ig-scalper-config.json",
+    "strategy": "ig-strategy.json",
+    "monitor-config": "ig-monitor-config.json",
+    "proofread-config": "ig-proofread-config.json",
+  };
+
+  if (route.startsWith("config/")) {
+    const configKey = route.slice("config/".length);
+    const fileName = configMap[configKey];
+    if (!fileName) { json(res, 404, { error: "Unknown config: " + configKey, available: Object.keys(configMap) }); return true; }
+    const filePath = path.join(DATA_DIR, fileName);
+
+    if (req.method === "GET") {
+      try {
+        const data = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, "utf8")) : {};
+        json(res, 200, data);
+      } catch (e) { json(res, 500, { error: e.message }); }
+      return true;
+    }
+
+    if (req.method === "POST" || req.method === "PUT") {
+      let body = "";
+      req.on("data", c => body += c);
+      req.on("end", () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (req.method === "PUT") {
+            fs.writeFileSync(filePath, JSON.stringify(parsed, null, 2));
+            console.log(`[canvas-api] Config ${configKey} replaced by agent`);
+          } else {
+            let existing = {};
+            try { existing = JSON.parse(fs.readFileSync(filePath, "utf8")); } catch (_) {}
+            const merged = { ...existing, ...parsed };
+            fs.writeFileSync(filePath, JSON.stringify(merged, null, 2));
+            console.log(`[canvas-api] Config ${configKey} patched by agent`);
+          }
+          writeConfigSnapshots();
+          json(res, 200, { ok: true, config: JSON.parse(fs.readFileSync(filePath, "utf8")) });
+        } catch (e) { json(res, 400, { error: "Invalid JSON: " + e.message }); }
+      });
+      return true;
+    }
+
+    json(res, 405, { error: "Method not allowed" });
+    return true;
+  }
+
+  if (route === "scalper/status" && req.method === "GET") {
+    try {
+      const status = await scalperEngine.getStatus();
+      json(res, 200, status);
+    } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  if (route === "scalper/start" && req.method === "POST") {
+    try { await scalperEngine.start(false); json(res, 200, { ok: true }); } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  if (route === "scalper/stop" && req.method === "POST") {
+    try { await scalperEngine.stop(); json(res, 200, { ok: true }); } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  if (route === "scalper/reset" && req.method === "POST") {
+    try { await scalperEngine.resetStats(); json(res, 200, { ok: true }); } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  if (route === "clawscript/templates" && req.method === "GET") {
+    try {
+      const templatesDir = path.join(CANVAS_DIR, "templates");
+      if (!fs.existsSync(templatesDir)) { json(res, 200, []); return true; }
+      const files = fs.readdirSync(templatesDir).filter(f => f.endsWith(".cs"));
+      const templates = files.map(f => {
+        const content = fs.readFileSync(path.join(templatesDir, f), "utf8");
+        const firstLine = content.split("\n").find(l => l.trim().startsWith("//")) || "";
+        return { name: f.replace(/\.cs$/, ""), file: f, description: firstLine.replace(/^\/\/\s*/, "").trim() };
+      });
+      json(res, 200, templates);
+    } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  if (route.startsWith("clawscript/templates/") && req.method === "GET") {
+    const tplName = route.slice("clawscript/templates/".length);
+    const templatesDir = path.join(CANVAS_DIR, "templates");
+    const fileName = tplName.endsWith(".cs") ? tplName : tplName + ".cs";
+    const filePath = path.join(templatesDir, fileName);
+    if (!fs.existsSync(filePath)) { json(res, 404, { error: "Template not found: " + tplName }); return true; }
+    try {
+      const content = fs.readFileSync(filePath, "utf8");
+      json(res, 200, { name: tplName.replace(/\.cs$/, ""), file: fileName, content: content });
+    } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  json(res, 404, { error: "Unknown canvas API route", available: ["config/scalper-config", "config/strategy", "config/monitor-config", "config/proofread-config", "scalper/status", "scalper/start", "scalper/stop", "scalper/reset", "clawscript/templates"] });
+  return true;
+}
+
 function serveCanvas(req, res) {
   const url = new URL(req.url, "http://localhost");
   const prefix = "/__openclaw__/canvas/";
-  if (req.method !== "GET" || !url.pathname.startsWith(prefix)) return false;
+  if (!url.pathname.startsWith(prefix)) return false;
+  if (url.pathname.startsWith("/__openclaw__/canvas/api/")) return handleCanvasApiRoutes(req, res);
+  if (req.method !== "GET") return false;
   const relPath = decodeURIComponent(url.pathname.slice(prefix.length)) || "index.html";
   if (relPath === "manifest.json") {
     const manifest = buildCanvasManifest();
@@ -3292,8 +5477,19 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
   autoRegisterBotScripts();
   startRegisteredBots();
   setTimeout(async () => {
+    try { const sdb = require("./skills/bots/ig-scalper-db.cjs"); await sdb.ensurePriceCandlesTable(); console.log("[startup] price_candles table ready"); } catch (e) { console.log("[startup] price_candles init failed:", e.message); }
     await igSessionStartup();
-    startLightstreamer();
+    if (shouldAutoConnectLiveStreaming()) {
+      console.log("[startup] Auto-connecting to live streaming (was active before restart)");
+      try {
+        await startLiveLightstreamer();
+      } catch (e) {
+        console.log("[startup] Live streaming auto-connect failed:", e.message, "— falling back to active profile");
+        startLightstreamer();
+      }
+    } else {
+      startLightstreamer();
+    }
   }, 3000);
 });
 
@@ -3305,4 +5501,5 @@ setInterval(() => {
   updateBeesFile();
   updateCrewFile();
   autoRegisterBotScripts();
+  writeDashboardSnapshot();
 }, 30000);
