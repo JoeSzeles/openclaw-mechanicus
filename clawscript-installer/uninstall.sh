@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
-set -e
+#
+# ClawScript Uninstaller for OpenClaw
+# Usage: bash uninstall.sh [openclaw_root] [skills_root]
+#
 
 OPENCLAW_ROOT="${1:-.openclaw}"
 SKILLS_ROOT="${2:-skills}"
-
-echo "=== ClawScript Uninstaller ==="
-echo "OpenClaw root: $OPENCLAW_ROOT"
-echo "Skills root:   $SKILLS_ROOT"
-echo ""
 
 BOTS_DIR="$SKILLS_ROOT/bots"
 STRATS_DIR="$BOTS_DIR/strategies"
@@ -15,54 +13,85 @@ CANVAS_DIR="$OPENCLAW_ROOT/canvas"
 TEMPLATES_DIR="$CANVAS_DIR/clawscript-templates"
 CLAWSKILL_DIR="$SKILLS_ROOT/clawscript"
 
-echo "[1/6] Removing parser and libraries..."
-rm -f "$BOTS_DIR/clawscript-parser.cjs"
-rm -f "$BOTS_DIR/indicators.cjs"
-rm -f "$BOTS_DIR/clawscript-ai-handler.cjs"
-
-echo "[2/6] Removing OpenClaw wrapper stubs..."
-rm -f "$BOTS_DIR"/openclaw-*.cjs
-
-echo "[3/6] Removing strategy framework..."
-rm -f "$STRATS_DIR/base-strategy.cjs"
-rm -f "$STRATS_DIR/index.cjs"
-rmdir "$STRATS_DIR" 2>/dev/null || true
-
-echo "[4/6] Removing editor files..."
-rm -f "$CANVAS_DIR/clawscript-editor.html"
-rm -f "$CANVAS_DIR/ig-clawscript-ui.js"
-rm -f "$CANVAS_DIR/ig-clawscript-flow.js"
-rm -f "$CANVAS_DIR/clawscript-docs.html"
-rm -f "$OPENCLAW_ROOT/serve-clawscript.cjs"
-
-echo "[5/6] Removing templates..."
-rm -rf "$TEMPLATES_DIR"
-
-echo "[6/6] Removing skill docs..."
-rm -f "$CLAWSKILL_DIR/CLAWSCRIPT.md"
-rmdir "$CLAWSKILL_DIR" 2>/dev/null || true
-
 echo ""
-echo "Cleaning up manifest..."
+echo "  ClawScript Uninstaller"
+echo "  ──────────────────────"
+echo "  Target: $OPENCLAW_ROOT"
+echo ""
+
+REMOVED=0
+
+safe_rm() {
+  local path="$1" label="$2"
+  if [ -f "$path" ]; then
+    rm -f "$path" 2>/dev/null
+    echo "  DEL   $label"
+    REMOVED=$((REMOVED + 1))
+  fi
+}
+
+safe_rm_glob() {
+  local dir="$1" pattern="$2" label="$3"
+  if [ ! -d "$dir" ]; then return 0; fi
+  local count=0
+  local old_nullglob=$(shopt -p nullglob 2>/dev/null)
+  shopt -s nullglob
+  for f in "$dir"/$pattern; do
+    [ -f "$f" ] || continue
+    rm -f "$f" && count=$((count + 1))
+  done
+  eval "$old_nullglob" 2>/dev/null
+  if [ $count -gt 0 ]; then
+    echo "  DEL   $label ($count files)"
+    REMOVED=$((REMOVED + count))
+  fi
+}
+
+echo "  [1/6] Parser & libraries"
+safe_rm "$BOTS_DIR/clawscript-parser.cjs" "clawscript-parser.cjs"
+safe_rm "$BOTS_DIR/indicators.cjs" "indicators.cjs"
+safe_rm "$BOTS_DIR/clawscript-ai-handler.cjs" "clawscript-ai-handler.cjs"
+
+echo "  [2/6] OpenClaw stubs"
+safe_rm_glob "$BOTS_DIR" "openclaw-*.cjs" "openclaw stubs"
+
+echo "  [3/6] Strategy framework"
+safe_rm "$STRATS_DIR/base-strategy.cjs" "base-strategy.cjs"
+safe_rm "$STRATS_DIR/index.cjs" "index.cjs"
+rmdir "$STRATS_DIR" 2>/dev/null && echo "  DEL   strategies/" || true
+
+echo "  [4/6] Editor files"
+safe_rm "$CANVAS_DIR/clawscript-editor.html" "clawscript-editor.html"
+safe_rm "$CANVAS_DIR/ig-clawscript-ui.js" "ig-clawscript-ui.js"
+safe_rm "$CANVAS_DIR/ig-clawscript-flow.js" "ig-clawscript-flow.js"
+safe_rm "$CANVAS_DIR/clawscript-docs.html" "clawscript-docs.html"
+safe_rm "$OPENCLAW_ROOT/serve-clawscript.cjs" "serve-clawscript.cjs"
+
+echo "  [5/6] Templates"
+if [ -d "$TEMPLATES_DIR" ]; then
+  rm -rf "$TEMPLATES_DIR" 2>/dev/null
+  echo "  DEL   clawscript-templates/"
+  REMOVED=$((REMOVED + 1))
+fi
+
+echo "  [6/6] Skill docs"
+safe_rm "$CLAWSKILL_DIR/CLAWSCRIPT.md" "CLAWSCRIPT.md"
+rmdir "$CLAWSKILL_DIR" 2>/dev/null && echo "  DEL   clawscript/" || true
+
 MANIFEST="$CANVAS_DIR/manifest.json"
-if [ -f "$MANIFEST" ]; then
+if [ -f "$MANIFEST" ] && command -v node >/dev/null 2>&1; then
   node -e "
-    const fs = require('fs');
+    var fs = require('fs');
     try {
-      const m = JSON.parse(fs.readFileSync('$MANIFEST','utf8'));
-      const filtered = m.filter(e => e.file !== 'clawscript-docs.html' && e.file !== 'clawscript-editor.html');
-      fs.writeFileSync('$MANIFEST', JSON.stringify(filtered, null, 2));
-      console.log('Manifest cleaned.');
-    } catch(e) { console.log('Could not update manifest:', e.message); }
-  " 2>/dev/null || echo "Manifest cleanup skipped (node not available)."
+      var m = JSON.parse(fs.readFileSync('$MANIFEST','utf8'));
+      var f = m.filter(function(e) { return e.file !== 'clawscript-docs.html' && e.file !== 'clawscript-editor.html'; });
+      if (f.length !== m.length) { fs.writeFileSync('$MANIFEST', JSON.stringify(f, null, 2)); }
+    } catch(e) {}
+  " 2>/dev/null
 fi
 
 echo ""
-echo "=== ClawScript uninstalled ==="
+echo "  Uninstall complete. Removed $REMOVED file(s)."
 echo ""
-echo "The following directories were NOT removed (may contain other files):"
-echo "  $BOTS_DIR"
-echo "  $CANVAS_DIR"
-echo "  $SKILLS_ROOT"
+echo "  To reinstall: bash clawscript/install.sh"
 echo ""
-echo "To reinstall: bash clawscript/install.sh"
