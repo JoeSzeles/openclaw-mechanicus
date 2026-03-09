@@ -534,18 +534,11 @@ function initResizeBar() {
       bottom.style.height = '220px';
     }
   } else {
-    if (saved) {
-      var mh = parseInt(saved, 10);
-      if (mh >= 150 && mh <= 900) {
-        mainPanel.style.minHeight = mh + 'px';
-        mainPanel.style.maxHeight = mh + 'px';
-        mainPanel.style.overflow = 'hidden';
-      }
-    } else {
-      mainPanel.style.minHeight = '400px';
-      mainPanel.style.maxHeight = '500px';
-      mainPanel.style.overflow = 'hidden';
-    }
+    var mh = saved ? parseInt(saved, 10) : 500;
+    if (mh < 150 || mh > 900) mh = 500;
+    mainPanel.style.height = mh + 'px';
+    mainPanel.style.minHeight = '0';
+    mainPanel.style.maxHeight = 'none';
   }
 
   var dragging = false;
@@ -571,9 +564,7 @@ function initResizeBar() {
     } else {
       var delta2 = e.clientY - startY;
       var newMH = Math.max(150, Math.min(900, startH + delta2));
-      mainPanel.style.minHeight = newMH + 'px';
-      mainPanel.style.maxHeight = newMH + 'px';
-      mainPanel.style.overflow = 'hidden';
+      mainPanel.style.height = newMH + 'px';
     }
   });
 
