@@ -518,7 +518,76 @@ tr:hover { background: rgba(88,166,255,0.04); }
             <table id="backtestTradeList" style="font-size:11px"></table>
           </div>
         </div>
+
+        <div style="margin-top:16px;padding:12px;background:#0d1117;border:1px solid #30363d;border-radius:6px">
+          <h4 style="font-size:13px;color:#f0883e;margin:0 0 10px 0;cursor:pointer" onclick="var p=document.getElementById('batchBtPanel');p.style.display=p.style.display==='none'?'':'none'">
+            Batch Backtest <span style="font-size:10px;color:#8b949e">&#9660;</span>
+          </h4>
+          <div id="batchBtPanel" style="display:none">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px">
+              <div style="position:relative">
+                <label style="color:#8b949e;display:block;margin-bottom:4px">Instrument</label>
+                <div style="display:flex;gap:4px">
+                  <input class="edit-input" id="batchBtInstrument" type="text" placeholder="Search or enter epic..." style="flex:1;padding:6px 8px" oninput="batchBtSearchInstrument(this.value)">
+                  <button class="btn-sm" onclick="batchBtSearchInstrument(document.getElementById('batchBtInstrument').value)" title="Search">&#128269;</button>
+                </div>
+                <div id="batchBtSearchResults" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;max-height:180px;overflow-y:auto;background:#161b22;border:1px solid #30363d;border-radius:4px;font-size:12px;margin-top:2px"></div>
+              </div>
+              <div>
+                <label style="color:#8b949e;display:block;margin-bottom:4px">Candle Count</label>
+                <input class="edit-input" id="batchBtCandleCount" type="number" value="500" min="50" step="50" style="width:100%;padding:6px 8px">
+              </div>
+            </div>
+            <div style="margin-top:10px">
+              <label style="color:#8b949e;display:block;margin-bottom:4px">Strategy Types <label style="color:#58a6ff;cursor:pointer;margin-left:8px;font-size:11px"><input type="checkbox" id="batchBtStratAll" onchange="batchBtToggleAll('batchBtStratChecks','batchBtStratAll')"> Select All</label></label>
+              <div id="batchBtStratChecks" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+            </div>
+            <div style="margin-top:10px">
+              <label style="color:#8b949e;display:block;margin-bottom:4px">Timeframes <label style="color:#58a6ff;cursor:pointer;margin-left:8px;font-size:11px"><input type="checkbox" id="batchBtTfAll" onchange="batchBtToggleAll('batchBtTfChecks','batchBtTfAll')"> Select All</label></label>
+              <div id="batchBtTfChecks" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+                <label style="color:#c9d1d9;cursor:pointer;font-size:11px"><input type="checkbox" value="MINUTE" checked> 1m</label>
+                <label style="color:#c9d1d9;cursor:pointer;font-size:11px"><input type="checkbox" value="MINUTE_5"> 5m</label>
+                <label style="color:#c9d1d9;cursor:pointer;font-size:11px"><input type="checkbox" value="MINUTE_15"> 15m</label>
+                <label style="color:#c9d1d9;cursor:pointer;font-size:11px"><input type="checkbox" value="HOUR"> 1h</label>
+                <label style="color:#c9d1d9;cursor:pointer;font-size:11px"><input type="checkbox" value="HOUR_4"> 4h</label>
+                <label style="color:#c9d1d9;cursor:pointer;font-size:11px"><input type="checkbox" value="DAY"> 1D</label>
+              </div>
+            </div>
+            <div style="margin-top:10px">
+              <label style="color:#8b949e;display:block;margin-bottom:4px;cursor:pointer" onclick="var p=document.getElementById('batchBtVarsPanel');p.style.display=p.style.display==='none'?'':'none'">Strategy Variables (per type) <span style="font-size:10px">&#9660;</span></label>
+              <div id="batchBtVarsPanel" style="display:none;max-height:250px;overflow-y:auto;border:1px solid #21262d;border-radius:4px;padding:8px;font-size:11px">
+                <p class="empty" style="margin:0">Select strategy types above to see their configurable variables.</p>
+              </div>
+            </div>
+            <div style="margin-top:10px;display:flex;align-items:center;gap:12px">
+              <button class="btn-sm btn-save" style="padding:6px 20px;font-size:13px" onclick="runBatchBacktest()">Run Batch Backtest</button>
+              <span id="batchBtProgress" style="color:#8b949e;font-size:12px;display:none"></span>
+            </div>
+            <div style="margin-top:12px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <h4 style="font-size:12px;color:#58a6ff;margin:0">Batch Results</h4>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <input class="edit-input" id="batchResultFilterStrat" placeholder="Filter strategy..." style="width:120px;padding:3px 6px;font-size:11px" oninput="filterBatchResults()">
+                  <input class="edit-input" id="batchResultFilterTf" placeholder="Filter timeframe..." style="width:120px;padding:3px 6px;font-size:11px" oninput="filterBatchResults()">
+                  <button class="btn-sm" onclick="loadBatchBacktestList()" style="font-size:10px">Refresh</button>
+                </div>
+              </div>
+              <div id="batchResultsList"><p class="empty">No batch results yet.</p></div>
+            </div>
+          </div>
+        </div>
+
       </div>
+    </div>
+  </div>
+
+  <div id="batchDetailModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:10000;justify-content:center;align-items:flex-start;padding-top:60px" onclick="if(event.target===this)closeBatchDetailModal()">
+    <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;width:90vw;max-width:900px;max-height:80vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 id="batchDetailTitle" style="font-size:14px;color:#58a6ff;margin:0">Backtest Details</h3>
+        <button class="btn-sm btn-cancel" onclick="closeBatchDetailModal()">Close</button>
+      </div>
+      <div id="batchDetailContent"><p class="empty">Loading...</p></div>
     </div>
   </div>
 
@@ -602,57 +671,9 @@ tr:hover { background: rgba(88,166,255,0.04); }
   </div>
 
   <div id="backtestTab" class="dash-tab-content">
-    <div class="card" style="margin-bottom:16px">
-      <h2>📊 Batch Backtest</h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px">
-        <div>
-          <label style="color:#8b949e;display:block;margin-bottom:4px">Instrument (Epic)</label>
-          <input class="edit-input" id="batchBtInstrument" type="text" placeholder="CS.D.CFAGOLD.CFA.IP" style="width:100%;padding:6px 8px" list="batchBtInstrumentList">
-          <datalist id="batchBtInstrumentList"></datalist>
-        </div>
-        <div>
-          <label style="color:#8b949e;display:block;margin-bottom:4px">Candle Count</label>
-          <input class="edit-input" id="batchBtCandleCount" type="number" value="500" min="50" step="50" style="width:100%;padding:6px 8px">
-        </div>
-      </div>
-      <div style="margin-top:12px">
-        <label style="color:#8b949e;display:block;margin-bottom:4px">Strategy Types <label style="color:#58a6ff;cursor:pointer;margin-left:8px;font-size:11px"><input type="checkbox" id="batchBtStratAll" onchange="batchBtToggleAll('batchBtStratChecks','batchBtStratAll')"> Select All</label></label>
-        <div id="batchBtStratChecks" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px"></div>
-      </div>
-      <div style="margin-top:12px">
-        <label style="color:#8b949e;display:block;margin-bottom:4px">Timeframes <label style="color:#58a6ff;cursor:pointer;margin-left:8px;font-size:11px"><input type="checkbox" id="batchBtTfAll" onchange="batchBtToggleAll('batchBtTfChecks','batchBtTfAll')"> Select All</label></label>
-        <div id="batchBtTfChecks" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
-          <label style="color:#c9d1d9;cursor:pointer"><input type="checkbox" value="MINUTE" checked> 1 Min</label>
-          <label style="color:#c9d1d9;cursor:pointer"><input type="checkbox" value="MINUTE_5"> 5 Min</label>
-          <label style="color:#c9d1d9;cursor:pointer"><input type="checkbox" value="MINUTE_15"> 15 Min</label>
-          <label style="color:#c9d1d9;cursor:pointer"><input type="checkbox" value="HOUR"> 1 Hour</label>
-          <label style="color:#c9d1d9;cursor:pointer"><input type="checkbox" value="HOUR_4"> 4 Hour</label>
-          <label style="color:#c9d1d9;cursor:pointer"><input type="checkbox" value="DAY"> 1 Day</label>
-        </div>
-      </div>
-      <div style="margin-top:12px;display:flex;align-items:center;gap:12px">
-        <button class="btn-sm btn-save" style="padding:6px 20px;font-size:13px" onclick="runBatchBacktest()">Run Batch Backtest</button>
-        <span id="batchBtProgress" style="color:#8b949e;font-size:12px;display:none"></span>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Batch Results <button class="btn-sm" onclick="loadBatchBacktestList()" style="margin-left:auto">Refresh</button></h2>
-      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <input class="edit-input" id="batchResultFilterStrat" placeholder="Filter strategy..." style="width:140px;padding:4px 6px" oninput="filterBatchResults()">
-        <input class="edit-input" id="batchResultFilterTf" placeholder="Filter timeframe..." style="width:140px;padding:4px 6px" oninput="filterBatchResults()">
-      </div>
-      <div id="batchResultsList"><p class="empty">No batch results yet. Run a batch backtest above.</p></div>
-    </div>
-
-    <div id="batchDetailModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:10000;justify-content:center;align-items:flex-start;padding-top:60px" onclick="if(event.target===this)closeBatchDetailModal()">
-      <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;width:90vw;max-width:900px;max-height:80vh;overflow-y:auto">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <h3 id="batchDetailTitle" style="font-size:14px;color:#58a6ff;margin:0">Backtest Details</h3>
-          <button class="btn-sm btn-cancel" onclick="closeBatchDetailModal()">Close</button>
-        </div>
-        <div id="batchDetailContent"><p class="empty">Loading...</p></div>
-      </div>
+    <div class="placeholder-card">
+      <h2>📊 Backtesting</h2>
+      <p>Coming Soon — Backtesting will be available here.</p>
     </div>
   </div>
 
@@ -3301,7 +3322,7 @@ function populateBatchStrategyCheckboxes() {
   var html = '';
   for (var i = 0; i < types.length; i++) {
     var label = types[i].replace(/-/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
-    html += '<label style="color:#c9d1d9;cursor:pointer"><input type="checkbox" value="' + types[i] + '"> ' + label + '</label>';
+    html += '<label style="color:#c9d1d9;cursor:pointer;font-size:11px"><input type="checkbox" value="' + types[i] + '" onchange="renderBatchVarsPanel()"> ' + label + '</label>';
   }
   container.innerHTML = html;
 }
@@ -3330,6 +3351,94 @@ function batchBtToggleAll(containerId, checkboxId) {
   for (var i = 0; i < boxes.length; i++) {
     if (boxes[i].id !== checkboxId) boxes[i].checked = checked;
   }
+  if (containerId === 'batchBtStratChecks') renderBatchVarsPanel();
+}
+
+var _batchBtSearchTimeout = null;
+function batchBtSearchInstrument(q) {
+  if (_batchBtSearchTimeout) clearTimeout(_batchBtSearchTimeout);
+  var resultsEl = document.getElementById('batchBtSearchResults');
+  q = (q || '').trim();
+  if (q.length < 2) { resultsEl.style.display = 'none'; return; }
+  _batchBtSearchTimeout = setTimeout(function() {
+    apiFetch('/api/ig/markets?q=' + encodeURIComponent(q)).then(function(data) {
+      if (!data || !data.markets || data.markets.length === 0) {
+        resultsEl.innerHTML = '<div style="padding:8px;color:#8b949e">No results</div>';
+        resultsEl.style.display = '';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < Math.min(data.markets.length, 10); i++) {
+        var m = data.markets[i];
+        html += '<div style="padding:6px 8px;cursor:pointer;border-bottom:1px solid #21262d" onmouseenter="this.style.background=\'rgba(88,166,255,0.08)\'" onmouseleave="this.style.background=\'\'" onclick="batchBtSelectInstrument(\'' + m.epic + '\',\'' + (m.instrumentName || '').replace(/'/g, "\\'") + '\')">' +
+          '<span style="font-weight:600">' + (m.instrumentName || m.epic) + '</span> ' +
+          '<span style="color:#8b949e;font-size:10px">' + m.epic + '</span></div>';
+      }
+      resultsEl.innerHTML = html;
+      resultsEl.style.display = '';
+    });
+  }, 400);
+}
+
+function batchBtSelectInstrument(epic, name) {
+  document.getElementById('batchBtInstrument').value = epic;
+  document.getElementById('batchBtSearchResults').style.display = 'none';
+}
+
+function renderBatchVarsPanel() {
+  var panel = document.getElementById('batchBtVarsPanel');
+  if (!panel) return;
+  var checkedBoxes = document.getElementById('batchBtStratChecks').querySelectorAll('input[type=checkbox]:checked');
+  var selectedTypes = [];
+  for (var i = 0; i < checkedBoxes.length; i++) selectedTypes.push(checkedBoxes[i].value);
+  if (selectedTypes.length === 0) {
+    panel.innerHTML = '<p class="empty" style="margin:0">Select strategy types above to see their configurable variables.</p>';
+    return;
+  }
+  var html = '';
+  for (var t = 0; t < selectedTypes.length; t++) {
+    var sType = selectedTypes[t];
+    var schema = (typeof strategySchemas !== 'undefined' && strategySchemas[sType]) ? strategySchemas[sType].configSchema : null;
+    if (!schema || schema.length === 0) continue;
+    html += '<div style="margin-bottom:8px;border-bottom:1px solid #21262d;padding-bottom:8px">';
+    html += '<div style="font-weight:600;color:#58a6ff;margin-bottom:4px;font-size:11px">' + sType + '</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">';
+    for (var p = 0; p < schema.length; p++) {
+      var param = schema[p];
+      var fieldId = 'batchVar_' + sType + '_' + param.key;
+      if (param.type === 'boolean') {
+        html += '<div><label style="color:#8b949e;font-size:10px">' + (param.label || param.key) + '</label>';
+        html += '<select class="edit-input" id="' + fieldId + '" style="width:100%;padding:2px 4px;font-size:10px">';
+        html += '<option value="">default</option><option value="true">true</option><option value="false">false</option>';
+        html += '</select></div>';
+      } else {
+        html += '<div><label style="color:#8b949e;font-size:10px">' + (param.label || param.key) + '</label>';
+        html += '<input class="edit-input" id="' + fieldId + '" type="number" step="any" placeholder="' + (param.default != null ? param.default : '') + '" style="width:100%;padding:2px 4px;font-size:10px"></div>';
+      }
+    }
+    html += '</div></div>';
+  }
+  if (!html) html = '<p class="empty" style="margin:0">Selected strategies have no configurable variables.</p>';
+  panel.innerHTML = html;
+}
+
+function collectBatchVarsForType(sType) {
+  var config = {};
+  var schema = (typeof strategySchemas !== 'undefined' && strategySchemas[sType]) ? strategySchemas[sType].configSchema : null;
+  if (!schema) return config;
+  for (var p = 0; p < schema.length; p++) {
+    var param = schema[p];
+    var el = document.getElementById('batchVar_' + sType + '_' + param.key);
+    if (!el) continue;
+    var val = el.value;
+    if (val === '' || val === null || val === undefined) continue;
+    if (param.type === 'boolean') {
+      config[param.key] = val === 'true';
+    } else {
+      config[param.key] = parseFloat(val);
+    }
+  }
+  return config;
 }
 
 async function runBatchBacktest() {
@@ -3338,7 +3447,9 @@ async function runBatchBacktest() {
   var stratBoxes = document.getElementById('batchBtStratChecks').querySelectorAll('input[type=checkbox]:checked');
   var strategies = [];
   for (var i = 0; i < stratBoxes.length; i++) {
-    strategies.push({ type: stratBoxes[i].value, config: {} });
+    var sType = stratBoxes[i].value;
+    var sConfig = collectBatchVarsForType(sType);
+    strategies.push({ type: sType, config: sConfig });
   }
   if (strategies.length === 0) { showToast('Select at least one strategy type', false); return; }
   var tfBoxes = document.getElementById('batchBtTfChecks').querySelectorAll('input[type=checkbox]:checked');
@@ -3406,7 +3517,8 @@ function renderBatchResults() {
     html += '<div><span style="color:#58a6ff;font-weight:600">Batch #' + (b.batchId || i) + '</span>';
     html += ' <span style="color:#8b949e;font-size:11px;margin-left:8px">' + dt + '</span>';
     html += ' <span class="badge badge-spike" style="margin-left:6px">' + (b.runCount || 0) + ' results</span>';
-    html += ' <span style="color:#8b949e;font-size:11px;margin-left:6px">P&L: <span class="' + ((b.totalPnl || 0) >= 0 ? 'pos' : 'neg') + '">' + ((b.totalPnl || 0) >= 0 ? '+' : '') + (b.totalPnl || 0).toFixed(2) + '</span></span></div>';
+    var bPnl = parseFloat(b.totalPnl) || 0;
+    html += ' <span style="color:#8b949e;font-size:11px;margin-left:6px">P&L: <span class="' + (bPnl >= 0 ? 'pos' : 'neg') + '">' + (bPnl >= 0 ? '+' : '') + bPnl.toFixed(2) + '</span></span></div>';
     html += '<div style="display:flex;gap:6px;align-items:center">';
     html += '<button class="btn-sm btn-danger" onclick="event.stopPropagation();deleteBatch(\'' + b.batchId + '\')">Delete</button>';
     html += '<span style="color:#8b949e;font-size:12px">▼</span></div>';
