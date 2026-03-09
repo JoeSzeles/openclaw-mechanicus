@@ -1,6 +1,7 @@
-modules = ["swift-5.8", "bash", "nodejs-22"]
+modules = ["swift-5.8", "bash", "nodejs-22", "python-3.11", "postgresql-16"]
 [agent]
 expertMode = true
+integrations = ["github:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
@@ -8,15 +9,16 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-OPENCLAW_GATEWAY_PORT = "5000"
+OPENCLAW_GATEWAY_PORT = "5001"
 OPENCLAW_SKIP_CHANNELS = "1"
-IG_API_KEY = "20849c0791ed15479752204f9632c949f742ddc5"
-IG_USERNAME = "Hoerbinator2"
-IG_PASSWORD = "Riacrepe88!"
+IG_API_KEY = "YOUR_IG_API_KEY"
+IG_USERNAME = "YOUR_IG_USERNAME"
+IG_PASSWORD = "YOUR_IG_PASSWORD"
 IG_ACCOUNT_ID = "Z3MJKY"
 IG_BASE_URL = "https://demo-api.ig.com/gateway/deal"
-OPENCLAW_GATEWAY_TOKEN = "7e3f7e32023e0220d91f15b4bb0d8469b34f3bda3b4b1b61242802ebb2264852"
+OPENCLAW_GATEWAY_TOKEN = "YOUR_GATEWAY_TOKEN"
 OPENCLAW_LOGIN_USER = "Josef_Szeles"
+CANVAS_API_KEY = "YOUR_CANVAS_API_KEY"
 
 [workflows]
 runButton = "Project"
@@ -39,7 +41,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd /home/runner/workspace && COREPACK_ENABLE_STRICT=0 bash start.sh"
+args = "COREPACK_ENABLE_STRICT=0 bash start.sh"
 waitForPort = 5000
 
 [[ports]]
@@ -57,5 +59,5 @@ externalPort = 3002
 [deployment]
 deploymentTarget = "vm"
 run = ["bash", "start.sh"]
-build = ["echo", "build-ok"]
+build = ["npm", "install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund"]
 publicDir = "dist"
