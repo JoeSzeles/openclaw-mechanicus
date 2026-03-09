@@ -716,6 +716,10 @@ async function ensureOptimizationMemory() {
     timeframe VARCHAR(20) NOT NULL,
     best_config JSONB,
     score NUMERIC DEFAULT 0,
+    best_pnl NUMERIC DEFAULT 0,
+    best_win_rate NUMERIC DEFAULT 0,
+    best_sharpe NUMERIC DEFAULT 0,
+    total_trades INTEGER DEFAULT 0,
     cycle_count INTEGER DEFAULT 0,
     total_iterations INTEGER DEFAULT 0,
     patterns TEXT DEFAULT '',
@@ -724,22 +728,37 @@ async function ensureOptimizationMemory() {
     updated_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(instrument, strategy_type, timeframe)
   )`);
+  try {
+    await query(`ALTER TABLE optimization_memory ADD COLUMN IF NOT EXISTS best_pnl NUMERIC DEFAULT 0`);
+    await query(`ALTER TABLE optimization_memory ADD COLUMN IF NOT EXISTS best_win_rate NUMERIC DEFAULT 0`);
+    await query(`ALTER TABLE optimization_memory ADD COLUMN IF NOT EXISTS best_sharpe NUMERIC DEFAULT 0`);
+    await query(`ALTER TABLE optimization_memory ADD COLUMN IF NOT EXISTS total_trades INTEGER DEFAULT 0`);
+  } catch (_) {}
   _optMemoryReady = true;
 }
 
 async function saveOptimizationMemory(record) {
   await ensureOptimizationMemory();
   const res = await query(
-    `INSERT INTO optimization_memory (instrument, strategy_type, timeframe, best_config, score, cycle_count, total_iterations, patterns, agent_analysis)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    `INSERT INTO optimization_memory (instrument, strategy_type, timeframe, best_config, score, best_pnl, best_win_rate, best_sharpe, total_trades, cycle_count, total_iterations, patterns, agent_analysis)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      ON CONFLICT (instrument, strategy_type, timeframe) DO UPDATE SET
-       best_config = EXCLUDED.best_config, score = EXCLUDED.score, cycle_count = EXCLUDED.cycle_count,
-       total_iterations = EXCLUDED.total_iterations, patterns = EXCLUDED.patterns, agent_analysis = EXCLUDED.agent_analysis,
+       best_config = CASE WHEN EXCLUDED.score > optimization_memory.score THEN EXCLUDED.best_config ELSE optimization_memory.best_config END,
+       score = GREATEST(EXCLUDED.score, optimization_memory.score),
+       best_pnl = CASE WHEN EXCLUDED.score > optimization_memory.score THEN EXCLUDED.best_pnl ELSE optimization_memory.best_pnl END,
+       best_win_rate = CASE WHEN EXCLUDED.score > optimization_memory.score THEN EXCLUDED.best_win_rate ELSE optimization_memory.best_win_rate END,
+       best_sharpe = CASE WHEN EXCLUDED.score > optimization_memory.score THEN EXCLUDED.best_sharpe ELSE optimization_memory.best_sharpe END,
+       total_trades = CASE WHEN EXCLUDED.score > optimization_memory.score THEN EXCLUDED.total_trades ELSE optimization_memory.total_trades END,
+       cycle_count = optimization_memory.cycle_count + EXCLUDED.cycle_count,
+       total_iterations = optimization_memory.total_iterations + EXCLUDED.total_iterations,
+       patterns = EXCLUDED.patterns, agent_analysis = EXCLUDED.agent_analysis,
        updated_at = NOW()
      RETURNING *`,
     [record.instrument, record.strategyType, record.timeframe,
-     JSON.stringify(record.bestConfig), record.score || 0, record.cycleCount || 0,
-     record.totalIterations || 0, record.patterns || '', record.agentAnalysis || '']
+     JSON.stringify(record.bestConfig), record.score || 0,
+     record.bestPnl || 0, record.bestWinRate || 0, record.bestSharpe || 0, record.totalTrades || 0,
+     record.cycleCount || 0, record.totalIterations || 0,
+     record.patterns || '', record.agentAnalysis || '']
   );
   return camel(res.rows[0]);
 }

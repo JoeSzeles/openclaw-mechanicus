@@ -152,6 +152,7 @@ function analyzeOptimizationRun(allResults) {
         bestSharpe: scored[0].sharpeRatio,
         bestConfig: scored[0].configSnapshot,
         totalRuns: scored.length,
+        totalTrades: scored[0].totalTrades || 0,
         score: scored[0]._score
       };
     }

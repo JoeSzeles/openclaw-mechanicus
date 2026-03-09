@@ -855,11 +855,13 @@ async function runOptimizationBatch(options) {
 
   const finalAnalysis = optAgent.analyzeOptimizationRun(allResults);
   for (const [key, best] of Object.entries(finalAnalysis.bestPerCombo)) {
-    if (best.bestConfig) {
+    if (best.bestConfig && best.score > 0 && best.bestPnl > 0) {
       try {
         await db.saveOptimizationMemory({
           instrument, strategyType: best.strategyType, timeframe: best.timeframe,
           bestConfig: best.bestConfig, score: best.score,
+          bestPnl: best.bestPnl || 0, bestWinRate: best.bestWinRate || 0,
+          bestSharpe: best.bestSharpe || 0, totalTrades: best.totalTrades || 0,
           cycleCount: cycles, totalIterations: allResults.length,
           patterns: (finalAnalysis.patterns || []).join("\n"),
           agentAnalysis: cycleAnalysis.map(c => c.aiAnalysis || '').filter(Boolean).join("\n---\n")
