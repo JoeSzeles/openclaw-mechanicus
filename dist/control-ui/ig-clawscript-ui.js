@@ -201,8 +201,8 @@ function buildEditorUI() {
   '#csEditorRoot.cs-standalone .cs-main .cs-code-pane { min-height:0; }' +
   '#csEditorRoot.cs-standalone .cs-main .cs-flow-pane { min-height:0; }' +
   '#csEditorRoot.cs-standalone .cs-main .cs-flow-canvas { min-height:0 !important; }' +
-  '#csEditorRoot.cs-standalone .cs-resize-bar { flex-shrink:0; height:6px; cursor:ns-resize; background:#21262d; border:1px solid #30363d; border-radius:3px; margin:2px 0; transition:background 0.15s; }' +
-  '#csEditorRoot.cs-standalone .cs-resize-bar:hover, #csEditorRoot.cs-standalone .cs-resize-bar.cs-dragging { background:#58a6ff; border-color:#58a6ff; }' +
+  '.cs-resize-bar { height:6px; cursor:ns-resize; background:#21262d; border:1px solid #30363d; border-radius:3px; margin:2px 0; transition:background 0.15s; flex-shrink:0; }' +
+  '.cs-resize-bar:hover, .cs-resize-bar.cs-dragging { background:#58a6ff; border-color:#58a6ff; }' +
   '#csEditorRoot.cs-standalone .cs-bottom-panels { flex-shrink:0; margin-top:0; overflow:hidden; }' +
   '#csEditorRoot.cs-standalone .cs-bottom-panels .cs-logs-pane { height:100%; }' +
   '#csEditorRoot.cs-standalone .cs-bottom-panels .cs-ai-pane { height:100%; }' +
@@ -515,18 +515,37 @@ function buildEditorUI() {
 
 function initResizeBar() {
   var root = document.getElementById('csEditorRoot');
-  if (!root || !root.classList.contains('cs-standalone')) return;
   var bar = document.getElementById('csResizeBar');
+  var mainPanel = document.getElementById('csMainPanel');
   var bottom = document.getElementById('csBottomPanels');
-  if (!bar || !bottom) return;
+  if (!bar || !mainPanel || !bottom) return;
+
+  var isStandalone = root && root.classList.contains('cs-standalone');
+  var storageKey = isStandalone ? 'cs-bottom-height' : 'cs-main-height';
 
   var saved = null;
-  try { saved = localStorage.getItem('cs-bottom-height'); } catch(e) {}
-  if (saved) {
-    var h = parseInt(saved, 10);
-    if (h >= 80 && h <= 600) bottom.style.height = h + 'px';
+  try { saved = localStorage.getItem(storageKey); } catch(e) {}
+
+  if (isStandalone) {
+    if (saved) {
+      var h = parseInt(saved, 10);
+      if (h >= 80 && h <= 600) bottom.style.height = h + 'px';
+    } else {
+      bottom.style.height = '220px';
+    }
   } else {
-    bottom.style.height = '220px';
+    if (saved) {
+      var mh = parseInt(saved, 10);
+      if (mh >= 150 && mh <= 900) {
+        mainPanel.style.minHeight = mh + 'px';
+        mainPanel.style.maxHeight = mh + 'px';
+        mainPanel.style.overflow = 'hidden';
+      }
+    } else {
+      mainPanel.style.minHeight = '400px';
+      mainPanel.style.maxHeight = '500px';
+      mainPanel.style.overflow = 'hidden';
+    }
   }
 
   var dragging = false;
@@ -537,7 +556,7 @@ function initResizeBar() {
     e.preventDefault();
     dragging = true;
     startY = e.clientY;
-    startH = bottom.offsetHeight;
+    startH = isStandalone ? bottom.offsetHeight : mainPanel.offsetHeight;
     bar.classList.add('cs-dragging');
     document.body.style.cursor = 'ns-resize';
     document.body.style.userSelect = 'none';
@@ -545,9 +564,17 @@ function initResizeBar() {
 
   document.addEventListener('mousemove', function(e) {
     if (!dragging) return;
-    var delta = startY - e.clientY;
-    var newH = Math.max(80, Math.min(600, startH + delta));
-    bottom.style.height = newH + 'px';
+    if (isStandalone) {
+      var delta = startY - e.clientY;
+      var newH = Math.max(80, Math.min(600, startH + delta));
+      bottom.style.height = newH + 'px';
+    } else {
+      var delta2 = e.clientY - startY;
+      var newMH = Math.max(150, Math.min(900, startH + delta2));
+      mainPanel.style.minHeight = newMH + 'px';
+      mainPanel.style.maxHeight = newMH + 'px';
+      mainPanel.style.overflow = 'hidden';
+    }
   });
 
   document.addEventListener('mouseup', function() {
@@ -556,7 +583,8 @@ function initResizeBar() {
     bar.classList.remove('cs-dragging');
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
-    try { localStorage.setItem('cs-bottom-height', bottom.offsetHeight); } catch(e) {}
+    var val = isStandalone ? bottom.offsetHeight : mainPanel.offsetHeight;
+    try { localStorage.setItem(storageKey, val); } catch(e) {}
   });
 }
 
