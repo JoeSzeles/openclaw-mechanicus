@@ -546,7 +546,15 @@ async function runStandaloneBacktest(instrument, strategyType, config, timeframe
   const candles = await fetchCandles(instrument, fetchResolution, candleCount);
   if (candles.length < 20) throw new Error("Insufficient candle data: " + candles.length);
 
-  const mergedConfig = { instrument, direction: "BOTH", size: 1, stopDistance: 0, limitDistance: 0, ...config };
+  const schemaDefaults = {};
+  const schemas = strategyLoader.getStrategySchemas ? strategyLoader.getStrategySchemas() : {};
+  const sSchema = schemas[strategyType];
+  if (sSchema && sSchema.configSchema) {
+    for (const p of sSchema.configSchema) {
+      if (p.default != null) schemaDefaults[p.key] = p.default;
+    }
+  }
+  const mergedConfig = { instrument, direction: "BOTH", size: 1, stopDistance: 0, limitDistance: 0, ...schemaDefaults, ...config };
   const stratInstance = strategyLoader.createInstance(strategyType, mergedConfig);
   const size = mergedConfig.size || 1;
   const stopDist = mergedConfig.stopDistance || 0;
@@ -650,6 +658,7 @@ async function runStandaloneBacktest(instrument, strategyType, config, timeframe
 
   return {
     trades,
+    configUsed: mergedConfig,
     summary: {
       totalTrades: trades.length, winCount: wins.length, lossCount: losses.length,
       winRate: Math.round(winRate * 10) / 10, totalPnl: Math.round(totalPnl * 100) / 100,
@@ -687,7 +696,7 @@ async function runBatchBacktest(options) {
           totalPnl: result.summary.totalPnl, maxDrawdown: result.summary.maxDrawdown,
           sharpeRatio: result.summary.sharpeRatio, avgWin: result.summary.avgWin,
           avgLoss: result.summary.avgLoss, trades: result.trades,
-          configSnapshot: { instrument, strategyType: strat.type, ...(strat.config || {}) },
+          configSnapshot: result.configUsed || { instrument, strategyType: strat.type, ...(strat.config || {}) },
           batchId, instrument, strategyTypeKey: strat.type
         });
         results.push({ id: saved.id, strategyType: strat.type, timeframe: tf, summary: result.summary });

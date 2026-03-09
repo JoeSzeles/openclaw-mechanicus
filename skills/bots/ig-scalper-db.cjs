@@ -230,7 +230,11 @@ async function getBacktests(strategyId, limit = 20) {
 
 async function getBacktest(id) {
   const res = await query("SELECT * FROM scalper_backtests WHERE id = $1", [id]);
-  return camel(res.rows[0]);
+  const row = camel(res.rows[0]);
+  if (row && row.configSnapshot && typeof row.configSnapshot === 'string') {
+    try { row.configSnapshot = JSON.parse(row.configSnapshot); } catch (_) {}
+  }
+  return row;
 }
 
 let _priceCandlesReady = false;
@@ -715,11 +719,18 @@ async function getBatchResults(batchId) {
   await ensureBatchColumns();
   const res = await query(
     `SELECT id, strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl,
-            max_drawdown, sharpe_ratio, avg_win, avg_loss, created_at, batch_id, instrument, strategy_type_key
+            max_drawdown, sharpe_ratio, avg_win, avg_loss, created_at, batch_id, instrument, strategy_type_key,
+            config_snapshot
      FROM scalper_backtests WHERE batch_id = $1 ORDER BY total_pnl DESC`,
     [batchId]
   );
-  return res.rows.map(camel);
+  return res.rows.map(r => {
+    const row = camel(r);
+    if (row.configSnapshot && typeof row.configSnapshot === 'string') {
+      try { row.configSnapshot = JSON.parse(row.configSnapshot); } catch (_) {}
+    }
+    return row;
+  });
 }
 
 async function listBatches(limit = 20) {
