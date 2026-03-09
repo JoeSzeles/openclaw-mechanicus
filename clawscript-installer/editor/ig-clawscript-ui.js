@@ -3681,33 +3681,100 @@ function _autoDetectOpenClawConfig() {
   if (!isStandalone) return;
   if (_getAiConfig()) return;
 
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', '/api/clawscript/ai/config', true);
-  xhr.timeout = 5000;
-  xhr.onload = function() {
-    if (xhr.status >= 200 && xhr.status < 300) {
-      try {
-        var cfg = JSON.parse(xhr.responseText);
-        if (cfg.found) {
-          _csAutoDetectedConfig = cfg;
-          var modelName = cfg.primaryModel || cfg.model || 'unknown';
-          var providerName = (cfg.provider || 'auto').toUpperCase();
-          csLog('Auto-detected OpenClaw AI: ' + providerName + ' (' + modelName + ')', 'success');
-          var modelSel = document.getElementById('csAiModelSelect');
-          if (modelSel) {
-            var opt = document.createElement('option');
-            opt.value = 'openclaw-local';
-            opt.textContent = providerName + ' (Local)';
-            modelSel.insertBefore(opt, modelSel.firstChild);
-            modelSel.value = 'openclaw-local';
+  var token = _getAuthToken();
+  function probeConfigEndpoint() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/clawscript/ai/config', true);
+    xhr.timeout = 3000;
+    if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr.onload = function() {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          var cfg = JSON.parse(xhr.responseText);
+          if (cfg.found) {
+            _csAutoDetectedConfig = cfg;
+            var modelName = cfg.primaryModel || cfg.model || 'unknown';
+            var providerName = (cfg.provider || 'auto').toUpperCase();
+            csLog('AI connected: ' + providerName + ' (' + modelName + ')', 'success');
+            _addLocalModelOption(providerName);
+            return;
           }
-        }
-      } catch(_e) {}
-    }
-  };
-  xhr.onerror = function() {};
-  xhr.ontimeout = function() {};
-  xhr.send();
+        } catch(_e) {}
+      }
+      probeGatewayModels();
+    };
+    xhr.onerror = function() { probeGatewayModels(); };
+    xhr.ontimeout = function() { probeGatewayModels(); };
+    xhr.send();
+  }
+
+  function probeGatewayModels() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/v1/models', true);
+    xhr.timeout = 3000;
+    if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr.onload = function() {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          var models = data.data || data.models || [];
+          if (models.length > 0) {
+            var firstModel = models[0].id || models[0];
+            _csAutoDetectedConfig = {
+              found: true,
+              chatCompletionsEnabled: true,
+              gatewayPort: null,
+              gatewayToken: token,
+              primaryModel: firstModel,
+              useOrigin: true
+            };
+            csLog('AI connected: Gateway (' + firstModel + ')', 'success');
+            _addLocalModelOption('Agent');
+            return;
+          }
+        } catch(_e) {}
+      }
+      probeAgentChat();
+    };
+    xhr.onerror = function() { probeAgentChat(); };
+    xhr.ontimeout = function() { probeAgentChat(); };
+    xhr.send();
+  }
+
+  function probeAgentChat() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/agent/chat', true);
+    xhr.timeout = 5000;
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr.onload = function() {
+      if (xhr.status < 500) {
+        _csAutoDetectedConfig = {
+          found: true,
+          useAgentChat: true,
+          gatewayToken: token
+        };
+        csLog('AI connected: OpenClaw Agent', 'success');
+        _addLocalModelOption('Agent');
+      }
+    };
+    xhr.onerror = function() {};
+    xhr.ontimeout = function() {};
+    xhr.send(JSON.stringify({ messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 }));
+  }
+
+  probeConfigEndpoint();
+}
+
+function _addLocalModelOption(label) {
+  var modelSel = document.getElementById('csAiModelSelect');
+  if (modelSel) {
+    var opt = document.createElement('option');
+    opt.value = 'openclaw-local';
+    opt.textContent = label + ' (Local)';
+    modelSel.insertBefore(opt, modelSel.firstChild);
+    modelSel.value = 'openclaw-local';
+  }
 }
 function _saveAiConfig(cfg) {
   _csAiConfig = cfg;
@@ -3833,30 +3900,60 @@ function _sendAiRequest(messages, callback) {
 }
 
 function _sendToLocalGateway(autoConfig, messages, callback) {
+  var gatewayToken = autoConfig.gatewayToken;
+
+  if (autoConfig.useAgentChat) {
+    var headers = { 'Content-Type': 'application/json' };
+    if (gatewayToken) headers['Authorization'] = 'Bearer ' + gatewayToken;
+    _xhrPost('/api/agent/chat', headers, { messages: messages }, function(text) {
+      var reply = _parseAiResponse(text);
+      if (reply) { callback(reply); return; }
+      try {
+        var data = JSON.parse(text);
+        if (data.response) { callback(data.response); return; }
+        if (data.message) { callback(data.message); return; }
+        if (data.content) { callback(data.content); return; }
+        if (typeof data === 'string') { callback(data); return; }
+      } catch(_e) {}
+      callback(text && text.length < 5000 ? text : null);
+    }, function(status, text) {
+      _sendToGatewayChatCompletions(autoConfig, messages, callback);
+    });
+    return;
+  }
+
+  _sendToGatewayChatCompletions(autoConfig, messages, callback);
+}
+
+function _sendToGatewayChatCompletions(autoConfig, messages, callback) {
   var port = autoConfig.gatewayPort;
   var gatewayToken = autoConfig.gatewayToken;
   var model = autoConfig.primaryModel || autoConfig.model || 'grok-4';
 
-  if (port && autoConfig.chatCompletionsEnabled) {
-    var url = 'http://localhost:' + port + '/v1/chat/completions';
-    var headers = { 'Content-Type': 'application/json' };
-    if (gatewayToken) headers['Authorization'] = 'Bearer ' + gatewayToken;
-    var body = { model: model, messages: messages, max_tokens: 4096, temperature: 0.3 };
-    _xhrPost(url, headers, body, function(text) {
-      var reply = _parseAiResponse(text);
-      callback(reply);
-    }, function(status, text) {
-      if (autoConfig.baseUrl) {
-        _sendToProviderDirect(autoConfig, messages, callback);
-      } else {
-        callback('Error: Local gateway at port ' + port + ' returned HTTP ' + status + '.');
-      }
-    });
-  } else if (autoConfig.baseUrl) {
-    _sendToProviderDirect(autoConfig, messages, callback);
+  var url;
+  if (autoConfig.useOrigin) {
+    url = '/v1/chat/completions';
+  } else if (port) {
+    url = 'http://localhost:' + port + '/v1/chat/completions';
   } else {
-    callback(null);
+    url = '/v1/chat/completions';
   }
+
+  var headers = { 'Content-Type': 'application/json' };
+  if (gatewayToken) headers['Authorization'] = 'Bearer ' + gatewayToken;
+  var body = { model: model, messages: messages, max_tokens: 4096, temperature: 0.3 };
+  _xhrPost(url, headers, body, function(text) {
+    var reply = _parseAiResponse(text);
+    callback(reply);
+  }, function(status, text) {
+    if (autoConfig.baseUrl) {
+      _sendToProviderDirect(autoConfig, messages, callback);
+    } else {
+      var errMsg = status ? 'HTTP ' + status : 'Network error';
+      try { var d = JSON.parse(text); if (d.error) errMsg = d.error.message || errMsg; } catch(_) {}
+      callback('Error: ' + errMsg);
+    }
+  });
 }
 
 function _sendToProviderDirect(autoConfig, messages, callback) {
