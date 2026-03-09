@@ -66,9 +66,9 @@ class MeanReversionStrategy extends BaseStrategy {
       if (rsi === null) return null;
 
       if (direction === "BUY") {
-        if (stoch.k >= 20 || rsi >= rsiOversold) return null;
+        if (stoch.k >= 30 && rsi >= rsiOversold) return null;
       } else {
-        if (stoch.k <= 80 || rsi <= rsiOverbought) return null;
+        if (stoch.k <= 70 && rsi <= rsiOverbought) return null;
       }
 
       let size = c.size || 1;

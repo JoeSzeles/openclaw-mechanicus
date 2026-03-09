@@ -63,10 +63,11 @@ class MarketMakingStrategy extends BaseStrategy {
 
     if (midPrice <= adjustedLower) {
       return {
+        signal: true,
         direction: "BUY",
         reason: `Price ${midPrice.toFixed(4)} near lower band ${lower.toFixed(4)} (pos ${posInBand.toFixed(2)})`,
-        stopDistance,
-        limitDistance,
+        stopDist: stopDistance,
+        limitDist: limitDistance,
         size: this.config.minSize,
         confidence: Math.min(1, (1 - posInBand) * 2),
         meta: { atr, upper, lower, middle, bandwidth, posInBand }
@@ -75,10 +76,11 @@ class MarketMakingStrategy extends BaseStrategy {
 
     if (midPrice >= adjustedUpper) {
       return {
+        signal: true,
         direction: "SELL",
         reason: `Price ${midPrice.toFixed(4)} near upper band ${upper.toFixed(4)} (pos ${posInBand.toFixed(2)})`,
-        stopDistance,
-        limitDistance,
+        stopDist: stopDistance,
+        limitDist: limitDistance,
         size: this.config.minSize,
         confidence: Math.min(1, posInBand * 2),
         meta: { atr, upper, lower, middle, bandwidth, posInBand }

@@ -541,4 +541,166 @@ async function runAndSave(strategyId, options = {}) {
   return { id: saved.id, summary: s, trades: result.trades };
 }
 
-module.exports = { runBacktest, runAndSave };
+async function runStandaloneBacktest(instrument, strategyType, config, timeframe, candleCount) {
+  const fetchResolution = igResolution(timeframe);
+  const candles = await fetchCandles(instrument, fetchResolution, candleCount);
+  if (candles.length < 20) throw new Error("Insufficient candle data: " + candles.length);
+
+  const mergedConfig = { instrument, direction: "BOTH", size: 1, stopDistance: 0, limitDistance: 0, ...config };
+  const stratInstance = strategyLoader.createInstance(strategyType, mergedConfig);
+  const size = mergedConfig.size || 1;
+  const stopDist = mergedConfig.stopDistance || 0;
+  const limitDist = mergedConfig.limitDistance || 0;
+  const trailingStop = mergedConfig.trailingStop || 0;
+  const profitTarget = mergedConfig.profitTarget || 0;
+  const cooldownBars = Math.max(1, Math.round((mergedConfig.cooldownMs || 6000) / resolutionMs(timeframe)));
+  const cs = mergedConfig.contractSize || 1;
+
+  const trades = [];
+  let openTrade = null;
+  let lastEntryBar = -cooldownBars;
+  let peakPnl = 0;
+
+  const warmupBars = Math.max(stratInstance.getRequiredBufferSize(), 10);
+
+  for (let i = warmupBars; i < candles.length; i++) {
+    const c = candles[i];
+
+    if (openTrade) {
+      const dir = openTrade.direction;
+      const entryPrice = openTrade.entryPrice;
+      const eStop = openTrade.stopDist || stopDist;
+      const eLimit = openTrade.limitDist || limitDist;
+      let exitPrice = null, reason = null;
+
+      if (eStop > 0) {
+        const sl = dir === "BUY" ? entryPrice - eStop : entryPrice + eStop;
+        if (dir === "BUY" && c.low <= sl) { exitPrice = sl; reason = "SL"; }
+        if (dir === "SELL" && c.high >= sl) { exitPrice = sl; reason = "SL"; }
+      }
+      if (!reason && eLimit > 0) {
+        const tp = dir === "BUY" ? entryPrice + eLimit : entryPrice - eLimit;
+        if (dir === "BUY" && c.high >= tp) { exitPrice = tp; reason = "TP"; }
+        if (dir === "SELL" && c.low <= tp) { exitPrice = tp; reason = "TP"; }
+      }
+      if (!reason && trailingStop > 0) {
+        const unrealised = dir === "BUY" ? (c.high - entryPrice) : (entryPrice - c.low);
+        if (unrealised > peakPnl) peakPnl = unrealised;
+        if (peakPnl > trailingStop && (peakPnl - unrealised) > trailingStop * 0.5) {
+          exitPrice = dir === "BUY" ? (c.high - trailingStop * 0.5) : (c.low + trailingStop * 0.5);
+          reason = "TRAIL";
+        }
+      }
+      if (!reason && profitTarget > 0) {
+        const rawPnl = dir === "BUY" ? (c.close - entryPrice) * (openTrade.size || size) * cs : (entryPrice - c.close) * (openTrade.size || size) * cs;
+        if (rawPnl >= profitTarget) { exitPrice = c.close; reason = "PT"; }
+      }
+
+      if (exitPrice !== null) {
+        const tSize = openTrade.size || size;
+        const pnl = Math.round((dir === "BUY" ? (exitPrice - entryPrice) * tSize * cs : (entryPrice - exitPrice) * tSize * cs) * 100) / 100;
+        trades.push({ entryTime: openTrade.entryTime, entryBar: openTrade.entryBar, entryPrice, exitTime: c.time, exitBar: i, exitPrice, direction: dir, pnl, reason, size: tSize });
+        openTrade = null; peakPnl = 0; lastEntryBar = i;
+      }
+      continue;
+    }
+
+    if (i - lastEntryBar < cooldownBars) continue;
+
+    const pseudoTicks = candles.slice(Math.max(0, i - warmupBars), i + 1).map(x => ({
+      bid: x.close, offer: x.close, mid: x.close, spread: x.high - x.low, ts: x.time * 1000
+    }));
+    const spread = c.high - c.low;
+    const context = { htfBias: null, accountBalance: 0, accountMargin: 0, spread, epic: instrument, config: mergedConfig, breakEvenBuffer: 1.5 };
+    let signal = stratInstance.safeEvaluateEntry(pseudoTicks, context);
+    if (signal && typeof signal.then === "function") { try { signal = await signal; } catch (_) { signal = null; } }
+
+    if (!signal || !signal.signal || !signal.direction) continue;
+    if (mergedConfig.direction && mergedConfig.direction !== "BOTH" && signal.direction !== mergedConfig.direction) continue;
+
+    let sigStop = signal.stopDist || stopDist;
+    let sigLimit = signal.limitDist || limitDist;
+    if (sigStop <= 0 && sigLimit <= 0 && trailingStop <= 0 && profitTarget <= 0) {
+      sigStop = spread > 0 ? spread * 3 : c.close * 0.005;
+      sigLimit = spread > 0 ? spread * 4 : c.close * 0.007;
+    }
+
+    openTrade = { direction: signal.direction, entryPrice: c.close, entryTime: c.time, entryBar: i, stopDist: sigStop, limitDist: sigLimit, size: signal.size || size };
+    peakPnl = 0;
+  }
+
+  if (openTrade) {
+    const lastC = candles[candles.length - 1];
+    const tSize = openTrade.size || size;
+    const pnl = Math.round((openTrade.direction === "BUY" ? (lastC.close - openTrade.entryPrice) : (openTrade.entryPrice - lastC.close)) * tSize * cs * 100) / 100;
+    trades.push({ entryTime: openTrade.entryTime, entryBar: openTrade.entryBar, entryPrice: openTrade.entryPrice, exitTime: lastC.time, exitBar: candles.length - 1, exitPrice: lastC.close, direction: openTrade.direction, pnl, reason: "OPEN" });
+  }
+
+  const wins = trades.filter(t => t.pnl > 0);
+  const losses = trades.filter(t => t.pnl <= 0);
+  const totalPnl = trades.reduce((s, t) => s + t.pnl, 0);
+  const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0;
+  const avgLoss = losses.length > 0 ? losses.reduce((s, t) => s + t.pnl, 0) / losses.length : 0;
+  const winRate = trades.length > 0 ? (wins.length / trades.length) * 100 : 0;
+  let maxDD = 0, peak = 0, equity = 0;
+  for (const t of trades) { equity += t.pnl; if (equity > peak) peak = equity; const dd = peak - equity; if (dd > maxDD) maxDD = dd; }
+  const returns = trades.map(t => t.pnl);
+  let sharpe = 0;
+  if (returns.length > 1) { const mean = returns.reduce((s, r) => s + r, 0) / returns.length; const variance = returns.reduce((s, r) => s + Math.pow(r - mean, 2), 0) / (returns.length - 1); const std = Math.sqrt(variance); sharpe = std > 0 ? (mean / std) * Math.sqrt(252) : 0; }
+
+  return {
+    trades,
+    summary: {
+      totalTrades: trades.length, winCount: wins.length, lossCount: losses.length,
+      winRate: Math.round(winRate * 10) / 10, totalPnl: Math.round(totalPnl * 100) / 100,
+      maxDrawdown: Math.round(maxDD * 100) / 100, sharpeRatio: Math.round(sharpe * 100) / 100,
+      avgWin: Math.round(avgWin * 100) / 100, avgLoss: Math.round(avgLoss * 100) / 100,
+      candleCount: candles.length, timeframe, strategyType
+    }
+  };
+}
+
+async function runBatchBacktest(options) {
+  const { instrument, strategies, timeframes, candleCount = 500 } = options;
+  if (!instrument) throw new Error("instrument is required");
+  if (!strategies || strategies.length === 0) throw new Error("at least one strategy is required");
+  if (!timeframes || timeframes.length === 0) throw new Error("at least one timeframe is required");
+
+  const batchId = "batch-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
+  const results = [];
+  const errors = [];
+  let completed = 0;
+  const total = strategies.length * timeframes.length;
+
+  console.log(`[batch-backtest] Starting batch ${batchId}: ${strategies.length} strategies × ${timeframes.length} timeframes = ${total} runs on ${instrument}`);
+
+  for (const strat of strategies) {
+    for (const tf of timeframes) {
+      completed++;
+      try {
+        console.log(`[batch-backtest] [${completed}/${total}] ${strat.type} @ ${tf}`);
+        const result = await runStandaloneBacktest(instrument, strat.type, strat.config || {}, tf, candleCount);
+        const saved = await db.saveBatchBacktest({
+          strategyId: 0, timeframe: tf, candleCount: result.summary.candleCount,
+          totalTrades: result.summary.totalTrades, winCount: result.summary.winCount,
+          lossCount: result.summary.lossCount, winRate: result.summary.winRate,
+          totalPnl: result.summary.totalPnl, maxDrawdown: result.summary.maxDrawdown,
+          sharpeRatio: result.summary.sharpeRatio, avgWin: result.summary.avgWin,
+          avgLoss: result.summary.avgLoss, trades: result.trades,
+          configSnapshot: { instrument, strategyType: strat.type, ...(strat.config || {}) },
+          batchId, instrument, strategyTypeKey: strat.type
+        });
+        results.push({ id: saved.id, strategyType: strat.type, timeframe: tf, summary: result.summary });
+      } catch (e) {
+        console.log(`[batch-backtest] ERROR ${strat.type} @ ${tf}: ${e.message}`);
+        errors.push({ strategyType: strat.type, timeframe: tf, error: e.message });
+      }
+      if (completed < total) await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+
+  console.log(`[batch-backtest] Batch ${batchId} complete: ${results.length} succeeded, ${errors.length} failed`);
+  return { batchId, instrument, total, completed: results.length, failed: errors.length, results, errors };
+}
+
+module.exports = { runBacktest, runAndSave, runStandaloneBacktest, runBatchBacktest };

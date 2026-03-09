@@ -3208,6 +3208,39 @@ async function handleIgApi(req, res, p) {
       return json(res, 200, bt);
     }
 
+    if (req.method === "POST" && p === "/api/ig/scalper/batch-backtest") {
+      let body; try { body = JSON.parse((await readBody(req)).toString() || "{}"); } catch(_) { return json(res, 400, { error: "Invalid JSON" }); }
+      try {
+        const backtestEngine = require("./skills/bots/ig-scalper-backtest.cjs");
+        const result = await backtestEngine.runBatchBacktest({
+          instrument: body.instrument,
+          strategies: body.strategies || [],
+          timeframes: body.timeframes || ["MINUTE"],
+          candleCount: parseInt(body.candleCount, 10) || 500
+        });
+        return json(res, 200, { ok: true, ...result });
+      } catch (e) {
+        var code = /required|invalid|missing/i.test(e.message) ? 400 : 500;
+        return json(res, code, { error: e.message });
+      }
+    }
+    if (req.method === "GET" && p === "/api/ig/scalper/batch-backtest") {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const batches = await scalperDb.listBatches(20);
+      return json(res, 200, { batches });
+    }
+    const batchDetailMatch = p.match(/^\/api\/ig\/scalper\/batch-backtest\/([^/]+)$/);
+    if (req.method === "GET" && batchDetailMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const results = await scalperDb.getBatchResults(batchDetailMatch[1]);
+      return json(res, 200, { batchId: batchDetailMatch[1], results });
+    }
+    if (req.method === "DELETE" && batchDetailMatch) {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const result = await scalperDb.deleteBatch(batchDetailMatch[1]);
+      return json(res, 200, result);
+    }
+
     return json(res, 404, { error: "Unknown IG endpoint" });
   } catch (e) {
     return json(res, 500, { error: e.message });

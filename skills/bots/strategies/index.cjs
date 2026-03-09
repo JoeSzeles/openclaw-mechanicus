@@ -66,16 +66,37 @@ function getStrategySchemas() {
   return schemas;
 }
 
+function resolveType(type) {
+  loadStrategies();
+  if (registry[type]) return type;
+  const lower = type.toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const regType of Object.keys(registry)) {
+    if (regType === lower || regType === 'custom-' + lower) return regType;
+  }
+  for (const [regType, Cls] of Object.entries(registry)) {
+    try {
+      const inst = new Cls({});
+      const name = (inst.getName() || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const desc = (inst.getDescription() || '').toLowerCase();
+      if (name === lower || desc.includes(type.toLowerCase())) return regType;
+    } catch (_) {}
+  }
+  return null;
+}
+
 function createInstance(type, config) {
   loadStrategies();
-  const Cls = registry[type];
-  if (!Cls) {
+  const resolved = resolveType(type);
+  if (!resolved) {
     const available = Object.keys(registry).join(", ");
-    const errMsg = `Strategy type "${type}" not found in registry. Available types: ${available}`;
+    const errMsg = `Strategy type "${type}" not found in registry. Available types: ${available}. Re-compile the strategy in ClawScript Editor.`;
     console.log(`[strategy-loader] ERROR: ${errMsg}`);
     throw new Error(errMsg);
   }
-  return new Cls(config);
+  if (resolved !== type) {
+    console.log(`[strategy-loader] Resolved "${type}" → "${resolved}"`);
+  }
+  return new registry[resolved](config);
 }
 
-module.exports = { getStrategy, listStrategies, getStrategySchemas, createInstance, loadStrategies };
+module.exports = { getStrategy, listStrategies, getStrategySchemas, createInstance, loadStrategies, resolveType };

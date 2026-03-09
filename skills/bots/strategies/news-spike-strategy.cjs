@@ -11,7 +11,7 @@ class NewsSpikeStrategy extends BaseStrategy {
     return [
       { key: "spikeThreshold", type: "number", default: 0.5, description: "Minimum velocity ratio (recent vs average) to trigger spike detection", group: "entry" },
       { key: "spikeWindowMs", type: "number", default: 5000, description: "Time window in ms to measure recent tick velocity", group: "entry" },
-      { key: "requireAlert", type: "boolean", default: true, description: "Require an HTF bias alert before entering a trade", group: "entry" },
+      { key: "requireAlert", type: "boolean", default: false, description: "Require an HTF bias alert before entering a trade", group: "entry" },
       { key: "minSize", type: "number", default: 0.5, description: "Minimum trade size in contracts", group: "sizing" },
       { key: "maxSize", type: "number", default: 10, description: "Maximum trade size in contracts", group: "sizing" }
     ];
@@ -23,7 +23,7 @@ class NewsSpikeStrategy extends BaseStrategy {
 
     const spikeThreshold = c.spikeThreshold || 0.5;
     const spikeWindowMs = c.spikeWindowMs || 5000;
-    const requireAlert = c.requireAlert !== false;
+    const requireAlert = c.requireAlert === true;
     const minSize = c.minSize || 0.5;
     const maxSize = c.maxSize || 10;
 
@@ -94,6 +94,7 @@ class NewsSpikeStrategy extends BaseStrategy {
     const size = Math.max(minSize, Math.min(maxSize, Math.round(minSize * sizeScale * 2) / 2));
 
     return {
+      signal: true,
       direction: spikeDirection,
       size,
       reason: `spike ratio ${spikeRatio.toFixed(2)} (threshold ${(1 + spikeThreshold).toFixed(2)}), dir=${spikeDirection}${htfBias ? ", bias=" + htfBias : ""}`

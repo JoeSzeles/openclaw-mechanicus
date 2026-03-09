@@ -37,10 +37,10 @@ class PairsTradingStrategy extends BaseStrategy {
     if (zScore === null) return null;
 
     if (zScore > this.config.zScoreEntry) {
-      return { direction: "SELL", reason: `z-score ${zScore.toFixed(2)} > ${this.config.zScoreEntry} (overvalued)` };
+      return { signal: true, direction: "SELL", size: this.config.minSize || 0.5, reason: `z-score ${zScore.toFixed(2)} > ${this.config.zScoreEntry} (overvalued)` };
     }
     if (zScore < -this.config.zScoreEntry) {
-      return { direction: "BUY", reason: `z-score ${zScore.toFixed(2)} < -${this.config.zScoreEntry} (undervalued)` };
+      return { signal: true, direction: "BUY", size: this.config.minSize || 0.5, reason: `z-score ${zScore.toFixed(2)} < -${this.config.zScoreEntry} (undervalued)` };
     }
 
     return null;

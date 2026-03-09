@@ -671,7 +671,8 @@ async function getAllBacktests(limit = 50) {
   const res = await query(
     `SELECT b.id, b.strategy_id, b.timeframe, b.candle_count, b.total_trades, b.win_count, b.loss_count,
             b.win_rate, b.total_pnl, b.max_drawdown, b.sharpe_ratio, b.avg_win, b.avg_loss, b.created_at,
-            s.name as strategy_name, s.instrument, s.strategy_type
+            b.batch_id, b.instrument, b.strategy_type_key,
+            s.name as strategy_name, s.instrument as strat_instrument, s.strategy_type
      FROM scalper_backtests b
      LEFT JOIN scalper_strategies s ON b.strategy_id = s.id
      ORDER BY b.created_at DESC LIMIT $1`,
@@ -685,6 +686,60 @@ async function deleteAllBacktests() {
   return { ok: true };
 }
 
+async function ensureBatchColumns() {
+  const cols = [
+    ["batch_id", "VARCHAR(40)"],
+    ["instrument", "VARCHAR(60)"],
+    ["strategy_type_key", "VARCHAR(120)"]
+  ];
+  for (const [col, def] of cols) {
+    try { await query(`ALTER TABLE scalper_backtests ADD COLUMN IF NOT EXISTS ${col} ${def}`); } catch (_) {}
+  }
+  try { await query(`CREATE INDEX IF NOT EXISTS idx_backtests_batch ON scalper_backtests (batch_id)`); } catch (_) {}
+}
+
+async function saveBatchBacktest(data) {
+  await ensureBatchColumns();
+  const res = await query(
+    `INSERT INTO scalper_backtests (strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl, max_drawdown, sharpe_ratio, avg_win, avg_loss, trades, config_snapshot, batch_id, instrument, strategy_type_key)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+    [data.strategyId || 0, data.timeframe, data.candleCount, data.totalTrades, data.winCount, data.lossCount,
+     data.winRate, data.totalPnl, data.maxDrawdown, data.sharpeRatio, data.avgWin, data.avgLoss,
+     JSON.stringify(data.trades), JSON.stringify(data.configSnapshot),
+     data.batchId, data.instrument, data.strategyTypeKey]
+  );
+  return camel(res.rows[0]);
+}
+
+async function getBatchResults(batchId) {
+  await ensureBatchColumns();
+  const res = await query(
+    `SELECT id, strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl,
+            max_drawdown, sharpe_ratio, avg_win, avg_loss, created_at, batch_id, instrument, strategy_type_key
+     FROM scalper_backtests WHERE batch_id = $1 ORDER BY total_pnl DESC`,
+    [batchId]
+  );
+  return res.rows.map(camel);
+}
+
+async function listBatches(limit = 20) {
+  await ensureBatchColumns();
+  const res = await query(
+    `SELECT batch_id, COUNT(*)::int as run_count, MIN(created_at) as started, MAX(created_at) as finished,
+            SUM(total_trades)::int as total_trades, ROUND(AVG(win_rate)::numeric, 1) as avg_win_rate,
+            ROUND(SUM(total_pnl)::numeric, 2) as total_pnl
+     FROM scalper_backtests WHERE batch_id IS NOT NULL
+     GROUP BY batch_id ORDER BY MIN(created_at) DESC LIMIT $1`,
+    [limit]
+  );
+  return res.rows.map(camel);
+}
+
+async function deleteBatch(batchId) {
+  const res = await query("DELETE FROM scalper_backtests WHERE batch_id = $1", [batchId]);
+  return { ok: true, deleted: res.rowCount };
+}
+
 async function close() {
   await pool.end();
 }
@@ -694,6 +749,7 @@ module.exports = {
   getStrategies, getStrategy, addStrategy, updateStrategy, deleteStrategy, toggleStrategy,
   logTrade, getTrades, getTradeStats, clearTrades,
   saveBacktest, getBacktests, getBacktest, deleteBacktests, getAllBacktests, deleteAllBacktests,
+  ensureBatchColumns, saveBatchBacktest, getBatchResults, listBatches, deleteBatch,
   ensurePriceCandlesTable, getStoredCandles, getLatestCandleTs, getCandleCount, storeCandles, getStoredCandlesRange,
   ensureNewColumns,
   backupAgent, listAgentBackups, restoreAgentBackup, deleteAgentBackup,

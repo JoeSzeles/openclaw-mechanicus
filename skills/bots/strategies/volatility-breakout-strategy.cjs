@@ -57,11 +57,11 @@ class VolatilityBreakoutStrategy extends BaseStrategy {
     const atrExpanded = currentATR > avgATR * (1 + atrExpansionPct / 100);
 
     if (currentPrice > keltner.upper && atrExpanded) {
-      return { direction: "BUY", reason: `Price ${currentPrice.toFixed(4)} broke above upper Keltner ${keltner.upper.toFixed(4)} with ATR expansion` };
+      return { signal: true, direction: "BUY", size: this.config.minSize, stopDist: currentATR * 2, limitDist: currentATR * 3, reason: `Price ${currentPrice.toFixed(4)} broke above upper Keltner ${keltner.upper.toFixed(4)} with ATR expansion` };
     }
 
     if (currentPrice < keltner.lower && atrExpanded) {
-      return { direction: "SELL", reason: `Price ${currentPrice.toFixed(4)} broke below lower Keltner ${keltner.lower.toFixed(4)} with ATR expansion` };
+      return { signal: true, direction: "SELL", size: this.config.minSize, stopDist: currentATR * 2, limitDist: currentATR * 3, reason: `Price ${currentPrice.toFixed(4)} broke below lower Keltner ${keltner.lower.toFixed(4)} with ATR expansion` };
     }
 
     return null;

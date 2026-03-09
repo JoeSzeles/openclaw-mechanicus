@@ -82,8 +82,11 @@ class GridTraderStrategy extends BaseStrategy {
         const size = Math.min(Math.max(minSize + (maxSize - minSize) * sizeRatio, minSize), maxSize);
 
         return {
+          signal: true,
           direction,
           size,
+          stopDist: spacing * 2,
+          limitDist: spacing,
           reason: `Grid level touched at ${level.toFixed(4)}, direction toward center`,
           grid: {
             level,

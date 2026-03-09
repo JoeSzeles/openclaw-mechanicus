@@ -54,10 +54,11 @@ class BreakoutStrategy extends BaseStrategy {
 
     if (price > donchian.upper) {
       return {
+        signal: true,
         direction: "BUY",
         price,
-        stopLoss: price - stopDistance,
-        takeProfit: price + stopDistance * 2,
+        stopDist: stopDistance,
+        limitDist: stopDistance * 2,
         size: this.config.minSize,
         reason: `Breakout above Donchian upper ${donchian.upper.toFixed(4)}, ATR stop ${stopDistance.toFixed(4)}`
       };
@@ -65,10 +66,11 @@ class BreakoutStrategy extends BaseStrategy {
 
     if (price < donchian.lower) {
       return {
+        signal: true,
         direction: "SELL",
         price,
-        stopLoss: price + stopDistance,
-        takeProfit: price - stopDistance * 2,
+        stopDist: stopDistance,
+        limitDist: stopDistance * 2,
         size: this.config.minSize,
         reason: `Breakout below Donchian lower ${donchian.lower.toFixed(4)}, ATR stop ${stopDistance.toFixed(4)}`
       };

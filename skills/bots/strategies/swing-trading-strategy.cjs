@@ -33,12 +33,12 @@ class SwingTradingStrategy extends BaseStrategy {
       const rsi = ind.calcRSI(prices, c.rsiPeriod || 14);
       if (rsi === null) return null;
 
-      const htfBias = context.htfBias;
+      const htfBias = context && context.htfBias ? context.htfBias : null;
       let direction = null;
 
-      if (fib.isUptrend && fib.nearestLevel >= 0.618 && rsi < 40) {
+      if (fib.isUptrend && fib.nearestLevel >= 0.382 && rsi < 45) {
         direction = "BUY";
-      } else if (!fib.isUptrend && fib.nearestLevel >= 0.618 && rsi > 60) {
+      } else if (!fib.isUptrend && fib.nearestLevel >= 0.382 && rsi > 55) {
         direction = "SELL";
       }
 
