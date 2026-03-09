@@ -36,8 +36,12 @@ cp "$SCRIPT_DIR/strategies/base-strategy.cjs" "$STRATS_DIR/"
 cp "$SCRIPT_DIR/strategies/index.cjs" "$STRATS_DIR/"
 
 echo "[4/7] Installing editor files..."
+cp "$SCRIPT_DIR/editor/clawscript-editor.html" "$CANVAS_DIR/"
 cp "$SCRIPT_DIR/editor/ig-clawscript-ui.js" "$CANVAS_DIR/"
 cp "$SCRIPT_DIR/editor/ig-clawscript-flow.js" "$CANVAS_DIR/"
+if [ -f "$SCRIPT_DIR/serve.cjs" ]; then
+  cp "$SCRIPT_DIR/serve.cjs" "$CANVAS_DIR/../serve-clawscript.cjs"
+fi
 
 echo "[5/7] Installing templates..."
 cp "$SCRIPT_DIR/templates/"*.cs "$TEMPLATES_DIR/"
@@ -108,10 +112,14 @@ echo "  Indicators: $BOTS_DIR/indicators.cjs"
 echo "  AI Handler: $BOTS_DIR/clawscript-ai-handler.cjs"
 echo "  Stubs:      $BOTS_DIR/openclaw-*.cjs"
 echo "  Strategies: $STRATS_DIR/"
-echo "  Editor:     $CANVAS_DIR/ig-clawscript-*.js"
+echo "  Editor UI:  $CANVAS_DIR/clawscript-editor.html"
+echo "  Editor JS:  $CANVAS_DIR/ig-clawscript-*.js"
 echo "  Templates:  $TEMPLATES_DIR/"
 echo "  Docs:       $CANVAS_DIR/clawscript-docs.html"
 echo "  Reference:  $CLAWSKILL_DIR/CLAWSCRIPT.md"
+if [ -f "$CANVAS_DIR/../serve-clawscript.cjs" ]; then
+echo "  Server:     $CANVAS_DIR/../serve-clawscript.cjs"
+fi
 echo ""
 echo "Usage:"
 echo "  const { parseAndGenerate } = require('./$BOTS_DIR/clawscript-parser.cjs');"
