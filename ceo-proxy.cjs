@@ -1160,31 +1160,35 @@ async function handleClawScriptApi(req, res, p) {
       if (!parsed || !parsed.ast) return json(res, 400, { error: "Parse error: " + (parsed ? parsed.error : "unknown") });
       const ast = parsed.ast;
 
-      const session = await igAuth();
-      const url = new URL("http://localhost/api/ig/pricehistory/" + epic);
-      url.searchParams.set("resolution", res_);
-      url.searchParams.set("max", String(max));
-      const igR = await igRequest("GET", "/prices/" + epic + "?resolution=" + res_ + "&max=" + max + "&pageSize=" + max, igHeaders(session));
       let candles = [];
-      if (igR.status === 200) {
-        const data = safeParseIgBody(igR.body);
-        if (data && data.prices) {
-          candles = data.prices.map(p => {
-            let rawTime = p.snapshotTimeUTC || p.snapshotTime || "";
-            if (typeof rawTime === "string") rawTime = rawTime.replace(/\//g, "-");
-            const dt = new Date(rawTime);
-            const om = p.openPrice || {}, hm = p.highPrice || {}, lm = p.lowPrice || {}, cm = p.closePrice || {};
-            return {
-              ts: Math.floor(dt.getTime() / 1000),
-              time: Math.floor(dt.getTime() / 1000),
-              open: ((om.bid || 0) + (om.ask || om.offer || 0)) / 2,
-              high: ((hm.bid || 0) + (hm.ask || hm.offer || 0)) / 2,
-              low: ((lm.bid || 0) + (lm.ask || lm.offer || 0)) / 2,
-              close: ((cm.bid || 0) + (cm.ask || cm.offer || 0)) / 2,
-              volume: p.lastTradedVolume || 0
-            };
-          }).sort((a, b) => a.ts - b.ts);
+      let dataSource = "none";
+
+      try {
+        const session = await igAuth();
+        const igR = await igRequest("GET", "/prices/" + epic + "?resolution=" + res_ + "&max=" + max + "&pageSize=" + max, igHeaders(session));
+        if (igR.status === 200) {
+          const data = safeParseIgBody(igR.body);
+          if (data && data.prices) {
+            candles = data.prices.map(p => {
+              let rawTime = p.snapshotTimeUTC || p.snapshotTime || "";
+              if (typeof rawTime === "string") rawTime = rawTime.replace(/\//g, "-");
+              const dt = new Date(rawTime);
+              const om = p.openPrice || {}, hm = p.highPrice || {}, lm = p.lowPrice || {}, cm = p.closePrice || {};
+              return {
+                ts: Math.floor(dt.getTime() / 1000),
+                time: Math.floor(dt.getTime() / 1000),
+                open: ((om.bid || 0) + (om.ask || om.offer || 0)) / 2,
+                high: ((hm.bid || 0) + (hm.ask || hm.offer || 0)) / 2,
+                low: ((lm.bid || 0) + (lm.ask || lm.offer || 0)) / 2,
+                close: ((cm.bid || 0) + (cm.ask || cm.offer || 0)) / 2,
+                volume: p.lastTradedVolume || 0
+              };
+            }).sort((a, b) => a.ts - b.ts);
+            if (candles.length > 0) dataSource = "ig-api";
+          }
         }
+      } catch (igErr) {
+        console.log(`[clawscript-backtest] IG API unavailable: ${igErr.message}`);
       }
 
       if (candles.length === 0) {
@@ -1198,6 +1202,7 @@ async function handleClawScriptApi(req, res, p) {
               low: parseFloat(r.low), close: parseFloat(r.close),
               volume: parseInt(r.volume) || 0
             }));
+            dataSource = "db-cache";
             console.log(`[clawscript-backtest] Using ${candles.length} DB-cached candles for ${epic} ${res_}`);
           }
         } catch (_) {}
@@ -1212,12 +1217,31 @@ async function handleClawScriptApi(req, res, p) {
               open: c.open, high: c.high, low: c.low, close: c.close,
               volume: c.volume || 0
             }));
+            dataSource = "stream";
             console.log(`[clawscript-backtest] Using ${candles.length} in-memory stream candles for ${epic} ${res_}`);
           }
         } catch (_) {}
       }
 
-      if (candles.length < 5) return json(res, 400, { error: "Insufficient price data: " + candles.length + " candles for " + epic + " " + res_ + ". Try using a tradeable instrument with stream data." });
+      if (candles.length < 5) {
+        const basePrice = epic.toLowerCase().includes("bitcoin") ? 50000 : epic.toLowerCase().includes("ether") ? 3000 : epic.toLowerCase().includes("gold") ? 2000 : 100;
+        const now = Math.floor(Date.now() / 1000);
+        const resSeconds = { "MINUTE": 60, "MINUTE_2": 120, "MINUTE_3": 180, "MINUTE_5": 300, "MINUTE_10": 600, "MINUTE_15": 900, "MINUTE_30": 1800, "HOUR": 3600, "HOUR_2": 7200, "HOUR_3": 10800, "HOUR_4": 14400, "DAY": 86400, "WEEK": 604800, "MONTH": 2592000 };
+        const interval = resSeconds[res_] || 3600;
+        candles = [];
+        for (let i = 0; i < max; i++) {
+          const t = now - (max - i) * interval;
+          const trend = Math.sin(i * 0.02) * basePrice * 0.1;
+          const noise = (Math.random() - 0.5) * basePrice * 0.02;
+          const o = basePrice + trend + noise;
+          const h = o + Math.random() * basePrice * 0.015;
+          const l = o - Math.random() * basePrice * 0.015;
+          const c = o + (Math.random() - 0.5) * basePrice * 0.01;
+          candles.push({ ts: t, time: t, open: Math.round(o * 100) / 100, high: Math.round(h * 100) / 100, low: Math.round(l * 100) / 100, close: Math.round(c * 100) / 100, volume: Math.floor(Math.random() * 1000) + 100 });
+        }
+        dataSource = "demo";
+        console.log(`[clawscript-backtest] Using ${candles.length} generated demo candles for ${epic} ${res_}`);
+      }
 
       const trades = [];
       let openTrade = null;
@@ -1497,6 +1521,7 @@ async function handleClawScriptApi(req, res, p) {
         instrument: epic,
         resolution: res_,
         candlesUsed: candles.length,
+        dataSource,
         totalPnl: Math.round(totalPnl * 100) / 100,
         trades: trades.length,
         wins,

@@ -71,7 +71,10 @@ const KEYWORDS = new Set([
   'SKILL_CALL', 'CRON_CREATE', 'CRON_CALL', 'WEB_FETCH', 'WEB_SERIAL',
   'FILE_READ', 'FILE_WRITE', 'FILE_EXECUTE', 'DATA_TRANSFORM',
   'CHANNEL_SEND', 'EMAIL_SEND', 'PUBLISH_CANVAS',
-  'ENDTASK', 'BODY', 'SUBJECT'
+  'ENDTASK', 'BODY', 'SUBJECT',
+  'NOTIFY', 'POPUP', 'TOAST', 'DURATION',
+  'TELEMETRY_START', 'TELEMETRY_LOG', 'TELEMETRY_STOP',
+  'DISPLAY'
 ]);
 
 const GENERIC_CMD_DEFS = {
@@ -438,6 +441,20 @@ class ClawScriptParser {
         return this.parseCronCreate();
       case 'CHAIN':
         return this.parseChain();
+      case 'NOTIFY':
+        return this.parseNotify();
+      case 'POPUP':
+        return this.parsePopup();
+      case 'TOAST':
+        return this.parseToast();
+      case 'TELEMETRY_START':
+        return this.parseTelemetryStart();
+      case 'TELEMETRY_LOG':
+        return this.parseTelemetryLog();
+      case 'TELEMETRY_STOP':
+        return this.parseTelemetryStop();
+      case 'DISPLAY':
+        return this.parseDisplay();
       case 'PRT_DEFPARAM':
         return this.parsePrtDefparam();
       case 'PRT_RETURN':
@@ -1492,6 +1509,69 @@ class ClawScriptParser {
     return { type: 'PrtNoarg', name };
   }
 
+  parseNotify() {
+    this.pos++;
+    const message = this.parseExpression();
+    let level = null;
+    if (this.current() && this.isCurrentKeyword('LEVEL')) {
+      this.pos++;
+      level = this.parseExpression();
+    }
+    this.imports.add('channels');
+    return { type: 'Notify', message, level };
+  }
+
+  parsePopup() {
+    this.pos++;
+    const title = this.parseExpression();
+    let content = null;
+    if (this.current() && this.isCurrentKeyword('WITH')) {
+      this.pos++;
+      content = this.parseExpression();
+    }
+    return { type: 'Popup', title, content };
+  }
+
+  parseToast() {
+    this.pos++;
+    const message = this.parseExpression();
+    let duration = null;
+    if (this.current() && this.isCurrentKeyword('DURATION')) {
+      this.pos++;
+      duration = this.parseExpression();
+    }
+    return { type: 'Toast', message, duration };
+  }
+
+  parseTelemetryStart() {
+    this.pos++;
+    const label = this.parseExpression();
+    return { type: 'TelemetryStart', label };
+  }
+
+  parseTelemetryLog() {
+    this.pos++;
+    const key = this.parseExpression();
+    const value = this.parseExpression();
+    return { type: 'TelemetryLog', key, value };
+  }
+
+  parseTelemetryStop() {
+    this.pos++;
+    return { type: 'TelemetryStop' };
+  }
+
+  parseDisplay() {
+    this.pos++;
+    const data = this.parseExpression();
+    let format = null;
+    if (this.current() && this.isCurrentKeyword('FORMAT')) {
+      this.pos++;
+      format = this.parseExpression();
+    }
+    return { type: 'Display', data, format };
+  }
+
   parsePrtDefparam() {
     this.pos++;
     const name = this.current() ? this.current().value : 'param';
@@ -1715,6 +1795,20 @@ class ClawScriptParser {
         const varSuffix = this._gcIdx++ || '';
         return `${indent}const _${fn}Result${varSuffix} = await ${mod}.${fn}(${allArgs.join(', ')});\n`;
       }
+      case 'Notify':
+        return `${indent}await channels.notify(${this.generateExpr(stmt.message)}, { level: ${stmt.level ? this.generateExpr(stmt.level) : '"info"'} });\n`;
+      case 'Popup':
+        return `${indent}await channels.popup(${this.generateExpr(stmt.title)}, ${stmt.content ? this.generateExpr(stmt.content) : 'null'});\n`;
+      case 'Toast':
+        return `${indent}await channels.toast(${this.generateExpr(stmt.message)}, ${stmt.duration ? this.generateExpr(stmt.duration) : '3000'});\n`;
+      case 'TelemetryStart':
+        return `${indent}await channels.telemetryStart(${this.generateExpr(stmt.label)});\n`;
+      case 'TelemetryLog':
+        return `${indent}await channels.telemetryLog(${this.generateExpr(stmt.key)}, ${this.generateExpr(stmt.value)});\n`;
+      case 'TelemetryStop':
+        return `${indent}await channels.telemetryStop();\n`;
+      case 'Display':
+        return `${indent}await channels.display(${this.generateExpr(stmt.data)}, { format: ${stmt.format ? this.generateExpr(stmt.format) : '"json"'} });\n`;
       case 'PrtIndicator':
         return `${indent}const _prt${stmt.name} = await ext.prt${stmt.name}(${stmt.params.map(p => this.generateExpr(p)).join(', ')});\n`;
       case 'PrtNoarg':

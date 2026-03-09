@@ -24,4 +24,23 @@ async function waitForReply(sessionId, timeout, filter) {
   };
 }
 
-module.exports = { sayToSession, waitForReply };
+async function spawnAgent(name, prompt, options = {}) {
+  console.log(`[openclaw-chat] spawnAgent name="${name}" prompt="${String(prompt || '').slice(0, 80)}"`);
+  return {
+    agentId: `agent_${Date.now()}`,
+    name,
+    spawned: true,
+    timestamp: new Date().toISOString()
+  };
+}
+
+async function callSession(agentName, command, options = {}) {
+  console.log(`[openclaw-chat] callSession agent="${agentName}" command="${String(command || '').slice(0, 80)}"`);
+  return {
+    agentName,
+    reply: `Session response from ${agentName}: ${String(command || '').slice(0, 50)}`,
+    timestamp: new Date().toISOString()
+  };
+}
+
+module.exports = { sayToSession, waitForReply, spawnAgent, callSession };

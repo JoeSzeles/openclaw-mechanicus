@@ -30,16 +30,19 @@ ENDIF
 
 ## Editor Features
 
-- **Syntax Highlighting**: Color-coded keywords by category (trade=green, AI=purple, data=blue, control=red)
+- **Syntax Highlighting**: Color-coded keywords by category (trade=green, AI=purple, data=blue, control=red, notifications=pink)
 - **VS Code-style Error Highlighting**: Red wavy underlines on error lines, gutter icons, inline error annotations
-- **AI Assistant Panel**: Built-in chat that reads your code, errors, and logs — ask it to fix issues or explain syntax
+- **AI Assistant Panel**: Built-in chat with auto-detect model selector — reads your code, errors, and logs
 - **Live Parse**: Real-time parsing as you type with statement count display
 - **Instrument Selector**: Set any IG epic for simulation/backtest (not just BTC)
-- **Real Data with Fallback**: IG API → DB-cached candles → in-memory stream ticks → mock data
+- **Real Data with Fallback**: IG API → DB-cached candles → in-memory stream ticks → demo data
 - **Green Play Button**: One-click simulation with visual feedback
+- **Backtest Button**: Opens config popup (timeframe, candle count, instrument) then shows results popup with equity curve
+- **Run Live Button**: Opens config popup then deploys script as persistent process with live log viewer
 - **Templates Dropdown**: 7 built-in templates across 3 sections (Default, ClawScript, Load Custom)
+- **Indicators Dropdown**: All 25+ indicators organized by category (Trend, Oscillators, Volatility, Volume) — inserts code at cursor, favorites saved to localStorage
 - **Export**: `.cs` source, `.json` AST, `.js` compiled output
-- **Visual Flow Builder**: Drag-drop node editor with bidirectional code sync
+- **Visual Flow Builder**: Drag-drop node editor with 20+ categories including Indicators (5 sub-categories) and Notifications
 
 ## Strategy Save & Deploy Pipeline
 
@@ -69,7 +72,7 @@ const { js, ast: parsedAst } = parseAndGenerate(scriptCode, 'MyStrategy');
 
 `parseAndGenerate(code, name)` returns `{ js, ast }` where `js` is a complete Node.js module exporting a strategy class.
 
-## All Commands (80+ total)
+## All Commands (100+ total)
 
 ### Trading (6)
 | Command | Syntax | Description |
@@ -318,7 +321,7 @@ Place compiled strategies in `skills/bots/strategies/` to auto-register with the
 ## Visual Flow Builder
 
 The flow builder provides a drag-drop node editor:
-- **Toolbox sidebar**: 16 categories, 80+ command nodes (collapsed by default)
+- **Toolbox sidebar**: 20+ categories, 100+ command nodes (collapsed by default)
 - **Drag & drop**: Drag commands onto the canvas
 - **Port connections**: Connect output ports to input ports
 - **Bidirectional sync**: Code changes update flow, flow changes update code
@@ -336,16 +339,61 @@ The flow builder provides a drag-drop node editor:
 - Instrument selector allows any IG epic (e.g. `CS.D.BITCOIN.CFD.IP`, `CS.D.CFAGOLD.CFA.IP`)
 - Mock data generates 100 BTC-like ticks (~$48k-$52k) for offline testing
 
-### Backtest
-- Sends strategy to server-side backtest engine with full indicator computation
-- Uses same fallback chain: IG API → DB-cached → stream candles → error
-- Returns: P&L, win rate, max drawdown, trade list with entry/exit prices and times
-- Uses up to 2000 historical candles at HOUR resolution
+### Backtest (v1.1.6+)
+- **Configuration popup** opens before running — set instrument, timeframe, and candle count
+- **Timeframe selector**: MINUTE, 5-MIN, 15-MIN, 30-MIN, HOUR, 4-HOUR, DAY, WEEK
+- **Candle count**: 10 to 2000 (default 200)
+- **Data source fallback chain**: IG API → DB-cached candles → in-memory stream → demo data (auto-generated)
+- **Results popup** shows: P&L summary, win rate, trade count, max drawdown, data source used
+- **Equity curve** canvas chart drawn in the popup
+- **Trade list** with entry/exit prices, times, and P&L per trade
+- Settings persist in localStorage across sessions
+- Works in standalone mode (serve.cjs) with demo data
+
+### Run Live (v1.1.6+)
+- **Configuration popup** before deploying — set script name and instrument
+- Deploys script as a persistent process on the server
+- **Live runner popup** shows real-time logs with color-coded output:
+  - `[INFO]` = blue, `[WARN]` = orange, `[ERROR]` = red, `[TRADE]` = green
+- **Control buttons**: Stop, Restart, Pause, Resume
+- **Status polling** every 3s shows RUNNING/STOPPED badge
+- **Log polling** every 2s fetches latest output
+- Works in standalone mode (serve.cjs) — spawns Node.js child process
+
+## Notification & Visual Output Commands (v1.1.6+)
+
+Commands for creating notifications, popups, toasts, and real-time telemetry displays.
+
+| Command | Syntax | Description |
+|---------|--------|-------------|
+| `NOTIFY` | `NOTIFY "message" [LEVEL "info"\|"warn"\|"error"]` | Browser notification + log output |
+| `TOAST` | `TOAST "message" [DURATION ms]` | Temporary floating toast (auto-dismisses) |
+| `POPUP` | `POPUP "title" WITH "html_content"` | Opens modal with HTML content |
+| `DISPLAY` | `DISPLAY data [FORMAT "table"\|"chart"\|"json"]` | Popup with formatted data |
+| `TELEMETRY_START` | `TELEMETRY_START "label"` | Opens real-time telemetry panel |
+| `TELEMETRY_LOG` | `TELEMETRY_LOG key value` | Adds data point to telemetry |
+| `TELEMETRY_STOP` | `TELEMETRY_STOP` | Closes telemetry session |
+
+```clawscript
+// Notification examples
+NOTIFY "RSI crossed below 30" LEVEL "warn"
+TOAST "Strategy started" DURATION 3000
+POPUP "Trade Summary" WITH "<h3>P&L: +$150</h3><p>3 trades today</p>"
+DISPLAY portfolio FORMAT "table"
+
+// Real-time telemetry
+TELEMETRY_START "Price Monitor"
+DEF price = LAST_PRICE()
+TELEMETRY_LOG "BTC" price
+TELEMETRY_LOG "RSI" RSI(14)
+TELEMETRY_STOP
+```
 
 ## AI Assistant
 
 Built into the editor's bottom panel (right side):
-- **Model selector**: CEO Agent (default, routes to OpenClaw gateway) or Grok
+- **Model selector**: Auto-detect (probes available AI endpoints)
+- **Auto-Find Agents**: Button scans 4 endpoints to discover available AI models
 - **Context-aware**: Automatically includes current code, parse errors, and recent logs in each prompt
 - **Capabilities**: Fix syntax errors, optimize strategies, explain ClawScript commands, suggest improvements
 - **Chat interface**: Full conversation history with send on Enter
@@ -589,67 +637,9 @@ AGENT_TERMINATE "news_bot"
 AGENT_TERMINATE "market_bot"
 ```
 
-## Automation Templates
-
-Five ready-to-use templates in `.openclaw/canvas/clawscript-templates/` exercise all 22 automation commands:
-
-| Template | File | Commands Covered |
-|----------|------|-----------------|
-| Self-Improving Trade Loop | `trade-self-improve.cs` | TASK_DEFINE, WEB_FETCH, BUY, FILE_READ, DATA_TRANSFORM, FILE_WRITE, TASK_LOG |
-| Multi-Agent Orchestration | `multi-agent-ops.cs` | AGENT_SPAWN, AGENT_CALL, AGENT_PASS, SKILL_CALL, AGENT_TERMINATE |
-| Scheduled Monitoring | `cron-monitor.cs` | CRON_CREATE, TASK_DEFINE, WEB_FETCH, DATA_TRANSFORM, CHANNEL_SEND, EMAIL_SEND, TASK_LOG |
-| Data Pipeline | `data-pipeline.cs` | FILE_READ, DATA_TRANSFORM, FILE_WRITE, FILE_EXECUTE, WEB_SERIAL, PUBLISH_CANVAS |
-| Full Operations Suite | `full-operations.cs` | TASK_DEFINE, TASK_ASSIGN, TASK_CHAIN, TASK_PARALLEL, TASK_SHOW_FLOW, CRON_CALL + remaining |
-
-## Chat Integration
-
-Agents can write and display ClawScript inline in chat:
-
-- **Fenced blocks**: ` ```clawscript ` code blocks render with an "Open in ClawScript Editor" button
-- **Embedded editor**: `![Editor](/__openclaw__/canvas/chat-clawscript-editor.html?code=...)`
-- **Trade results**: `![Results](/__openclaw__/canvas/trade-results.html)`
-- **Logbook viewer**: `![Logbook](/__openclaw__/canvas/clawscript-logbook.html)`
-- **Compile API**: `POST /api/clawscript/compile` — returns AST + JS without backtest
-- **Logbook API**: `GET/POST /api/clawscript/logbook`, `PATCH /api/clawscript/logbook/:id`
-
-## Live Script Runner
-
-Scripts can be started as persistent bot processes that run continuously (like trading bots):
-
-### Running Scripts
-- **Run Live button** (green) in both the chat editor and IG dashboard editor
-- Click Run Live to compile and start the script as a persistent process
-- A popup window opens showing live logs, status badge, and lifecycle controls
-- Scripts register as bots (`cs-script-<name>`) and appear in the Processes page
-
-### Runner API Endpoints
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/clawscript/run` | POST | Start a script: `{code, name}` or `{file}` |
-| `/api/clawscript/scripts` | GET | List all scripts with running status |
-| `/api/clawscript/scripts/:id/stop` | POST | Stop a running script |
-| `/api/clawscript/scripts/:id/start` | POST | Start a stopped script |
-| `/api/clawscript/scripts/:id/restart` | POST | Restart a script |
-| `/api/clawscript/scripts/:id/pause` | POST | Pause (SIGUSR1) |
-| `/api/clawscript/scripts/:id/resume` | POST | Resume (SIGUSR2) |
-| `/api/clawscript/scripts/:id/logs` | GET | Tail log output (last 200 lines) |
-
-### Script Runner (`skills/bots/clawscript-runner.cjs`)
-- Compiles ClawScript source to JS, executes in sandboxed context
-- Supports lifecycle signals: SIGUSR1=pause, SIGUSR2=resume, SIGTERM=graceful stop
-- Logs to `.openclaw/clawscript-logs/<id>.log` with [INFO], [WARN], [ERROR], [TRADE] levels
-- Scripts saved to `.openclaw/clawscript-scripts/<id>.cs`
-- Auto-restarts with exponential backoff on crash
-
-### AI Assistant
-- **Endpoint**: `POST /api/clawscript/ai` — direct model call with ClawScript-optimized system prompt
-- Model selector: Grok 4.1 Fast Reasoning (default), Grok 4, Grok 2
-- Returns code corrections in ` ```clawscript ` blocks with line-specific error references
-- Used by the editor's built-in AI chat panel
-
 ## Test Suite
 
-- **191 pipeline tests**: End-to-end parse → compile → save → load across 27 categories including automation templates
-- **100% pass rate** including real BTC data integration tests and all 22 automation commands
+- **169 pipeline tests**: End-to-end parse → compile → save → load across 26 categories
+- **100% pass rate** including real BTC data integration tests and all automation commands
 - Test runner: `skills/bots/tests/test-clawscript-parser.cjs` and `test-clawscript-pipeline.cjs`
 - Report saved to: `.openclaw/clawscript-pipeline-report.json`

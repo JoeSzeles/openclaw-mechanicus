@@ -6,9 +6,10 @@ A domain-specific language (DSL) for writing automated trading strategies in [Op
 
 ## Features
 
-- **80+ commands** across 16 categories: Trading, Variables, Control Flow, AI/Analysis, Data Fetch, Agent Orchestration, Advanced, Functions, TradingView-Style, Bloomberg/Data Access, Time/Schedule, Portfolio, Economic/Political, Scientific/Quantitative, Utility, and PRT Compatibility (40+ ProRealTime commands)
+- **100+ commands** across 18 categories: Trading, Variables, Control Flow, AI/Analysis, Data Fetch, Agent Orchestration, Advanced, Functions, TradingView-Style, Bloomberg/Data Access, Time/Schedule, Portfolio, Economic/Political, Scientific/Quantitative, Utility, PRT Compatibility (40+ ProRealTime commands), Notifications, and Agent Management
 - **21 Automation Commands** — define tasks, chain workflows, schedule cron jobs, send notifications via chat channels and email, read/write/execute files, and publish scripts — all from within `.cs` scripts
-- **Visual Flow Builder** — drag-and-drop node editor with bidirectional code-to-flow synchronization
+- **Notification Commands** — NOTIFY (browser notifications), TOAST (auto-dismiss overlays), POPUP (HTML modals), DISPLAY (formatted data tables/charts/JSON), TELEMETRY_START/LOG/STOP (real-time telemetry windows)
+- **Visual Flow Builder** — drag-and-drop node editor with bidirectional code-to-flow synchronization, 20+ categories including Indicators (5 sub-categories) and Notifications
 - **Operator Nodes** — round/circular operator nodes (Arithmetic, Comparison, Logical, Crossover, String) with multi-port I/O
 - **Flow Toolbar** — Connect mode, Delete, Select All, Zoom In/Out/Fit, Auto-Layout, Export PNG, Undo/Redo, Clear All
 - **Animated Flow Execution** — real-time node highlighting, glowing connection paths, live values on nodes, speed control (Fast/Normal/Slow/Step)
@@ -19,8 +20,10 @@ A domain-specific language (DSL) for writing automated trading strategies in [Op
 - **AI Assistant** — built-in chat panel with Bearer token auth, reads code/errors/logs to help fix issues
 - **Strategy Compiler** — compiles `.cs` scripts to production-ready `.cjs` strategy modules
 - **Save & Deploy Pipeline** — save dialog with strategy name/filename, auto-deploy to `strategies/` for bot engine discovery
-- **Run Live** — one-click deployment of compiled strategies as persistent background processes
-- **Simulation & Backtest** — test strategies with real or cached price data; green play button, instrument selector, multi-tier data fallback (API → DB cache → stream ticks → mock)
+- **Run Live** — config popup (name, instrument) then deploys as persistent background process with live log viewer, stop/restart/pause controls
+- **Backtest** — config popup (timeframe, candle count, instrument) with progress indicator, results popup with equity curve canvas and trade list
+- **Simulation & Backtest** — test strategies with real or cached price data; green play button, instrument selector, multi-tier data fallback (API → DB cache → stream ticks → demo data)
+- **Indicator Dropdown** — toolbar selector with all 25+ indicators organized by category (Trend, Oscillators, Volatility, Volume), inserts code at cursor, favorites saved to localStorage
 - **AI Integration** — query AI models, generate scripts, analyze logs, and scan sentiment
 - **Agent Orchestration** — spawn agents, manage sessions, mutate configs at runtime
 - **30+ Technical Indicators** — RSI, EMA, SMA, MACD, Bollinger Bands (Upper/Lower), ATR, ADX, Stochastic (K/D), CCI, Williams %R, ROC, Aroon, Ichimoku, Parabolic SAR, Keltner, Donchian, OBV, VWAP, CMF, ZScore, Supertrend, and more
@@ -40,7 +43,7 @@ The editor combines a syntax-highlighted code pane (left), a visual flow builder
 ### Visual Flow Builder
 ![Flow builder with drag-and-drop nodes and operator connections](screenshots/clawscript-flow-builder.png)
 
-The flow view renders ClawScript as a directed graph. Rectangular nodes represent commands (trading, variables, control flow), circular nodes represent operators (AND, OR, comparisons, crossovers). The Commands sidebar organizes all 80+ blocks into collapsible categories.
+The flow view renders ClawScript as a directed graph. Rectangular nodes represent commands (trading, variables, control flow), circular nodes represent operators (AND, OR, comparisons, crossovers). The Commands sidebar organizes all 100+ blocks into collapsible categories.
 
 ### Simulation Output
 ![Simulation running with parsed statements and indicator values](screenshots/clawscript-simulation.png)
@@ -352,7 +355,7 @@ DEF vol = VOLUME()
 
 The editor includes a drag-and-drop node editor that syncs bidirectionally with the code pane:
 
-- **Toolbox sidebar** with 80+ command blocks organized in 16 categories
+- **Toolbox sidebar** with 100+ command blocks organized in 20+ categories (including 5 Indicator sub-categories and Notifications)
 - **Drag nodes** onto the canvas — they snap to a grid
 - **Connect ports** between nodes to define execution flow
 - **Inline editing** of node parameters

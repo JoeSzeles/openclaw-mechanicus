@@ -60,7 +60,10 @@ var CS_KEYWORDS = [
   'SKILL_CALL','CRON_CREATE','CRON_CALL','WEB_FETCH','WEB_SERIAL',
   'FILE_READ','FILE_WRITE','FILE_EXECUTE','DATA_TRANSFORM',
   'CHANNEL_SEND','EMAIL_SEND','PUBLISH_CANVAS',
-  'BODY','ENDTASK','PRIORITY','DEPENDS_ON','STEPS','RESULT_VAR','SKILL','PROVIDER','SUBJECT'
+  'BODY','ENDTASK','PRIORITY','DEPENDS_ON','STEPS','RESULT_VAR','SKILL','PROVIDER','SUBJECT',
+  'NOTIFY','POPUP','TOAST','DURATION',
+  'TELEMETRY_START','TELEMETRY_LOG','TELEMETRY_STOP',
+  'DISPLAY'
 ];
 
 var TRADE_CMDS = ['BUY','SELL','SELLSHORT','EXIT','CLOSE','TRAILSTOP','STRATEGY_ENTRY','STRATEGY_EXIT','STRATEGY_CLOSE','PRT_BUY','PRT_SELL'];
@@ -175,6 +178,7 @@ function syntaxHighlight(code) {
     else if (TV_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-tv';
     else if (UTILITY_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-utility';
     else if (AUTOMATION_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-automation';
+    else if (NOTIFICATION_CMDS.indexOf(upper) >= 0) cls = 'cs-tok-notification';
     else if (t.type === TOKEN_TYPES.KEYWORD) cls = 'cs-tok-keyword';
     else if (t.type === TOKEN_TYPES.IDENTIFIER) cls = 'cs-tok-ident';
     result += '<span class="' + cls + '">' + escapeHtml(originalText) + '</span>';
@@ -345,6 +349,7 @@ function buildEditorUI() {
   '.cs-tok-tv { color:#f78166; font-weight:600; }' +
   '.cs-tok-utility { color:#8b949e; font-weight:600; }' +
   '.cs-tok-automation { color:#e3b341; font-weight:600; }' +
+  '.cs-tok-notification { color:#ff6ac1; font-weight:600; }' +
   '.cs-tok-keyword { color:#ff7b72; }' +
   '.cs-tok-string { color:#a5d6ff; }' +
   '.cs-tok-number { color:#79c0ff; }' +
@@ -444,6 +449,26 @@ function buildEditorUI() {
   '.cs-runner-popup__logs .cs-log-warn { color:#f0883e; }' +
   '.cs-runner-popup__logs .cs-log-error { color:#f85149; }' +
   '.cs-runner-popup__logs .cs-log-trade { color:#2dc653; font-weight:700; }' +
+  '.cs-toast-container { position:fixed; top:20px; right:20px; z-index:10000; display:flex; flex-direction:column; gap:8px; pointer-events:none; }' +
+  '.cs-toast { padding:10px 18px; background:#161b22; border:1px solid #30363d; border-radius:6px; color:#c9d1d9; font:12px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; box-shadow:0 4px 16px rgba(0,0,0,.5); pointer-events:auto; animation:cs-toast-in .3s ease; max-width:360px; }' +
+  '.cs-toast-info { border-left:3px solid #58a6ff; }' +
+  '.cs-toast-warn { border-left:3px solid #f0883e; }' +
+  '.cs-toast-error { border-left:3px solid #f85149; }' +
+  '.cs-toast-fade { opacity:0; transition:opacity .3s ease; }' +
+  '@keyframes cs-toast-in { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }' +
+  '.cs-display-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.6); z-index:9998; display:flex; align-items:center; justify-content:center; }' +
+  '.cs-display-popup { background:#161b22; border:1px solid #30363d; border-radius:8px; width:600px; max-width:92vw; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 8px 32px rgba(0,0,0,.5); }' +
+  '.cs-display-popup__header { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; border-bottom:1px solid #21262d; font-size:13px; font-weight:700; color:#c9d1d9; }' +
+  '.cs-display-popup__body { flex:1; overflow-y:auto; padding:14px; font:12px/1.5 "Fira Code",monospace; color:#c9d1d9; background:#0d1117; max-height:500px; }' +
+  '.cs-display-popup__body table { border-collapse:collapse; width:100%; }' +
+  '.cs-display-popup__body th,.cs-display-popup__body td { border:1px solid #30363d; padding:4px 8px; text-align:left; font-size:11px; }' +
+  '.cs-display-popup__body th { background:#21262d; color:#8b949e; font-weight:600; }' +
+  '.cs-telemetry-panel { position:fixed; bottom:20px; right:20px; z-index:9997; width:320px; background:#161b22; border:1px solid #30363d; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.5); font:11px/1.5 "Fira Code",monospace; max-height:300px; overflow:hidden; display:flex; flex-direction:column; }' +
+  '.cs-telemetry-header { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:#21262d; border-bottom:1px solid #30363d; font-size:11px; font-weight:700; color:#c9d1d9; }' +
+  '.cs-telemetry-body { flex:1; overflow-y:auto; padding:6px 10px; }' +
+  '.cs-telemetry-row { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px solid #21262d; }' +
+  '.cs-telemetry-key { color:#8b949e; }' +
+  '.cs-telemetry-val { color:#79c0ff; font-weight:600; }' +
   '</style>' +
 
   '<div class="cs-toolbar">' +
@@ -465,6 +490,42 @@ function buildEditorUI() {
     '<button id="csBtnRunLive" title="Run script live as a persistent process" style="background:#0a2a0a;border:2px solid #2ea043;color:#2ea043;padding:6px 16px;border-radius:6px;font-size:13px;font-weight:600;">&#9998; Run Live</button>' +
     '<div class="cs-sep"></div>' +
     '<select id="csTemplateSelect"><option value="">Templates...</option></select>' +
+    '<select id="csIndicatorSelect"><option value="">Indicators...</option>' +
+      '<optgroup label="Trend">' +
+        '<option value="EMA" data-code="DEF ema = INDICATOR(&quot;EMA&quot;, 20)">EMA (20)</option>' +
+        '<option value="SMA" data-code="DEF sma = INDICATOR(&quot;SMA&quot;, 20)">SMA (20)</option>' +
+        '<option value="MACD" data-code="DEF macd = INDICATOR(&quot;MACD&quot;, 12, 26, 9)">MACD (12,26,9)</option>' +
+        '<option value="ADX" data-code="DEF adx = INDICATOR(&quot;ADX&quot;, 14)">ADX (14)</option>' +
+        '<option value="ParabolicSAR" data-code="DEF psar = INDICATOR(&quot;ParabolicSAR&quot;, 0.02, 0.2)">Parabolic SAR</option>' +
+        '<option value="Supertrend" data-code="DEF supertrend = INDICATOR(&quot;Supertrend&quot;, 10, 3)">Supertrend (10,3)</option>' +
+        '<option value="Aroon" data-code="DEF aroon = INDICATOR(&quot;Aroon&quot;, 25)">Aroon (25)</option>' +
+        '<option value="Ichimoku" data-code="DEF ichimoku = INDICATOR(&quot;Ichimoku&quot;, 9, 26, 52)">Ichimoku (9,26,52)</option>' +
+      '</optgroup>' +
+      '<optgroup label="Oscillators">' +
+        '<option value="RSI" data-code="DEF rsi = INDICATOR(&quot;RSI&quot;, 14)">RSI (14)</option>' +
+        '<option value="Stochastic" data-code="DEF stoch = INDICATOR(&quot;Stochastic&quot;, 14, 3, 3)">Stochastic (14,3,3)</option>' +
+        '<option value="CCI" data-code="DEF cci = INDICATOR(&quot;CCI&quot;, 20)">CCI (20)</option>' +
+        '<option value="WilliamsR" data-code="DEF willr = INDICATOR(&quot;WilliamsR&quot;, 14)">Williams %R (14)</option>' +
+        '<option value="ROC" data-code="DEF roc = INDICATOR(&quot;ROC&quot;, 12)">ROC (12)</option>' +
+        '<option value="UltimateOscillator" data-code="DEF ultosc = INDICATOR(&quot;UltimateOscillator&quot;, 7, 14, 28)">Ultimate Oscillator</option>' +
+      '</optgroup>' +
+      '<optgroup label="Volatility">' +
+        '<option value="ATR" data-code="DEF atr = INDICATOR(&quot;ATR&quot;, 14)">ATR (14)</option>' +
+        '<option value="Bollinger" data-code="DEF bb = INDICATOR(&quot;Bollinger&quot;, 20, 2)">Bollinger (20,2)</option>' +
+        '<option value="Keltner" data-code="DEF kc = INDICATOR(&quot;Keltner&quot;, 20, 1.5)">Keltner (20,1.5)</option>' +
+        '<option value="Donchian" data-code="DEF dc = INDICATOR(&quot;Donchian&quot;, 20)">Donchian (20)</option>' +
+        '<option value="ChaikinVolatility" data-code="DEF chvol = INDICATOR(&quot;ChaikinVolatility&quot;, 10, 10)">Chaikin Volatility</option>' +
+        '<option value="ZScore" data-code="DEF zscore = INDICATOR(&quot;ZScore&quot;, 20)">Z-Score (20)</option>' +
+      '</optgroup>' +
+      '<optgroup label="Volume">' +
+        '<option value="OBV" data-code="DEF obv = INDICATOR(&quot;OBV&quot;)">OBV</option>' +
+        '<option value="VWAP" data-code="DEF vwap = INDICATOR(&quot;VWAP&quot;)">VWAP</option>' +
+        '<option value="CMF" data-code="DEF cmf = INDICATOR(&quot;CMF&quot;, 20)">CMF (20)</option>' +
+      '</optgroup>' +
+      '<optgroup label="Other">' +
+        '<option value="Fibonacci" data-code="DEF fib = INDICATOR(&quot;Fibonacci&quot;, high, low)">Fibonacci</option>' +
+      '</optgroup>' +
+    '</select>' +
     '<div class="cs-sep"></div>' +
     '<select id="csLoadSelect"><option value="">Load Existing...</option></select>' +
     '<div class="cs-sep"></div>' +
@@ -664,6 +725,53 @@ function attachEditorEvents() {
     loadTemplatesList(tplSelect);
     tplSelect.addEventListener('change', function() {
       if (this.value) loadTemplate(this.value);
+      this.value = '';
+    });
+  }
+
+  var indSelect = document.getElementById('csIndicatorSelect');
+  if (indSelect) {
+    var favKey = 'clawscript_fav_indicators';
+    var favs = [];
+    try { var raw = localStorage.getItem(favKey); if (raw) favs = JSON.parse(raw); } catch(_e) {}
+    if (favs.length) {
+      var favGroup = document.createElement('optgroup');
+      favGroup.label = 'Favorites';
+      for (var fi = 0; fi < favs.length; fi++) {
+        var allOpts = indSelect.querySelectorAll('option[value]');
+        for (var oi = 0; oi < allOpts.length; oi++) {
+          if (allOpts[oi].value === favs[fi]) {
+            var clone = allOpts[oi].cloneNode(true);
+            clone.textContent = '\u2605 ' + clone.textContent;
+            favGroup.appendChild(clone);
+            break;
+          }
+        }
+      }
+      if (favGroup.children.length) indSelect.insertBefore(favGroup, indSelect.querySelector('optgroup'));
+    }
+    indSelect.addEventListener('change', function() {
+      if (!this.value) return;
+      var opt = this.options[this.selectedIndex];
+      var code = opt.getAttribute('data-code') || '';
+      if (!code) { this.value = ''; return; }
+      var editor = document.getElementById('csCodeEditor');
+      if (editor) {
+        var start = editor.selectionStart;
+        var before = editor.value.substring(0, start);
+        var after = editor.value.substring(editor.selectionEnd);
+        var prefix = (before.length > 0 && before.charAt(before.length - 1) !== '\n') ? '\n' : '';
+        editor.value = before + prefix + code + '\n' + after;
+        editor.selectionStart = editor.selectionEnd = start + prefix.length + code.length + 1;
+        editor.focus();
+        editor.dispatchEvent(new Event('input'));
+      }
+      var indVal = this.value;
+      if (favs.indexOf(indVal) < 0) {
+        favs.push(indVal);
+        if (favs.length > 10) favs.shift();
+        try { localStorage.setItem(favKey, JSON.stringify(favs)); } catch(_e2) {}
+      }
       this.value = '';
     });
   }
@@ -1196,43 +1304,91 @@ function runSimulationWithMockData(result) {
   animatedSimulateAST(result.ast, mockTicks);
 }
 
-function runBacktest() {
+function _showBacktestConfigPopup() {
   var editor = document.getElementById('csCodeEditor');
   if (!editor) return;
   var code = editor.value.trim();
   if (!code) { csLog('No code to backtest.', 'warn'); return; }
+  var savedCfg = {};
+  try { savedCfg = JSON.parse(localStorage.getItem('cs_backtest_cfg') || '{}'); } catch(_) {}
+  var overlay = document.createElement('div');
+  overlay.className = 'cs-runner-overlay';
+  overlay.id = 'csBacktestCfgOverlay';
+  overlay.innerHTML =
+    '<div class="cs-runner-popup" style="max-width:420px;">' +
+      '<div class="cs-runner-popup__header">' +
+        '<div class="cs-runner-popup__title"><span>Backtest Configuration</span></div>' +
+        '<button style="padding:2px 8px;font-size:14px;background:#21262d;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;cursor:pointer;" id="csBtCfgClose">\u2715</button>' +
+      '</div>' +
+      '<div style="padding:14px;display:flex;flex-direction:column;gap:10px;">' +
+        '<label style="font-size:11px;color:#8b949e;">Instrument (Epic)</label>' +
+        '<input id="csBtEpic" type="text" value="' + (savedCfg.epic || getSelectedInstrument()) + '" style="padding:6px 10px;font-size:12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;">' +
+        '<label style="font-size:11px;color:#8b949e;">Timeframe / Resolution</label>' +
+        '<select id="csBtResolution" style="padding:6px 10px;font-size:12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;">' +
+          '<option value="MINUTE">1 Minute</option>' +
+          '<option value="MINUTE_5">5 Minutes</option>' +
+          '<option value="MINUTE_15">15 Minutes</option>' +
+          '<option value="MINUTE_30">30 Minutes</option>' +
+          '<option value="HOUR" selected>1 Hour</option>' +
+          '<option value="HOUR_4">4 Hours</option>' +
+          '<option value="DAY">Daily</option>' +
+          '<option value="WEEK">Weekly</option>' +
+        '</select>' +
+        '<label style="font-size:11px;color:#8b949e;">Candle Count (max 2000)</label>' +
+        '<input id="csBtCount" type="number" value="' + (savedCfg.count || 200) + '" min="10" max="2000" style="padding:6px 10px;font-size:12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;">' +
+        '<div style="display:flex;gap:8px;margin-top:6px;">' +
+          '<button id="csBtRunBtn" style="flex:1;padding:8px 16px;font-size:13px;font-weight:600;background:#2a1a00;border:2px solid #e8a317;color:#e8a317;border-radius:6px;cursor:pointer;">Run Backtest</button>' +
+          '<button id="csBtCancelBtn" style="padding:8px 16px;font-size:13px;background:#21262d;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;cursor:pointer;">Cancel</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  if (savedCfg.resolution) {
+    var sel = document.getElementById('csBtResolution');
+    for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === savedCfg.resolution) { sel.selectedIndex = i; break; } }
+  }
+  function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
+  document.getElementById('csBtCfgClose').addEventListener('click', close);
+  document.getElementById('csBtCancelBtn').addEventListener('click', close);
+  document.getElementById('csBtRunBtn').addEventListener('click', function() {
+    var epic = document.getElementById('csBtEpic').value.trim();
+    var resolution = document.getElementById('csBtResolution').value;
+    var count = parseInt(document.getElementById('csBtCount').value) || 200;
+    localStorage.setItem('cs_backtest_cfg', JSON.stringify({ epic: epic, resolution: resolution, count: count }));
+    close();
+    _executeBacktest(code, epic, resolution, count);
+  });
+}
 
+function _executeBacktest(code, epic, resolution, candleCount) {
   clearLog();
   csLog('=== BACKTEST START ===', 'info');
-  csLog('Sending strategy to backtest engine with real BTC data...', 'info');
+  csLog('Instrument: ' + epic + ' | Resolution: ' + resolution + ' | Candles: ' + candleCount, 'info');
+  csLog('Sending strategy to backtest engine...', 'info');
 
   var btn = document.getElementById('csBtnBacktest');
   if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
 
-  var backtestEpic = getSelectedInstrument();
-  csLog('Instrument: ' + backtestEpic, 'info');
-  var payload = JSON.stringify({
-    code: code,
-    instrument: backtestEpic,
-    resolution: 'HOUR',
-    candleCount: 200
-  });
+  _openBacktestResultsPopup(epic, resolution);
 
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', '/api/clawscript/backtest', true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  xhr.onload = function() {
-    if (btn) { btn.disabled = false; btn.textContent = 'Run Backtest'; }
+  var payload = JSON.stringify({ code: code, instrument: epic, resolution: resolution, candleCount: candleCount });
+  var token = _getAuthToken();
+  var headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+
+  _xhrPost('/api/clawscript/backtest', headers, payload, function(text) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '&#9654; Backtest'; }
     try {
-      var data = JSON.parse(xhr.responseText);
-      if (xhr.status === 200 && data.ok) {
+      var data = JSON.parse(text);
+      if (data.ok) {
         csLog('=== BACKTEST RESULTS ===', 'success');
+        csLog('Data source: ' + (data.dataSource || 'unknown'), 'info');
         csLog('Instrument: ' + data.instrument + ' | Resolution: ' + data.resolution + ' | Candles: ' + data.candlesUsed, 'info');
         csLog('Total P&L: ' + (data.totalPnl >= 0 ? '+' : '') + data.totalPnl, data.totalPnl >= 0 ? 'success' : 'error');
         csLog('Trades: ' + data.trades + ' (Wins: ' + data.wins + ', Losses: ' + data.losses + ')', 'info');
         csLog('Win Rate: ' + data.winRate + '%', data.winRate >= 50 ? 'success' : 'warn');
         csLog('Max Drawdown: ' + data.maxDrawdown, data.maxDrawdown > 0 ? 'warn' : 'info');
-        csLog('', 'info');
         if (data.tradeList && data.tradeList.length > 0) {
           csLog('--- Trade List ---', 'info');
           for (var t = 0; t < data.tradeList.length; t++) {
@@ -1240,24 +1396,156 @@ function runBacktest() {
             var pnlColor = tr.pnl >= 0 ? 'success' : 'error';
             var entryDate = tr.entryTime ? new Date(tr.entryTime * 1000).toLocaleString() : '?';
             var exitDate = tr.exitTime ? new Date(tr.exitTime * 1000).toLocaleString() : '?';
-            csLog('#' + (t + 1) + ' ' + tr.direction + ' x' + tr.size + ' | Entry: ' + Math.round(tr.entryPrice * 100) / 100 + ' (' + entryDate + ') → Exit: ' + Math.round(tr.exitPrice * 100) / 100 + ' (' + exitDate + ') | P&L: ' + (tr.pnl >= 0 ? '+' : '') + tr.pnl + (tr.openAtEnd ? ' [still open]' : ''), pnlColor);
+            csLog('#' + (t + 1) + ' ' + tr.direction + ' x' + tr.size + ' | Entry: ' + Math.round(tr.entryPrice * 100) / 100 + ' (' + entryDate + ') \u2192 Exit: ' + Math.round(tr.exitPrice * 100) / 100 + ' (' + exitDate + ') | P&L: ' + (tr.pnl >= 0 ? '+' : '') + tr.pnl + (tr.openAtEnd ? ' [still open]' : ''), pnlColor);
           }
         }
         csLog('=== BACKTEST COMPLETE ===', 'success');
         storeBacktestResults(data);
         _csStoredResults.flowTrace = simLog.slice();
+        _updateBacktestPopup(data);
       } else {
         csLog('Backtest Error: ' + (data.error || 'Unknown error'), 'error');
+        _updateBacktestPopupError(data.error || 'Unknown error');
       }
     } catch (e) {
       csLog('Backtest Error: ' + e.message, 'error');
+      csLog('Raw response (first 200 chars): ' + String(text).substring(0, 200), 'warn');
+      _updateBacktestPopupError(e.message + '\n\nRaw: ' + String(text).substring(0, 300));
     }
-  };
-  xhr.onerror = function() {
-    if (btn) { btn.disabled = false; btn.textContent = 'Run Backtest'; }
-    csLog('Backtest Error: Network error', 'error');
-  };
-  xhr.send(payload);
+  }, function(status, text) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '&#9654; Backtest'; }
+    var errMsg = 'HTTP ' + status;
+    try { var errData = JSON.parse(text); errMsg = errData.error || errMsg; } catch(_) { errMsg += ': ' + String(text).substring(0, 200); }
+    csLog('Backtest Error: ' + errMsg, 'error');
+    _updateBacktestPopupError(errMsg);
+  });
+}
+
+function runBacktest() {
+  _showBacktestConfigPopup();
+}
+
+function _openBacktestResultsPopup(epic, resolution) {
+  var existing = document.getElementById('csBacktestOverlay');
+  if (existing) existing.parentNode.removeChild(existing);
+  var overlay = document.createElement('div');
+  overlay.className = 'cs-runner-overlay';
+  overlay.id = 'csBacktestOverlay';
+  overlay.innerHTML =
+    '<div class="cs-runner-popup" style="max-width:600px;">' +
+      '<div class="cs-runner-popup__header">' +
+        '<div class="cs-runner-popup__title">' +
+          '<span>Backtest: ' + _escHtml(epic) + ' (' + resolution + ')</span>' +
+          '<span class="cs-runner-badge cs-runner-badge-starting" id="csBtBadge">RUNNING</span>' +
+        '</div>' +
+        '<button style="padding:2px 8px;font-size:14px;background:#21262d;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;cursor:pointer;" id="csBtPopClose">\u2715</button>' +
+      '</div>' +
+      '<div class="cs-runner-popup__logs" id="csBtPopBody" style="min-height:200px;">' +
+        '<div style="text-align:center;padding:40px;color:#8b949e;">' +
+          '<div style="font-size:20px;margin-bottom:8px;">Running backtest...</div>' +
+          '<div class="cs-bt-spinner" style="display:inline-block;width:24px;height:24px;border:3px solid #30363d;border-top:3px solid #e8a317;border-radius:50%;animation:csSpin 1s linear infinite;"></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  var spinStyle = document.createElement('style');
+  spinStyle.textContent = '@keyframes csSpin { to { transform: rotate(360deg); } }';
+  overlay.appendChild(spinStyle);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.parentNode.removeChild(overlay); });
+  document.getElementById('csBtPopClose').addEventListener('click', function() { overlay.parentNode.removeChild(overlay); });
+}
+
+function _updateBacktestPopup(data) {
+  var badge = document.getElementById('csBtBadge');
+  if (badge) { badge.textContent = 'COMPLETE'; badge.className = 'cs-runner-badge'; badge.style.background = '#238636'; badge.style.color = '#fff'; }
+  var body = document.getElementById('csBtPopBody');
+  if (!body) return;
+  var pnlColor = data.totalPnl >= 0 ? '#2dc653' : '#f85149';
+  var wrColor = data.winRate >= 50 ? '#2dc653' : '#f0883e';
+  var html =
+    '<div style="padding:12px;">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">' +
+        '<div style="background:#161b22;padding:10px;border-radius:6px;text-align:center;">' +
+          '<div style="font-size:10px;color:#8b949e;">Total P&L</div>' +
+          '<div style="font-size:18px;font-weight:700;color:' + pnlColor + ';">' + (data.totalPnl >= 0 ? '+' : '') + data.totalPnl + '</div>' +
+        '</div>' +
+        '<div style="background:#161b22;padding:10px;border-radius:6px;text-align:center;">' +
+          '<div style="font-size:10px;color:#8b949e;">Win Rate</div>' +
+          '<div style="font-size:18px;font-weight:700;color:' + wrColor + ';">' + data.winRate + '%</div>' +
+        '</div>' +
+        '<div style="background:#161b22;padding:10px;border-radius:6px;text-align:center;">' +
+          '<div style="font-size:10px;color:#8b949e;">Trades</div>' +
+          '<div style="font-size:18px;font-weight:700;color:#58a6ff;">' + data.trades + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px;">' +
+        '<div style="background:#161b22;padding:8px;border-radius:6px;text-align:center;">' +
+          '<div style="font-size:9px;color:#8b949e;">Wins</div><div style="font-size:14px;color:#2dc653;">' + data.wins + '</div>' +
+        '</div>' +
+        '<div style="background:#161b22;padding:8px;border-radius:6px;text-align:center;">' +
+          '<div style="font-size:9px;color:#8b949e;">Losses</div><div style="font-size:14px;color:#f85149;">' + data.losses + '</div>' +
+        '</div>' +
+        '<div style="background:#161b22;padding:8px;border-radius:6px;text-align:center;">' +
+          '<div style="font-size:9px;color:#8b949e;">Max DD</div><div style="font-size:14px;color:#f0883e;">' + data.maxDrawdown + '</div>' +
+        '</div>' +
+        '<div style="background:#161b22;padding:8px;border-radius:6px;text-align:center;">' +
+          '<div style="font-size:9px;color:#8b949e;">Data</div><div style="font-size:14px;color:#8b949e;">' + (data.dataSource || '?') + '</div>' +
+        '</div>' +
+      '</div>';
+  if (data.equityCurve && data.equityCurve.length > 1) {
+    html += '<div style="margin-bottom:12px;"><div style="font-size:10px;color:#8b949e;margin-bottom:4px;">Equity Curve</div>';
+    html += '<canvas id="csBtEquityCanvas" width="560" height="120" style="width:100%;height:120px;background:#0d1117;border-radius:4px;"></canvas></div>';
+  }
+  if (data.tradeList && data.tradeList.length > 0) {
+    html += '<div style="font-size:10px;color:#8b949e;margin-bottom:4px;">Trade List (' + data.tradeList.length + ')</div>';
+    html += '<div style="max-height:200px;overflow-y:auto;font-size:10px;font-family:monospace;">';
+    for (var t = 0; t < data.tradeList.length; t++) {
+      var tr = data.tradeList[t];
+      var tc = tr.pnl >= 0 ? '#2dc653' : '#f85149';
+      var ed = tr.entryTime ? new Date(tr.entryTime * 1000).toLocaleString() : '?';
+      var xd = tr.exitTime ? new Date(tr.exitTime * 1000).toLocaleString() : '?';
+      html += '<div style="padding:2px 0;border-bottom:1px solid #21262d;color:' + tc + ';">#' + (t+1) + ' ' + tr.direction + ' x' + tr.size + ' | ' + Math.round(tr.entryPrice*100)/100 + ' \u2192 ' + Math.round(tr.exitPrice*100)/100 + ' | P&L: ' + (tr.pnl>=0?'+':'') + tr.pnl + (tr.openAtEnd?' [open]':'') + '</div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  body.innerHTML = html;
+  if (data.equityCurve && data.equityCurve.length > 1) {
+    setTimeout(function() { _drawEquityCurve('csBtEquityCanvas', data.equityCurve); }, 50);
+  }
+}
+
+function _drawEquityCurve(canvasId, curve) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var w = canvas.width, h = canvas.height;
+  var vals = curve.map(function(c) { return c.equity; });
+  var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+  var range = mx - mn || 1;
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = '#58a6ff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (var i = 0; i < vals.length; i++) {
+    var x = (i / (vals.length - 1)) * w;
+    var y = h - ((vals[i] - mn) / range) * (h - 10) - 5;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(88,166,255,0.1)';
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function _updateBacktestPopupError(errMsg) {
+  var badge = document.getElementById('csBtBadge');
+  if (badge) { badge.textContent = 'ERROR'; badge.className = 'cs-runner-badge'; badge.style.background = '#da3633'; badge.style.color = '#fff'; }
+  var body = document.getElementById('csBtPopBody');
+  if (!body) return;
+  body.innerHTML = '<div style="padding:20px;color:#f85149;font-size:12px;white-space:pre-wrap;">' + _escHtml(errMsg) + '</div>';
 }
 
 var _csRunnerLogTimer = null;
@@ -1266,11 +1554,48 @@ var _csRunnerStatusTimer = null;
 function runLive() {
   var code = document.getElementById('csCodeEditor').value.trim();
   if (!code) { csLog('No code to run.', 'error'); return; }
+  var savedCfg = {};
+  try { savedCfg = JSON.parse(localStorage.getItem('cs_runlive_cfg') || '{}'); } catch(_) {}
+  var overlay = document.createElement('div');
+  overlay.className = 'cs-runner-overlay';
+  overlay.id = 'csRunLiveCfgOverlay';
+  overlay.innerHTML =
+    '<div class="cs-runner-popup" style="max-width:420px;">' +
+      '<div class="cs-runner-popup__header">' +
+        '<div class="cs-runner-popup__title"><span>Run Live Configuration</span></div>' +
+        '<button style="padding:2px 8px;font-size:14px;background:#21262d;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;cursor:pointer;" id="csRlCfgClose">\u2715</button>' +
+      '</div>' +
+      '<div style="padding:14px;display:flex;flex-direction:column;gap:10px;">' +
+        '<label style="font-size:11px;color:#8b949e;">Script Name</label>' +
+        '<input id="csRlName" type="text" value="' + (savedCfg.name || 'editor-' + Date.now().toString(36)) + '" style="padding:6px 10px;font-size:12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;">' +
+        '<label style="font-size:11px;color:#8b949e;">Instrument (Epic)</label>' +
+        '<input id="csRlEpic" type="text" value="' + (savedCfg.epic || getSelectedInstrument()) + '" style="padding:6px 10px;font-size:12px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;">' +
+        '<div id="csRlStatus" style="font-size:10px;color:#8b949e;padding:4px 0;">Ready to deploy</div>' +
+        '<div style="display:flex;gap:8px;margin-top:6px;">' +
+          '<button id="csRlRunBtn" style="flex:1;padding:8px 16px;font-size:13px;font-weight:600;background:#0a2a0a;border:2px solid #2ea043;color:#2ea043;border-radius:6px;cursor:pointer;">Deploy & Run</button>' +
+          '<button id="csRlCancelBtn" style="padding:8px 16px;font-size:13px;background:#21262d;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;cursor:pointer;">Cancel</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
+  document.getElementById('csRlCfgClose').addEventListener('click', close);
+  document.getElementById('csRlCancelBtn').addEventListener('click', close);
+  document.getElementById('csRlRunBtn').addEventListener('click', function() {
+    var name = document.getElementById('csRlName').value.trim() || 'editor-' + Date.now().toString(36);
+    var epic = document.getElementById('csRlEpic').value.trim();
+    localStorage.setItem('cs_runlive_cfg', JSON.stringify({ name: name, epic: epic }));
+    close();
+    _executeLiveRun(code, name, epic);
+  });
+}
+
+function _executeLiveRun(code, name, epic) {
   var btn = document.getElementById('csBtnRunLive');
   if (btn) { btn.disabled = true; btn.textContent = 'Starting...'; }
-  csLog('Starting live script...', 'info');
-  var ts = Date.now().toString(36);
-  var payload = JSON.stringify({ code: code, name: 'editor-' + ts });
+  csLog('Starting live script: ' + name + '...', 'info');
+  var payload = JSON.stringify({ code: code, name: name, instrument: epic });
   var token = _getAuthToken();
   var headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -1282,15 +1607,22 @@ function runLive() {
         csLog('Run Error: ' + data.error, 'error');
         return;
       }
-      var scriptId = data.scriptId || data.name || ('editor-' + ts);
-      csLog('Script started: ' + scriptId, 'info');
+      var scriptId = data.scriptId || data.name || name;
+      csLog('Script started: ' + scriptId + (data.pid ? ' (PID ' + data.pid + ')' : ''), 'info');
       _openRunnerPopup(data.name || scriptId, scriptId);
     } catch(e) {
       csLog('Run Error: ' + e.message, 'error');
+      csLog('Raw response: ' + String(text).substring(0, 200), 'warn');
     }
   }, function(status, text) {
     if (btn) { btn.disabled = false; btn.innerHTML = '&#9998; Run Live'; }
-    csLog('Run Live failed (HTTP ' + status + '). Ensure server has /api/clawscript/run endpoint.', 'error');
+    var errMsg = 'HTTP ' + status;
+    try { var errData = JSON.parse(text); errMsg = errData.error || errMsg; } catch(_) {}
+    if (status === 404) {
+      csLog('Run Live endpoint not found (HTTP 404). This feature requires the full OpenClaw server (ceo-proxy.cjs), not the standalone editor.', 'error');
+    } else {
+      csLog('Run Live failed: ' + errMsg, 'error');
+    }
   });
 }
 
@@ -1758,6 +2090,140 @@ function animatedSimulateAST(ast, ticks) {
   })();
 }
 
+function _csShowNotify(message, level) {
+  csLog('[NOTIFY] ' + message, level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'info');
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    new Notification('ClawScript', { body: message });
+  } else if (typeof Notification !== 'undefined' && Notification.permission !== 'denied') {
+    Notification.requestPermission().then(function(perm) {
+      if (perm === 'granted') new Notification('ClawScript', { body: message });
+    });
+  }
+  _csShowToast(message, level || 'info', 4000);
+}
+
+function _csShowToast(message, level, duration) {
+  var container = document.getElementById('csToastContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'csToastContainer';
+    container.className = 'cs-toast-container';
+    document.body.appendChild(container);
+  }
+  var toast = document.createElement('div');
+  toast.className = 'cs-toast cs-toast-' + (level || 'info');
+  toast.textContent = message;
+  container.appendChild(toast);
+  var dur = duration || 3000;
+  setTimeout(function() {
+    toast.classList.add('cs-toast-fade');
+    setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300);
+  }, dur);
+}
+
+function _csShowPopup(title, htmlContent) {
+  var existing = document.getElementById('csDisplayOverlay');
+  if (existing) existing.parentNode.removeChild(existing);
+  var overlay = document.createElement('div');
+  overlay.id = 'csDisplayOverlay';
+  overlay.className = 'cs-display-overlay';
+  overlay.innerHTML =
+    '<div class="cs-display-popup">' +
+      '<div class="cs-display-popup__header">' +
+        '<span>' + _escHtml(title) + '</span>' +
+        '<button style="padding:2px 8px;font-size:14px;background:#21262d;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;cursor:pointer;" id="csDisplayClose">\u2715</button>' +
+      '</div>' +
+      '<div class="cs-display-popup__body">' + (htmlContent || '') + '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.parentNode.removeChild(overlay); });
+  document.getElementById('csDisplayClose').addEventListener('click', function() { overlay.parentNode.removeChild(overlay); });
+}
+
+var _csTelemetryData = {};
+
+function _csOpenTelemetryPanel(label) {
+  _csTelemetryData = {};
+  var existing = document.getElementById('csTelemetryPanel');
+  if (existing) existing.parentNode.removeChild(existing);
+  var panel = document.createElement('div');
+  panel.id = 'csTelemetryPanel';
+  panel.className = 'cs-telemetry-panel';
+  panel.innerHTML =
+    '<div class="cs-telemetry-header">' +
+      '<span>\uD83D\uDCCA ' + _escHtml(label) + '</span>' +
+      '<button style="padding:1px 6px;font-size:12px;background:none;border:none;color:#8b949e;cursor:pointer;" id="csTelClose">\u2715</button>' +
+    '</div>' +
+    '<div class="cs-telemetry-body" id="csTelBody"></div>';
+  document.body.appendChild(panel);
+  document.getElementById('csTelClose').addEventListener('click', function() { _csCloseTelemetryPanel(); });
+}
+
+function _csLogTelemetry(key, value) {
+  _csTelemetryData[key] = value;
+  var body = document.getElementById('csTelBody');
+  if (!body) return;
+  body.innerHTML = '';
+  for (var k in _csTelemetryData) {
+    var row = document.createElement('div');
+    row.className = 'cs-telemetry-row';
+    row.innerHTML = '<span class="cs-telemetry-key">' + _escHtml(k) + '</span><span class="cs-telemetry-val">' + _escHtml(JSON.stringify(_csTelemetryData[k])) + '</span>';
+    body.appendChild(row);
+  }
+  body.scrollTop = body.scrollHeight;
+}
+
+function _csCloseTelemetryPanel() {
+  var panel = document.getElementById('csTelemetryPanel');
+  if (panel) panel.parentNode.removeChild(panel);
+  _csTelemetryData = {};
+}
+
+function _csShowDisplay(data, format) {
+  var existing = document.getElementById('csDisplayOverlay');
+  if (existing) existing.parentNode.removeChild(existing);
+  var bodyHtml = '';
+  if (format === 'table' && Array.isArray(data) && data.length > 0) {
+    var keys = Object.keys(data[0]);
+    bodyHtml = '<table><tr>';
+    for (var hi = 0; hi < keys.length; hi++) bodyHtml += '<th>' + _escHtml(keys[hi]) + '</th>';
+    bodyHtml += '</tr>';
+    for (var ri = 0; ri < data.length; ri++) {
+      bodyHtml += '<tr>';
+      for (var ci = 0; ci < keys.length; ci++) bodyHtml += '<td>' + _escHtml(String(data[ri][keys[ci]] != null ? data[ri][keys[ci]] : '')) + '</td>';
+      bodyHtml += '</tr>';
+    }
+    bodyHtml += '</table>';
+  } else if (format === 'chart' && Array.isArray(data)) {
+    var maxVal = Math.max.apply(null, data.map(function(d) { return typeof d === 'number' ? d : 0; }));
+    var minVal = Math.min.apply(null, data.map(function(d) { return typeof d === 'number' ? d : 0; }));
+    var range = maxVal - minVal || 1;
+    bodyHtml = '<div style="display:flex;align-items:flex-end;gap:2px;height:150px;padding:10px 0;">';
+    for (var bi = 0; bi < data.length; bi++) {
+      var val = typeof data[bi] === 'number' ? data[bi] : 0;
+      var pct = ((val - minVal) / range) * 100;
+      bodyHtml += '<div style="flex:1;background:#58a6ff;min-width:4px;height:' + Math.max(pct, 2) + '%;border-radius:2px 2px 0 0;" title="' + val + '"></div>';
+    }
+    bodyHtml += '</div>';
+  } else {
+    bodyHtml = '<pre style="margin:0;white-space:pre-wrap;word-break:break-all;">' + _escHtml(JSON.stringify(data, null, 2)) + '</pre>';
+  }
+  var overlay = document.createElement('div');
+  overlay.id = 'csDisplayOverlay';
+  overlay.className = 'cs-display-overlay';
+  overlay.innerHTML =
+    '<div class="cs-display-popup">' +
+      '<div class="cs-display-popup__header">' +
+        '<span>DISPLAY [' + _escHtml(format) + ']</span>' +
+        '<button style="padding:2px 8px;font-size:14px;background:#21262d;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;cursor:pointer;" id="csDisplayClose">\u2715</button>' +
+      '</div>' +
+      '<div class="cs-display-popup__body">' + bodyHtml + '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.parentNode.removeChild(overlay); });
+  document.getElementById('csDisplayClose').addEventListener('click', function() { overlay.parentNode.removeChild(overlay); });
+}
+
 function simulateAST(ast, ticks) {
   var vars = {};
   var prices = ticks.map(function(t) { return t.mid; });
@@ -1888,6 +2354,27 @@ function simulateAST(ast, ticks) {
       case 'RumorScan':
         csLog('[SIM] RUMOR_SCAN: ' + evalExpr(expr.topic), 'trace');
         return [{text:'rumor mock',score:0.7}];
+      case 'AgentSpawn':
+        csLog('[SIM] AGENT_SPAWN: "' + evalExpr(expr.name) + '"', 'trace');
+        return { agentId: 'agent_mock', name: evalExpr(expr.name), spawned: true };
+      case 'AgentCall':
+        csLog('[SIM] AGENT_CALL: "' + evalExpr(expr.agent) + '" — "' + evalExpr(expr.command) + '"', 'trace');
+        return 'agent response mock';
+      case 'SkillCall':
+        csLog('[SIM] SKILL_CALL: "' + evalExpr(expr.skill) + '"', 'trace');
+        return 'skill result mock';
+      case 'WebFetch':
+        csLog('[SIM] WEB_FETCH: ' + evalExpr(expr.url), 'trace');
+        return { status: 200, body: 'mock response', ok: true };
+      case 'FileRead':
+        csLog('[SIM] FILE_READ: ' + evalExpr(expr.path), 'trace');
+        return 'file content mock';
+      case 'FileExecute':
+        csLog('[SIM] FILE_EXECUTE: ' + evalExpr(expr.command), 'trace');
+        return { exitCode: 0, stdout: 'mock output' };
+      case 'DataTransform':
+        csLog('[SIM] DATA_TRANSFORM', 'trace');
+        return evalExpr(expr.data);
       case 'IndicatorCall':
         var iname = expr.name.toUpperCase();
         var iparams = expr.params.map(evalExpr);
@@ -2092,6 +2579,112 @@ function simulateAST(ast, ticks) {
       case 'Chain':
         csLog(prefix + 'CHAIN (' + stmt.steps.length + ' steps)', 'trace');
         for (var ci = 0; ci < stmt.steps.length; ci++) evalExpr(stmt.steps[ci]);
+        break;
+      case 'TaskDefine':
+        csLog(prefix + 'AGENT: Task defined — "' + evalExpr(stmt.name) + '"', 'trace');
+        if (stmt.body && stmt.body.length > 0) { for (var tdi = 0; tdi < stmt.body.length; tdi++) execStmt(stmt.body[tdi], depth + 1); }
+        break;
+      case 'TaskAssign':
+        csLog(prefix + 'AGENT: Task assigned — ' + evalExpr(stmt.task) + ' → ' + evalExpr(stmt.to), 'trace');
+        break;
+      case 'TaskChain':
+        csLog(prefix + 'AGENT: Task chain — ' + stmt.steps.length + ' tasks chained sequentially', 'trace');
+        break;
+      case 'TaskParallel':
+        csLog(prefix + 'AGENT: Task parallel — ' + stmt.steps.length + ' tasks running concurrently', 'trace');
+        break;
+      case 'TaskShowFlow':
+        csLog(prefix + 'AGENT: Task flow visualized' + (stmt.name ? ' — ' + evalExpr(stmt.name) : ''), 'trace');
+        break;
+      case 'TaskLog':
+        csLog(prefix + 'AGENT: Task log — ' + evalExpr(stmt.message), 'trace');
+        break;
+      case 'AgentSpawn':
+        csLog(prefix + 'AGENT: Spawning agent "' + evalExpr(stmt.name) + '"' + (stmt.prompt ? ' with prompt: "' + evalExpr(stmt.prompt) + '"' : ''), 'trace');
+        break;
+      case 'AgentCall':
+        csLog(prefix + 'AGENT: Calling agent "' + evalExpr(stmt.agent) + '" — command: "' + evalExpr(stmt.command) + '"', 'trace');
+        break;
+      case 'AgentPass':
+        csLog(prefix + 'AGENT: Passing data from "' + evalExpr(stmt.from) + '" → "' + evalExpr(stmt.to) + '"', 'trace');
+        break;
+      case 'AgentTerminate':
+        csLog(prefix + 'AGENT: Terminating agent "' + evalExpr(stmt.agent) + '"', 'trace');
+        break;
+      case 'SkillCall':
+        csLog(prefix + 'AGENT: Skill call — "' + evalExpr(stmt.skill) + '"' + (stmt.args ? ' with args: ' + evalExpr(stmt.args) : ''), 'trace');
+        break;
+      case 'CronCreate':
+        csLog(prefix + 'AGENT: Cron created — "' + evalExpr(stmt.name) + '"' + (stmt.schedule ? ' schedule: ' + evalExpr(stmt.schedule) : ''), 'trace');
+        break;
+      case 'CronCall':
+        csLog(prefix + 'AGENT: Cron triggered — "' + evalExpr(stmt.name) + '"', 'trace');
+        break;
+      case 'WebFetch':
+        csLog(prefix + 'AGENT: Web fetch — ' + evalExpr(stmt.url), 'trace');
+        break;
+      case 'WebSerial':
+        csLog(prefix + 'AGENT: Web serial — ' + stmt.steps.length + ' steps', 'trace');
+        break;
+      case 'FileRead':
+        csLog(prefix + 'AGENT: File read — ' + evalExpr(stmt.path), 'trace');
+        break;
+      case 'FileWrite':
+        csLog(prefix + 'AGENT: File write — ' + evalExpr(stmt.path), 'trace');
+        break;
+      case 'FileExecute':
+        csLog(prefix + 'AGENT: File execute — ' + evalExpr(stmt.command), 'trace');
+        break;
+      case 'DataTransform':
+        csLog(prefix + 'AGENT: Data transform' + (stmt.using ? ' using ' + evalExpr(stmt.using) : ''), 'trace');
+        break;
+      case 'ChannelSend':
+        csLog(prefix + 'AGENT: Channel send — ' + evalExpr(stmt.channel) + ': "' + evalExpr(stmt.message) + '"', 'trace');
+        break;
+      case 'EmailSend':
+        csLog(prefix + 'AGENT: Email send — to: ' + evalExpr(stmt.to), 'trace');
+        break;
+      case 'PublishCanvas':
+        csLog(prefix + 'AGENT: Publish canvas — "' + evalExpr(stmt.name) + '"', 'trace');
+        break;
+      case 'Notify':
+        var nMsg = evalExpr(stmt.message);
+        var nLevel = stmt.level ? evalExpr(stmt.level) : 'info';
+        csLog(prefix + 'NOTIFY [' + nLevel + ']: "' + nMsg + '"', nLevel === 'error' ? 'error' : nLevel === 'warn' ? 'warn' : 'info');
+        _csShowNotify(nMsg, nLevel);
+        break;
+      case 'Popup':
+        var pTitle = evalExpr(stmt.title);
+        var pContent = stmt.content ? evalExpr(stmt.content) : '';
+        csLog(prefix + 'POPUP: "' + pTitle + '"', 'info');
+        _csShowPopup(pTitle, pContent);
+        break;
+      case 'Toast':
+        var tMsg = evalExpr(stmt.message);
+        var tDur = stmt.duration ? evalExpr(stmt.duration) : 3000;
+        csLog(prefix + 'TOAST: "' + tMsg + '" (duration=' + tDur + 'ms)', 'info');
+        _csShowToast(tMsg, 'info', tDur);
+        break;
+      case 'TelemetryStart':
+        var tLabel = evalExpr(stmt.label);
+        csLog(prefix + 'TELEMETRY_START: "' + tLabel + '"', 'trace');
+        _csOpenTelemetryPanel(tLabel);
+        break;
+      case 'TelemetryLog':
+        var tlKey = evalExpr(stmt.key);
+        var tlVal = evalExpr(stmt.value);
+        csLog(prefix + 'TELEMETRY_LOG: ' + tlKey + ' = ' + JSON.stringify(tlVal), 'trace');
+        _csLogTelemetry(tlKey, tlVal);
+        break;
+      case 'TelemetryStop':
+        csLog(prefix + 'TELEMETRY_STOP', 'trace');
+        _csCloseTelemetryPanel();
+        break;
+      case 'Display':
+        var dData = evalExpr(stmt.data);
+        var dFmt = stmt.format ? evalExpr(stmt.format) : 'json';
+        csLog(prefix + 'DISPLAY [' + dFmt + ']: ' + JSON.stringify(dData).substring(0, 80), 'info');
+        _csShowDisplay(dData, dFmt);
         break;
       default:
         csLog(prefix + 'Unknown: ' + stmt.type, 'info');
@@ -3142,6 +3735,15 @@ function generateJSFromAST(ast) {
       case 'MemberExpr': return genExpr(expr.object) + '.' + expr.property;
       case 'IndexExpr': return genExpr(expr.object) + '[' + genExpr(expr.index) + ']';
       case 'LoopCount': return genExpr(expr.num);
+      case 'CallSession': return 'await chat.callSession(' + genExpr(expr.agentName) + ', ' + genExpr(expr.command) + ')';
+      case 'WaitForReply': return 'await chat.waitForReply(' + genExpr(expr.sessionId) + ', ' + (expr.timeout ? genExpr(expr.timeout) : '300') + ', ' + (expr.filter ? genExpr(expr.filter) : 'null') + ')';
+      case 'AgentCall': return 'await automation.agentCall(' + genExpr(expr.agent) + ', ' + genExpr(expr.command) + ')';
+      case 'SkillCall': return 'await automation.skillCall(' + genExpr(expr.skill) + ', ' + genExpr(expr.args) + ')';
+      case 'AgentSpawn': return 'await automation.agentSpawn(' + genExpr(expr.name) + ', ' + genExpr(expr.prompt) + ')';
+      case 'WebFetch': return 'await automation.webFetch(' + genExpr(expr.url) + ', ' + genExpr(expr.options) + ')';
+      case 'FileRead': return 'await automation.fileRead(' + genExpr(expr.path) + ', ' + genExpr(expr.format) + ')';
+      case 'FileExecute': return 'await automation.fileExecute(' + genExpr(expr.command) + ', ' + genExpr(expr.timeout) + ')';
+      case 'DataTransform': return 'await automation.dataTransform(' + genExpr(expr.data) + ', ' + genExpr(expr.using) + ')';
       default: return 'null';
     }
   }
@@ -3181,7 +3783,10 @@ function generateJSFromAST(ast) {
       case 'ErrorThrow': lines.push(p + 'throw new Error(' + genExpr(stmt.message) + ');'); break;
       case 'Wait': lines.push(p + 'await new Promise(r => setTimeout(r, ' + genExpr(stmt.ms) + '));'); break;
       case 'Alert': lines.push(p + 'await channels.send(' + (stmt.to ? genExpr(stmt.to) : '"default"') + ', ' + genExpr(stmt.message) + ', { level: ' + (stmt.level ? genExpr(stmt.level) : '"info"') + ' });'); break;
+      case 'SpawnAgent': lines.push(p + 'await chat.spawnAgent(' + genExpr(stmt.name) + ', ' + (stmt.prompt ? genExpr(stmt.prompt) : 'null') + ');'); break;
+      case 'CallSession': lines.push(p + 'const _sessResult = await chat.callSession(' + genExpr(stmt.agentName) + ', ' + genExpr(stmt.command) + ');'); break;
       case 'SayToSession': lines.push(p + 'await chat.sayToSession(' + genExpr(stmt.sessionId) + ', ' + genExpr(stmt.message) + ');'); break;
+      case 'WaitForReply': lines.push(p + 'const _reply = await chat.waitForReply(' + genExpr(stmt.sessionId) + ', ' + (stmt.timeout ? genExpr(stmt.timeout) : '300') + ', ' + (stmt.filter ? genExpr(stmt.filter) : 'null') + ');'); break;
       case 'MutateConfig': lines.push(p + 'this.config[' + genExpr(stmt.key) + '] = ' + (stmt.value ? genExpr(stmt.value) : 'null') + ';'); break;
       case 'CrashScan': lines.push(p + 'this._crashScanEnabled = ' + (stmt.state === 'ON') + ';'); break;
       case 'TaskDefine': lines.push(p + 'await automation.taskDefine(' + genExpr(stmt.name) + ', { priority: ' + genExpr(stmt.priority) + ' });'); if (stmt.body.length > 0) { stmt.body.forEach(function(s) { genStmt(s, p + '  '); }); } break;
@@ -3206,6 +3811,13 @@ function generateJSFromAST(ast) {
       case 'ChannelSend': lines.push(p + 'await automation.channelSend(' + genExpr(stmt.channel) + ', ' + genExpr(stmt.message) + ', ' + genExpr(stmt.options) + ');'); break;
       case 'EmailSend': lines.push(p + 'await automation.emailSend(' + genExpr(stmt.to) + ', ' + genExpr(stmt.subject) + ', ' + genExpr(stmt.body) + ');'); break;
       case 'PublishCanvas': lines.push(p + 'await automation.publishCanvas(' + genExpr(stmt.name) + ', ' + genExpr(stmt.content) + ');'); break;
+      case 'Notify': lines.push(p + 'await channels.notify(' + genExpr(stmt.message) + ', { level: ' + (stmt.level ? genExpr(stmt.level) : '"info"') + ' });'); break;
+      case 'Popup': lines.push(p + 'await channels.popup(' + genExpr(stmt.title) + ', ' + (stmt.content ? genExpr(stmt.content) : 'null') + ');'); break;
+      case 'Toast': lines.push(p + 'await channels.toast(' + genExpr(stmt.message) + ', ' + (stmt.duration ? genExpr(stmt.duration) : '3000') + ');'); break;
+      case 'TelemetryStart': lines.push(p + 'await channels.telemetryStart(' + genExpr(stmt.label) + ');'); break;
+      case 'TelemetryLog': lines.push(p + 'await channels.telemetryLog(' + genExpr(stmt.key) + ', ' + genExpr(stmt.value) + ');'); break;
+      case 'TelemetryStop': lines.push(p + 'await channels.telemetryStop();'); break;
+      case 'Display': lines.push(p + 'await channels.display(' + genExpr(stmt.data) + ', { format: ' + (stmt.format ? genExpr(stmt.format) : '"json"') + ' });'); break;
       default: lines.push(p + '// ' + stmt.type); break;
     }
   }
@@ -3276,7 +3888,14 @@ var NODE_COLORS = {
   'DataTransform': { bg: '#0c2d48', border: '#a5d6ff', cls: 'cs-fn-data' },
   'ChannelSend': { bg: '#2d1b4e', border: '#d2a8ff', cls: 'cs-fn-ai' },
   'EmailSend': { bg: '#2d1b4e', border: '#d2a8ff', cls: 'cs-fn-ai' },
-  'PublishCanvas': { bg: '#2d1b4e', border: '#d2a8ff', cls: 'cs-fn-ai' }
+  'PublishCanvas': { bg: '#2d1b4e', border: '#d2a8ff', cls: 'cs-fn-ai' },
+  'Notify': { bg: '#3d1a3d', border: '#ff6ac1', cls: 'cs-fn-notification' },
+  'Popup': { bg: '#3d1a3d', border: '#ff6ac1', cls: 'cs-fn-notification' },
+  'Toast': { bg: '#3d1a3d', border: '#ff6ac1', cls: 'cs-fn-notification' },
+  'TelemetryStart': { bg: '#3d1a3d', border: '#ff6ac1', cls: 'cs-fn-notification' },
+  'TelemetryLog': { bg: '#3d1a3d', border: '#ff6ac1', cls: 'cs-fn-notification' },
+  'TelemetryStop': { bg: '#3d1a3d', border: '#ff6ac1', cls: 'cs-fn-notification' },
+  'Display': { bg: '#3d1a3d', border: '#ff6ac1', cls: 'cs-fn-notification' }
 };
 
 function getNodeLabel(stmt) {
@@ -3343,6 +3962,13 @@ function getNodeLabel(stmt) {
     case 'ChannelSend': return 'CHANNEL_SEND';
     case 'EmailSend': return 'EMAIL_SEND';
     case 'PublishCanvas': return 'PUBLISH_CANVAS';
+    case 'Notify': return 'NOTIFY';
+    case 'Popup': return 'POPUP';
+    case 'Toast': return 'TOAST';
+    case 'TelemetryStart': return 'TELEMETRY_START';
+    case 'TelemetryLog': return 'TELEMETRY_LOG';
+    case 'TelemetryStop': return 'TELEMETRY_STOP';
+    case 'Display': return 'DISPLAY';
     default: return stmt.type;
   }
 }
