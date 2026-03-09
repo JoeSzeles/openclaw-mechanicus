@@ -195,7 +195,7 @@ function buildEditorUI() {
   root.innerHTML = '' +
   '<style>' +
   '#csEditorRoot { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding:0 8px; }' +
-  '#csEditorRoot.cs-standalone { display:flex; flex-direction:column; overflow:hidden; height:100%; }' +
+  '#csEditorRoot.cs-standalone { display:flex; flex-direction:column; overflow:hidden; height:100%; padding-bottom:4px; }' +
   '#csEditorRoot.cs-standalone .cs-toolbar { flex-shrink:0; }' +
   '#csEditorRoot.cs-standalone .cs-main { flex:1 1 0; min-height:0 !important; overflow:hidden; }' +
   '#csEditorRoot.cs-standalone .cs-main .cs-code-pane { min-height:0; }' +
@@ -3567,7 +3567,7 @@ function _sendAiRequest(messages, callback) {
     return;
   }
 
-  if (cfg && cfg.apiUrl && cfg.apiKey) {
+  if (cfg && cfg.apiUrl) {
     _sendToDirectApi(cfg, messages, callback);
     return;
   }
