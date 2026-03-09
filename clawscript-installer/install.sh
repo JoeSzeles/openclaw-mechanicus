@@ -2,13 +2,58 @@
 #
 # ClawScript Installer for OpenClaw
 # Usage: bash install.sh [openclaw_root] [skills_root]
-#   openclaw_root: path to .openclaw directory (default: .openclaw)
-#   skills_root:   path to skills directory    (default: skills)
+#   openclaw_root: path to .openclaw directory (default: auto-detect)
+#   skills_root:   path to skills directory    (default: auto-detect)
+#
+# Auto-detection order:
+#   1. Explicit arguments ($1, $2)
+#   2. Windows npm global: ~/. openclaw + %APPDATA%/npm/node_modules/openclaw/skills
+#   3. Linux/Mac local: ./.openclaw + ./skills
 #
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OPENCLAW_ROOT="${1:-.openclaw}"
-SKILLS_ROOT="${2:-skills}"
+
+_detect_paths() {
+  if [ -n "$1" ] && [ -n "$2" ]; then
+    OPENCLAW_ROOT="$1"
+    SKILLS_ROOT="$2"
+    echo "  Mode: explicit paths"
+    return
+  fi
+
+  local home="${HOME:-$USERPROFILE}"
+  home="${home:-$(eval echo ~)}"
+
+  if [ -d "$home/.openclaw" ]; then
+    OPENCLAW_ROOT="$home/.openclaw"
+  else
+    OPENCLAW_ROOT=".openclaw"
+  fi
+
+  local npm_global=""
+  if [ -n "$APPDATA" ] && [ -d "$APPDATA/npm/node_modules/openclaw/skills" ]; then
+    npm_global="$APPDATA/npm/node_modules/openclaw/skills"
+  elif [ -n "$home" ] && [ -d "$home/AppData/Roaming/npm/node_modules/openclaw/skills" ]; then
+    npm_global="$home/AppData/Roaming/npm/node_modules/openclaw/skills"
+  fi
+
+  if [ -n "$npm_global" ]; then
+    SKILLS_ROOT="$npm_global"
+    echo "  Mode: Windows npm global install"
+  elif [ -d "$home/.openclaw/skills" ]; then
+    SKILLS_ROOT="$home/.openclaw/skills"
+    echo "  Mode: home directory layout"
+  elif [ -d "./skills" ]; then
+    SKILLS_ROOT="./skills"
+    echo "  Mode: local directory"
+  else
+    SKILLS_ROOT="${OPENCLAW_ROOT}/skills"
+    echo "  Mode: fallback (skills under openclaw root)"
+    mkdir -p "$SKILLS_ROOT" 2>/dev/null
+  fi
+}
+
+_detect_paths "$1" "$2"
 
 BOTS_DIR="$SKILLS_ROOT/bots"
 STRATS_DIR="$BOTS_DIR/strategies"
@@ -22,7 +67,8 @@ VERSION="unknown"
 echo ""
 echo "  ClawScript Installer v${VERSION}"
 echo "  ──────────────────────────────"
-echo "  Target: $OPENCLAW_ROOT"
+echo "  OpenClaw: $OPENCLAW_ROOT"
+echo "  Skills:   $SKILLS_ROOT"
 echo ""
 
 ERRORS=0
@@ -55,8 +101,8 @@ safe_cp_glob() {
   shopt -s nullglob
   for f in "$dir"/$pattern; do
     [ -f "$f" ] || continue
-    local basename=$(basename "$f")
-    rm -f "$dst/$basename" 2>/dev/null
+    local bn=$(basename "$f")
+    rm -f "$dst/$bn" 2>/dev/null
     if cp -f "$f" "$dst"; then
       count=$((count + 1))
     else

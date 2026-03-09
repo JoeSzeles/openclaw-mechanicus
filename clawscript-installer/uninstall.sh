@@ -3,9 +3,44 @@
 # ClawScript Uninstaller for OpenClaw
 # Usage: bash uninstall.sh [openclaw_root] [skills_root]
 #
+# Auto-detects Windows npm global install paths if no arguments given.
+#
 
-OPENCLAW_ROOT="${1:-.openclaw}"
-SKILLS_ROOT="${2:-skills}"
+_detect_paths() {
+  if [ -n "$1" ] && [ -n "$2" ]; then
+    OPENCLAW_ROOT="$1"
+    SKILLS_ROOT="$2"
+    return
+  fi
+
+  local home="${HOME:-$USERPROFILE}"
+  home="${home:-$(eval echo ~)}"
+
+  if [ -d "$home/.openclaw" ]; then
+    OPENCLAW_ROOT="$home/.openclaw"
+  else
+    OPENCLAW_ROOT=".openclaw"
+  fi
+
+  local npm_global=""
+  if [ -n "$APPDATA" ] && [ -d "$APPDATA/npm/node_modules/openclaw/skills" ]; then
+    npm_global="$APPDATA/npm/node_modules/openclaw/skills"
+  elif [ -n "$home" ] && [ -d "$home/AppData/Roaming/npm/node_modules/openclaw/skills" ]; then
+    npm_global="$home/AppData/Roaming/npm/node_modules/openclaw/skills"
+  fi
+
+  if [ -n "$npm_global" ]; then
+    SKILLS_ROOT="$npm_global"
+  elif [ -d "$home/.openclaw/skills" ]; then
+    SKILLS_ROOT="$home/.openclaw/skills"
+  elif [ -d "./skills" ]; then
+    SKILLS_ROOT="./skills"
+  else
+    SKILLS_ROOT="${OPENCLAW_ROOT}/skills"
+  fi
+}
+
+_detect_paths "$1" "$2"
 
 BOTS_DIR="$SKILLS_ROOT/bots"
 STRATS_DIR="$BOTS_DIR/strategies"
@@ -16,7 +51,8 @@ CLAWSKILL_DIR="$SKILLS_ROOT/clawscript"
 echo ""
 echo "  ClawScript Uninstaller"
 echo "  ──────────────────────"
-echo "  Target: $OPENCLAW_ROOT"
+echo "  OpenClaw: $OPENCLAW_ROOT"
+echo "  Skills:   $SKILLS_ROOT"
 echo ""
 
 REMOVED=0
