@@ -84,6 +84,14 @@ echo ""
 
 echo "[2/3] Installing Mechanicus files..."
 
+# Inject navigation into index.html
+if [ -f "$OPENCLAW_ROOT/index.html" ]; then
+  if ! grep -q "nav-inject.js" "$OPENCLAW_ROOT/index.html"; then
+    sed -i 's|</body>|<script src="/nav-inject.js"></script></body>|' "$OPENCLAW_ROOT/index.html"
+    echo "  Injected navigation into index.html"
+  fi
+fi
+
 cd "$FILES_DIR"
 find . -type f | sed 's|^\./||' | sort | while IFS= read -r rel; do
   target="$OPENCLAW_ROOT/$rel"

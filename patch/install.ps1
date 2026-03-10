@@ -88,6 +88,17 @@ Write-Host ""
 
 Write-Host "[2/3] Installing Mechanicus files..."
 
+# Inject navigation into index.html
+$indexPath = Join-Path $OpenClawRoot "index.html"
+if (Test-Path $indexPath) {
+    $indexContent = Get-Content $indexPath -Raw
+    if ($indexContent -notmatch "nav-inject.js") {
+        $indexContent = $indexContent -replace "</body>", "<script src=""/nav-inject.js""></script></body>"
+        $indexContent | Set-Content $indexPath
+        Write-Host "  Injected navigation into index.html"
+    }
+}
+
 foreach ($f in $allFiles) {
     $rel = $f.FullName.Substring($FilesDir.Length + 1)
     $target = Join-Path $OpenClawRoot $rel
