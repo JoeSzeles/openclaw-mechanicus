@@ -73,12 +73,17 @@ function resolveType(type) {
   for (const regType of Object.keys(registry)) {
     if (regType === lower || regType === 'custom-' + lower) return regType;
   }
+  const dashLower = type.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  if (registry[dashLower]) return dashLower;
+  for (const regType of Object.keys(registry)) {
+    const regNorm = regType.replace(/[^a-z0-9]/g, '');
+    if (regNorm === lower) return regType;
+  }
   for (const [regType, Cls] of Object.entries(registry)) {
     try {
       const inst = new Cls({});
       const name = (inst.getName() || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const desc = (inst.getDescription() || '').toLowerCase();
-      if (name === lower || desc.includes(type.toLowerCase())) return regType;
+      if (name === lower) return regType;
     } catch (_) {}
   }
   return null;

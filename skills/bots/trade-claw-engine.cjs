@@ -350,7 +350,14 @@ async function saveConfig() {
       strategies: (config.strategies || []).map(s => ({
         instrument: s.instrument, name: s.name, direction: s.direction, size: s.size,
         enabled: s.enabled, stopDistance: s.stopDistance, limitDistance: s.limitDistance,
-        minMomentumPct: s.minMomentumPct, dealId: s.dealId, strategyType: s.strategyType
+        minMomentumPct: s.minMomentumPct, dealId: s.dealId, strategyType: s.strategyType,
+        profitTarget: s.profitTarget, trailingStop: s.trailingStop,
+        cooldownMs: s.cooldownMs, tickWindow: s.tickWindow,
+        maxOpenPositions: s.maxOpenPositions, minSize: s.minSize, maxSize: s.maxSize,
+        warmupMs: s.warmupMs, contractSize: s.contractSize, timeframe: s.timeframe,
+        rsiEnabled: s.rsiEnabled, rsiPeriod: s.rsiPeriod, rsiOverbought: s.rsiOverbought, rsiOversold: s.rsiOversold,
+        emaEnabled: s.emaEnabled, emaShort: s.emaShort, emaLong: s.emaLong,
+        macdEnabled: s.macdEnabled, macdFast: s.macdFast, macdSlow: s.macdSlow, macdSignal: s.macdSignal
       }))
     };
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(legacy, null, 2));

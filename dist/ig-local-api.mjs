@@ -1731,7 +1731,30 @@ async function routeRequest(req, res, p, m, url) {
   }
 
   if (m === 'GET' && p === '/api/ig/scalper/strategy-schemas') {
-    return json(res, 200, { schemas: { 'ema-crossover': { name: 'EMA Crossover', params: { fastPeriod: 9, slowPeriod: 21, size: 1 } }, 'rsi-reversal': { name: 'RSI Reversal', params: { period: 14, overbought: 70, oversold: 30, size: 1 } }, 'bollinger-bounce': { name: 'Bollinger Bounce', params: { period: 20, stdDev: 2, size: 1 } } } }), true;
+    const schemas = {
+      'scalper': { type: 'scalper', name: 'Scalper', description: 'Quick in-outs on micro-moves using momentum %' },
+      'momentum-scalper': { type: 'momentum-scalper', name: 'Momentum Scalper', description: 'Scalps momentum bursts using ROC and volume spike detection' },
+      'mean-reversion': { type: 'mean-reversion', name: 'Mean Reversion', description: 'Bollinger Band edge entries with Stochastic/RSI confirmation' },
+      'trend-following': { type: 'trend-following', name: 'Trend Following', description: 'EMA crossover + ADX trend strength + Parabolic SAR' },
+      'breakout': { type: 'breakout', name: 'Breakout', description: 'Breakout strategy for range expansions' },
+      'swing-trading': { type: 'swing-trading', name: 'Swing Trading', description: 'Fibonacci extension targets with RSI divergence' },
+      'position-trading': { type: 'position-trading', name: 'Position Trading', description: 'Ichimoku Cloud breakout with ATR trailing stop' },
+      'grid-trader': { type: 'grid-trader', name: 'Grid Trader', description: 'Grid-based trading with multiple levels' },
+      'donchian-trend': { type: 'donchian-trend', name: 'Donchian Trend', description: 'Donchian channel breakout trend following' },
+      'volatility-breakout': { type: 'volatility-breakout', name: 'Volatility Breakout', description: 'Volatility expansion breakout strategy' },
+      'carry-trade': { type: 'carry-trade', name: 'Carry Trade', description: 'Positive swap direction trading with EMA trend filter' },
+      'arbitrage-scalper': { type: 'arbitrage-scalper', name: 'Arbitrage Scalper', description: 'Statistical arbitrage using z-score of price spread' },
+      'market-making': { type: 'market-making', name: 'Market Making', description: 'Market making with bid/offer spread capture' },
+      'news-spike': { type: 'news-spike', name: 'News Spike Trader', description: 'Detects volatility surges from news events' },
+      'pairs-trading': { type: 'pairs-trading', name: 'Pairs Trading', description: 'Correlated pair mean reversion' },
+      'hybrid-ml': { type: 'hybrid-ml', name: 'Hybrid ML Predictor', description: 'Multi-indicator feature vector prediction' },
+      'portfolio-optimizer': { type: 'portfolio-optimizer', name: 'Portfolio Optimizer', description: 'Kelly Criterion sizing with ROC momentum' },
+      'seasonal-trader': { type: 'seasonal-trader', name: 'Seasonal Trader', description: 'Calendar pattern trading with EMA confirmation' },
+      'sentiment-trader': { type: 'sentiment-trader', name: 'Sentiment Trader', description: 'Sentiment-driven entries from HTF bias' },
+      'value-investing': { type: 'value-investing', name: 'Value Investing Algo', description: 'Price below SMA fair value proxy with trend confirmation' },
+      'options-linked': { type: 'options-linked', name: 'Options-Linked', description: 'Implied volatility proxy with momentum filter' }
+    };
+    return json(res, 200, { schemas }), true;
   }
 
   if (m === 'GET' && p === '/api/ig/scalper/backtests') {
