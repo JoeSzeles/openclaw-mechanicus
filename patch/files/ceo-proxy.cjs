@@ -5247,6 +5247,45 @@ function proxyReq(req, res, retries = 3) {
 
 const NAV_INJECT_TAG = '<script src="/nav-inject.js"></script>';
 
+const CONTROL_PAGES = new Set([
+  "/model-config.html", "/model-config.js",
+  "/processes.html", "/processes.js",
+  "/workers.html", "/workers.js",
+  "/nav-inject.js", "/token-init.js",
+  "/login.html"
+]);
+
+function serveControlPage(req, res) {
+  const url = new URL(req.url, "http://localhost");
+  const p = url.pathname;
+  if (!CONTROL_PAGES.has(p)) return false;
+  const dirs = [
+    path.join(__dirname, "ui", "public"),
+    path.join(__dirname, "dist", "control-ui"),
+    path.join(__dirname, "dist")
+  ];
+  for (const dir of dirs) {
+    const filePath = path.join(dir, path.basename(p));
+    if (fs.existsSync(filePath)) {
+      let content = fs.readFileSync(filePath, "utf8");
+      const ext = path.extname(p);
+      const mime = MIME_TYPES[ext] || "application/octet-stream";
+      if (ext === ".html" && !content.includes("nav-inject.js")) {
+        const idx = content.indexOf("</body>");
+        if (idx !== -1) content = content.slice(0, idx) + NAV_INJECT_TAG + content.slice(idx);
+        else content += NAV_INJECT_TAG;
+      }
+      res.writeHead(200, {
+        "Content-Type": mime,
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      });
+      res.end(content);
+      return true;
+    }
+  }
+  return false;
+}
+
 function unescapeHtmlEntities(html) {
   return html
     .replace(/&lt;/g, "<")
@@ -5492,6 +5531,7 @@ const server = http.createServer(async (req, res) => {
       }
       return serveLoginPage(req, res);
     }
+    if (serveControlPage(req, res)) return;
     if (serveCanvas(req, res)) return;
     if (!(await handleApi(req, res))) proxyReq(req, res);
   } catch (err) {

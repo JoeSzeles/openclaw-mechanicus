@@ -1,0 +1,13 @@
+SES Removing unpermitted intrinsics lockdown-install.js:1:203117
+  Removing intrinsics.%MapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%MapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%DatePrototype%.toTemporalInstant lockdown-install.js:1:202962
+Loading failed for the <script> with source “http://127.0.0.1:18789/token-init.js”. model-config.html:193:30
+The resource from “http://127.0.0.1:18789/token-init.js” was blocked due to MIME type (“text/plain”) mismatch (X-Content-Type-Options: nosniff). model-config.html
+Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-YiC5bd+aSY6gJKgwwD9kRRZCdn/qi++mRW6ERR4uZ3c=') or a nonce. inpage.js:1:557775
+Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-AscTKh1Dz6R8WKw7cDDziaBK5Uzgqpc4LVNpdaAtUnY=') or a nonce. preload.js:139:16
+Content-Security-Policy: The page’s settings blocked an inline script (script-src-elem) from being executed because it violates the following directive: “script-src 'self'”. Consider using a hash ('sha256-ieoeWczDHkReVBsRBqaal5AFMlBtNjMzgwKvLqi/tSU=') or a nonce. sandbox eval code:17:34
+Content-Security-Policy: The page’s settings blocked the loading of a resource (connect-src) at http://127.0.0.1:5000/__openclaw/control-ui-config.json because it violates the following directive: “connect-src 'self' ws: wss:” model-config.js:27:10
+Content-Security-Policy: The page’s settings blocked the loading of a resource (connect-src) at http://127.0.0.1:5000/api/ig/config because it violates the following directive: “connect-src 'self' ws: wss:”
