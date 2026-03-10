@@ -44,21 +44,32 @@ if not exist "ceo-proxy.cjs" (
     exit /b 1
 )
 
-echo [start] Launching CEO proxy on port 5000...
+if not defined OPENCLAW_PROXY_PORT set OPENCLAW_PROXY_PORT=5000
+if not defined OPENCLAW_GATEWAY_PORT set OPENCLAW_GATEWAY_PORT=5001
+
+echo [start] Launching CEO proxy on port %OPENCLAW_PROXY_PORT%...
 start /b node ceo-proxy.cjs
 
-echo [start] Waiting for IG connection...
+echo [start] Waiting for CEO proxy + IG connection...
 timeout /t 5 /nobreak >nul
 
-echo [start] Launching OpenClaw gateway on port 5001...
+echo [start] Launching OpenClaw gateway on port %OPENCLAW_GATEWAY_PORT%...
 echo.
-echo   Dashboard:     http://localhost:5000
-echo   IG Dashboard:  http://localhost:5000/__openclaw__/canvas/ig-dashboard.html
-echo   Config:        http://localhost:5000/model-config.html
-echo   Processes:     http://localhost:5000/processes.html
-echo   Workers:       http://localhost:5000/workers.html
+echo   ================================================
+echo   OpenClaw Mechanicus is running!
+echo   ================================================
+echo.
+echo   Open in browser:  http://localhost:%OPENCLAW_PROXY_PORT%
+echo.
+echo   Dashboard:     http://localhost:%OPENCLAW_PROXY_PORT%
+echo   IG Dashboard:  http://localhost:%OPENCLAW_PROXY_PORT%/__openclaw__/canvas/ig-dashboard.html
+echo   Config:        http://localhost:%OPENCLAW_PROXY_PORT%/model-config.html
+echo   Processes:     http://localhost:%OPENCLAW_PROXY_PORT%/processes.html
+echo   Workers:       http://localhost:%OPENCLAW_PROXY_PORT%/workers.html
+echo.
+echo   If CEO proxy failed, try: http://localhost:%OPENCLAW_GATEWAY_PORT%
 echo.
 echo   Watch log for [ig-session] Connected to demo/live profile
 echo   If you see 'Login failed' check your .env credentials
 echo.
-node dist/entry.js gateway --bind loopback --port 5001 --allow-unconfigured
+node dist/entry.js gateway --bind loopback --port %OPENCLAW_GATEWAY_PORT% --allow-unconfigured

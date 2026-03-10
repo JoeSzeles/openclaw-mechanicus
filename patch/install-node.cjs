@@ -228,8 +228,12 @@ async function main() {
   console.log("  HOW TO START:");
   console.log("    1. Edit your credentials in: " + path.join(appRoot, ".env"));
   console.log("    2. cd \"" + appRoot + "\"");
-  console.log("    3. .\\start-mechanicus.ps1");
-  console.log("    4. Open: http://localhost:5000");
+  console.log("    3. .\\start-mechanicus.ps1   (or start-mechanicus.bat)");
+  console.log("    4. Wait for '[ceo-proxy] listening on http://localhost:5000'");
+  console.log("    5. Open: http://localhost:5000");
+  console.log("");
+  console.log("  If CEO proxy fails to start, check the log for errors.");
+  console.log("  Common fix: npm install ws pg");
   console.log("");
 }
 

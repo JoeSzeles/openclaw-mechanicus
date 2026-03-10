@@ -71,26 +71,46 @@ if (-not (Test-Path "ceo-proxy.cjs")) {
     exit 1
 }
 
-Write-Host "[start] Launching CEO proxy on port 5000..." -ForegroundColor Cyan
+$proxyPort = if ($env:OPENCLAW_PROXY_PORT) { $env:OPENCLAW_PROXY_PORT } else { "5000" }
+$gatewayPort = if ($env:OPENCLAW_GATEWAY_PORT) { $env:OPENCLAW_GATEWAY_PORT } else { "5001" }
+
+Write-Host "[start] Launching CEO proxy on port $proxyPort..." -ForegroundColor Cyan
 $proxy = Start-Process -FilePath "node" -ArgumentList "ceo-proxy.cjs" -WorkingDirectory $ScriptDir -PassThru -NoNewWindow
 Write-Host "[start] CEO proxy PID: $($proxy.Id)"
 
-Write-Host "[start] Waiting for IG connection..." -ForegroundColor DarkGray
+Write-Host "[start] Waiting for CEO proxy + IG connection..." -ForegroundColor DarkGray
 Start-Sleep -Seconds 5
 
-Write-Host "[start] Launching OpenClaw gateway on port 5001..." -ForegroundColor Cyan
+if ($proxy.HasExited) {
+    Write-Host ""
+    Write-Host "  [X] CEO proxy FAILED to start (exit code: $($proxy.ExitCode))" -ForegroundColor Red
+    Write-Host "  [X] Check for errors above. Common issues:" -ForegroundColor Red
+    Write-Host "      - Port $proxyPort already in use (kill other node processes)" -ForegroundColor Yellow
+    Write-Host "      - Missing 'ws' package: npm install ws" -ForegroundColor Yellow
+    Write-Host "      - Missing 'pg' package: npm install pg" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  Falling back to gateway-only mode on port $gatewayPort..." -ForegroundColor Yellow
+    Write-Host "  Open: http://localhost:$gatewayPort" -ForegroundColor Green
+    Write-Host ""
+    node dist/entry.js gateway --bind loopback --port $gatewayPort --allow-unconfigured
+    exit
+}
+
+Write-Host "[start] Launching OpenClaw gateway on port $gatewayPort..." -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  ================================================" -ForegroundColor DarkCyan
-Write-Host "  OpenClaw Mechanicus is starting up!" -ForegroundColor Cyan
+Write-Host "  OpenClaw Mechanicus is running!" -ForegroundColor Cyan
 Write-Host "  ================================================" -ForegroundColor DarkCyan
 Write-Host ""
-Write-Host "  Dashboard:     http://localhost:5000" -ForegroundColor Green
-Write-Host "  IG Dashboard:  http://localhost:5000/__openclaw__/canvas/ig-dashboard.html" -ForegroundColor Green
-Write-Host "  Config:        http://localhost:5000/model-config.html" -ForegroundColor Green
-Write-Host "  Processes:     http://localhost:5000/processes.html" -ForegroundColor Green
-Write-Host "  Workers:       http://localhost:5000/workers.html" -ForegroundColor Green
+Write-Host "  Open in browser:  http://localhost:$proxyPort" -ForegroundColor Green
+Write-Host ""
+Write-Host "  Dashboard:     http://localhost:$proxyPort" -ForegroundColor DarkCyan
+Write-Host "  IG Dashboard:  http://localhost:$proxyPort/__openclaw__/canvas/ig-dashboard.html" -ForegroundColor DarkCyan
+Write-Host "  Config:        http://localhost:$proxyPort/model-config.html" -ForegroundColor DarkCyan
+Write-Host "  Processes:     http://localhost:$proxyPort/processes.html" -ForegroundColor DarkCyan
+Write-Host "  Workers:       http://localhost:$proxyPort/workers.html" -ForegroundColor DarkCyan
 Write-Host ""
 Write-Host "  Watch the log below for [ig-session] Connected to demo/live profile" -ForegroundColor DarkGray
 Write-Host "  If you see 'Login failed' check your .env credentials" -ForegroundColor DarkGray
 Write-Host ""
-node dist/entry.js gateway --bind loopback --port 5001 --allow-unconfigured
+node dist/entry.js gateway --bind loopback --port $gatewayPort --allow-unconfigured

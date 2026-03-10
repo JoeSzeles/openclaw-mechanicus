@@ -5,8 +5,8 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { WebSocket } = require("ws");
 
-const GATEWAY_PORT = 5001;
-const PROXY_PORT = 5000;
+const GATEWAY_PORT = parseInt(process.env.OPENCLAW_GATEWAY_PORT || "5001", 10);
+const PROXY_PORT = parseInt(process.env.OPENCLAW_PROXY_PORT || "5000", 10);
 const OPENCLAW_HOME = process.env.OPENCLAW_HOME || "/home/runner/workspace";
 const DATA_DIR = path.join(OPENCLAW_HOME, ".openclaw");
 const API_KEYS_FILE = path.join(DATA_DIR, "api-keys.json");
@@ -5590,8 +5590,17 @@ server.on("upgrade", (req, socket, head) => {
   p.end();
 });
 
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`[ceo-proxy] FATAL: Port ${PROXY_PORT} is already in use. Kill the other process or set OPENCLAW_PROXY_PORT in .env`);
+  } else {
+    console.error(`[ceo-proxy] FATAL:`, err.message);
+  }
+  process.exit(1);
+});
+
 server.listen(PROXY_PORT, "0.0.0.0", () => {
-  console.log(`[ceo-proxy] listening on 0.0.0.0:${PROXY_PORT}, proxying to gateway:${GATEWAY_PORT}`);
+  console.log(`[ceo-proxy] listening on http://localhost:${PROXY_PORT} (proxying gateway on port ${GATEWAY_PORT})`);
   const igConfig = ensureIgConfig();
   const ap = igConfig.activeProfile || "none";
   const hasDemo = !!(igConfig.profiles && igConfig.profiles.demo && igConfig.profiles.demo.apiKey);
