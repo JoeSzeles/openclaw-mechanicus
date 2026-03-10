@@ -18312,67 +18312,23 @@ function createGatewayHttpServer(opts) {
 	}) : createServer((req, res) => {
 		handleRequest(req, res);
 	});
-	/* mechanicus-ig-config-api */
-const __igCfgPath = (() => { try { return path.join(os.homedir(), ".openclaw", "ig-config.json"); } catch(_) { return null; } })();
-function __igCfgDefaults() { return { activeProfile: "demo", profiles: { demo: { label: "Demo Account", baseUrl: "https://demo-api.ig.com/gateway/deal", apiKey: "", username: "", password: "", accountId: "" }, live: { label: "Live Account", baseUrl: "https://api.ig.com/gateway/deal", apiKey: "", username: "", password: "", accountId: "" } }, liveStreamingAutoConnect: false, timezone: "UTC" }; }
-function __igCfgRead() { if (!__igCfgPath) return __igCfgDefaults(); try { return JSON.parse(fsSync.readFileSync(__igCfgPath, "utf8")); } catch(_) { return __igCfgDefaults(); } }
-function __igCfgWrite(cfg) { if (!__igCfgPath) return; try { fsSync.mkdirSync(path.dirname(__igCfgPath), { recursive: true }); fsSync.writeFileSync(__igCfgPath, JSON.stringify(cfg, null, 2)); } catch(_) {} }
-function __igCfgMask(s) { if (!s || s.length < 4) return "****"; return s.slice(0,2) + "****" + s.slice(-2); }
-async function __igHttps(method, urlStr, headers, bodyStr) { const resp = await fetch(urlStr, { method, headers: headers || {}, body: bodyStr || undefined, signal: AbortSignal.timeout(15000) }); const d = await resp.text(); const rh = {}; resp.headers.forEach((v, k) => { rh[k.toLowerCase()] = v; }); return { status: resp.status, body: d, headers: rh }; }
-function __handleIgConfigApi(req, res) {
-  const u = new URL(req.url || "/", "http://localhost");
-  if (u.pathname === "/api/ig/config") {
-    if (req.method === "GET") {
-      const cfg = __igCfgRead();
-      const masked = JSON.parse(JSON.stringify(cfg));
-      for (const k of Object.keys(masked.profiles || {})) { const pr = masked.profiles[k]; pr.apiKey = __igCfgMask(pr.apiKey); pr.username = __igCfgMask(pr.username); pr.password = __igCfgMask(pr.password); pr.hasCredentials = !!(cfg.profiles[k].apiKey && cfg.profiles[k].username && cfg.profiles[k].password); }
-      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(masked)); return true;
+	/* mechanicus-ig-config-api removed — replaced by ig-local-api.mjs */
+/* mechanicus-ig-local-api */
+let __igLocalApi = null;
+async function __loadIgLocalApi() {
+  if (__igLocalApi) return __igLocalApi;
+  try {
+    const __igDir = path.dirname(process.argv[1] || ".");
+    const __igModPath = path.join(__igDir, "ig-local-api.mjs");
+    if (fsSync.existsSync(__igModPath)) {
+      const __igFileUrl = "file://" + __igModPath.replace(/\\/g, "/");
+      __igLocalApi = await import(__igFileUrl);
+      console.log("[mechanicus] Loaded ig-local-api.mjs — all IG endpoints active");
+    } else {
+      console.log("[mechanicus] ig-local-api.mjs not found at " + __igModPath);
     }
-    if (req.method === "POST") {
-      let body = ""; req.on("data", (c) => body += c); req.on("end", () => {
-        try {
-          const data = JSON.parse(body || "{}");
-          const cfg = __igCfgRead();
-          if (data.activeProfile && cfg.profiles[data.activeProfile]) cfg.activeProfile = data.activeProfile;
-          if (data.timezone) cfg.timezone = data.timezone;
-          if (data.profiles) { for (const k of Object.keys(data.profiles)) { if (!cfg.profiles[k]) continue; const s = data.profiles[k]; if (s.apiKey !== undefined && !s.apiKey.includes("****")) cfg.profiles[k].apiKey = s.apiKey; if (s.username !== undefined && !s.username.includes("****")) cfg.profiles[k].username = s.username; if (s.password !== undefined && !s.password.includes("****")) cfg.profiles[k].password = s.password; if (s.accountId !== undefined) cfg.profiles[k].accountId = s.accountId; } }
-          __igCfgWrite(cfg);
-          res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify({ ok: true, activeProfile: cfg.activeProfile }));
-        } catch(e) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: e.message })); }
-      }); return true;
-    }
-    return false;
-  }
-  if (u.pathname === "/api/ig/config/test" && req.method === "POST") {
-    let body = ""; req.on("data", (c) => body += c); req.on("end", async () => {
-      const jRes = (s, d) => { res.writeHead(s, { "Content-Type": "application/json" }); res.end(JSON.stringify(d)); };
-      try {
-        const data = JSON.parse(body || "{}");
-        const profName = data.profile || "demo";
-        const cfg = __igCfgRead();
-        const prof = cfg.profiles[profName];
-        if (!prof || !prof.apiKey || !prof.username || !prof.password || !prof.baseUrl) { jRes(400, { error: "No credentials configured for " + profName + " profile" }); return; }
-        const sessRes = await __igHttps("POST", prof.baseUrl + "/session", { "Content-Type": "application/json; charset=UTF-8", Accept: "application/json; charset=UTF-8", "X-IG-API-KEY": prof.apiKey, Version: "2" }, JSON.stringify({ identifier: prof.username, password: prof.password }));
-        if (sessRes.status !== 200) {
-          let errDetail = sessRes.body || ""; let errorType = "unknown";
-          try { const ej = JSON.parse(errDetail); errDetail = ej.errorCode || ej.error || errDetail; } catch(_) { errDetail = errDetail.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim().slice(0, 200); }
-          if (sessRes.status === 503 || sessRes.status === 502) { errorType = "server_unavailable"; errDetail = "IG servers returned " + sessRes.status + " — may be blocking this IP. Your credentials may be correct."; }
-          else if (sessRes.status === 401 || sessRes.status === 403) { errorType = "auth_rejected"; if (errDetail.includes("exceeded-api-key-allowance")) { errDetail = "API rate limit exceeded — wait a few minutes"; errorType = "rate_limited"; } }
-          else if (sessRes.status === 400) { errorType = "bad_credentials"; }
-          jRes(200, { ok: false, error: errDetail, errorType, statusCode: sessRes.status }); return;
-        }
-        let lsEndpoint = null; try { lsEndpoint = JSON.parse(sessRes.body).lightstreamerEndpoint || null; } catch(_) {}
-        const cst = sessRes.headers["cst"] || ""; const xst = sessRes.headers["x-security-token"] || "";
-        let accountInfo = null;
-        try {
-          const acctRes = await __igHttps("GET", prof.baseUrl + "/accounts", { "Content-Type": "application/json; charset=UTF-8", Accept: "application/json; charset=UTF-8", "X-IG-API-KEY": prof.apiKey, CST: cst, "X-SECURITY-TOKEN": xst, Version: "1" });
-          if (acctRes.status === 200) { const acctData = JSON.parse(acctRes.body); const accounts = acctData.accounts || []; const acct = accounts.find(a => a.accountId === prof.accountId) || accounts[0]; if (acct && acct.balance) { accountInfo = { accountId: acct.accountId, accountName: acct.accountName, balance: acct.balance.balance, deposit: acct.balance.deposit, profitLoss: acct.balance.profitLoss, available: acct.balance.available, currency: acct.currency }; } }
-        } catch(_) {}
-        jRes(200, { ok: true, profile: profName, lightstreamerEndpoint: lsEndpoint, account: accountInfo });
-      } catch(e) { jRes(500, { error: e.message }); }
-    }); return true;
-  }
-  return false;
+  } catch(e) { console.error("[mechanicus] Failed to load ig-local-api.mjs:", e.message); }
+  return __igLocalApi;
 }
 async function handleRequest(req, res) {
 		if (String(req.headers.upgrade ?? "").toLowerCase() === "websocket") return;
@@ -18439,7 +18395,7 @@ async function handleRequest(req, res) {
 				if (await handleA2uiHttpRequest(req, res)) return;
 				if (await canvasHost.handleHttpRequest(req, res)) return;
 			}
-			if (__handleIgConfigApi(req, res)) return;
+			{ const __igApi = await __loadIgLocalApi(); if (__igApi && await __igApi.handleRequest(req, res)) return; }
 if (controlUiEnabled) {
 				if (handleControlUiAvatarRequest(req, res, {
 					basePath: controlUiBasePath,
