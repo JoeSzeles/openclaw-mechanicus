@@ -64,7 +64,7 @@ The profile config file at `.openclaw/ig-config.json`:
       "apiKey": "your-demo-api-key",
       "username": "your-username",
       "password": "your-password",
-      "accountId": "Z3MJKY"
+      "accountId": "YOUR_ACCOUNT_ID"
     },
     "live": {
       "label": "Live Account",
@@ -87,7 +87,7 @@ Environment variables are still supported and are used to seed the initial profi
 | `IG_API_KEY` | Yes | Your generated API key | Identifies and authorises the application |
 | `IG_USERNAME` | Yes | Your IG username | Login credential |
 | `IG_PASSWORD` | Yes | Your IG password | Login credential |
-| `IG_ACCOUNT_ID` | Yes | `Z3MJKY` | Your IG account identifier |
+| `IG_ACCOUNT_ID` | Yes | `YOUR_ACCOUNT_ID` | Your IG account identifier |
 | `IG_BASE_URL` | Yes | `https://demo-api.ig.com/gateway/deal` | API endpoint (demo or live) |
 
 Once profiles are configured via the Config page, env vars are no longer read directly.

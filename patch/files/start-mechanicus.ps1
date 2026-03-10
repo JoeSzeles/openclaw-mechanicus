@@ -3,6 +3,22 @@ Write-Host "[start] Starting OpenClaw Mechanicus..." -ForegroundColor Cyan
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
 
+$envFile = Join-Path $ScriptDir ".env"
+if (Test-Path $envFile) {
+    Write-Host "[start] Loading .env file..."
+    Get-Content $envFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#")) {
+            $parts = $line -split "=", 2
+            if ($parts.Length -eq 2) {
+                $key = $parts[0].Trim()
+                $val = $parts[1].Trim()
+                [Environment]::SetEnvironmentVariable($key, $val, "Process")
+            }
+        }
+    }
+}
+
 $env:OPENCLAW_HOME = $env:USERPROFILE
 if (-not $env:OPENCLAW_HOME) { $env:OPENCLAW_HOME = [Environment]::GetFolderPath("UserProfile") }
 $env:OPENCLAW_GATEWAY_PORT = "5001"
@@ -10,6 +26,12 @@ $env:OPENCLAW_GATEWAY_PORT = "5001"
 Write-Host "[start] App directory:  $ScriptDir"
 Write-Host "[start] Home directory: $($env:OPENCLAW_HOME)"
 Write-Host "[start] Data directory: $($env:OPENCLAW_HOME)\.openclaw"
+
+if ($env:IG_API_KEY) { Write-Host "[start] IG_API_KEY:     set" -ForegroundColor Green }
+else { Write-Host "[start] IG_API_KEY:     NOT SET - edit .env file" -ForegroundColor Yellow }
+
+if ($env:DATABASE_URL) { Write-Host "[start] DATABASE_URL:   set" -ForegroundColor Green }
+else { Write-Host "[start] DATABASE_URL:   NOT SET - edit .env file" -ForegroundColor Yellow }
 
 if (-not (Test-Path "dist\entry.js")) {
     Write-Host "[start] FATAL: dist\entry.js not found" -ForegroundColor Red

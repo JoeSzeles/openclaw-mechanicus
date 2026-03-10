@@ -23,8 +23,8 @@ const BOT_REGISTRY_FILE = path.join(DATA_DIR, "bot-registry.json");
 const https = require("https");
 const scalperEngine = require("./skills/bots/trade-claw-engine.cjs");
 
-const LOGIN_USER = process.env.OPENCLAW_LOGIN_USER || "Josef_Szeles";
-const LOGIN_PASS = process.env.OPENCLAW_LOGIN_PASSWORD || "NiDhRlT9xVeWoE32c3sSacA15Vq9pQKE";
+const LOGIN_USER = process.env.OPENCLAW_LOGIN_USER || "";
+const LOGIN_PASS = process.env.OPENCLAW_LOGIN_PASSWORD || "";
 const LOGIN_SESSION_FILE = path.join(DATA_DIR, "login-sessions.json");
 const LOGIN_SESSION_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 
@@ -3434,7 +3434,7 @@ async function fetchAccountForSnapshot() {
       if (data && data.accounts) {
         const profiles = (ic && ic.profiles) || {};
         const prof = profiles[profileId] || {};
-        const targetAccountId = prof.accountId || process.env.IG_ACCOUNT_ID || "Z3MJKY";
+        const targetAccountId = prof.accountId || process.env.IG_ACCOUNT_ID || "";
         const acct = data.accounts.find(a => a.accountId === targetAccountId) || data.accounts[0];
         if (acct) {
           _snapshotAccountCache = {
@@ -3479,7 +3479,7 @@ async function writeDashboardSnapshotAsync() {
     timestamp: new Date().toISOString(),
     account: {
       profile: activeProfile,
-      accountId: acctData ? acctData.accountId : (process.env.IG_ACCOUNT_ID || "Z3MJKY"),
+      accountId: acctData ? acctData.accountId : (process.env.IG_ACCOUNT_ID || ""),
       accountType: acctData ? acctData.accountType : null,
       currency: acctData ? acctData.currency : null,
       balance: acctData ? acctData.balance : null,
