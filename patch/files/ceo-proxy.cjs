@@ -5542,7 +5542,8 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
   const hasDemo = !!(igConfig.profiles && igConfig.profiles.demo && igConfig.profiles.demo.apiKey);
   const hasLive = !!(igConfig.profiles && igConfig.profiles.live && igConfig.profiles.live.apiKey);
   console.log(`[startup] IG profiles: demo=${hasDemo ? "configured" : "empty"}, live=${hasLive ? "configured" : "empty"}, active=${ap}`);
-  console.log(`[startup] Database: ${process.env.DATABASE_URL ? "configured" : "not configured (file-only mode)"}`);
+  console.log(`[startup] Database: ${process.env.DATABASE_URL ? "configured (PostgreSQL)" : "not configured (CSV file fallback in ~/.openclaw/db/)"}`);
+  if (!process.env.DATABASE_URL) console.log(`[startup] Tip: set DATABASE_URL in .env to use PostgreSQL for better performance`);
   console.log(`[startup] Login: ${(LOGIN_USER && LOGIN_PASS) ? "protected (user: " + LOGIN_USER + ")" : "open (no password)"}`);
   updateCrewFile();
   writeConfigSnapshots();

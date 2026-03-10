@@ -1,7 +1,171 @@
 const { Pool } = require("pg");
+const fs = require("fs");
+const pathMod = require("path");
+const os = require("os");
 
 const DB_URL = process.env.DATABASE_URL;
 const pool = DB_URL ? new Pool({ connectionString: DB_URL }) : null;
+
+const CSV_DIR = pathMod.join(
+  process.env.OPENCLAW_HOME || process.env.HOME || process.env.USERPROFILE || os.homedir(),
+  ".openclaw", "db"
+);
+
+function _ensureCsvDir() {
+  if (!fs.existsSync(CSV_DIR)) fs.mkdirSync(CSV_DIR, { recursive: true });
+}
+
+function _csvPath(table) { return pathMod.join(CSV_DIR, table + ".csv"); }
+
+function _csvEscape(val) {
+  if (val === null || val === undefined) return "";
+  const s = typeof val === "object" ? JSON.stringify(val) : String(val);
+  if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+function _csvParseLine(line) {
+  const fields = [];
+  let i = 0;
+  while (i <= line.length) {
+    if (i === line.length) { fields.push(""); break; }
+    if (line[i] === '"') {
+      let val = "";
+      i++;
+      while (i < line.length) {
+        if (line[i] === '"') {
+          if (i + 1 < line.length && line[i + 1] === '"') { val += '"'; i += 2; }
+          else { i++; break; }
+        } else { val += line[i]; i++; }
+      }
+      fields.push(val);
+      if (i < line.length && line[i] === ",") i++;
+    } else {
+      let end = line.indexOf(",", i);
+      if (end === -1) { fields.push(line.slice(i)); break; }
+      fields.push(line.slice(i, end));
+      i = end + 1;
+    }
+  }
+  return fields;
+}
+
+function _csvParseValue(val) {
+  if (val === "" || val === "null") return null;
+  if (val === "true") return true;
+  if (val === "false") return false;
+  if (/^-?\d+$/.test(val)) return parseInt(val, 10);
+  if (/^-?\d+\.\d+$/.test(val)) return parseFloat(val);
+  if ((val.startsWith("{") && val.endsWith("}")) || (val.startsWith("[") && val.endsWith("]"))) {
+    try { return JSON.parse(val); } catch (_) {}
+  }
+  return val;
+}
+
+function _csvRead(table) {
+  const fp = _csvPath(table);
+  if (!fs.existsSync(fp)) return [];
+  const raw = fs.readFileSync(fp, "utf8").trim();
+  if (!raw) return [];
+  const records = _csvParseRecords(raw);
+  if (records.length < 2) return [];
+  const headers = records[0];
+  const rows = [];
+  for (let i = 1; i < records.length; i++) {
+    const vals = records[i];
+    const row = {};
+    for (let j = 0; j < headers.length; j++) {
+      row[headers[j]] = _csvParseValue(vals[j] || "");
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+function _csvParseRecords(raw) {
+  const records = [];
+  let fields = [];
+  let field = "";
+  let inQuote = false;
+  let i = 0;
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (inQuote) {
+      if (ch === '"') {
+        if (i + 1 < raw.length && raw[i + 1] === '"') {
+          field += '"';
+          i += 2;
+        } else {
+          inQuote = false;
+          i++;
+        }
+      } else {
+        field += ch;
+        i++;
+      }
+    } else {
+      if (ch === '"') {
+        inQuote = true;
+        i++;
+      } else if (ch === ',') {
+        fields.push(field);
+        field = "";
+        i++;
+      } else if (ch === '\r') {
+        i++;
+      } else if (ch === '\n') {
+        fields.push(field);
+        field = "";
+        records.push(fields);
+        fields = [];
+        i++;
+      } else {
+        field += ch;
+        i++;
+      }
+    }
+  }
+  if (field || fields.length > 0) {
+    fields.push(field);
+    records.push(fields);
+  }
+  return records;
+}
+
+function _csvWrite(table, rows, headers) {
+  _ensureCsvDir();
+  if (!rows.length && !headers) { fs.writeFileSync(_csvPath(table), ""); return; }
+  if (!headers) headers = Object.keys(rows[0]);
+  const lines = [headers.join(",")];
+  for (const row of rows) {
+    lines.push(headers.map(h => _csvEscape(row[h])).join(","));
+  }
+  fs.writeFileSync(_csvPath(table), lines.join("\n") + "\n");
+}
+
+function _csvAppend(table, row, headers) {
+  _ensureCsvDir();
+  const fp = _csvPath(table);
+  if (!fs.existsSync(fp) || fs.readFileSync(fp, "utf8").trim() === "") {
+    fs.writeFileSync(fp, headers.join(",") + "\n" + headers.map(h => _csvEscape(row[h])).join(",") + "\n");
+  } else {
+    fs.appendFileSync(fp, headers.map(h => _csvEscape(row[h])).join(",") + "\n");
+  }
+}
+
+let _csvNextId = {};
+function _csvAutoId(table) {
+  if (!_csvNextId[table]) {
+    const rows = _csvRead(table);
+    let max = 0;
+    for (const r of rows) { if (r.id && typeof r.id === "number" && r.id > max) max = r.id; }
+    _csvNextId[table] = max;
+  }
+  _csvNextId[table]++;
+  return _csvNextId[table];
+}
 
 function isAvailable() {
   return !!pool;
@@ -32,7 +196,25 @@ async function query(sql, params) {
   }
 }
 
+const CONFIG_DEFAULTS = {
+  id: 1, enabled: false, budget: 1000, max_drawdown: 200, max_margin_pct: 50,
+  break_even_buffer: 0, drawdown_tripped: false,
+  demo_mode: true, demo_reject_pct: 5, demo_slippage_min: 0.1, demo_slippage_max: 0.5,
+  updated_at: null
+};
+
+const CONFIG_HEADERS = Object.keys(CONFIG_DEFAULTS);
+
 async function getConfig() {
+  if (!pool) {
+    const rows = _csvRead("scalper_config");
+    if (rows.length === 0) {
+      const def = { ...CONFIG_DEFAULTS, updated_at: new Date().toISOString() };
+      _csvWrite("scalper_config", [def], CONFIG_HEADERS);
+      return camel(def);
+    }
+    return camel(rows[0]);
+  }
   const res = await query("SELECT * FROM scalper_config WHERE id = 1");
   if (res.rows.length === 0) {
     await query(`INSERT INTO scalper_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
@@ -43,7 +225,6 @@ async function getConfig() {
 }
 
 async function updateConfig(updates) {
-  const allowed = ["enabled", "budget", "max_drawdown", "max_margin_pct", "break_even_buffer", "drawdown_tripped", "demo_mode", "demo_reject_pct", "demo_slippage_min", "demo_slippage_max"];
   const camelToSnake = {
     enabled: "enabled", budget: "budget", maxDrawdown: "max_drawdown",
     maxMarginPct: "max_margin_pct", breakEvenBuffer: "break_even_buffer",
@@ -51,6 +232,21 @@ async function updateConfig(updates) {
     demoMode: "demo_mode", demoRejectPct: "demo_reject_pct",
     demoSlippageMin: "demo_slippage_min", demoSlippageMax: "demo_slippage_max"
   };
+  const allowed = ["enabled", "budget", "max_drawdown", "max_margin_pct", "break_even_buffer", "drawdown_tripped", "demo_mode", "demo_reject_pct", "demo_slippage_min", "demo_slippage_max"];
+
+  if (!pool) {
+    const rows = _csvRead("scalper_config");
+    const cfg = rows.length > 0 ? rows[0] : { ...CONFIG_DEFAULTS };
+    for (const [k, v] of Object.entries(updates)) {
+      const col = camelToSnake[k] || k;
+      if (!allowed.includes(col)) continue;
+      cfg[col] = v;
+    }
+    cfg.updated_at = new Date().toISOString();
+    _csvWrite("scalper_config", [cfg], CONFIG_HEADERS);
+    return camel(cfg);
+  }
+
   const sets = [];
   const vals = [];
   let i = 1;
@@ -65,16 +261,6 @@ async function updateConfig(updates) {
   sets.push(`updated_at = NOW()`);
   await query(`UPDATE scalper_config SET ${sets.join(", ")} WHERE id = 1`, vals);
   return getConfig();
-}
-
-async function getStrategies() {
-  const res = await query("SELECT * FROM scalper_strategies ORDER BY id");
-  return res.rows.map(camel);
-}
-
-async function getStrategy(id) {
-  const res = await query("SELECT * FROM scalper_strategies WHERE id = $1", [id]);
-  return camel(res.rows[0]);
 }
 
 const STRATEGY_COLS = [
@@ -105,6 +291,8 @@ const STRATEGY_COLS = [
   "kelly_enabled", "sentiment_enabled"
 ];
 
+const STRATEGY_CSV_HEADERS = ["id", ...STRATEGY_COLS, "created_at", "updated_at"];
+
 const CAMEL_TO_SNAKE = {};
 for (const col of STRATEGY_COLS) {
   const ck = col.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
@@ -116,7 +304,36 @@ function resolveCol(key) {
   return CAMEL_TO_SNAKE[key] || null;
 }
 
+async function getStrategies() {
+  if (!pool) {
+    return _csvRead("scalper_strategies").map(camel);
+  }
+  const res = await query("SELECT * FROM scalper_strategies ORDER BY id");
+  return res.rows.map(camel);
+}
+
+async function getStrategy(id) {
+  if (!pool) {
+    const rows = _csvRead("scalper_strategies");
+    const r = rows.find(r => r.id === parseInt(id, 10));
+    return r ? camel(r) : null;
+  }
+  const res = await query("SELECT * FROM scalper_strategies WHERE id = $1", [id]);
+  return camel(res.rows[0]);
+}
+
 async function addStrategy(data) {
+  if (!pool) {
+    const row = { id: _csvAutoId("scalper_strategies"), created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    for (const [k, v] of Object.entries(data)) {
+      const col = resolveCol(k);
+      if (col) row[col] = v;
+    }
+    const rows = _csvRead("scalper_strategies");
+    rows.push(row);
+    _csvWrite("scalper_strategies", rows, STRATEGY_CSV_HEADERS);
+    return camel(row);
+  }
   const cols = [];
   const vals = [];
   const placeholders = [];
@@ -138,6 +355,18 @@ async function addStrategy(data) {
 }
 
 async function updateStrategy(id, data) {
+  if (!pool) {
+    const rows = _csvRead("scalper_strategies");
+    const idx = rows.findIndex(r => r.id === parseInt(id, 10));
+    if (idx === -1) return null;
+    for (const [k, v] of Object.entries(data)) {
+      const col = resolveCol(k);
+      if (col) rows[idx][col] = v;
+    }
+    rows[idx].updated_at = new Date().toISOString();
+    _csvWrite("scalper_strategies", rows, STRATEGY_CSV_HEADERS);
+    return camel(rows[idx]);
+  }
   const sets = [];
   const vals = [];
   let i = 1;
@@ -156,13 +385,29 @@ async function updateStrategy(id, data) {
 }
 
 async function deleteStrategy(id) {
+  if (!pool) {
+    const rows = _csvRead("scalper_strategies").filter(r => r.id !== parseInt(id, 10));
+    _csvWrite("scalper_strategies", rows, STRATEGY_CSV_HEADERS);
+    return;
+  }
   await query("DELETE FROM scalper_strategies WHERE id = $1", [id]);
 }
 
 async function toggleStrategy(id) {
+  if (!pool) {
+    const rows = _csvRead("scalper_strategies");
+    const idx = rows.findIndex(r => r.id === parseInt(id, 10));
+    if (idx === -1) return null;
+    rows[idx].enabled = !rows[idx].enabled;
+    rows[idx].updated_at = new Date().toISOString();
+    _csvWrite("scalper_strategies", rows, STRATEGY_CSV_HEADERS);
+    return camel(rows[idx]);
+  }
   await query("UPDATE scalper_strategies SET enabled = NOT enabled, updated_at = NOW() WHERE id = $1", [id]);
   return getStrategy(id);
 }
+
+const TRADE_HEADERS = ["id", "deal_id", "epic", "direction", "size", "entry_price", "exit_price", "pnl", "type", "strategy_name", "opened_at", "closed_at", "created_at"];
 
 async function logTrade(trade) {
   const camelMap = {
@@ -173,6 +418,17 @@ async function logTrade(trade) {
     strategyName: "strategy_name",
     openedAt: "opened_at", closedAt: "closed_at"
   };
+
+  if (!pool) {
+    const row = { id: _csvAutoId("scalper_trades"), created_at: new Date().toISOString() };
+    for (const [k, v] of Object.entries(trade)) {
+      const col = camelMap[k] || k;
+      if (TRADE_HEADERS.includes(col)) row[col] = v;
+    }
+    _csvAppend("scalper_trades", row, TRADE_HEADERS);
+    return camel(row);
+  }
+
   const cols = [];
   const vals = [];
   const placeholders = [];
@@ -194,11 +450,29 @@ async function logTrade(trade) {
 }
 
 async function getTrades(limit = 100) {
+  if (!pool) {
+    const rows = _csvRead("scalper_trades");
+    rows.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    return rows.slice(0, limit).map(camel);
+  }
   const res = await query("SELECT * FROM scalper_trades ORDER BY created_at DESC LIMIT $1", [limit]);
   return res.rows.map(camel);
 }
 
 async function getTradeStats() {
+  if (!pool) {
+    const rows = _csvRead("scalper_trades");
+    const closed = rows.filter(r => r.type === "CLOSE");
+    const wins = closed.filter(r => (parseFloat(r.pnl) || 0) > 0).length;
+    const losses = closed.length - wins;
+    const totalPnl = rows.reduce((s, r) => s + (parseFloat(r.pnl) || 0), 0);
+    return {
+      totalPnl: Math.round(totalPnl * 100) / 100,
+      wins, losses,
+      totalClosed: closed.length,
+      winRate: closed.length > 0 ? ((wins / closed.length) * 100).toFixed(1) : "0.0"
+    };
+  }
   const res = await query(`
     SELECT
       COALESCE(SUM(pnl), 0) as total_pnl,
@@ -219,7 +493,32 @@ async function getTradeStats() {
   };
 }
 
+async function clearTrades() {
+  if (!pool) {
+    _csvWrite("scalper_trades", [], TRADE_HEADERS);
+    return { ok: true, message: "All trade records cleared" };
+  }
+  await query("DELETE FROM scalper_trades");
+  return { ok: true, message: "All trade records cleared" };
+}
+
+const BACKTEST_HEADERS = ["id", "strategy_id", "timeframe", "candle_count", "total_trades", "win_count", "loss_count", "win_rate", "total_pnl", "max_drawdown", "sharpe_ratio", "avg_win", "avg_loss", "trades", "config_snapshot", "created_at", "batch_id", "instrument", "strategy_type_key", "cycle_number", "iteration_number", "optimization_batch_id"];
+
 async function saveBacktest(data) {
+  if (!pool) {
+    const row = {
+      id: _csvAutoId("scalper_backtests"),
+      strategy_id: data.strategyId, timeframe: data.timeframe, candle_count: data.candleCount,
+      total_trades: data.totalTrades, win_count: data.winCount, loss_count: data.lossCount,
+      win_rate: data.winRate, total_pnl: data.totalPnl, max_drawdown: data.maxDrawdown,
+      sharpe_ratio: data.sharpeRatio, avg_win: data.avgWin, avg_loss: data.avgLoss,
+      trades: data.trades, config_snapshot: data.configSnapshot,
+      created_at: new Date().toISOString(), batch_id: null, instrument: null,
+      strategy_type_key: null, cycle_number: null, iteration_number: null, optimization_batch_id: null
+    };
+    _csvAppend("scalper_backtests", row, BACKTEST_HEADERS);
+    return camel(row);
+  }
   const res = await query(
     `INSERT INTO scalper_backtests (strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl, max_drawdown, sharpe_ratio, avg_win, avg_loss, trades, config_snapshot)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
@@ -231,6 +530,18 @@ async function saveBacktest(data) {
 }
 
 async function getBacktests(strategyId, limit = 20) {
+  if (!pool) {
+    const rows = _csvRead("scalper_backtests")
+      .filter(r => r.strategy_id === parseInt(strategyId, 10))
+      .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+      .slice(0, limit);
+    return rows.map(r => {
+      const c = camel(r);
+      delete c.trades;
+      delete c.configSnapshot;
+      return c;
+    });
+  }
   const res = await query(
     "SELECT id, strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl, max_drawdown, sharpe_ratio, avg_win, avg_loss, created_at FROM scalper_backtests WHERE strategy_id = $1 ORDER BY created_at DESC LIMIT $2",
     [strategyId, limit]
@@ -239,12 +550,73 @@ async function getBacktests(strategyId, limit = 20) {
 }
 
 async function getBacktest(id) {
+  if (!pool) {
+    const rows = _csvRead("scalper_backtests");
+    const r = rows.find(r => r.id === parseInt(id, 10));
+    if (!r) return null;
+    const row = camel(r);
+    if (row.configSnapshot && typeof row.configSnapshot === "string") {
+      try { row.configSnapshot = JSON.parse(row.configSnapshot); } catch (_) {}
+    }
+    if (row.trades && typeof row.trades === "string") {
+      try { row.trades = JSON.parse(row.trades); } catch (_) {}
+    }
+    return row;
+  }
   const res = await query("SELECT * FROM scalper_backtests WHERE id = $1", [id]);
   const row = camel(res.rows[0]);
   if (row && row.configSnapshot && typeof row.configSnapshot === 'string') {
     try { row.configSnapshot = JSON.parse(row.configSnapshot); } catch (_) {}
   }
   return row;
+}
+
+async function deleteBacktests(strategyId) {
+  if (!pool) {
+    const rows = _csvRead("scalper_backtests").filter(r => r.strategy_id !== parseInt(strategyId, 10));
+    _csvWrite("scalper_backtests", rows, BACKTEST_HEADERS);
+    return { ok: true, deleted: 0 };
+  }
+  const res = await query("DELETE FROM scalper_backtests WHERE strategy_id = $1", [strategyId]);
+  return { ok: true, deleted: res.rowCount };
+}
+
+async function getAllBacktests(limit = 50) {
+  if (!pool) {
+    const bts = _csvRead("scalper_backtests");
+    const strats = _csvRead("scalper_strategies");
+    const stratMap = {};
+    for (const s of strats) stratMap[s.id] = s;
+    bts.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    return bts.slice(0, limit).map(r => {
+      const row = camel(r);
+      const s = stratMap[r.strategy_id];
+      if (s) { row.strategyName = s.name; row.stratInstrument = s.instrument; row.strategyType = s.strategy_type; }
+      delete row.trades;
+      delete row.configSnapshot;
+      return row;
+    });
+  }
+  const res = await query(
+    `SELECT b.id, b.strategy_id, b.timeframe, b.candle_count, b.total_trades, b.win_count, b.loss_count,
+            b.win_rate, b.total_pnl, b.max_drawdown, b.sharpe_ratio, b.avg_win, b.avg_loss, b.created_at,
+            b.batch_id, b.instrument, b.strategy_type_key,
+            s.name as strategy_name, s.instrument as strat_instrument, s.strategy_type
+     FROM scalper_backtests b
+     LEFT JOIN scalper_strategies s ON b.strategy_id = s.id
+     ORDER BY b.created_at DESC LIMIT $1`,
+    [limit]
+  );
+  return res.rows.map(camel);
+}
+
+async function deleteAllBacktests() {
+  if (!pool) {
+    _csvWrite("scalper_backtests", [], BACKTEST_HEADERS);
+    return { ok: true };
+  }
+  await query("DELETE FROM scalper_backtests");
+  return { ok: true };
 }
 
 let _priceCandlesReady = false;
@@ -254,7 +626,10 @@ async function _ensurePriceCandles() {
   _priceCandlesReady = true;
 }
 
+const CANDLE_HEADERS = ["epic", "resolution", "ts", "open", "high", "low", "close", "volume"];
+
 async function ensurePriceCandlesTable() {
+  if (!pool) { _priceCandlesReady = true; return; }
   await query(`
     CREATE TABLE IF NOT EXISTS price_candles (
       epic VARCHAR(60) NOT NULL,
@@ -269,9 +644,53 @@ async function ensurePriceCandlesTable() {
     )
   `);
   await query(`CREATE INDEX IF NOT EXISTS idx_price_candles_lookup ON price_candles (epic, resolution, ts DESC)`);
+  _priceCandlesReady = true;
+}
+
+function _candleFile(epic, resolution) {
+  const safe = (epic + "_" + resolution).replace(/[^a-zA-Z0-9_.-]/g, "_");
+  return pathMod.join(CSV_DIR, "candles_" + safe + ".csv");
+}
+
+function _readCandles(epic, resolution) {
+  const fp = _candleFile(epic, resolution);
+  if (!fs.existsSync(fp)) return [];
+  const raw = fs.readFileSync(fp, "utf8").trim();
+  if (!raw) return [];
+  const lines = raw.split("\n");
+  if (lines.length < 2) return [];
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const parts = lines[i].split(",");
+    if (parts.length < 6) continue;
+    rows.push({
+      ts: parseInt(parts[0], 10),
+      open: parseFloat(parts[1]),
+      high: parseFloat(parts[2]),
+      low: parseFloat(parts[3]),
+      close: parseFloat(parts[4]),
+      volume: parseInt(parts[5], 10) || 0
+    });
+  }
+  return rows;
+}
+
+function _writeCandles(epic, resolution, candles) {
+  _ensureCsvDir();
+  const fp = _candleFile(epic, resolution);
+  const lines = ["ts,open,high,low,close,volume"];
+  for (const c of candles) {
+    lines.push([c.ts, c.open, c.high, c.low, c.close, c.volume || 0].join(","));
+  }
+  fs.writeFileSync(fp, lines.join("\n") + "\n");
 }
 
 async function getStoredCandles(epic, resolution, limit) {
+  if (!pool) {
+    const candles = _readCandles(epic, resolution);
+    candles.sort((a, b) => a.ts - b.ts);
+    return candles.slice(-limit);
+  }
   await _ensurePriceCandles();
   const res = await query(
     "SELECT ts, open, high, low, close, volume FROM price_candles WHERE epic = $1 AND resolution = $2 ORDER BY ts DESC LIMIT $3",
@@ -281,6 +700,11 @@ async function getStoredCandles(epic, resolution, limit) {
 }
 
 async function getLatestCandleTs(epic, resolution) {
+  if (!pool) {
+    const candles = _readCandles(epic, resolution);
+    if (candles.length === 0) return null;
+    return Math.max(...candles.map(c => c.ts));
+  }
   await _ensurePriceCandles();
   const res = await query(
     "SELECT ts FROM price_candles WHERE epic = $1 AND resolution = $2 ORDER BY ts DESC LIMIT 1",
@@ -290,6 +714,9 @@ async function getLatestCandleTs(epic, resolution) {
 }
 
 async function getCandleCount(epic, resolution) {
+  if (!pool) {
+    return _readCandles(epic, resolution).length;
+  }
   const res = await query(
     "SELECT COUNT(*)::int as cnt FROM price_candles WHERE epic = $1 AND resolution = $2",
     [epic, resolution]
@@ -299,6 +726,23 @@ async function getCandleCount(epic, resolution) {
 
 async function storeCandles(epic, resolution, candles) {
   if (!candles || candles.length === 0) return 0;
+  if (!pool) {
+    const existing = _readCandles(epic, resolution);
+    const tsSet = new Set(existing.map(c => c.ts));
+    let added = 0;
+    for (const c of candles) {
+      if (!tsSet.has(c.ts)) {
+        existing.push({ ts: c.ts, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume || 0 });
+        tsSet.add(c.ts);
+        added++;
+      }
+    }
+    if (added > 0) {
+      existing.sort((a, b) => a.ts - b.ts);
+      _writeCandles(epic, resolution, existing);
+    }
+    return added;
+  }
   await _ensurePriceCandles();
   const BATCH = 500;
   let stored = 0;
@@ -322,6 +766,10 @@ async function storeCandles(epic, resolution, candles) {
 }
 
 async function getStoredCandlesRange(epic, resolution, fromTs, toTs) {
+  if (!pool) {
+    const candles = _readCandles(epic, resolution);
+    return candles.filter(c => c.ts >= fromTs && c.ts <= toTs).sort((a, b) => a.ts - b.ts);
+  }
   await _ensurePriceCandles();
   const res = await query(
     "SELECT ts, open, high, low, close, volume FROM price_candles WHERE epic = $1 AND resolution = $2 AND ts >= $3 AND ts <= $4 ORDER BY ts ASC",
@@ -329,14 +777,6 @@ async function getStoredCandlesRange(epic, resolution, fromTs, toTs) {
   );
   return res.rows;
 }
-
-async function clearTrades() {
-  await query("DELETE FROM scalper_trades");
-  return { ok: true, message: "All trade records cleared" };
-}
-
-const fs = require("fs");
-const pathMod = require("path");
 
 const AGENT_WORKSPACE_MAP = {
   CEO: pathMod.join(process.cwd(), ".openclaw", "workspace"),
@@ -350,6 +790,7 @@ function resolveAgentWorkspace(agentId) {
 let _agentTablesReady = false;
 async function _ensureAgentTables() {
   if (_agentTablesReady) return;
+  if (!pool) { _agentTablesReady = true; return; }
   await query(`
     CREATE TABLE IF NOT EXISTS agent_backups (
       id SERIAL PRIMARY KEY,
@@ -387,8 +828,9 @@ async function _ensureAgentTables() {
   _agentTablesReady = true;
 }
 
+const BACKUP_HEADERS = ["id", "agent_id", "backup_name", "files", "created_at"];
+
 async function backupAgent(agentId, backupName) {
-  await _ensureAgentTables();
   const wsDir = resolveAgentWorkspace(agentId);
   if (!wsDir) throw new Error("Unknown agent: " + agentId);
   const files = {};
@@ -396,23 +838,34 @@ async function backupAgent(agentId, backupName) {
     const entries = fs.readdirSync(wsDir);
     for (const f of entries) {
       if (!f.endsWith(".md")) continue;
-      try {
-        files[f] = fs.readFileSync(pathMod.join(wsDir, f), "utf-8");
-      } catch (_) {}
+      try { files[f] = fs.readFileSync(pathMod.join(wsDir, f), "utf-8"); } catch (_) {}
     }
     const memDir = pathMod.join(wsDir, "memory");
     if (fs.existsSync(memDir)) {
       const memEntries = fs.readdirSync(memDir);
       for (const f of memEntries) {
         if (!f.endsWith(".md")) continue;
-        try {
-          files["memory/" + f] = fs.readFileSync(pathMod.join(memDir, f), "utf-8");
-        } catch (_) {}
+        try { files["memory/" + f] = fs.readFileSync(pathMod.join(memDir, f), "utf-8"); } catch (_) {}
       }
     }
   } catch (e) {
     throw new Error("Cannot read workspace: " + e.message);
   }
+
+  if (!pool) {
+    await _ensureAgentTables();
+    const row = {
+      id: _csvAutoId("agent_backups"),
+      agent_id: agentId.toUpperCase(),
+      backup_name: backupName || "Auto backup",
+      files: files,
+      created_at: new Date().toISOString()
+    };
+    _csvAppend("agent_backups", row, BACKUP_HEADERS);
+    return { id: row.id, agentId: row.agent_id, backupName: row.backup_name, fileCount: Object.keys(files).length, createdAt: row.created_at };
+  }
+
+  await _ensureAgentTables();
   const res = await query(
     "INSERT INTO agent_backups (agent_id, backup_name, files) VALUES ($1, $2, $3) RETURNING id, agent_id, backup_name, created_at",
     [agentId.toUpperCase(), backupName || "Auto backup", JSON.stringify(files)]
@@ -422,33 +875,46 @@ async function backupAgent(agentId, backupName) {
 }
 
 async function listAgentBackups(agentId) {
-  await _ensureAgentTables();
-  const res = await query(
-    "SELECT id, agent_id, backup_name, created_at, jsonb_object_keys(files) FROM agent_backups WHERE agent_id = $1 ORDER BY created_at DESC",
-    [agentId.toUpperCase()]
-  );
-  const backupMap = {};
-  for (const row of res.rows) {
-    if (!backupMap[row.id]) {
-      backupMap[row.id] = { id: row.id, agentId: row.agent_id, backupName: row.backup_name, createdAt: row.created_at, fileCount: 0 };
-    }
-    backupMap[row.id].fileCount++;
-  }
-  const list = Object.values(backupMap);
-  if (list.length === 0) {
-    const res2 = await query(
-      "SELECT id, agent_id, backup_name, files, created_at FROM agent_backups WHERE agent_id = $1 ORDER BY created_at DESC",
-      [agentId.toUpperCase()]
-    );
-    return res2.rows.map(r => ({
+  if (!pool) {
+    await _ensureAgentTables();
+    const rows = _csvRead("agent_backups").filter(r => r.agent_id === agentId.toUpperCase());
+    rows.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    return rows.map(r => ({
       id: r.id, agentId: r.agent_id, backupName: r.backup_name,
-      fileCount: r.files ? Object.keys(r.files).length : 0, createdAt: r.created_at
+      fileCount: r.files ? (typeof r.files === "object" ? Object.keys(r.files).length : 0) : 0,
+      createdAt: r.created_at
     }));
   }
-  return list;
+  await _ensureAgentTables();
+  const res = await query(
+    "SELECT id, agent_id, backup_name, files, created_at FROM agent_backups WHERE agent_id = $1 ORDER BY created_at DESC",
+    [agentId.toUpperCase()]
+  );
+  return res.rows.map(r => ({
+    id: r.id, agentId: r.agent_id, backupName: r.backup_name,
+    fileCount: r.files ? Object.keys(r.files).length : 0, createdAt: r.created_at
+  }));
 }
 
 async function restoreAgentBackup(backupId) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const rows = _csvRead("agent_backups");
+    const row = rows.find(r => r.id === parseInt(backupId, 10));
+    if (!row) throw new Error("Backup not found: " + backupId);
+    const wsDir = resolveAgentWorkspace(row.agent_id);
+    if (!wsDir) throw new Error("Unknown agent: " + row.agent_id);
+    const files = typeof row.files === "string" ? JSON.parse(row.files) : (row.files || {});
+    let restored = 0;
+    for (const [filename, content] of Object.entries(files)) {
+      const filePath = pathMod.join(wsDir, filename);
+      const dir = pathMod.dirname(filePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(filePath, content, "utf-8");
+      restored++;
+    }
+    return { ok: true, agentId: row.agent_id, backupName: row.backup_name, filesRestored: restored };
+  }
   await _ensureAgentTables();
   const res = await query("SELECT * FROM agent_backups WHERE id = $1", [backupId]);
   if (res.rows.length === 0) throw new Error("Backup not found: " + backupId);
@@ -468,12 +934,26 @@ async function restoreAgentBackup(backupId) {
 }
 
 async function deleteAgentBackup(backupId) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const rows = _csvRead("agent_backups").filter(r => r.id !== parseInt(backupId, 10));
+    _csvWrite("agent_backups", rows, BACKUP_HEADERS);
+    return { ok: true };
+  }
   await _ensureAgentTables();
   await query("DELETE FROM agent_backups WHERE id = $1", [backupId]);
   return { ok: true };
 }
 
+const MEMORY_HEADERS = ["agent_id", "entry_type", "entry_date", "content", "updated_at"];
+
 async function getAgentMemory(agentId) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const rows = _csvRead("agent_memory");
+    const r = rows.find(r => r.agent_id === agentId.toUpperCase() && r.entry_type === "long_term");
+    return r ? { content: r.content || "", updatedAt: r.updated_at } : { content: "", updatedAt: null };
+  }
   await _ensureAgentTables();
   const res = await query(
     "SELECT content, updated_at FROM agent_memory WHERE agent_id = $1 AND entry_type = 'long_term' LIMIT 1",
@@ -483,6 +963,15 @@ async function getAgentMemory(agentId) {
 }
 
 async function setAgentMemory(agentId, content) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const rows = _csvRead("agent_memory");
+    const idx = rows.findIndex(r => r.agent_id === agentId.toUpperCase() && r.entry_type === "long_term");
+    const entry = { agent_id: agentId.toUpperCase(), entry_type: "long_term", entry_date: "1970-01-01", content, updated_at: new Date().toISOString() };
+    if (idx >= 0) rows[idx] = entry; else rows.push(entry);
+    _csvWrite("agent_memory", rows, MEMORY_HEADERS);
+    return { ok: true };
+  }
   await _ensureAgentTables();
   await query(
     `INSERT INTO agent_memory (agent_id, entry_type, entry_date, content, updated_at)
@@ -494,6 +983,12 @@ async function setAgentMemory(agentId, content) {
 }
 
 async function getDailyMemory(agentId, date) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const rows = _csvRead("agent_memory");
+    const r = rows.find(r => r.agent_id === agentId.toUpperCase() && r.entry_type === "daily" && r.entry_date === date);
+    return r ? { content: r.content || "", updatedAt: r.updated_at } : { content: "", updatedAt: null };
+  }
   await _ensureAgentTables();
   const res = await query(
     "SELECT content, updated_at FROM agent_memory WHERE agent_id = $1 AND entry_type = 'daily' AND entry_date = $2",
@@ -503,6 +998,15 @@ async function getDailyMemory(agentId, date) {
 }
 
 async function setDailyMemory(agentId, date, content) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const rows = _csvRead("agent_memory");
+    const idx = rows.findIndex(r => r.agent_id === agentId.toUpperCase() && r.entry_type === "daily" && r.entry_date === date);
+    const entry = { agent_id: agentId.toUpperCase(), entry_type: "daily", entry_date: date, content, updated_at: new Date().toISOString() };
+    if (idx >= 0) rows[idx] = entry; else rows.push(entry);
+    _csvWrite("agent_memory", rows, MEMORY_HEADERS);
+    return { ok: true };
+  }
   await _ensureAgentTables();
   await query(
     `INSERT INTO agent_memory (agent_id, entry_type, entry_date, content, updated_at)
@@ -514,6 +1018,14 @@ async function setDailyMemory(agentId, date, content) {
 }
 
 async function listDailyMemories(agentId, limit) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const rows = _csvRead("agent_memory")
+      .filter(r => r.agent_id === agentId.toUpperCase() && r.entry_type === "daily")
+      .sort((a, b) => (b.entry_date || "").localeCompare(a.entry_date || ""))
+      .slice(0, limit || 30);
+    return rows.map(r => ({ date: r.entry_date, preview: (r.content || "").slice(0, 200), updatedAt: r.updated_at }));
+  }
   await _ensureAgentTables();
   const res = await query(
     "SELECT entry_date, LEFT(content, 200) as preview, updated_at FROM agent_memory WHERE agent_id = $1 AND entry_type = 'daily' ORDER BY entry_date DESC LIMIT $2",
@@ -523,6 +1035,14 @@ async function listDailyMemories(agentId, limit) {
 }
 
 async function searchMemory(agentId, searchTerm) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const term = searchTerm.toLowerCase();
+    const rows = _csvRead("agent_memory")
+      .filter(r => r.agent_id === agentId.toUpperCase() && (r.content || "").toLowerCase().includes(term))
+      .slice(0, 20);
+    return rows.map(r => ({ entryType: r.entry_type, date: r.entry_date, content: r.content, updatedAt: r.updated_at }));
+  }
   await _ensureAgentTables();
   const res = await query(
     "SELECT entry_type, entry_date, content, updated_at FROM agent_memory WHERE agent_id = $1 AND content ILIKE $2 ORDER BY updated_at DESC LIMIT 20",
@@ -532,8 +1052,22 @@ async function searchMemory(agentId, searchTerm) {
 }
 
 const SUBCONSCIOUS_CATEGORIES = ["likes", "dislikes", "wants", "hopes", "wishes", "fears", "shadow", "observations", "notes", "dreams"];
+const SUB_HEADERS = ["id", "agent_id", "category", "key", "value", "created_at", "updated_at"];
 
 async function setSubconscious(agentId, category, key, value) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const rows = _csvRead("agent_subconscious");
+    const idx = rows.findIndex(r => r.agent_id === agentId.toUpperCase() && r.category === category && r.key === key);
+    if (idx >= 0) {
+      rows[idx].value = value;
+      rows[idx].updated_at = new Date().toISOString();
+    } else {
+      rows.push({ id: _csvAutoId("agent_subconscious"), agent_id: agentId.toUpperCase(), category, key, value, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    }
+    _csvWrite("agent_subconscious", rows, SUB_HEADERS);
+    return { ok: true };
+  }
   await _ensureAgentTables();
   await query(
     `INSERT INTO agent_subconscious (agent_id, category, key, value, updated_at)
@@ -545,6 +1079,13 @@ async function setSubconscious(agentId, category, key, value) {
 }
 
 async function getSubconscious(agentId, category) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const rows = _csvRead("agent_subconscious")
+      .filter(r => r.agent_id === agentId.toUpperCase() && r.category === category)
+      .sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
+    return rows.map(r => ({ key: r.key, value: r.value, createdAt: r.created_at, updatedAt: r.updated_at }));
+  }
   await _ensureAgentTables();
   const res = await query(
     "SELECT key, value, created_at, updated_at FROM agent_subconscious WHERE agent_id = $1 AND category = $2 ORDER BY created_at ASC",
@@ -554,6 +1095,11 @@ async function getSubconscious(agentId, category) {
 }
 
 async function getSubconsciousEntry(agentId, category, key) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const r = _csvRead("agent_subconscious").find(r => r.agent_id === agentId.toUpperCase() && r.category === category && r.key === key);
+    return r ? { key: r.key, value: r.value, createdAt: r.created_at, updatedAt: r.updated_at } : null;
+  }
   await _ensureAgentTables();
   const res = await query(
     "SELECT key, value, created_at, updated_at FROM agent_subconscious WHERE agent_id = $1 AND category = $2 AND key = $3",
@@ -563,12 +1109,30 @@ async function getSubconsciousEntry(agentId, category, key) {
 }
 
 async function deleteSubconscious(agentId, category, key) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const rows = _csvRead("agent_subconscious").filter(r => !(r.agent_id === agentId.toUpperCase() && r.category === category && r.key === key));
+    _csvWrite("agent_subconscious", rows, SUB_HEADERS);
+    return { ok: true };
+  }
   await _ensureAgentTables();
   await query("DELETE FROM agent_subconscious WHERE agent_id = $1 AND category = $2 AND key = $3", [agentId.toUpperCase(), category, key]);
   return { ok: true };
 }
 
 async function getAllSubconscious(agentId) {
+  if (!pool) {
+    await _ensureAgentTables();
+    const rows = _csvRead("agent_subconscious")
+      .filter(r => r.agent_id === agentId.toUpperCase())
+      .sort((a, b) => (a.category || "").localeCompare(b.category || "") || (a.created_at || "").localeCompare(b.created_at || ""));
+    const grouped = {};
+    for (const r of rows) {
+      if (!grouped[r.category]) grouped[r.category] = [];
+      grouped[r.category].push({ key: r.key, value: r.value, createdAt: r.created_at, updatedAt: r.updated_at });
+    }
+    return grouped;
+  }
   await _ensureAgentTables();
   const res = await query(
     "SELECT category, key, value, created_at, updated_at FROM agent_subconscious WHERE agent_id = $1 ORDER BY category, created_at ASC",
@@ -604,6 +1168,7 @@ async function reflectSubconscious(agentId) {
 }
 
 async function ensureNewColumns() {
+  if (!pool) return;
   const newCols = [
     ["strategy_type", "VARCHAR(40) DEFAULT 'scalper'"],
     ["adx_enabled", "BOOLEAN DEFAULT FALSE"],
@@ -676,31 +1241,8 @@ async function ensureNewColumns() {
   }
 }
 
-async function deleteBacktests(strategyId) {
-  const res = await query("DELETE FROM scalper_backtests WHERE strategy_id = $1", [strategyId]);
-  return { ok: true, deleted: res.rowCount };
-}
-
-async function getAllBacktests(limit = 50) {
-  const res = await query(
-    `SELECT b.id, b.strategy_id, b.timeframe, b.candle_count, b.total_trades, b.win_count, b.loss_count,
-            b.win_rate, b.total_pnl, b.max_drawdown, b.sharpe_ratio, b.avg_win, b.avg_loss, b.created_at,
-            b.batch_id, b.instrument, b.strategy_type_key,
-            s.name as strategy_name, s.instrument as strat_instrument, s.strategy_type
-     FROM scalper_backtests b
-     LEFT JOIN scalper_strategies s ON b.strategy_id = s.id
-     ORDER BY b.created_at DESC LIMIT $1`,
-    [limit]
-  );
-  return res.rows.map(camel);
-}
-
-async function deleteAllBacktests() {
-  await query("DELETE FROM scalper_backtests");
-  return { ok: true };
-}
-
 async function ensureBatchColumns() {
+  if (!pool) return;
   const cols = [
     ["batch_id", "VARCHAR(40)"],
     ["instrument", "VARCHAR(60)"],
@@ -716,9 +1258,12 @@ async function ensureBatchColumns() {
   try { await query(`CREATE INDEX IF NOT EXISTS idx_backtests_opt ON scalper_backtests (optimization_batch_id)`); } catch (_) {}
 }
 
+const OPT_MEMORY_HEADERS = ["id", "instrument", "strategy_type", "timeframe", "best_config", "score", "best_pnl", "best_win_rate", "best_sharpe", "total_trades", "cycle_count", "total_iterations", "patterns", "agent_analysis", "created_at", "updated_at"];
+
 let _optMemoryReady = false;
 async function ensureOptimizationMemory() {
   if (_optMemoryReady) return;
+  if (!pool) { _optMemoryReady = true; return; }
   await query(`CREATE TABLE IF NOT EXISTS optimization_memory (
     id SERIAL PRIMARY KEY,
     instrument VARCHAR(60) NOT NULL,
@@ -749,6 +1294,44 @@ async function ensureOptimizationMemory() {
 
 async function saveOptimizationMemory(record) {
   await ensureOptimizationMemory();
+  if (!pool) {
+    const rows = _csvRead("optimization_memory");
+    const idx = rows.findIndex(r => r.instrument === record.instrument && r.strategy_type === record.strategyType && r.timeframe === record.timeframe);
+    const entry = {
+      id: idx >= 0 ? rows[idx].id : _csvAutoId("optimization_memory"),
+      instrument: record.instrument, strategy_type: record.strategyType, timeframe: record.timeframe,
+      best_config: record.bestConfig, score: record.score || 0,
+      best_pnl: record.bestPnl || 0, best_win_rate: record.bestWinRate || 0,
+      best_sharpe: record.bestSharpe || 0, total_trades: record.totalTrades || 0,
+      cycle_count: (idx >= 0 ? (rows[idx].cycle_count || 0) : 0) + (record.cycleCount || 0),
+      total_iterations: (idx >= 0 ? (rows[idx].total_iterations || 0) : 0) + (record.totalIterations || 0),
+      patterns: record.patterns || "", agent_analysis: record.agentAnalysis || "",
+      created_at: idx >= 0 ? rows[idx].created_at : new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    if (idx >= 0) {
+      if ((record.score || 0) > (rows[idx].score || 0)) {
+        entry.best_config = record.bestConfig;
+        entry.score = record.score || 0;
+        entry.best_pnl = record.bestPnl || 0;
+        entry.best_win_rate = record.bestWinRate || 0;
+        entry.best_sharpe = record.bestSharpe || 0;
+        entry.total_trades = record.totalTrades || 0;
+      } else {
+        entry.best_config = rows[idx].best_config;
+        entry.score = rows[idx].score;
+        entry.best_pnl = rows[idx].best_pnl;
+        entry.best_win_rate = rows[idx].best_win_rate;
+        entry.best_sharpe = rows[idx].best_sharpe;
+        entry.total_trades = rows[idx].total_trades;
+      }
+      rows[idx] = entry;
+    } else {
+      rows.push(entry);
+    }
+    _csvWrite("optimization_memory", rows, OPT_MEMORY_HEADERS);
+    return camel(entry);
+  }
   const res = await query(
     `INSERT INTO optimization_memory (instrument, strategy_type, timeframe, best_config, score, best_pnl, best_win_rate, best_sharpe, total_trades, cycle_count, total_iterations, patterns, agent_analysis)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
@@ -775,6 +1358,14 @@ async function saveOptimizationMemory(record) {
 
 async function getOptimizationMemory(instrument, strategyType, timeframe) {
   await ensureOptimizationMemory();
+  if (!pool) {
+    const rows = _csvRead("optimization_memory");
+    const r = rows.find(r => r.instrument === instrument && r.strategy_type === strategyType && r.timeframe === timeframe);
+    if (!r) return null;
+    const row = camel(r);
+    if (row.bestConfig && typeof row.bestConfig === "string") { try { row.bestConfig = JSON.parse(row.bestConfig); } catch (_) {} }
+    return row;
+  }
   const res = await query(
     "SELECT * FROM optimization_memory WHERE instrument = $1 AND strategy_type = $2 AND timeframe = $3",
     [instrument, strategyType, timeframe]
@@ -788,6 +1379,16 @@ async function getOptimizationMemory(instrument, strategyType, timeframe) {
 
 async function getAllOptimizationMemories(instrument) {
   await ensureOptimizationMemory();
+  if (!pool) {
+    let rows = _csvRead("optimization_memory");
+    if (instrument) rows = rows.filter(r => r.instrument === instrument);
+    rows.sort((a, b) => (b.score || 0) - (a.score || 0));
+    return rows.map(r => {
+      const row = camel(r);
+      if (row.bestConfig && typeof row.bestConfig === "string") { try { row.bestConfig = JSON.parse(row.bestConfig); } catch (_) {} }
+      return row;
+    });
+  }
   const q = instrument
     ? "SELECT * FROM optimization_memory WHERE instrument = $1 ORDER BY score DESC"
     : "SELECT * FROM optimization_memory ORDER BY score DESC";
@@ -803,6 +1404,13 @@ async function getAllOptimizationMemories(instrument) {
 
 async function deleteOptimizationMemory(instrument) {
   await ensureOptimizationMemory();
+  if (!pool) {
+    let rows = _csvRead("optimization_memory");
+    if (instrument) rows = rows.filter(r => r.instrument !== instrument);
+    else rows = [];
+    _csvWrite("optimization_memory", rows, OPT_MEMORY_HEADERS);
+    return { ok: true };
+  }
   if (instrument) {
     await query("DELETE FROM optimization_memory WHERE instrument = $1", [instrument]);
   } else {
@@ -813,6 +1421,22 @@ async function deleteOptimizationMemory(instrument) {
 
 async function saveBatchBacktest(data) {
   await ensureBatchColumns();
+  if (!pool) {
+    const row = {
+      id: _csvAutoId("scalper_backtests"),
+      strategy_id: data.strategyId || 0, timeframe: data.timeframe, candle_count: data.candleCount,
+      total_trades: data.totalTrades, win_count: data.winCount, loss_count: data.lossCount,
+      win_rate: data.winRate, total_pnl: data.totalPnl, max_drawdown: data.maxDrawdown,
+      sharpe_ratio: data.sharpeRatio, avg_win: data.avgWin, avg_loss: data.avgLoss,
+      trades: data.trades, config_snapshot: data.configSnapshot,
+      created_at: new Date().toISOString(),
+      batch_id: data.batchId, instrument: data.instrument, strategy_type_key: data.strategyTypeKey,
+      cycle_number: data.cycleNumber || null, iteration_number: data.iterationNumber || null,
+      optimization_batch_id: data.optimizationBatchId || null
+    };
+    _csvAppend("scalper_backtests", row, BACKTEST_HEADERS);
+    return camel(row);
+  }
   const res = await query(
     `INSERT INTO scalper_backtests (strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl, max_drawdown, sharpe_ratio, avg_win, avg_loss, trades, config_snapshot, batch_id, instrument, strategy_type_key, cycle_number, iteration_number, optimization_batch_id)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
@@ -827,6 +1451,17 @@ async function saveBatchBacktest(data) {
 
 async function getOptimizationResults(optBatchId) {
   await ensureBatchColumns();
+  if (!pool) {
+    const rows = _csvRead("scalper_backtests")
+      .filter(r => r.optimization_batch_id === optBatchId)
+      .sort((a, b) => (a.cycle_number || 0) - (b.cycle_number || 0) || (b.total_pnl || 0) - (a.total_pnl || 0));
+    return rows.map(r => {
+      const row = camel(r);
+      if (row.configSnapshot && typeof row.configSnapshot === "string") { try { row.configSnapshot = JSON.parse(row.configSnapshot); } catch (_) {} }
+      delete row.trades;
+      return row;
+    });
+  }
   const res = await query(
     `SELECT id, strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl,
             max_drawdown, sharpe_ratio, avg_win, avg_loss, created_at, batch_id, instrument, strategy_type_key,
@@ -845,6 +1480,22 @@ async function getOptimizationResults(optBatchId) {
 
 async function getBestOptimizationResults(optBatchId, topN = 5) {
   await ensureBatchColumns();
+  if (!pool) {
+    const rows = _csvRead("scalper_backtests")
+      .filter(r => r.optimization_batch_id === optBatchId && (r.total_trades || 0) > 0)
+      .sort((a, b) => {
+        const scoreA = (a.total_pnl || 0) * 0.4 + ((a.win_rate || 0) / 100) * (a.total_pnl || 0) * 0.3 + (a.sharpe_ratio || 0) * 10 * 0.3;
+        const scoreB = (b.total_pnl || 0) * 0.4 + ((b.win_rate || 0) / 100) * (b.total_pnl || 0) * 0.3 + (b.sharpe_ratio || 0) * 10 * 0.3;
+        return scoreB - scoreA;
+      })
+      .slice(0, topN);
+    return rows.map(r => {
+      const row = camel(r);
+      if (row.configSnapshot && typeof row.configSnapshot === "string") { try { row.configSnapshot = JSON.parse(row.configSnapshot); } catch (_) {} }
+      delete row.trades;
+      return row;
+    });
+  }
   const res = await query(
     `SELECT id, strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl,
             max_drawdown, sharpe_ratio, avg_win, avg_loss, created_at, batch_id, instrument, strategy_type_key,
@@ -865,6 +1516,17 @@ async function getBestOptimizationResults(optBatchId, topN = 5) {
 
 async function getBatchResults(batchId) {
   await ensureBatchColumns();
+  if (!pool) {
+    const rows = _csvRead("scalper_backtests")
+      .filter(r => r.batch_id === batchId)
+      .sort((a, b) => (b.total_pnl || 0) - (a.total_pnl || 0));
+    return rows.map(r => {
+      const row = camel(r);
+      if (row.configSnapshot && typeof row.configSnapshot === "string") { try { row.configSnapshot = JSON.parse(row.configSnapshot); } catch (_) {} }
+      delete row.trades;
+      return row;
+    });
+  }
   const res = await query(
     `SELECT id, strategy_id, timeframe, candle_count, total_trades, win_count, loss_count, win_rate, total_pnl,
             max_drawdown, sharpe_ratio, avg_win, avg_loss, created_at, batch_id, instrument, strategy_type_key,
@@ -883,6 +1545,25 @@ async function getBatchResults(batchId) {
 
 async function listBatches(limit = 20) {
   await ensureBatchColumns();
+  if (!pool) {
+    const bts = _csvRead("scalper_backtests").filter(r => r.batch_id);
+    const groups = {};
+    for (const r of bts) {
+      if (!groups[r.batch_id]) groups[r.batch_id] = [];
+      groups[r.batch_id].push(r);
+    }
+    const result = Object.entries(groups).map(([batchId, runs]) => ({
+      batchId,
+      runCount: runs.length,
+      started: runs.reduce((m, r) => !m || (r.created_at || "") < m ? (r.created_at || "") : m, ""),
+      finished: runs.reduce((m, r) => !m || (r.created_at || "") > m ? (r.created_at || "") : m, ""),
+      totalTrades: runs.reduce((s, r) => s + (r.total_trades || 0), 0),
+      avgWinRate: Math.round(runs.reduce((s, r) => s + (r.win_rate || 0), 0) / runs.length * 10) / 10,
+      totalPnl: Math.round(runs.reduce((s, r) => s + (r.total_pnl || 0), 0) * 100) / 100
+    }));
+    result.sort((a, b) => (b.started || "").localeCompare(a.started || ""));
+    return result.slice(0, limit);
+  }
   const res = await query(
     `SELECT batch_id, COUNT(*)::int as run_count, MIN(created_at) as started, MAX(created_at) as finished,
             SUM(total_trades)::int as total_trades, ROUND(AVG(win_rate)::numeric, 1) as avg_win_rate,
@@ -895,6 +1576,11 @@ async function listBatches(limit = 20) {
 }
 
 async function deleteBatch(batchId) {
+  if (!pool) {
+    const rows = _csvRead("scalper_backtests").filter(r => r.batch_id !== batchId);
+    _csvWrite("scalper_backtests", rows, BACKTEST_HEADERS);
+    return { ok: true, deleted: 0 };
+  }
   const res = await query("DELETE FROM scalper_backtests WHERE batch_id = $1", [batchId]);
   return { ok: true, deleted: res.rowCount };
 }

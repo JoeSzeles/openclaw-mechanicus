@@ -64,7 +64,11 @@ cp .env.example .env
 
 ## Database Setup (PostgreSQL)
 
-The system uses **PostgreSQL** for storing strategies, backtest results, optimization memory, trade history, and candle data. Without a database, the dashboard still works but database-backed features (backtests, optimization, trade logs) will show a "Database not configured" message.
+The system uses **PostgreSQL** for storing strategies, backtest results, optimization memory, trade history, and candle data.
+
+**No database? No problem.** When `DATABASE_URL` is not set, the system automatically falls back to **CSV files** stored in `~/.openclaw/db/`. Everything works — strategies, backtests, trades, optimization memory, candle caching — just using local CSV files instead of PostgreSQL. This means you can run the full system without any database setup at all.
+
+PostgreSQL is recommended for production use (better performance with large datasets, concurrent access, proper indexing), but CSV mode is fully functional for development, testing, and personal use.
 
 All tables are created automatically on first startup — no manual SQL required.
 
