@@ -25,6 +25,471 @@ const IG_CACHE_TTL = 30000;
 const marketDetailsCache = new Map();
 let csLastResults = null;
 
+let lsClient = null;
+let lsSubscription = null;
+let lsStatus = 'disconnected';
+let lsConnectedEpics = [];
+let lsConnectedAt = null;
+let lsUpdateCount = 0;
+let lsUpdateCounts = {};
+let lsLastUpdateTs = 0;
+let lsUpdateIntervals = [];
+let lsReconnectAttempts = 0;
+let lsReconnectTimer = null;
+const LS_MAX_RECONNECT_ATTEMPTS = 10;
+const streamedPrices = new Map();
+let lsLiveClient = null;
+let lsLiveSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: null, accountId: null, accountType: null };
+let lsLiveActive = false;
+let lsLiveRefreshTimer = null;
+const LS_LIVE_SESSION_REFRESH = 4 * 60 * 1000;
+let lsHybridPollingTimer = null;
+let hybridPollErrorCount = 0;
+let lsStarted = false;
+
+const STREAM_RESOLUTIONS = {
+  SECOND: 1, SECOND_2: 2, SECOND_5: 5, SECOND_10: 10, SECOND_20: 20, SECOND_30: 30,
+  MINUTE: 60, MINUTE_5: 300, MINUTE_15: 900, MINUTE_30: 1800, HOUR: 3600, HOUR_4: 14400, DAY: 86400
+};
+const streamCandleBuilders = new Map();
+let streamCandleFlushTimer = null;
+
+function feedStreamTick(epic, mid, timestamp) {
+  if (mid == null || isNaN(mid)) return;
+  const tsSec = Math.floor(timestamp / 1000);
+  for (const [res, resSec] of Object.entries(STREAM_RESOLUTIONS)) {
+    const candleTs = Math.floor(tsSec / resSec) * resSec;
+    const key = epic + ':' + res;
+    let builder = streamCandleBuilders.get(key);
+    if (!builder) {
+      builder = { epic, resolution: res, resSec, current: null, completed: [] };
+      streamCandleBuilders.set(key, builder);
+    }
+    if (builder.current && builder.current.ts === candleTs) {
+      const c = builder.current;
+      c.high = Math.max(c.high, mid);
+      c.low = Math.min(c.low, mid);
+      c.close = mid;
+      c.ticks++;
+    } else {
+      if (builder.current) builder.completed.push(builder.current);
+      builder.current = { ts: candleTs, open: mid, high: mid, low: mid, close: mid, ticks: 1 };
+      if (builder.completed.length > 500) builder.completed = builder.completed.slice(-200);
+    }
+  }
+}
+
+function startStreamCandleFlush() {
+  if (streamCandleFlushTimer) return;
+  streamCandleFlushTimer = setInterval(() => {
+    for (const [key, builder] of streamCandleBuilders) {
+      if (builder.completed.length > 0) {
+        const count = builder.completed.length;
+        console.log(`[stream-candles-local] ${builder.epic} ${builder.resolution}: ${count} candles buffered`);
+      }
+    }
+  }, 10000);
+}
+
+function collectInstrumentEpics() {
+  const epics = new Set();
+  try {
+    const monCfg = join(DATA_DIR, 'ig-monitor-config.json');
+    if (existsSync(monCfg)) {
+      const cfg = JSON.parse(readFileSync(monCfg, 'utf8'));
+      if (cfg.instruments) cfg.instruments.forEach(i => { if (i.epic) epics.add(i.epic); });
+    }
+  } catch (_) {}
+  try {
+    const strCfg = join(DATA_DIR, 'ig-strategy.json');
+    if (existsSync(strCfg)) {
+      const cfg = JSON.parse(readFileSync(strCfg, 'utf8'));
+      if (cfg.strategies) cfg.strategies.forEach(s => { if (s.instrument) epics.add(s.instrument); });
+    }
+  } catch (_) {}
+  try {
+    const scalpCfg = join(DATA_DIR, 'ig-scalper-config.json');
+    if (existsSync(scalpCfg)) {
+      const cfg = JSON.parse(readFileSync(scalpCfg, 'utf8'));
+      if (cfg.strategies) cfg.strategies.forEach(s => { if (s.instrument) epics.add(s.instrument); });
+    }
+  } catch (_) {}
+  try {
+    const watchCfg = join(DATA_DIR, 'ig-watched-list.json');
+    if (existsSync(watchCfg)) {
+      const cfg = JSON.parse(readFileSync(watchCfg, 'utf8'));
+      if (cfg.instruments) cfg.instruments.forEach(i => { if (typeof i === 'string') epics.add(i); else if (i.epic) epics.add(i.epic); });
+    }
+  } catch (_) {}
+  return [...epics].slice(0, 40);
+}
+
+function getLiveProfile() {
+  const config = ensureIgConfig();
+  const live = config.profiles && config.profiles.live;
+  if (!live || !live.apiKey || !live.username || !live.password || !live.baseUrl) return null;
+  return { ...live, profileName: 'live' };
+}
+
+async function liveStreamingLogin() {
+  const profile = getLiveProfile();
+  if (!profile) throw new Error('No live profile credentials configured');
+  console.log('[ls-local] Authenticating with live account for streaming...');
+  const res = await igRequest('POST', '/session', {
+    'Content-Type': 'application/json; charset=UTF-8',
+    'Accept': 'application/json; charset=UTF-8',
+    'X-IG-API-KEY': profile.apiKey,
+    'Version': '2',
+  }, JSON.stringify({ identifier: profile.username, password: profile.password }), profile.baseUrl);
+  if (res.status !== 200) {
+    let errDetail = res.body || '';
+    try { const ej = JSON.parse(errDetail); errDetail = ej.errorCode || errDetail; } catch(_) {}
+    throw new Error('Live auth failed: ' + errDetail);
+  }
+  const cst = res.headers['cst'] || res.headers['CST'];
+  const xst = res.headers['x-security-token'] || res.headers['X-SECURITY-TOKEN'];
+  if (!cst || !xst) throw new Error('Live auth missing tokens');
+  let sessionBody = {};
+  try { sessionBody = JSON.parse(res.body); } catch (_) {}
+  const lsEndpoint = sessionBody.lightstreamerEndpoint || null;
+  if (!lsEndpoint) throw new Error('Live account did not return a Lightstreamer endpoint');
+  let accountType = sessionBody.accountType || 'CFD';
+  let accountId = sessionBody.currentAccountId || profile.accountId;
+  try {
+    const acctRes = await igRequest('GET', '/accounts', {
+      'X-IG-API-KEY': profile.apiKey, 'CST': cst, 'X-SECURITY-TOKEN': xst, 'Version': '1',
+    }, null, profile.baseUrl);
+    if (acctRes.status === 200) {
+      const acctBody = JSON.parse(acctRes.body);
+      const accounts = acctBody.accounts || [];
+      console.log('[ls-local] Available accounts:', accounts.map(a => `${a.accountId}(${a.accountType}/${a.status})`).join(', '));
+      const spreadbetAccount = accounts.find(a => a.accountType === 'SPREADBET' && a.status === 'ENABLED');
+      if (spreadbetAccount && spreadbetAccount.accountId !== accountId) {
+        console.log(`[ls-local] Switching to spreadbet account ${spreadbetAccount.accountId} for L1 data`);
+        const switchRes = await igRequest('PUT', '/session', {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Accept': 'application/json; charset=UTF-8',
+          'X-IG-API-KEY': profile.apiKey, 'CST': cst, 'X-SECURITY-TOKEN': xst, 'Version': '1',
+        }, JSON.stringify({ accountId: spreadbetAccount.accountId }), profile.baseUrl);
+        if (switchRes.status === 200) {
+          console.log('[ls-local] Switched to spreadbet account');
+          accountId = spreadbetAccount.accountId;
+          accountType = 'SPREADBET';
+        }
+      }
+    }
+  } catch (e) { console.log('[ls-local] Accounts lookup failed:', e.message); }
+  lsLiveSession = { cst, xst, ts: Date.now(), lightstreamerEndpoint: lsEndpoint, accountType, accountId };
+  console.log('[ls-local] Authenticated:', lsEndpoint, 'type:', accountType, 'account:', accountId);
+  return { cst, xst, lightstreamerEndpoint: lsEndpoint };
+}
+
+function scheduleLiveStreamingRefresh() {
+  if (lsLiveRefreshTimer) clearTimeout(lsLiveRefreshTimer);
+  lsLiveRefreshTimer = setTimeout(async () => {
+    if (!lsLiveActive) return;
+    console.log('[ls-local] Proactive live token refresh...');
+    try {
+      await liveStreamingLogin();
+      scheduleLiveStreamingRefresh();
+    } catch (e) {
+      console.log('[ls-local] Refresh failed:', e.message, '— retry in 60s');
+      if (lsLiveRefreshTimer) clearTimeout(lsLiveRefreshTimer);
+      lsLiveRefreshTimer = setTimeout(async () => {
+        if (!lsLiveActive) return;
+        try { await liveStreamingLogin(); scheduleLiveStreamingRefresh(); } catch (e2) {
+          console.log('[ls-local] Retry refresh failed:', e2.message);
+          scheduleLiveStreamingRefresh();
+        }
+      }, 60000);
+    }
+  }, LS_LIVE_SESSION_REFRESH);
+}
+
+function startHybridPricePolling() {
+  if (lsHybridPollingTimer) return;
+  hybridPollErrorCount = 0;
+  startStreamCandleFlush();
+  console.log('[ls-local] Starting hybrid price polling (L1 unavailable)');
+  lsHybridPollingTimer = true;
+  function scheduleNext() {
+    const delay = hybridPollErrorCount > 0 ? Math.min(30000, 5000 * hybridPollErrorCount) : 3000;
+    lsHybridPollingTimer = setTimeout(pollOnce, delay);
+  }
+  async function pollOnce() {
+    if (!lsHybridPollingTimer) return;
+    const epics = collectInstrumentEpics();
+    if (epics.length === 0) { scheduleNext(); return; }
+    try {
+      const session = await igAuth();
+      for (let i = 0; i < epics.length; i += 20) {
+        const chunk = epics.slice(i, i + 20);
+        const url = `/markets?epics=${chunk.join(',')}`;
+        const r = await igRequest('GET', url, { ...igHeaders(session), Version: '2' });
+        if (r.status === 200) {
+          const data = JSON.parse(r.body);
+          if (data && data.marketDetails) {
+            data.marketDetails.forEach(m => {
+              const epic = m.instrument.epic;
+              const snapshot = m.snapshot;
+              if (!snapshot) return;
+              const now = Date.now();
+              const bid = snapshot.bid;
+              const offer = snapshot.offer;
+              const mid = (bid && offer) ? (bid + offer) / 2 : null;
+              streamedPrices.set(epic, {
+                bid, offer, mid,
+                high: snapshot.high, low: snapshot.low, midOpen: null,
+                marketState: snapshot.marketStatus, updateTime: null,
+                timestamp: now, source: 'rest-polling'
+              });
+              lsUpdateCount++;
+              if (mid) feedStreamTick(epic, mid, now);
+            });
+            hybridPollErrorCount = 0;
+          }
+        }
+      }
+    } catch (e) {
+      hybridPollErrorCount++;
+      console.log('[ls-local] Hybrid poll error:', e.message);
+    }
+    scheduleNext();
+  }
+  pollOnce();
+}
+
+function stopHybridPricePolling() {
+  if (lsHybridPollingTimer) { clearTimeout(lsHybridPollingTimer); lsHybridPollingTimer = null; }
+}
+
+function scheduleLsReconnect(reason) {
+  if (lsReconnectAttempts >= LS_MAX_RECONNECT_ATTEMPTS) {
+    console.log('[ls-local] Max reconnect attempts reached, starting hybrid polling');
+    startHybridPricePolling();
+    return;
+  }
+  const delay = Math.min(30000, 5000 * Math.pow(1.5, lsReconnectAttempts));
+  lsReconnectAttempts++;
+  console.log(`[ls-local] Scheduling reconnect in ${Math.round(delay/1000)}s (attempt ${lsReconnectAttempts}, reason: ${reason})`);
+  lsReconnectTimer = setTimeout(async () => {
+    lsReconnectTimer = null;
+    try { await startLightstreamer(); } catch (e) {
+      console.log('[ls-local] Reconnect failed:', e.message);
+      scheduleLsReconnect('reconnect_failed');
+    }
+  }, delay);
+}
+
+async function startLightstreamer() {
+  if (!igConfigured()) { lsStatus = 'not_configured'; return; }
+  try {
+    let LsModule;
+    try { LsModule = await import('lightstreamer-client-node'); } catch (e1) {
+      try { const { createRequire } = await import('module'); const req = createRequire(import.meta.url); LsModule = req('lightstreamer-client-node'); } catch (e2) {
+        console.log('[ls-local] lightstreamer-client-node not available:', e2.message);
+        lsStatus = 'no_library';
+        startHybridPricePolling();
+        return;
+      }
+    }
+    const LightstreamerClient = LsModule.LightstreamerClient || LsModule.default?.LightstreamerClient;
+    const Subscription = LsModule.Subscription || LsModule.default?.Subscription;
+    if (!LightstreamerClient || !Subscription) {
+      console.log('[ls-local] Could not resolve LightstreamerClient/Subscription exports');
+      lsStatus = 'no_library';
+      startHybridPricePolling();
+      return;
+    }
+
+    const session = await igAuth();
+    let endpoint = igSession.lightstreamerEndpoint;
+    const activeProfile = getActiveIgProfile();
+    let accountId = activeProfile ? activeProfile.accountId : null;
+    let streamSource = activeProfile ? activeProfile.profileName : 'demo';
+    if (!endpoint) {
+      console.log('[ls-local] No LS endpoint from session — starting hybrid polling');
+      lsStatus = 'no_endpoint';
+      startHybridPricePolling();
+      return;
+    }
+
+    if (lsClient) { try { lsClient.disconnect(); } catch (_) {} }
+
+    const client = new LightstreamerClient(endpoint, 'DEFAULT');
+    client.connectionDetails.setUser(accountId);
+    client.connectionDetails.setPassword(`CST-${session.cst}|XST-${session.xst}`);
+    console.log(`[ls-local] Connecting via ${streamSource} profile to ${endpoint}`);
+
+    client.addListener({
+      onStatusChange: (status) => {
+        console.log('[ls-local] Status:', status);
+        if (status.startsWith('CONNECTED')) {
+          lsStatus = 'connected';
+          lsReconnectAttempts = 0;
+          if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
+          if (!lsConnectedAt) lsConnectedAt = Date.now();
+        } else if (status === 'DISCONNECTED:WILL-RETRY') {
+          lsStatus = 'reconnecting';
+        } else if (status.startsWith('DISCONNECTED')) {
+          lsStatus = 'disconnected';
+          lsConnectedAt = null;
+          if (!lsReconnectTimer) scheduleLsReconnect('disconnected');
+        } else if (status.startsWith('CONNECTING') || status.startsWith('STALLED')) {
+          lsStatus = 'reconnecting';
+          if (status.startsWith('STALLED') && !lsReconnectTimer) scheduleLsReconnect('stalled');
+        }
+      },
+      onServerError: (code, msg) => {
+        console.log('[ls-local] Server error:', code, msg);
+        lsStatus = 'error';
+        if (!lsReconnectTimer) scheduleLsReconnect('server_error_' + code);
+      }
+    });
+
+    client.connect();
+    lsClient = client;
+
+    const epics = collectInstrumentEpics();
+    if (epics.length === 0) {
+      console.log('[ls-local] No instruments to subscribe — connected but idle');
+      lsStatus = 'connected';
+      lsConnectedEpics = [];
+      return;
+    }
+
+    const fields = ['BID', 'OFFER', 'HIGH', 'LOW', 'MID_OPEN', 'MARKET_STATE', 'UPDATE_TIME'];
+    const items = epics.map(e => `L1:${e}`);
+    const sub = new Subscription('MERGE', items, fields);
+    sub.setRequestedSnapshot('yes');
+    sub.addListener({
+      onSubscription: () => {
+        console.log(`[ls-local] Subscribed to ${epics.length} instruments via ${streamSource}`);
+        lsConnectedEpics = epics;
+        startStreamCandleFlush();
+      },
+      onSubscriptionError: (code, msg) => {
+        console.error(`[ls-local] Subscription error: ${code} ${msg}`);
+        console.log('[ls-local] L1 subscription failed — starting hybrid polling fallback');
+        lsStatus = 'connected';
+        startHybridPricePolling();
+      },
+      onItemUpdate: (info) => {
+        const epicFull = info.getItemName();
+        const epic = epicFull.includes(':') ? epicFull.split(':').slice(1).join(':') : epicFull;
+        const bid = parseFloat(info.getValue('BID')) || null;
+        const offer = parseFloat(info.getValue('OFFER')) || null;
+        const mid = (bid && offer) ? (bid + offer) / 2 : null;
+        const now = Date.now();
+        streamedPrices.set(epic, {
+          bid, offer, mid,
+          high: parseFloat(info.getValue('HIGH')) || null,
+          low: parseFloat(info.getValue('LOW')) || null,
+          midOpen: parseFloat(info.getValue('MID_OPEN')) || null,
+          marketState: info.getValue('MARKET_STATE') || null,
+          updateTime: info.getValue('UPDATE_TIME') || null,
+          timestamp: now, source: 'lightstreamer'
+        });
+        lsUpdateCount++;
+        lsUpdateCounts[epic] = (lsUpdateCounts[epic] || 0) + 1;
+        if (lsLastUpdateTs > 0) {
+          lsUpdateIntervals.push(now - lsLastUpdateTs);
+          if (lsUpdateIntervals.length > 200) lsUpdateIntervals = lsUpdateIntervals.slice(-100);
+        }
+        lsLastUpdateTs = now;
+        if (mid) feedStreamTick(epic, mid, now);
+      },
+      onUnsubscription: () => {
+        console.log('[ls-local] Unsubscribed');
+        lsConnectedEpics = [];
+      }
+    });
+    client.subscribe(sub);
+    lsSubscription = sub;
+
+    const liveProfile = getLiveProfile();
+    const hasLiveCreds = !!(liveProfile && liveProfile.apiKey && liveProfile.username && liveProfile.password && liveProfile.accountId);
+    if (hasLiveCreds) {
+      try {
+        if (!lsLiveActive || !lsLiveSession.cst) {
+          await liveStreamingLogin();
+          lsLiveActive = true;
+          scheduleLiveStreamingRefresh();
+        }
+        const liveEndpoint = lsLiveSession.lightstreamerEndpoint;
+        const liveAccountId = lsLiveSession.accountId || liveProfile.accountId;
+        if (liveEndpoint && lsLiveSession.cst) {
+          if (lsLiveClient) { try { lsLiveClient.disconnect(); } catch (_) {} }
+          const liveClient = new LightstreamerClient(liveEndpoint, 'DEFAULT');
+          liveClient.connectionDetails.setUser(liveAccountId);
+          liveClient.connectionDetails.setPassword(`CST-${lsLiveSession.cst}|XST-${lsLiveSession.xst}`);
+          liveClient.addListener({
+            onStatusChange: (s) => { if (s.startsWith('CONNECTED')) console.log('[ls-local] Live ACCOUNT client connected'); },
+            onServerError: (c, m) => console.log('[ls-local] Live ACCOUNT error:', c, m)
+          });
+          liveClient.connect();
+          const acctSub = new Subscription('MERGE', [`ACCOUNT:${liveAccountId}`], ['DEPOSIT', 'PNL', 'AVAILABLE_CASH', 'FUNDS', 'MARGIN', 'EQUITY']);
+          acctSub.setRequestedSnapshot('yes');
+          acctSub.addListener({
+            onSubscription: () => console.log(`[ls-local] ACCOUNT subscription OK for ${liveAccountId}`),
+            onSubscriptionError: (c2, m2) => console.error(`[ls-local] ACCOUNT sub error: ${c2} ${m2}`),
+            onItemUpdate: (info2) => {
+              streamedPrices.set('__ACCOUNT__', {
+                deposit: parseFloat(info2.getValue('DEPOSIT')) || null,
+                pnl: parseFloat(info2.getValue('PNL')) || null,
+                availableCash: parseFloat(info2.getValue('AVAILABLE_CASH')) || null,
+                funds: parseFloat(info2.getValue('FUNDS')) || null,
+                margin: parseFloat(info2.getValue('MARGIN')) || null,
+                equity: parseFloat(info2.getValue('EQUITY')) || null,
+                source: 'live', timestamp: Date.now()
+              });
+            }
+          });
+          liveClient.subscribe(acctSub);
+          lsLiveClient = liveClient;
+          console.log(`[ls-local] Live ACCOUNT client connecting to ${liveEndpoint} for account ${liveAccountId}`);
+        }
+      } catch (e) {
+        console.log('[ls-local] Live ACCOUNT streaming setup failed:', e.message);
+      }
+    }
+
+    console.log(`[ls-local] Connecting to ${endpoint} (via ${streamSource}), subscribing to ${epics.length} instruments`);
+  } catch (e) {
+    console.error('[ls-local] Error starting:', e.message);
+    lsStatus = 'error';
+    if (!lsReconnectTimer) scheduleLsReconnect('start_error');
+  }
+}
+
+function stopLightstreamer() {
+  if (lsReconnectTimer) { clearTimeout(lsReconnectTimer); lsReconnectTimer = null; }
+  lsReconnectAttempts = 0;
+  stopHybridPricePolling();
+  if (lsLiveRefreshTimer) { clearTimeout(lsLiveRefreshTimer); lsLiveRefreshTimer = null; }
+  lsLiveActive = false;
+  if (lsLiveClient && lsLiveClient !== lsClient) { try { lsLiveClient.disconnect(); } catch (_) {} }
+  lsLiveClient = null;
+  if (lsClient) {
+    try { if (lsSubscription) lsClient.unsubscribe(lsSubscription); lsClient.disconnect(); } catch (_) {}
+    lsClient = null; lsSubscription = null;
+    lsStatus = 'disconnected'; lsConnectedEpics = []; lsConnectedAt = null;
+    lsUpdateCount = 0; lsUpdateCounts = {}; lsLastUpdateTs = 0; lsUpdateIntervals = [];
+    console.log('[ls-local] Disconnected');
+  }
+}
+
+function getStreamedPrices() {
+  const result = {};
+  const config = ensureIgConfig();
+  const activeProfile = config.activeProfile || 'demo';
+  for (const [epic, data] of streamedPrices) {
+    if (epic === '__ACCOUNT__' && data.source !== activeProfile) continue;
+    result[epic] = { ...data };
+  }
+  return result;
+}
+
 function json(res, status, data) {
   const body = JSON.stringify(data);
   res.writeHead(status, {
@@ -176,6 +641,14 @@ async function igSessionLogin() {
   igSessionError = null;
   igSessionLastRefresh = Date.now();
   console.log(`[ig-local-api] Connected to ${profile.profileName} profile`);
+  if (!lsStarted && lsEndpoint) {
+    lsStarted = true;
+    setTimeout(() => {
+      if (lsClient || lsHybridPollingTimer) return;
+      console.log('[ig-local-api] Auto-starting Lightstreamer after first auth...');
+      startLightstreamer().catch(e => console.log('[ig-local-api] Auto-start LS failed:', e.message));
+    }, 2000);
+  }
   return { cst, xst };
 }
 
@@ -300,15 +773,16 @@ async function routeRequest(req, res, p, m, url) {
       lightstreamerEndpoint: igSession.lightstreamerEndpoint || null
     };
     safe.streaming = {
-      status: 'disconnected',
-      liveStreamingActive: false,
-      streamingSource: 'rest-polling',
-      connectedEpics: [],
-      priceCount: 0,
-      reconnectAttempts: 0,
-      reconnectPending: false,
-      _localMode: true,
-      _hint: 'Live Lightstreamer streaming requires ceo-proxy. Charts use REST price history.'
+      status: lsStatus,
+      liveStreamingActive: !!lsLiveClient,
+      streamingSource: lsConnectedEpics.length > 0 ? 'lightstreamer' : (lsHybridPollingTimer ? 'rest-polling' : 'none'),
+      connectedEpics: lsConnectedEpics,
+      priceCount: streamedPrices.size,
+      hybridPolling: !!lsHybridPollingTimer,
+      reconnectAttempts: lsReconnectAttempts,
+      reconnectPending: !!lsReconnectTimer,
+      priceMethod: lsConnectedEpics.length > 0 ? 'LIGHTSTREAMER L1' : (lsHybridPollingTimer ? 'REST POLLING (every 3s)' : 'DISCONNECTED'),
+      totalUpdates: lsUpdateCount
     };
     return json(res, 200, safe), true;
   }
@@ -339,6 +813,11 @@ async function routeRequest(req, res, p, m, url) {
     }
     saveIgConfig(config);
     igSession = { cst: null, xst: null, ts: 0, lightstreamerEndpoint: igSession.lightstreamerEndpoint };
+    lsStarted = false;
+    if (lsClient || lsHybridPollingTimer) {
+      stopLightstreamer();
+      console.log('[ig-local-api] Config changed — LS stopped, will restart on next auth');
+    }
     return json(res, 200, { ok: true, activeProfile: config.activeProfile }), true;
   }
 
@@ -794,20 +1273,43 @@ async function routeRequest(req, res, p, m, url) {
   }
 
   if (m === 'GET' && p === '/api/ig/stream/prices') {
-    return json(res, 200, { streaming: false, polling: false, method: 'none', prices: {}, _localMode: true, _hint: 'Lightstreamer streaming requires ceo-proxy. Use REST polling via price history endpoints.' }), true;
+    const prices = getStreamedPrices();
+    const isStreaming = lsStatus === 'connected' && lsConnectedEpics.length > 0;
+    const isPolling = !!lsHybridPollingTimer;
+    return json(res, 200, {
+      streaming: isStreaming,
+      polling: isPolling,
+      method: isStreaming ? 'lightstreamer' : (isPolling ? 'rest-polling' : 'none'),
+      prices
+    }), true;
   }
 
   if (m === 'GET' && p === '/api/ig/stream/status') {
+    const uptimeMs = lsConnectedAt ? Date.now() - lsConnectedAt : null;
+    let updatesPerSec = null, avgInterval = null, minInterval = null, maxInterval = null;
+    if (lsUpdateIntervals.length > 5) {
+      const sum = lsUpdateIntervals.reduce((a, b) => a + b, 0);
+      avgInterval = Math.round(sum / lsUpdateIntervals.length);
+      minInterval = Math.min(...lsUpdateIntervals);
+      maxInterval = Math.max(...lsUpdateIntervals);
+      if (avgInterval > 0) updatesPerSec = Math.round(1000 / avgInterval * 10) / 10;
+    }
+    const epicStats = {};
+    for (const [epic, data] of streamedPrices) {
+      if (epic === '__ACCOUNT__') continue;
+      epicStats[epic] = { ...data, ageMs: Date.now() - (data.timestamp || 0), updates: lsUpdateCounts[epic] || 0 };
+    }
     return json(res, 200, {
-      status: 'disconnected', connectedEpics: [], priceCount: 0,
+      status: lsStatus, connectedEpics: lsConnectedEpics, priceCount: streamedPrices.size,
       activeProfile: getActiveIgProfile()?.profileName || null,
       lightstreamerEndpoint: igSession.lightstreamerEndpoint || null,
-      liveAccountClient: false, hybridPolling: false,
+      liveAccountClient: !!lsLiveClient, hybridPolling: !!lsHybridPollingTimer,
       streamingSource: getActiveIgProfile()?.profileName || 'demo',
-      priceSource: 'none', priceMethod: 'LOCAL MODE — No Lightstreamer (use price history)',
-      reconnect: { attempts: 0, maxAttempts: 0, pending: false },
-      metrics: { connectedAt: null, uptimeMs: null, totalUpdates: 0, updatesPerSec: null },
-      instruments: {}, _localMode: true
+      priceSource: lsConnectedEpics.length > 0 ? 'lightstreamer-' + (getActiveIgProfile()?.profileName || 'demo') : (lsHybridPollingTimer ? 'rest-polling' : 'none'),
+      priceMethod: lsConnectedEpics.length > 0 ? 'LIGHTSTREAMER L1' : (lsHybridPollingTimer ? 'REST POLLING (every 3s)' : 'DISCONNECTED'),
+      reconnect: { attempts: lsReconnectAttempts, maxAttempts: LS_MAX_RECONNECT_ATTEMPTS, pending: !!lsReconnectTimer },
+      metrics: { connectedAt: lsConnectedAt, uptimeMs, totalUpdates: lsUpdateCount, updatesPerSec, avgIntervalMs: avgInterval, minIntervalMs: minInterval, maxIntervalMs: maxInterval, recentSamples: lsUpdateIntervals.length },
+      instruments: epicStats
     }), true;
   }
 
@@ -840,11 +1342,28 @@ async function routeRequest(req, res, p, m, url) {
   }
 
   if (m === 'GET' && p === '/api/ig/stream/candle-stats') {
-    return json(res, 200, { stats: {}, resolutions: ['SECOND', 'MINUTE', 'MINUTE_5', 'MINUTE_15', 'MINUTE_30', 'HOUR', 'HOUR_4', 'DAY'] }), true;
+    const stats = {};
+    for (const [key, builder] of streamCandleBuilders) {
+      const candleCount = builder.completed.length + (builder.current ? 1 : 0);
+      if (candleCount > 0) {
+        stats[key] = { epic: builder.epic, resolution: builder.resolution, candleCount, ticks: builder.current ? builder.current.ticks : 0, lastClose: builder.current ? builder.current.close : null };
+      }
+    }
+    return json(res, 200, { stats, resolutions: Object.keys(STREAM_RESOLUTIONS) }), true;
   }
 
-  if (m === 'POST' && (p === '/api/ig/stream/connect-live' || p === '/api/ig/stream/disconnect-live')) {
-    return json(res, 200, { ok: false, _localMode: true, message: 'Lightstreamer streaming requires ceo-proxy' }), true;
+  if (m === 'POST' && p === '/api/ig/stream/connect-live') {
+    try {
+      await startLightstreamer();
+      return json(res, 200, { ok: true, status: lsStatus, connectedEpics: lsConnectedEpics }), true;
+    } catch (e) {
+      return json(res, 500, { ok: false, error: e.message }), true;
+    }
+  }
+
+  if (m === 'POST' && p === '/api/ig/stream/disconnect-live') {
+    stopLightstreamer();
+    return json(res, 200, { ok: true, status: 'disconnected' }), true;
   }
 
   if (m === 'GET' && p === '/api/ig/proofread') {

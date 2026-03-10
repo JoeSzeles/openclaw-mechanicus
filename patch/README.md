@@ -158,7 +158,7 @@ All trade types verified on IG demo account (Silver CFD — CS.D.CFASILVER.CFA.I
 The config page displays API Session status and Streaming Status. The local API now includes `session` and `streaming` objects in the `GET /api/ig/config` response:
 
 - **Session**: Shows `connected`/`disconnected`/`not_configured`, profile name, session age, TTL remaining, last refresh time, and Lightstreamer endpoint
-- **Streaming**: Shows `disconnected` in local mode (Lightstreamer requires CEO proxy), with source set to `rest-polling`
+- **Streaming**: Shows real Lightstreamer connection status (`connected`/`disconnected`/`reconnecting`), connected epics, price count, hybrid polling state, update metrics, and total updates. Lightstreamer connects automatically after first IG auth and subscribes to all configured instrument epics
 
 The session auto-connects when any IG API call is made (positions, markets, etc.).
 
@@ -180,7 +180,7 @@ Stats display correctly: Realized P&L, trade count (W/L), win rate, all from the
 - **Price history / chart data** may return `exceeded-account-historical-data-allowance` on demo accounts (IG rate limit, resets after a few hours)
 - **Market navigation** returns 500 from IG API on some demo accounts
 - **Activity endpoint** requires `?from=` date parameter (e.g., `?from=2026-03-01T00:00:00`)
-- **Streaming** (Lightstreamer live prices) requires the CEO proxy — local mode uses REST price history for charts
+- **Streaming** (Lightstreamer live prices) now works in local mode — auto-connects after first IG auth, subscribes to configured instrument epics, falls back to hybrid REST polling if L1 subscription fails (e.g., CFD account type). Live account streaming also supported if live profile is configured
 - **ClawScript compile/run/AI** execution requires the CEO proxy — local mode returns helpful stubs
 - **Scalper engine start/stop** requires the CEO proxy — local mode manages config/strategies/trades locally
 
