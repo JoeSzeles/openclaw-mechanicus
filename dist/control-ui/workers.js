@@ -11,7 +11,16 @@ var COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e
 function avatarColor(name) { var h = 0; for (var i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h); return COLORS[Math.abs(h) % COLORS.length]; }
 function initials(name) { var p = name.split(/[\s-]+/); return p.length > 1 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : name.slice(0,2).toUpperCase(); }
 function showToast(msg, type) { var t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast show ' + (type||''); setTimeout(function(){ t.className = 'toast'; }, 3000); }
-function apiFetch(url, opts) { opts = opts || {}; opts.headers = opts.headers || {}; if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN; return fetch(url, opts); }
+function apiFetch(url, opts) {
+  opts = opts || {}; opts.headers = opts.headers || {};
+  if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+  return fetch(url, opts).then(function(r) {
+    var ct = (r.headers.get('content-type') || '');
+    if (!r.ok && ct.indexOf('json') === -1) throw new Error('API not available (HTTP ' + r.status + ')');
+    if (ct.indexOf('json') === -1 && ct.indexOf('javascript') === -1 && ct.indexOf('octet') === -1) throw new Error('API not available — endpoint returned non-JSON');
+    return r;
+  });
+}
 function formatSize(b) { if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1) + ' KB'; return (b/1048576).toFixed(1) + ' MB'; }
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -37,7 +46,11 @@ function loadKeys() {
     }
     el.innerHTML = html;
     buildConnectionScripts();
-  }).catch(function(e) { el.innerHTML = '<p class="empty" style="color:#f85149">Error: ' + e.message + '</p>'; });
+  }).catch(function(e) {
+    el.innerHTML = e.message.indexOf('API not available') !== -1
+      ? '<p class="empty" style="color:#8b949e">This feature requires the CEO proxy. Run <code>.\\start-mechanicus.ps1</code> to enable.</p>'
+      : '<p class="empty" style="color:#f85149">' + escHtml(e.message) + '</p>';
+  });
 }
 
 function buildConnectionScripts() {
@@ -93,7 +106,11 @@ function loadWorkers() {
     }
     html += '</table>';
     el.innerHTML = html;
-  }).catch(function(e) { el.innerHTML = '<p class="empty" style="color:#f85149">Error: ' + e.message + '</p>'; });
+  }).catch(function(e) {
+    el.innerHTML = e.message.indexOf('API not available') !== -1
+      ? '<p class="empty" style="color:#8b949e">This feature requires the CEO proxy. Run <code>.\\start-mechanicus.ps1</code> to enable.</p>'
+      : '<p class="empty" style="color:#f85149">' + escHtml(e.message) + '</p>';
+  });
 }
 
 function loadExchange() {
@@ -111,7 +128,11 @@ function loadExchange() {
     }
     html += '</table>';
     el.innerHTML = html;
-  }).catch(function(e) { el.innerHTML = '<p class="empty" style="color:#f85149">Error: ' + e.message + '</p>'; });
+  }).catch(function(e) {
+    el.innerHTML = e.message.indexOf('API not available') !== -1
+      ? '<p class="empty" style="color:#8b949e">This feature requires the CEO proxy. Run <code>.\\start-mechanicus.ps1</code> to enable.</p>'
+      : '<p class="empty" style="color:#f85149">' + escHtml(e.message) + '</p>';
+  });
 }
 
 function loadSharedspace() {
@@ -133,7 +154,11 @@ function loadSharedspace() {
       html += '</div>';
     }
     el.innerHTML = html;
-  }).catch(function(e) { el.innerHTML = '<p class="empty" style="color:#f85149">Error: ' + e.message + '</p>'; });
+  }).catch(function(e) {
+    el.innerHTML = e.message.indexOf('API not available') !== -1
+      ? '<p class="empty" style="color:#8b949e">This feature requires the CEO proxy. Run <code>.\\start-mechanicus.ps1</code> to enable.</p>'
+      : '<p class="empty" style="color:#f85149">' + escHtml(e.message) + '</p>';
+  });
 }
 
 var lastChatTs = null;
@@ -158,7 +183,11 @@ function loadChat() {
     }
     el.innerHTML = html;
     el.scrollTop = el.scrollHeight;
-  }).catch(function(e) { el.innerHTML = '<p class="empty" style="color:#f85149">Error: ' + e.message + '</p>'; });
+  }).catch(function(e) {
+    el.innerHTML = e.message.indexOf('API not available') !== -1
+      ? '<p class="empty" style="color:#8b949e">This feature requires the CEO proxy. Run <code>.\\start-mechanicus.ps1</code> to enable.</p>'
+      : '<p class="empty" style="color:#f85149">' + escHtml(e.message) + '</p>';
+  });
 }
 
 document.getElementById('addKeyBtn').addEventListener('click', function() {
@@ -401,7 +430,11 @@ function loadWorkspaceFiles() {
     var tree = buildTree(files);
     var html = renderTree(tree, 0);
     el.innerHTML = html;
-  }).catch(function(e) { el.innerHTML = '<p class="empty" style="color:#f85149">Error: ' + e.message + '</p>'; });
+  }).catch(function(e) {
+    el.innerHTML = e.message.indexOf('API not available') !== -1
+      ? '<p class="empty" style="color:#8b949e">This feature requires the CEO proxy. Run <code>.\\start-mechanicus.ps1</code> to enable.</p>'
+      : '<p class="empty" style="color:#f85149">' + escHtml(e.message) + '</p>';
+  });
 }
 
 document.getElementById('wsAgentTabs').addEventListener('click', function(e) {

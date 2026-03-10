@@ -23,6 +23,13 @@ function apiFetch(url, opts) {
       showToast('Authentication failed — please hard-refresh (Ctrl+Shift+R)', 'error');
       throw new Error('Unauthorized (401) — token may be stale, hard-refresh the page');
     }
+    var ct = (r.headers.get('content-type') || '');
+    if (!r.ok) {
+      if (ct.indexOf('json') === -1) throw new Error('API not available (HTTP ' + r.status + ')');
+    }
+    if (ct.indexOf('json') === -1 && ct.indexOf('javascript') === -1) {
+      throw new Error('API not available — endpoint returned non-JSON response');
+    }
     return r;
   });
 }
