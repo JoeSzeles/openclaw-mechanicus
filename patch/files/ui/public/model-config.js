@@ -118,7 +118,12 @@ function loadIgConfig() {
     currentIgConfig = config;
     renderIgConfig(config);
   }).catch(function(e) {
-    document.getElementById('streamingCard').innerHTML = '<p style="color:#8b949e">Could not load IG config: ' + escHtml(e.message) + '</p>';
+    var igCards = ['streamingCard'];
+    var msg = '<p style="color:#8b949e">IG Trading API not available.</p><p style="color:#6e7681;font-size:12px;margin-top:8px">If running vanilla <code>openclaw gateway</code>, use <code>.\\start-mechanicus.ps1</code> to enable IG features.</p>';
+    for (var ci = 0; ci < igCards.length; ci++) {
+      var el = document.getElementById(igCards[ci]);
+      if (el) el.innerHTML = msg;
+    }
   });
 }
 

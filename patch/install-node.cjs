@@ -131,7 +131,7 @@ async function main() {
   }
 
   var uiPublic = path.join(appRoot, "ui", "public");
-  var controlUiFiles = ["model-config.html", "model-config.js", "workers.html", "workers.js", "processes.html", "processes.js", "nav-inject.js"];
+  var controlUiFiles = ["model-config.html", "model-config.js", "workers.html", "workers.js", "processes.html", "processes.js", "login.html", "nav-inject.js"];
   if (fs.existsSync(ctrlDir)) {
     console.log("");
     console.log("--- Copying control-ui files to dist/control-ui/ ---");
@@ -153,6 +153,37 @@ async function main() {
       }
     }
     console.log("[+] Copied control files to dist/");
+  }
+
+  console.log("");
+  console.log("--- Patching gateway CSP for local compatibility ---");
+  var gatewayChunks = [];
+  try {
+    var distFiles = fs.readdirSync(distDir);
+    for (var gi = 0; gi < distFiles.length; gi++) {
+      if (distFiles[gi].indexOf("gateway-cli-") === 0 && distFiles[gi].endsWith(".js")) {
+        gatewayChunks.push(path.join(distDir, distFiles[gi]));
+      }
+    }
+  } catch (_) {}
+  for (var gc = 0; gc < gatewayChunks.length; gc++) {
+    var gw = fs.readFileSync(gatewayChunks[gc], "utf8");
+    var changed = false;
+    if (gw.indexOf("\"script-src 'self'\"") !== -1) {
+      gw = gw.replace("\"script-src 'self'\"", "\"script-src 'self' 'unsafe-inline'\"");
+      changed = true;
+    }
+    if (gw.indexOf("\"connect-src 'self' ws: wss:\"") !== -1) {
+      gw = gw.replace("\"connect-src 'self' ws: wss:\"", "\"connect-src 'self' http://127.0.0.1:* http://localhost:* ws: wss:\"");
+      changed = true;
+    }
+    if (changed) {
+      fs.writeFileSync(gatewayChunks[gc], gw);
+      console.log("[+] Patched CSP in: " + path.basename(gatewayChunks[gc]));
+    }
+  }
+  if (gatewayChunks.length === 0) {
+    console.log("[!] No gateway-cli-*.js found in dist/ — CSP not patched");
   }
 
   var htmlTargets = [
@@ -228,12 +259,12 @@ async function main() {
   console.log("  HOW TO START:");
   console.log("    1. Edit your credentials in: " + path.join(appRoot, ".env"));
   console.log("    2. cd \"" + appRoot + "\"");
-  console.log("    3. .\\start-mechanicus.ps1   (or start-mechanicus.bat)");
-  console.log("    4. Wait for '[ceo-proxy] listening on http://localhost:5000'");
-  console.log("    5. Open: http://localhost:5000");
+  console.log("    3. openclaw gateway");
+  console.log("    4. Open: http://localhost:18789");
   console.log("");
-  console.log("  If CEO proxy fails to start, check the log for errors.");
-  console.log("  Common fix: npm install ws pg");
+  console.log("  ALTERNATIVE (with IG trading proxy):");
+  console.log("    3. .\\start-mechanicus.ps1   (or start-mechanicus.bat)");
+  console.log("    4. Open: http://localhost:5000");
   console.log("");
 }
 

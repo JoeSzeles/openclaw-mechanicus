@@ -10,6 +10,12 @@ if (!TOKEN) {
   } catch(e) {}
 }
 
+function escHtml(s) {
+  var d = document.createElement('div');
+  d.appendChild(document.createTextNode(s));
+  return d.innerHTML;
+}
+
 function showToast(msg, type) {
   var t = document.getElementById('toast');
   t.textContent = msg;
@@ -114,27 +120,27 @@ function loadBots() {
         : (b.enabled ? '<span class="badge badge-stopped">STOPPED</span>' : '<span class="badge badge-disabled">DISABLED</span>');
       var checked = b.enabled ? ' checked' : '';
       html += '<tr>';
-      html += '<td style="font-weight:600;color:#e6edf3">' + b.id + '</td>';
+      html += '<td style="font-weight:600;color:#e6edf3">' + escHtml(b.id || '') + '</td>';
       html += '<td>' + statusBadge + '</td>';
-      html += '<td><label class="startup-toggle"><input type="checkbox"' + checked + ' data-startup-id="' + b.id + '"><span class="startup-label">Auto</span></label></td>';
-      html += '<td style="font-family:monospace">' + (b.pid || '-') + '</td>';
-      html += '<td>' + (b.restarts || 0) + '</td>';
-      html += '<td><span class="cmd" title="' + (b.cmd || '').replace(/"/g, '&quot;') + '">' + (b.cmd || '') + '</span></td>';
-      html += '<td style="font-size:12px;color:#8b949e">' + (b.addedBy || '-') + '</td>';
+      html += '<td><label class="startup-toggle"><input type="checkbox"' + checked + ' data-startup-id="' + escHtml(b.id || '') + '"><span class="startup-label">Auto</span></label></td>';
+      html += '<td style="font-family:monospace">' + escHtml(String(b.pid || '-')) + '</td>';
+      html += '<td>' + escHtml(String(b.restarts || 0)) + '</td>';
+      html += '<td><span class="cmd" title="' + escHtml(b.cmd || '') + '">' + escHtml(b.cmd || '') + '</span></td>';
+      html += '<td style="font-size:12px;color:#8b949e">' + escHtml(b.addedBy || '-') + '</td>';
       html += '<td><div class="btn-actions">';
       if (b.running) {
-        html += '<button class="btn-stop" data-bot-id="' + b.id + '" data-action="stop">Stop</button>';
+        html += '<button class="btn-stop" data-bot-id="' + escHtml(b.id || '') + '" data-action="stop">Stop</button>';
       } else {
-        html += '<button class="btn-start" data-bot-id="' + b.id + '" data-action="start">Start</button>';
+        html += '<button class="btn-start" data-bot-id="' + escHtml(b.id || '') + '" data-action="start">Start</button>';
       }
-      html += '<button class="btn-remove" data-bot-id="' + b.id + '" data-action="remove">Remove</button>';
+      html += '<button class="btn-remove" data-bot-id="' + escHtml(b.id || '') + '" data-action="remove">Remove</button>';
       html += '</div></td>';
       html += '</tr>';
     }
     html += '</table>';
     el.innerHTML = html;
   }).catch(function(e) {
-    el.innerHTML = '<p class="empty" style="color:#f85149">Error loading bots: ' + e.message + '</p>';
+    el.innerHTML = '<p class="empty" style="color:#8b949e">Bot management not available. Use <code>.\\start-mechanicus.ps1</code> to enable.</p>';
   });
 }
 
@@ -155,20 +161,21 @@ function loadProcesses() {
     for (var i = 0; i < procs.length; i++) {
       var p = procs[i];
       html += '<tr>';
-      html += '<td style="font-weight:600;color:#e6edf3">' + p.name + '</td>';
-      html += '<td><span class="badge ' + badgeClass(p.type) + '">' + p.type + '</span></td>';
-      html += '<td style="font-family:monospace">' + p.pid + '</td>';
-      html += '<td>' + p.cpu + '%</td>';
-      html += '<td>' + p.mem + '%</td>';
-      html += '<td>' + p.startTime + '</td>';
-      html += '<td><span class="cmd" title="' + p.cmd.replace(/"/g, '&quot;') + '">' + p.cmd + '</span></td>';
-      html += '<td><button class="btn-kill" data-pid="' + p.pid + '" data-name="' + p.name.replace(/"/g, '&quot;') + '">Kill</button></td>';
+      html += '<td style="font-weight:600;color:#e6edf3">' + escHtml(p.name || '') + '</td>';
+      html += '<td><span class="badge ' + badgeClass(p.type) + '">' + escHtml(p.type || '') + '</span></td>';
+      html += '<td style="font-family:monospace">' + escHtml(String(p.pid || '')) + '</td>';
+      html += '<td>' + escHtml(String(p.cpu || 0)) + '%</td>';
+      html += '<td>' + escHtml(String(p.mem || 0)) + '%</td>';
+      html += '<td>' + escHtml(p.startTime || '') + '</td>';
+      html += '<td><span class="cmd" title="' + escHtml(p.cmd || '') + '">' + escHtml(p.cmd || '') + '</span></td>';
+      html += '<td><button class="btn-kill" data-pid="' + escHtml(String(p.pid || '')) + '" data-name="' + escHtml(p.name || '') + '">Kill</button></td>';
       html += '</tr>';
     }
     html += '</table>';
     el.innerHTML = html;
   }).catch(function(e) {
-    el.innerHTML = '<p class="empty" style="color:#f85149">Error loading processes: ' + e.message + '</p>';
+    el.innerHTML = '<p class="empty" style="color:#8b949e">Process management not available. Use <code>.\\start-mechanicus.ps1</code> to enable.</p>';
+    if (countEl) countEl.textContent = '-';
   });
 }
 
