@@ -109,7 +109,7 @@ $pkgJson = Join-Path $OpenClawRoot "package.json"
 $depsNeeded = @()
 if (Test-Path $pkgJson) {
     $pkg = Get-Content $pkgJson -Raw
-    foreach ($dep in @("pg", "ws")) {
+    foreach ($dep in @("pg", "ws", "lightstreamer-client-node")) {
         if ($pkg -notmatch "`"$dep`"") {
             $depsNeeded += $dep
         }

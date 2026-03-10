@@ -107,7 +107,7 @@ echo "[3/3] Checking dependencies..."
 cd "$OPENCLAW_ROOT"
 deps_needed=""
 if [ -f "package.json" ]; then
-  for dep in pg ws; do
+  for dep in pg ws lightstreamer-client-node; do
     if ! grep -q "\"$dep\"" package.json 2>/dev/null; then
       deps_needed="$deps_needed $dep"
     fi
