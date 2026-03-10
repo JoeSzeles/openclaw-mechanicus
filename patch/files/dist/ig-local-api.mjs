@@ -285,6 +285,31 @@ async function routeRequest(req, res, p, m, url) {
       if (pr.password) pr.password = '••••••••';
       if (pr.apiKey) pr.apiKey = pr.apiKey.slice(0, 4) + '••••' + pr.apiKey.slice(-4);
     }
+    const activeProf = getActiveIgProfile();
+    const profName = config.activeProfile || 'demo';
+    const sessionAge = igSession.ts ? Math.floor((Date.now() - igSession.ts) / 1000) : null;
+    const ttlRemaining = igSession.ts ? Math.max(0, 300 - Math.floor((Date.now() - igSession.ts) / 1000)) : null;
+    safe.session = {
+      status: igSession.cst ? 'connected' : (activeProf && activeProf.apiKey ? 'disconnected' : 'not_configured'),
+      error: igSessionError || null,
+      profile: profName,
+      connectedSince: igSession.ts ? new Date(igSession.ts).toISOString() : null,
+      lastRefresh: igSessionLastRefresh ? new Date(igSessionLastRefresh).toISOString() : null,
+      sessionAge: sessionAge,
+      ttlRemaining: ttlRemaining,
+      lightstreamerEndpoint: igSession.lightstreamerEndpoint || null
+    };
+    safe.streaming = {
+      status: 'disconnected',
+      liveStreamingActive: false,
+      streamingSource: 'rest-polling',
+      connectedEpics: [],
+      priceCount: 0,
+      reconnectAttempts: 0,
+      reconnectPending: false,
+      _localMode: true,
+      _hint: 'Live Lightstreamer streaming requires ceo-proxy. Charts use REST price history.'
+    };
     return json(res, 200, safe), true;
   }
 
@@ -793,14 +818,25 @@ async function routeRequest(req, res, p, m, url) {
     if (!epic) return json(res, 400, { error: 'Missing ?epic= parameter' }), true;
     try {
       const session = await igAuth();
+      const cacheKey = `candles:${epic}:${resolution}:${max}`;
+      const cached = igCacheGet(cacheKey);
+      if (cached) return json(res, 200, cached), true;
       let igPath = `/prices/${epic}?resolution=${resolution}&max=${max}&pageSize=${max}`;
       const r = await igRequest('GET', igPath, { ...igHeaders(session), Version: '3' });
       if (r.status === 200) {
         const data = safeParseIgBody(r.body);
-        return json(res, 200, { prices: data.prices || [], instrumentType: 'CURRENCIES', metadata: { size: (data.prices || []).length, source: 'ig-rest' } }), true;
+        const result = { prices: data.prices || [], instrumentType: data.instrumentType || 'CURRENCIES', metadata: { size: (data.prices || []).length, source: 'ig-rest' } };
+        igCacheSet(cacheKey, result);
+        return json(res, 200, result), true;
       }
-    } catch (_) {}
-    return json(res, 200, { prices: [], instrumentType: 'CURRENCIES', metadata: { size: 0, source: 'local-empty' } }), true;
+      const errBody = safeParseIgBody(r.body);
+      const errCode = errBody.errorCode || '';
+      console.log(`[ig-local-api] stream/candles IG error: ${r.status} ${errCode}`);
+      return json(res, 200, { prices: [], instrumentType: 'CURRENCIES', metadata: { size: 0, source: 'ig-error', error: errCode, status: r.status } }), true;
+    } catch (e) {
+      console.log('[ig-local-api] stream/candles exception:', e.message);
+      return json(res, 200, { prices: [], instrumentType: 'CURRENCIES', metadata: { size: 0, source: 'error', error: e.message } }), true;
+    }
   }
 
   if (m === 'GET' && p === '/api/ig/stream/candle-stats') {
@@ -1038,25 +1074,53 @@ async function routeRequest(req, res, p, m, url) {
 
   if (m === 'GET' && p === '/api/ig/scalper') {
     const cfgPath = join(DATA_DIR, 'ig-scalper-config.json');
-    const defaults = { enabled: false, strategies: [], riskPerTrade: 1, maxConcurrentTrades: 3, cooldownSeconds: 60 };
+    const defaults = { enabled: false, strategies: [], riskPerTrade: 1, maxConcurrentTrades: 3, cooldownSeconds: 60, budget: 0, maxDrawdown: 0, maxMarginPct: 0, breakEvenBuffer: 0 };
     return json(res, 200, loadJsonFile(cfgPath, defaults)), true;
   }
 
   if (m === 'PUT' && p === '/api/ig/scalper') {
     let body; try { body = JSON.parse((await readBody(req)).toString() || '{}'); } catch (_) { return json(res, 400, { error: 'Invalid JSON' }), true; }
     const cfgPath = join(DATA_DIR, 'ig-scalper-config.json');
-    const defaults = { enabled: false, strategies: [], riskPerTrade: 1, maxConcurrentTrades: 3, cooldownSeconds: 60 };
+    const defaults = { enabled: false, strategies: [], riskPerTrade: 1, maxConcurrentTrades: 3, cooldownSeconds: 60, budget: 0, maxDrawdown: 0, maxMarginPct: 0, breakEvenBuffer: 0 };
     const cfg = loadJsonFile(cfgPath, defaults);
-    if (body.riskPerTrade !== undefined) cfg.riskPerTrade = Number(body.riskPerTrade);
-    if (body.maxConcurrentTrades !== undefined) cfg.maxConcurrentTrades = Number(body.maxConcurrentTrades);
-    if (body.cooldownSeconds !== undefined) cfg.cooldownSeconds = Number(body.cooldownSeconds);
+    const numFields = ['riskPerTrade','maxConcurrentTrades','cooldownSeconds','budget','maxDrawdown','maxMarginPct','breakEvenBuffer'];
+    for (const f of numFields) { if (body[f] !== undefined) cfg[f] = Number(body[f]); }
     if (body.enabled !== undefined) cfg.enabled = !!body.enabled;
     saveJsonFile(cfgPath, cfg);
     return json(res, 200, { ok: true, ...cfg }), true;
   }
 
   if (m === 'GET' && p === '/api/ig/scalper/status') {
-    return json(res, 200, { running: false, _localMode: true, message: 'Scalper engine requires ceo-proxy for real-time execution', activeTrades: [], stats: { totalTrades: 0, winRate: 0, profitLoss: 0 } }), true;
+    const cfgPath = join(DATA_DIR, 'ig-scalper-config.json');
+    const defaults = { enabled: false, strategies: [], riskPerTrade: 1, maxConcurrentTrades: 3, cooldownSeconds: 60, budget: 0, maxDrawdown: 0, maxMarginPct: 0, breakEvenBuffer: 0 };
+    const cfg = loadJsonFile(cfgPath, defaults);
+    const tradesPath = join(DATA_DIR, 'ig-scalper-trades.json');
+    const tradesData = loadJsonFile(tradesPath, { trades: [] });
+    const trades = tradesData.trades || [];
+    const closedTrades = trades.filter(t => t.type === 'CLOSE' || t.exitPrice != null);
+    const wins = closedTrades.filter(t => (t.pnl || 0) > 0);
+    const losses = closedTrades.filter(t => (t.pnl || 0) <= 0);
+    const totalPnl = closedTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+    const winRate = closedTrades.length > 0 ? Math.round((wins.length / closedTrades.length) * 100) : 0;
+    const strategies = (cfg.strategies || []).map((s, i) => ({
+      id: i, name: s.name || s.instrument || 'Strategy ' + i,
+      instrument: s.instrument || '', strategyType: s.type || s.strategyType || 'claw-trader',
+      direction: s.direction || 'BOTH', timeframe: s.timeframe || 'MINUTE',
+      size: s.size || 1, stopDistance: s.stopDistance || 'auto', limitDistance: s.limitDistance || 'auto',
+      cooldownMs: (s.cooldownMs || s.cooldownSeconds * 1000 || 6000),
+      profitTarget: s.profitTarget || 0, trailingStop: s.trailingStop || 0,
+      enabled: s.enabled !== undefined ? s.enabled : false, params: s.params || {}
+    }));
+    return json(res, 200, {
+      running: false, enabled: cfg.enabled || false, _localMode: true,
+      openPositions: 0, drawdownTripped: false,
+      realizedPnl: totalPnl, tradeCount: closedTrades.length,
+      winCount: wins.length, lossCount: losses.length, winRate: winRate,
+      budget: cfg.budget || 0, maxDrawdown: cfg.maxDrawdown || 0,
+      maxMarginPct: cfg.maxMarginPct || 0, breakEvenBuffer: cfg.breakEvenBuffer || 0,
+      strategies: strategies, allTrades: trades.slice(-100).reverse(),
+      recentTrades: trades.slice(-20).reverse()
+    }), true;
   }
 
   if (m === 'POST' && p === '/api/ig/scalper/start') {
@@ -1068,6 +1132,8 @@ async function routeRequest(req, res, p, m, url) {
   }
 
   if (m === 'POST' && p === '/api/ig/scalper/reset') {
+    const tradesPath = join(DATA_DIR, 'ig-scalper-trades.json');
+    saveJsonFile(tradesPath, { trades: [] });
     return json(res, 200, { ok: true, reset: true }), true;
   }
 
@@ -1080,16 +1146,23 @@ async function routeRequest(req, res, p, m, url) {
   if (m === 'POST' && p === '/api/ig/scalper/strategies') {
     let body; try { body = JSON.parse((await readBody(req)).toString() || '{}'); } catch (_) { return json(res, 400, { error: 'Invalid JSON' }), true; }
     const cfgPath = join(DATA_DIR, 'ig-scalper-config.json');
-    const defaults = { enabled: false, strategies: [], riskPerTrade: 1, maxConcurrentTrades: 3, cooldownSeconds: 60 };
+    const defaults = { enabled: false, strategies: [], riskPerTrade: 1, maxConcurrentTrades: 3, cooldownSeconds: 60, budget: 0, maxDrawdown: 0, maxMarginPct: 0, breakEvenBuffer: 0 };
     const cfg = loadJsonFile(cfgPath, defaults);
     if (!Array.isArray(cfg.strategies)) cfg.strategies = [];
     const strat = {
-      instrument: body.instrument || '',
-      name: body.name || body.instrument || 'New Strategy',
-      type: body.type || 'ema-crossover',
+      instrument: body.instrument || '', name: body.name || body.instrument || 'New Strategy',
+      strategyType: body.strategyType || body.type || 'claw-trader',
       enabled: body.enabled !== undefined ? !!body.enabled : false,
-      size: Number(body.size) || 1,
-      params: body.params || {},
+      direction: body.direction || 'BOTH', timeframe: body.timeframe || 'MINUTE',
+      size: Number(body.size) || 1, stopDistance: body.stopDistance, limitDistance: body.limitDistance,
+      minMomentumPct: body.minMomentumPct || 0.03, cooldownMs: body.cooldownMs || 6000,
+      tickWindow: body.tickWindow || 15, maxOpenPositions: body.maxOpenPositions || 2,
+      minSize: body.minSize || 0.5, maxSize: body.maxSize || 10,
+      profitTarget: body.profitTarget || 0, trailingStop: body.trailingStop || 0,
+      warmupMs: body.warmupMs || 60000, params: body.params || {},
+      rsiEnabled: body.rsiEnabled, rsiPeriod: body.rsiPeriod, rsiOverbought: body.rsiOverbought, rsiOversold: body.rsiOversold,
+      emaEnabled: body.emaEnabled, emaShort: body.emaShort, emaLong: body.emaLong,
+      macdEnabled: body.macdEnabled, macdFast: body.macdFast, macdSlow: body.macdSlow, macdSignal: body.macdSignal
     };
     cfg.strategies.push(strat);
     saveJsonFile(cfgPath, cfg);
@@ -1116,12 +1189,14 @@ async function routeRequest(req, res, p, m, url) {
     const cfg = loadJsonFile(cfgPath, { strategies: [] });
     if (!cfg.strategies || idx < 0 || idx >= cfg.strategies.length) return json(res, 400, { error: 'Invalid index' }), true;
     const s = cfg.strategies[idx];
-    if (body.name !== undefined) s.name = body.name;
+    const stratFields = ['name','enabled','size','type','strategyType','instrument','direction','timeframe',
+      'stopDistance','limitDistance','minMomentumPct','cooldownMs','tickWindow','maxOpenPositions',
+      'minSize','maxSize','profitTarget','trailingStop','warmupMs',
+      'rsiEnabled','rsiPeriod','rsiOverbought','rsiOversold',
+      'emaEnabled','emaShort','emaLong',
+      'macdEnabled','macdFast','macdSlow','macdSignal','params'];
+    for (const f of stratFields) { if (body[f] !== undefined) s[f] = body[f]; }
     if (body.enabled !== undefined) s.enabled = !!body.enabled;
-    if (body.size !== undefined) s.size = Number(body.size);
-    if (body.type !== undefined) s.type = body.type;
-    if (body.instrument !== undefined) s.instrument = body.instrument;
-    if (body.params !== undefined) s.params = body.params;
     saveJsonFile(cfgPath, cfg);
     return json(res, 200, { ok: true, index: idx, strategy: s }), true;
   }

@@ -153,14 +153,36 @@ All trade types verified on IG demo account (Silver CFD — CS.D.CFASILVER.CFA.I
 - **SELL to open (short)** — `dealStatus: ACCEPTED`, short position opened
 - **BUY to close (cover short)** — `dealStatus: ACCEPTED`, short position fully closed
 
+### Config Page (Session & Streaming)
+
+The config page displays API Session status and Streaming Status. The local API now includes `session` and `streaming` objects in the `GET /api/ig/config` response:
+
+- **Session**: Shows `connected`/`disconnected`/`not_configured`, profile name, session age, TTL remaining, last refresh time, and Lightstreamer endpoint
+- **Streaming**: Shows `disconnected` in local mode (Lightstreamer requires CEO proxy), with source set to `rest-polling`
+
+The session auto-connects when any IG API call is made (positions, markets, etc.).
+
+### Claw Trader Bot
+
+All Claw Trader CRUD operations work in local mode:
+
+- **Add/edit/delete strategies** with full field support (direction, timeframe, size, stop/limit, indicators, RSI/EMA/MACD params)
+- **Engine settings** (budget, max drawdown, max margin %, break-even buffer)
+- **Strategy toggle** (enable/disable individual strategies)
+- **Reset stats** (clears trade history)
+- **Template loading** from strategy-templates
+- **Start/stop** returns a helpful message (real-time execution requires CEO proxy)
+
+Stats display correctly: Realized P&L, trade count (W/L), win rate, all from the local trade history file.
+
 ### Known Limitations
 
-- **Price history** may return `exceeded-account-historical-data-allowance` on demo accounts (IG rate limit)
+- **Price history / chart data** may return `exceeded-account-historical-data-allowance` on demo accounts (IG rate limit, resets after a few hours)
 - **Market navigation** returns 500 from IG API on some demo accounts
 - **Activity endpoint** requires `?from=` date parameter (e.g., `?from=2026-03-01T00:00:00`)
-- **Streaming** (Lightstreamer live prices) requires the CEO proxy — local mode returns status stubs
+- **Streaming** (Lightstreamer live prices) requires the CEO proxy — local mode uses REST price history for charts
 - **ClawScript compile/run/AI** execution requires the CEO proxy — local mode returns helpful stubs
-- **Scalper engine start/stop** requires the CEO proxy — local mode returns status info
+- **Scalper engine start/stop** requires the CEO proxy — local mode manages config/strategies/trades locally
 
 ### Config API Compatibility
 
