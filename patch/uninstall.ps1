@@ -11,10 +11,10 @@ Write-Host ""
 function Find-OpenClaw {
     param([string]$Hint)
     if ($Hint -and (Test-Path $Hint)) { return (Resolve-Path $Hint).Path }
-    $home = $env:USERPROFILE
-    if (-not $home) { $home = $env:HOME }
+    $userHome = $env:USERPROFILE
+    if (-not $userHome) { $userHome = $HOME }
     $candidates = @(
-        (Join-Path $home "openclaw"),
+        (Join-Path $userHome "openclaw"),
         (Join-Path "." "openclaw"),
         "."
     )
