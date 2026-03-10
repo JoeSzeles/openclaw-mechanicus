@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 var https = require("https");
 var fs = require("fs");
 var path = require("path");
@@ -10,26 +10,41 @@ var FILES_LIST = ["AGENTS.md", "ceo-proxy.cjs", "clawscript-installer/docs/claws
 
 function detectOpenClaw() {
   var home = os.homedir();
-  var candidates = [
-    path.join(process.env.APPDATA || "", "npm", "node_modules", "openclaw"),
+  var candidates = [];
+  if (process.env.APPDATA) {
+    candidates.push(path.join(process.env.APPDATA, "npm", "node_modules", "openclaw"));
+  }
+  candidates.push(
     path.join(home, "openclaw"),
     path.join(home, ".openclaw"),
     path.resolve(".")
-  ];
+  );
   for (var i = 0; i < candidates.length; i++) {
-    if (fs.existsSync(path.join(candidates[i], "package.json"))) return path.resolve(candidates[i]);
+    var c = candidates[i];
+    if (fs.existsSync(c) && fs.existsSync(path.join(c, "package.json"))) {
+      return path.resolve(c);
+    }
   }
   return null;
 }
 
-function ensureDir(d) { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); }
+function ensureDir(d) {
+  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+}
 
 function download(url) {
   return new Promise(function(resolve, reject) {
     https.get(url, function(res) {
-      if (res.statusCode === 301 || res.statusCode === 302) return download(res.headers.location).then(resolve, reject);
-      if (res.statusCode !== 200) { res.resume(); return reject(new Error("HTTP " + res.statusCode)); }
-      var ch = []; res.on("data", function(c) { ch.push(c); }); res.on("end", function() { resolve(Buffer.concat(ch)); });
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        return download(res.headers.location).then(resolve, reject);
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        return reject(new Error("HTTP " + res.statusCode));
+      }
+      var ch = [];
+      res.on("data", function(c) { ch.push(c); });
+      res.on("end", function() { resolve(Buffer.concat(ch)); });
     }).on("error", reject);
   });
 }
@@ -37,44 +52,108 @@ function download(url) {
 async function main() {
   console.log("");
   console.log("[!] OpenClaw Mechanicus Installer v" + VERSION);
+  console.log("    ========================================");
+
   var root = detectOpenClaw();
-  if (!root) { console.error("[X] OpenClaw not found. Run from your OpenClaw folder."); process.exit(1); }
+  if (!root) {
+    console.error("[X] OpenClaw not found.");
+    console.error("    Run this from your OpenClaw directory, or set APPDATA.");
+    process.exit(1);
+  }
+
   console.log("[+] Target: " + root);
-  console.log("[+] Downloading " + FILES_LIST.length + " files...");
+  console.log("[+] Files to install: " + FILES_LIST.length);
   console.log("");
-  var ok = 0, fail = 0;
+
+  var ok = 0;
+  var fail = 0;
+  var failList = [];
+
   for (var i = 0; i < FILES_LIST.length; i++) {
     var rel = FILES_LIST[i];
+    var url = REPO_BASE + encodeURIComponent(rel).replace(/%2F/g, "/");
     var dstPath = path.join(root, rel);
     ensureDir(path.dirname(dstPath));
     try {
-      var data = await download(REPO_BASE + rel);
+      var data = await download(url);
       fs.writeFileSync(dstPath, data);
       var sz = fs.statSync(dstPath).size;
-      if (sz > 0) { console.log("[OK] " + rel + " (" + sz + "b)"); ok++; }
-      else { throw new Error("Empty file"); }
-    } catch(e) { console.log("[FAIL] " + rel + " - " + e.message); fail++; }
-  }
-  var idx = path.join(root, "index.html");
-  if (fs.existsSync(idx)) {
-    var html = fs.readFileSync(idx, "utf8");
-    if (html.indexOf("nav-inject.js") === -1) {
-      html = html.replace("</body>", '<script src="/nav-inject.js"></script></body>');
-      fs.writeFileSync(idx, html);
-      console.log("");
-      console.log("[+] Navigation injected into index.html");
+      if (sz > 0) {
+        console.log("[OK]   " + rel + " (" + sz + "b)");
+        ok++;
+      } else {
+        throw new Error("Empty file");
+      }
+    } catch (e) {
+      console.log("[FAIL] " + rel + " - " + e.message);
+      fail++;
+      failList.push(rel);
     }
   }
+
+  // Patch index.html for navigation bar
+  var indexFiles = [
+    path.join(root, "index.html"),
+    path.join(root, "dist", "index.html")
+  ];
+  for (var ix = 0; ix < indexFiles.length; ix++) {
+    var idx = indexFiles[ix];
+    if (fs.existsSync(idx)) {
+      var html = fs.readFileSync(idx, "utf8");
+      if (html.indexOf("nav-inject.js") === -1) {
+        html = html.replace("</head>", '<script src="/nav-inject.js" defer></script></head>');
+        if (html.indexOf("nav-inject.js") === -1) {
+          html = html.replace("</body>", '<script src="/nav-inject.js"></script></body>');
+        }
+        fs.writeFileSync(idx, html);
+        console.log("[+] Patched: " + idx);
+      } else {
+        console.log("[=] Already patched: " + idx);
+      }
+    }
+  }
+
+  // Also copy nav-inject.js to dist/
+  var navSrc = path.join(root, "ui", "public", "nav-inject.js");
+  var navDst = path.join(root, "dist", "nav-inject.js");
+  if (fs.existsSync(navSrc) && fs.existsSync(path.join(root, "dist"))) {
+    fs.copyFileSync(navSrc, navDst);
+    console.log("[+] Copied nav-inject.js to dist/");
+  }
+
   console.log("");
   console.log("========================================");
-  console.log("  INSTALLED: " + ok + " files");
-  console.log("  FAILED:    " + fail + " files");
-  if (fail === 0) console.log("  STATUS:    ALL FILES VERIFIED");
-  else console.log("  STATUS:    ERRORS DETECTED");
+  console.log("  INSTALLED:  " + ok + " files");
+  console.log("  FAILED:     " + fail + " files");
+  if (fail === 0) {
+    console.log("  STATUS:     ALL " + ok + " FILES VERIFIED");
+  } else {
+    console.log("  STATUS:     ERRORS DETECTED");
+    console.log("  Failed files:");
+    for (var f = 0; f < failList.length; f++) {
+      console.log("    - " + failList[f]);
+    }
+  }
   console.log("========================================");
   console.log("");
-  console.log("[!] Run: npm install pg lightstreamer-client-node");
-  console.log("[!] Then restart OpenClaw.");
+
+  // Check deps
+  var pkgPath = path.join(root, "package.json");
+  if (fs.existsSync(pkgPath)) {
+    var pkg = fs.readFileSync(pkgPath, "utf8");
+    var missing = [];
+    if (pkg.indexOf('"pg"') === -1) missing.push("pg");
+    if (pkg.indexOf('"lightstreamer-client-node"') === -1) missing.push("lightstreamer-client-node");
+    if (missing.length > 0) {
+      console.log("[!] Missing dependencies: " + missing.join(", "));
+      console.log("    Run: npm install " + missing.join(" "));
+    } else {
+      console.log("[+] All dependencies present.");
+    }
+  }
+
+  console.log("");
+  console.log("[!] Restart OpenClaw and hard-refresh your browser (Ctrl+F5).");
   console.log("");
 }
 
