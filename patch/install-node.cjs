@@ -223,6 +223,31 @@ async function main() {
   }
 
   console.log("");
+  console.log("--- Stripping token-init.js references from all HTML files ---");
+  var tokenInitDirs = [ctrlDir, distDir, path.join(appRoot, "ui", "public")];
+  var homeDir = process.env.USERPROFILE || process.env.HOME || os.homedir();
+  var ocCanvasDir = path.join(homeDir, ".openclaw", "canvas");
+  if (fs.existsSync(ocCanvasDir)) tokenInitDirs.push(ocCanvasDir);
+  var tokenStripped = 0;
+  for (var td = 0; td < tokenInitDirs.length; td++) {
+    try {
+      var dirFiles = fs.readdirSync(tokenInitDirs[td]);
+      for (var tf = 0; tf < dirFiles.length; tf++) {
+        if (!dirFiles[tf].endsWith(".html")) continue;
+        var htmlPath = path.join(tokenInitDirs[td], dirFiles[tf]);
+        var htmlContent = fs.readFileSync(htmlPath, "utf8");
+        if (htmlContent.indexOf("token-init") !== -1) {
+          htmlContent = htmlContent.replace(/<script[^>]*token-init[^>]*><\/script>\n?/g, "");
+          fs.writeFileSync(htmlPath, htmlContent);
+          tokenStripped++;
+          console.log("[+] Stripped token-init.js from: " + dirFiles[tf]);
+        }
+      }
+    } catch(_) {}
+  }
+  if (tokenStripped === 0) console.log("[+] No token-init.js references found (clean)");
+
+  console.log("");
   console.log("========================================");
   console.log("  INSTALLED:  " + ok + " files");
   console.log("  FAILED:     " + fail + " files");
