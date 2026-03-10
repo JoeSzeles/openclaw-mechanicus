@@ -6,17 +6,18 @@ var os = require("os");
 
 var REPO_BASE = "https://raw.githubusercontent.com/JoeSzeles/openclaw-mechanicus-patches/main/files/";
 var VERSION = "2026.3.11";
-var FILES_LIST = ["AGENTS.md", "ceo-proxy.cjs", "clawscript-installer/docs/clawscript-docs.html", "clawscript-installer/docs/CLAWSCRIPT.md", "clawscript-installer/editor/clawscript-editor.html", "clawscript-installer/editor/ig-clawscript-flow.js", "clawscript-installer/editor/ig-clawscript-ui.js", "clawscript-installer/examples/custom-btctest-strategy.cjs", "clawscript-installer/.gitignore", "clawscript-installer/install-node.cjs", "clawscript-installer/install.ps1", "clawscript-installer/install.sh", "clawscript-installer/lib/clawscript-ai-handler.cjs", "clawscript-installer/lib/clawscript-parser.cjs", "clawscript-installer/lib/indicators.cjs", "clawscript-installer/lib/openclaw-automation.cjs", "clawscript-installer/lib/openclaw-ext.cjs", "clawscript-installer/lib/openclaw/openclaw-ai.cjs", "clawscript-installer/lib/openclaw/openclaw-automation.cjs", "clawscript-installer/lib/openclaw/openclaw-channels.cjs", "clawscript-installer/lib/openclaw/openclaw-chat.cjs", "clawscript-installer/lib/openclaw/openclaw-data.cjs", "clawscript-installer/lib/openclaw/openclaw-nomad.cjs", "clawscript-installer/lib/openclaw/openclaw-tools.cjs", "clawscript-installer/lib/test-clawscript-pipeline.cjs", "clawscript-installer/LICENSE", "clawscript-installer/package.json", "clawscript-installer/README.md", "clawscript-installer/screenshots/clawscript-flow-builder.png", "clawscript-installer/screenshots/clawscript-full-editor.png", "clawscript-installer/screenshots/clawscript-simulation.png", "clawscript-installer/serve.cjs", "clawscript-installer/strategies/base-strategy.cjs", "clawscript-installer/strategies/index.cjs", "clawscript-installer/sync-and-push.sh", "clawscript-installer/templates/bourse-trackers.cs", "clawscript-installer/templates/btc-scalper.cs", "clawscript-installer/templates/ema-crossover.cs", "clawscript-installer/templates/mean-reversion.cs", "clawscript-installer/templates/multi-indicator.cs", "clawscript-installer/templates/rsi-simple.cs", "clawscript-installer/templates/sentiment-scan.cs", "clawscript-installer/test/test-clawscript-parser.cjs", "clawscript-installer/test/test-clawscript-pipeline.cjs", "clawscript-installer/uninstall.ps1", "clawscript-installer/uninstall.sh", "clawscript-installer/update.ps1", "clawscript-installer/update.sh", "clawscript-installer/VERSION", "docs/IG_TRADING_SETUP.md", "docs/images/backtest-chart.png", "docs/images/ig-bot-status.png", "docs/images/ig-dashboard.png", "docs/images/ig-skills.png", "docs/images/processes-bots.png", "docs/reference/templates/AGENTS.md", "docs/reference/templates/BOOTSTRAP.md", "docs/reference/templates/TOOLS.md", ".openclaw/canvas/all-scalper-trades-data.json", ".openclaw/canvas/all-scalper-trades.html", ".openclaw/canvas/binance-test.html", ".openclaw/canvas/chat-clawscript-editor.html", ".openclaw/canvas/clawscript-docs.html", ".openclaw/canvas/clawscript-editor.html", ".openclaw/canvas/clawscript-logbook.html", ".openclaw/canvas/gann-bot-status.html", ".openclaw/canvas/gold-backtest.html", ".openclaw/canvas/ig-alerts-snapshot.json", ".openclaw/canvas/ig-backtest-ui.js", ".openclaw/canvas/ig-bot-log-snapshot.json", ".openclaw/canvas/ig-bot-status.html", ".openclaw/canvas/ig-clawscript-flow.js", ".openclaw/canvas/ig-clawscript-ui.js", ".openclaw/canvas/ig-config-ui.js", ".openclaw/canvas/ig-dashboard.html", ".openclaw/canvas/ig-dashboard-snapshot.json", ".openclaw/canvas/ig-history-ui.js", ".openclaw/canvas/ig-live-prices.js", ".openclaw/canvas/ig-logs-settings-ui.js", ".openclaw/canvas/ig-monitor-config-snapshot.json", ".openclaw/canvas/ig-price-history.json", ".openclaw/canvas/ig-scalper-config-snapshot.json", ".openclaw/canvas/ig-scalper-ui.js", ".openclaw/canvas/ig-strategy-manager.js", ".openclaw/canvas/ig-strategy-snapshot.json", ".openclaw/canvas/ig-verify-log.json", ".openclaw/canvas/index.html", ".openclaw/canvas/lightweight-charts.js", ".openclaw/canvas/manifest.json", ".openclaw/canvas/metamask-connect.html", ".openclaw/canvas/metamask-skill.html", ".openclaw/canvas/trade-results.html", ".openclaw/canvas/trades-test.html", ".openclaw/canvas/wdk-skill.html", "openclaw.json", ".openclaw/workspace-ig/AGENTS.md", ".openclaw/workspace-ig/api-config.json", ".openclaw/workspace-ig/BOOTSTRAP.md", ".openclaw/workspace-ig/BRAINSTORM.md", ".openclaw/workspace-ig/canvas/chart.min.js", ".openclaw/workspace-ig/canvas/gann-bot-status.html", ".openclaw/workspace-ig/CLAWSCRIPT-RULES.md", ".openclaw/workspace-ig/config.json", ".openclaw/workspace-ig/dashboard.json", ".openclaw/workspace-ig/fetch_data.sh", ".openclaw/workspace-ig/get_ig_account.sh", ".openclaw/workspace-ig/headers.txt", ".openclaw/workspace-ig/HEARTBEAT.md", ".openclaw/workspace-ig/IDENTITY.md", ".openclaw/workspace-ig/ig_prices.sh", ".openclaw/workspace-ig/IG_TRADING.md", ".openclaw/workspace-ig/market.json", ".openclaw/workspace-ig/.openclaw/canvas/gann-bot-status.html", ".openclaw/workspace-ig/.openclaw/canvas/ig-bot-status.html", ".openclaw/workspace-ig/.openclaw/canvas/ig-strategy-snapshot.json", ".openclaw/workspace-ig/.openclaw/canvas/manifest.json", ".openclaw/workspace-ig/.openclaw/cookies.txt", ".openclaw/workspace-ig/.openclaw/ig-config.json", ".openclaw/workspace-ig/.openclaw/ig-monitor-config.json", ".openclaw/workspace-ig/.openclaw/ig-strategy.json", ".openclaw/workspace-ig/.openclaw/workspace-state.json", ".openclaw/workspace-ig/PROREALTIME_CODE_RULES.md", ".openclaw/workspace-ig/skills/clawscript/SKILL.md", ".openclaw/workspace-ig/SKILLS-IG.md", ".openclaw/workspace-ig/SOUL.md", ".openclaw/workspace-ig/status.json", ".openclaw/workspace-ig/STRATEGIES.md", ".openclaw/workspace-ig/TOOLS.md", ".openclaw/workspace-ig/trades.json", ".openclaw/workspace-ig/USER.md", ".openclaw/workspace-ig/WARSTRATEGY.md", "README.md", "skills/binance-btc-feed/references/binance-ws-api.md", "skills/binance-btc-feed/scripts/binance-ws.cjs", "skills/binance-btc-feed/SKILL.md", "skills/binance-stream/references/binance-streams.md", "skills/binance-stream/scripts/multi-ws.cjs", "skills/binance-stream/SKILL.md", "skills/bots/binance-receiver.cjs", "skills/bots/clawscript-parser.cjs", "skills/bots/clawscript-runner.cjs", "skills/bots/ig-optimization-agent.cjs", "skills/bots/ig-scalper-backtest.cjs", "skills/bots/ig-scalper-db.cjs", "skills/bots/ig-scalper-engine.cjs", "skills/bots/ig-signal-monitor.cjs", "skills/bots/ig-trading-bot.cjs", "skills/bots/indicators.cjs", "skills/bots/openclaw-ai.cjs", "skills/bots/openclaw-automation.cjs", "skills/bots/openclaw-channels.cjs", "skills/bots/openclaw-chat.cjs", "skills/bots/openclaw-data.cjs", "skills/bots/openclaw-nomad.cjs", "skills/bots/openclaw-tools.cjs", "skills/bots/strategies/arbitrage-scalper-strategy.cjs", "skills/bots/strategies/base-strategy.cjs", "skills/bots/strategies/breakout-strategy.cjs", "skills/bots/strategies/carry-trade-strategy.cjs", "skills/bots/strategies/custom-bourse-index-trackers-strategy-strategy.cjs", "skills/bots/strategies/custom-btctest-strategy.cjs", "skills/bots/strategies/donchian-trend-strategy.cjs", "skills/bots/strategies/grid-trader-strategy.cjs", "skills/bots/strategies/hybrid-ml-strategy.cjs", "skills/bots/strategies/index.cjs", "skills/bots/strategies/market-making-strategy.cjs", "skills/bots/strategies/mean-reversion-strategy.cjs", "skills/bots/strategies/momentum-scalper-strategy.cjs", "skills/bots/strategies/news-spike-strategy.cjs", "skills/bots/strategies/options-linked-strategy.cjs", "skills/bots/strategies/pairs-trading-strategy.cjs", "skills/bots/strategies/portfolio-optimizer-strategy.cjs", "skills/bots/strategies/position-trading-strategy.cjs", "skills/bots/strategies/scalper-strategy.cjs", "skills/bots/strategies/seasonal-trader-strategy.cjs", "skills/bots/strategies/sentiment-trader-strategy.cjs", "skills/bots/strategies/swing-trading-strategy.cjs", "skills/bots/strategies/trend-following-strategy.cjs", "skills/bots/strategies/value-investing-strategy.cjs", "skills/bots/strategies/volatility-breakout-strategy.cjs", "skills/bots/test-btctest-strategy.cjs", "skills/bots/test-clawscript-parser.cjs", "skills/bots/test-clawscript-pipeline.cjs", "skills/bots/trade-claw-engine.cjs", "skills/clawscript/CLAWSCRIPT-AI-REFERENCE.md", "skills/clawscript/CLAWSCRIPT.md", "skills/clawscript/STRATEGY-PERFORMANCE-RULEBOOK.md", "skills/clawscript/TRADING-BOT-RULEBOOK.md", "skills/ig-backtest/backtest.cjs", "skills/ig-backtest/SKILL.md", "skills/ig-market-data/SKILL.md", "skills/ig-signal-monitor/SKILL.md", "skills/ig-trade-verify/SKILL.md", "skills/ig-trading-bot/SKILL.md", "skills/ig-trading/IG-COMMANDS.md", "skills/ig-trading/IG-PL-CALCULATION.md", "skills/ig-trading/SKILL.md", "skills/medallion-fund/dashboard/index.html", "skills/medallion-fund/SKILL.md", "skills/openclaw-ext.cjs", "skills/prorealtime-ig-adapter/SKILL.md", "src/auto-reply/reply/inbound-meta.ts", "src/gateway/control-ui-csp.ts", "start.sh", "ui/public/login.html", "ui/public/model-config.html", "ui/public/model-config.js", "ui/public/nav-inject.js", "ui/public/processes.html", "ui/public/processes.js", "ui/public/workers.html", "ui/public/workers.js", "ui/src/styles/chat/grouped.css", "ui/src/styles/chat/layout.css", "ui/src/styles/chat/text.css", "ui/src/ui/app-render.ts", "ui/src/ui/app.ts", "ui/src/ui/chat/grouped-render.ts", "ui/src/ui/controllers/chat.ts", "ui/src/ui/icons.ts", "ui/src/ui/markdown.ts", "ui/src/ui/views/chat.ts", "ui/src/ui/voice/voice-manager.ts", "start-mechanicus.bat", "start-mechanicus.ps1"];
+
+var HOME_FILES = [".openclaw/canvas/all-scalper-trades-data.json", ".openclaw/canvas/all-scalper-trades.html", ".openclaw/canvas/binance-test.html", ".openclaw/canvas/chat-clawscript-editor.html", ".openclaw/canvas/clawscript-docs.html", ".openclaw/canvas/clawscript-editor.html", ".openclaw/canvas/clawscript-logbook.html", ".openclaw/canvas/gann-bot-status.html", ".openclaw/canvas/gold-backtest.html", ".openclaw/canvas/ig-alerts-snapshot.json", ".openclaw/canvas/ig-backtest-ui.js", ".openclaw/canvas/ig-bot-log-snapshot.json", ".openclaw/canvas/ig-bot-status.html", ".openclaw/canvas/ig-clawscript-flow.js", ".openclaw/canvas/ig-clawscript-ui.js", ".openclaw/canvas/ig-config-ui.js", ".openclaw/canvas/ig-dashboard.html", ".openclaw/canvas/ig-dashboard-snapshot.json", ".openclaw/canvas/ig-history-ui.js", ".openclaw/canvas/ig-live-prices.js", ".openclaw/canvas/ig-logs-settings-ui.js", ".openclaw/canvas/ig-monitor-config-snapshot.json", ".openclaw/canvas/ig-price-history.json", ".openclaw/canvas/ig-scalper-config-snapshot.json", ".openclaw/canvas/ig-scalper-ui.js", ".openclaw/canvas/ig-strategy-manager.js", ".openclaw/canvas/ig-strategy-snapshot.json", ".openclaw/canvas/ig-verify-log.json", ".openclaw/canvas/index.html", ".openclaw/canvas/lightweight-charts.js", ".openclaw/canvas/manifest.json", ".openclaw/canvas/metamask-connect.html", ".openclaw/canvas/metamask-skill.html", ".openclaw/canvas/trade-results.html", ".openclaw/canvas/trades-test.html", ".openclaw/canvas/wdk-skill.html", ".openclaw/workspace-ig/AGENTS.md", ".openclaw/workspace-ig/api-config.json", ".openclaw/workspace-ig/BOOTSTRAP.md", ".openclaw/workspace-ig/BRAINSTORM.md", ".openclaw/workspace-ig/canvas/chart.min.js", ".openclaw/workspace-ig/canvas/gann-bot-status.html", ".openclaw/workspace-ig/CLAWSCRIPT-RULES.md", ".openclaw/workspace-ig/config.json", ".openclaw/workspace-ig/dashboard.json", ".openclaw/workspace-ig/fetch_data.sh", ".openclaw/workspace-ig/get_ig_account.sh", ".openclaw/workspace-ig/headers.txt", ".openclaw/workspace-ig/HEARTBEAT.md", ".openclaw/workspace-ig/IDENTITY.md", ".openclaw/workspace-ig/ig_prices.sh", ".openclaw/workspace-ig/IG_TRADING.md", ".openclaw/workspace-ig/market.json", ".openclaw/workspace-ig/.openclaw/canvas/gann-bot-status.html", ".openclaw/workspace-ig/.openclaw/canvas/ig-bot-status.html", ".openclaw/workspace-ig/.openclaw/canvas/ig-strategy-snapshot.json", ".openclaw/workspace-ig/.openclaw/canvas/manifest.json", ".openclaw/workspace-ig/.openclaw/cookies.txt", ".openclaw/workspace-ig/.openclaw/ig-config.json", ".openclaw/workspace-ig/.openclaw/ig-monitor-config.json", ".openclaw/workspace-ig/.openclaw/ig-strategy.json", ".openclaw/workspace-ig/.openclaw/workspace-state.json", ".openclaw/workspace-ig/PROREALTIME_CODE_RULES.md", ".openclaw/workspace-ig/skills/clawscript/SKILL.md", ".openclaw/workspace-ig/SKILLS-IG.md", ".openclaw/workspace-ig/SOUL.md", ".openclaw/workspace-ig/status.json", ".openclaw/workspace-ig/STRATEGIES.md", ".openclaw/workspace-ig/TOOLS.md", ".openclaw/workspace-ig/trades.json", ".openclaw/workspace-ig/USER.md", ".openclaw/workspace-ig/WARSTRATEGY.md"];
+var APP_FILES = ["AGENTS.md", "ceo-proxy.cjs", "clawscript-installer/docs/clawscript-docs.html", "clawscript-installer/docs/CLAWSCRIPT.md", "clawscript-installer/editor/clawscript-editor.html", "clawscript-installer/editor/ig-clawscript-flow.js", "clawscript-installer/editor/ig-clawscript-ui.js", "clawscript-installer/examples/custom-btctest-strategy.cjs", "clawscript-installer/.gitignore", "clawscript-installer/install-node.cjs", "clawscript-installer/install.ps1", "clawscript-installer/install.sh", "clawscript-installer/lib/clawscript-ai-handler.cjs", "clawscript-installer/lib/clawscript-parser.cjs", "clawscript-installer/lib/indicators.cjs", "clawscript-installer/lib/openclaw-automation.cjs", "clawscript-installer/lib/openclaw-ext.cjs", "clawscript-installer/lib/openclaw/openclaw-ai.cjs", "clawscript-installer/lib/openclaw/openclaw-automation.cjs", "clawscript-installer/lib/openclaw/openclaw-channels.cjs", "clawscript-installer/lib/openclaw/openclaw-chat.cjs", "clawscript-installer/lib/openclaw/openclaw-data.cjs", "clawscript-installer/lib/openclaw/openclaw-nomad.cjs", "clawscript-installer/lib/openclaw/openclaw-tools.cjs", "clawscript-installer/lib/test-clawscript-pipeline.cjs", "clawscript-installer/LICENSE", "clawscript-installer/package.json", "clawscript-installer/README.md", "clawscript-installer/screenshots/clawscript-flow-builder.png", "clawscript-installer/screenshots/clawscript-full-editor.png", "clawscript-installer/screenshots/clawscript-simulation.png", "clawscript-installer/serve.cjs", "clawscript-installer/strategies/base-strategy.cjs", "clawscript-installer/strategies/index.cjs", "clawscript-installer/sync-and-push.sh", "clawscript-installer/templates/bourse-trackers.cs", "clawscript-installer/templates/btc-scalper.cs", "clawscript-installer/templates/ema-crossover.cs", "clawscript-installer/templates/mean-reversion.cs", "clawscript-installer/templates/multi-indicator.cs", "clawscript-installer/templates/rsi-simple.cs", "clawscript-installer/templates/sentiment-scan.cs", "clawscript-installer/test/test-clawscript-parser.cjs", "clawscript-installer/test/test-clawscript-pipeline.cjs", "clawscript-installer/uninstall.ps1", "clawscript-installer/uninstall.sh", "clawscript-installer/update.ps1", "clawscript-installer/update.sh", "clawscript-installer/VERSION", "docs/IG_TRADING_SETUP.md", "docs/images/backtest-chart.png", "docs/images/ig-bot-status.png", "docs/images/ig-dashboard.png", "docs/images/ig-skills.png", "docs/images/processes-bots.png", "docs/reference/templates/AGENTS.md", "docs/reference/templates/BOOTSTRAP.md", "docs/reference/templates/TOOLS.md", "openclaw.json", "README.md", "skills/binance-btc-feed/references/binance-ws-api.md", "skills/binance-btc-feed/scripts/binance-ws.cjs", "skills/binance-btc-feed/SKILL.md", "skills/binance-stream/references/binance-streams.md", "skills/binance-stream/scripts/multi-ws.cjs", "skills/binance-stream/SKILL.md", "skills/bots/binance-receiver.cjs", "skills/bots/clawscript-parser.cjs", "skills/bots/clawscript-runner.cjs", "skills/bots/ig-optimization-agent.cjs", "skills/bots/ig-scalper-backtest.cjs", "skills/bots/ig-scalper-db.cjs", "skills/bots/ig-scalper-engine.cjs", "skills/bots/ig-signal-monitor.cjs", "skills/bots/ig-trading-bot.cjs", "skills/bots/indicators.cjs", "skills/bots/openclaw-ai.cjs", "skills/bots/openclaw-automation.cjs", "skills/bots/openclaw-channels.cjs", "skills/bots/openclaw-chat.cjs", "skills/bots/openclaw-data.cjs", "skills/bots/openclaw-nomad.cjs", "skills/bots/openclaw-tools.cjs", "skills/bots/strategies/arbitrage-scalper-strategy.cjs", "skills/bots/strategies/base-strategy.cjs", "skills/bots/strategies/breakout-strategy.cjs", "skills/bots/strategies/carry-trade-strategy.cjs", "skills/bots/strategies/custom-bourse-index-trackers-strategy-strategy.cjs", "skills/bots/strategies/custom-btctest-strategy.cjs", "skills/bots/strategies/donchian-trend-strategy.cjs", "skills/bots/strategies/grid-trader-strategy.cjs", "skills/bots/strategies/hybrid-ml-strategy.cjs", "skills/bots/strategies/index.cjs", "skills/bots/strategies/market-making-strategy.cjs", "skills/bots/strategies/mean-reversion-strategy.cjs", "skills/bots/strategies/momentum-scalper-strategy.cjs", "skills/bots/strategies/news-spike-strategy.cjs", "skills/bots/strategies/options-linked-strategy.cjs", "skills/bots/strategies/pairs-trading-strategy.cjs", "skills/bots/strategies/portfolio-optimizer-strategy.cjs", "skills/bots/strategies/position-trading-strategy.cjs", "skills/bots/strategies/scalper-strategy.cjs", "skills/bots/strategies/seasonal-trader-strategy.cjs", "skills/bots/strategies/sentiment-trader-strategy.cjs", "skills/bots/strategies/swing-trading-strategy.cjs", "skills/bots/strategies/trend-following-strategy.cjs", "skills/bots/strategies/value-investing-strategy.cjs", "skills/bots/strategies/volatility-breakout-strategy.cjs", "skills/bots/test-btctest-strategy.cjs", "skills/bots/test-clawscript-parser.cjs", "skills/bots/test-clawscript-pipeline.cjs", "skills/bots/trade-claw-engine.cjs", "skills/clawscript/CLAWSCRIPT-AI-REFERENCE.md", "skills/clawscript/CLAWSCRIPT.md", "skills/clawscript/STRATEGY-PERFORMANCE-RULEBOOK.md", "skills/clawscript/TRADING-BOT-RULEBOOK.md", "skills/ig-backtest/backtest.cjs", "skills/ig-backtest/SKILL.md", "skills/ig-market-data/SKILL.md", "skills/ig-signal-monitor/SKILL.md", "skills/ig-trade-verify/SKILL.md", "skills/ig-trading-bot/SKILL.md", "skills/ig-trading/IG-COMMANDS.md", "skills/ig-trading/IG-PL-CALCULATION.md", "skills/ig-trading/SKILL.md", "skills/medallion-fund/dashboard/index.html", "skills/medallion-fund/SKILL.md", "skills/openclaw-ext.cjs", "skills/prorealtime-ig-adapter/SKILL.md", "src/auto-reply/reply/inbound-meta.ts", "src/gateway/control-ui-csp.ts", "start.sh", "ui/public/login.html", "ui/public/model-config.html", "ui/public/model-config.js", "ui/public/nav-inject.js", "ui/public/processes.html", "ui/public/processes.js", "ui/public/workers.html", "ui/public/workers.js", "ui/src/styles/chat/grouped.css", "ui/src/styles/chat/layout.css", "ui/src/styles/chat/text.css", "ui/src/ui/app-render.ts", "ui/src/ui/app.ts", "ui/src/ui/chat/grouped-render.ts", "ui/src/ui/controllers/chat.ts", "ui/src/ui/icons.ts", "ui/src/ui/markdown.ts", "ui/src/ui/views/chat.ts", "ui/src/ui/voice/voice-manager.ts", "start-mechanicus.bat", "start-mechanicus.ps1"];
 
 function detectOpenClaw() {
-  var home = os.homedir();
   var candidates = [];
   if (process.env.APPDATA) {
     candidates.push(path.join(process.env.APPDATA, "npm", "node_modules", "openclaw"));
   }
+  var home = os.homedir();
   candidates.push(
     path.join(home, "openclaw"),
-    path.join(home, ".openclaw"),
     path.resolve(".")
   );
   for (var i = 0; i < candidates.length; i++) {
@@ -49,41 +50,49 @@ function download(url) {
   });
 }
 
+async function installFile(rel, destRoot) {
+  var url = REPO_BASE + encodeURIComponent(rel).replace(/%2F/g, "/");
+  var dstPath = path.join(destRoot, rel);
+  ensureDir(path.dirname(dstPath));
+  var data = await download(url);
+  fs.writeFileSync(dstPath, data);
+  var sz = fs.statSync(dstPath).size;
+  if (sz <= 0) throw new Error("Empty file");
+  return sz;
+}
+
 async function main() {
   console.log("");
   console.log("[!] OpenClaw Mechanicus Installer v" + VERSION);
   console.log("    ========================================");
 
-  var root = detectOpenClaw();
-  if (!root) {
+  var appRoot = detectOpenClaw();
+  if (!appRoot) {
     console.error("[X] OpenClaw not found.");
-    console.error("    Run this from your OpenClaw directory, or set APPDATA.");
     process.exit(1);
   }
 
-  console.log("[+] Target: " + root);
-  console.log("[+] Files to install: " + FILES_LIST.length);
+  var homeDir = os.homedir();
+  var homeRoot = homeDir;
+
+  console.log("[+] App directory:  " + appRoot);
+  console.log("[+] Home directory: " + homeDir);
+  console.log("[+] App files:  " + APP_FILES.length);
+  console.log("[+] Home files: " + HOME_FILES.length + " (.openclaw/canvas, workspace-ig, etc.)");
   console.log("");
 
   var ok = 0;
   var fail = 0;
   var failList = [];
 
-  for (var i = 0; i < FILES_LIST.length; i++) {
-    var rel = FILES_LIST[i];
-    var url = REPO_BASE + encodeURIComponent(rel).replace(/%2F/g, "/");
-    var dstPath = path.join(root, rel);
-    ensureDir(path.dirname(dstPath));
+  console.log("--- Installing App files to: " + appRoot + " ---");
+  console.log("");
+  for (var i = 0; i < APP_FILES.length; i++) {
+    var rel = APP_FILES[i];
     try {
-      var data = await download(url);
-      fs.writeFileSync(dstPath, data);
-      var sz = fs.statSync(dstPath).size;
-      if (sz > 0) {
-        console.log("[OK]   " + rel + " (" + sz + "b)");
-        ok++;
-      } else {
-        throw new Error("Empty file");
-      }
+      var sz = await installFile(rel, appRoot);
+      console.log("[OK]   " + rel + " (" + sz + "b)");
+      ok++;
     } catch (e) {
       console.log("[FAIL] " + rel + " - " + e.message);
       fail++;
@@ -91,24 +100,40 @@ async function main() {
     }
   }
 
-  // Copy nav-inject.js to dist/
-  var navSrc = path.join(root, "ui", "public", "nav-inject.js");
-  var distDir = path.join(root, "dist");
-  if (fs.existsSync(navSrc) && fs.existsSync(distDir)) {
-    fs.copyFileSync(navSrc, path.join(distDir, "nav-inject.js"));
-    console.log("[+] Copied nav-inject.js to dist/");
-  }
-  var ctrlDir = path.join(distDir, "control-ui");
-  if (fs.existsSync(navSrc) && fs.existsSync(ctrlDir)) {
-    fs.copyFileSync(navSrc, path.join(ctrlDir, "nav-inject.js"));
-    console.log("[+] Copied nav-inject.js to dist/control-ui/");
+  console.log("");
+  console.log("--- Installing Home files to: " + path.join(homeDir, ".openclaw") + " ---");
+  console.log("");
+  for (var j = 0; j < HOME_FILES.length; j++) {
+    var rel2 = HOME_FILES[j];
+    try {
+      var sz2 = await installFile(rel2, homeRoot);
+      console.log("[OK]   " + rel2 + " (" + sz2 + "b)");
+      ok++;
+    } catch (e) {
+      console.log("[FAIL] " + rel2 + " - " + e.message);
+      fail++;
+      failList.push(rel2);
+    }
   }
 
-  // Patch all index.html files
+  var navSrc = path.join(appRoot, "ui", "public", "nav-inject.js");
+  if (fs.existsSync(navSrc)) {
+    var distDir = path.join(appRoot, "dist");
+    if (fs.existsSync(distDir)) {
+      fs.copyFileSync(navSrc, path.join(distDir, "nav-inject.js"));
+      console.log("[+] Copied nav-inject.js -> dist/");
+    }
+    var ctrlDir = path.join(distDir, "control-ui");
+    if (fs.existsSync(ctrlDir)) {
+      fs.copyFileSync(navSrc, path.join(ctrlDir, "nav-inject.js"));
+      console.log("[+] Copied nav-inject.js -> dist/control-ui/");
+    }
+  }
+
   var htmlTargets = [
-    path.join(root, "index.html"),
-    path.join(distDir, "index.html"),
-    path.join(ctrlDir, "index.html")
+    path.join(appRoot, "index.html"),
+    path.join(appRoot, "dist", "index.html"),
+    path.join(appRoot, "dist", "control-ui", "index.html")
   ];
   for (var h = 0; h < htmlTargets.length; h++) {
     if (fs.existsSync(htmlTargets[h])) {
@@ -131,7 +156,7 @@ async function main() {
   if (fail === 0) {
     console.log("  STATUS:     ALL " + ok + " FILES VERIFIED");
   } else {
-    console.log("  STATUS:     ERRORS DETECTED");
+    console.log("  STATUS:     ERRORS (" + fail + ")");
     for (var f = 0; f < failList.length; f++) {
       console.log("    - " + failList[f]);
     }
@@ -139,8 +164,7 @@ async function main() {
   console.log("========================================");
   console.log("");
 
-  // Check deps
-  var pkgPath = path.join(root, "package.json");
+  var pkgPath = path.join(appRoot, "package.json");
   if (fs.existsSync(pkgPath)) {
     var pkg = fs.readFileSync(pkgPath, "utf8");
     var missing = [];
@@ -148,28 +172,14 @@ async function main() {
     if (pkg.indexOf('"lightstreamer-client-node"') === -1) missing.push("lightstreamer-client-node");
     if (missing.length > 0) {
       console.log("[!] Missing: npm install " + missing.join(" "));
-    } else {
-      console.log("[+] All dependencies present.");
     }
   }
 
   console.log("");
-  console.log("========================================");
-  console.log("  HOW TO START OPENCLAW MECHANICUS");
-  console.log("========================================");
-  console.log("");
-  console.log("  IMPORTANT: Do NOT use the regular 'openclaw' command.");
-  console.log("  Use the Mechanicus launcher instead:");
-  console.log("");
-  console.log("  PowerShell:");
-  console.log("    cd \"" + root + "\"");
+  console.log("  HOW TO START:");
+  console.log("    cd \"" + appRoot + "\"");
   console.log("    .\\start-mechanicus.ps1");
-  console.log("");
-  console.log("  CMD:");
-  console.log("    cd \"" + root + "\"");
-  console.log("    start-mechanicus.bat");
-  console.log("");
-  console.log("  Then open: http://localhost:5000");
+  console.log("    Then open: http://localhost:5000");
   console.log("");
 }
 

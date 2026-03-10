@@ -3,10 +3,13 @@ Write-Host "[start] Starting OpenClaw Mechanicus..." -ForegroundColor Cyan
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
 
-$env:OPENCLAW_HOME = $ScriptDir
+$env:OPENCLAW_HOME = $env:USERPROFILE
+if (-not $env:OPENCLAW_HOME) { $env:OPENCLAW_HOME = [Environment]::GetFolderPath("UserProfile") }
 $env:OPENCLAW_GATEWAY_PORT = "5001"
 
-Write-Host "[start] OpenClaw Home: $ScriptDir"
+Write-Host "[start] App directory:  $ScriptDir"
+Write-Host "[start] Home directory: $($env:OPENCLAW_HOME)"
+Write-Host "[start] Data directory: $($env:OPENCLAW_HOME)\.openclaw"
 
 if (-not (Test-Path "dist\entry.js")) {
     Write-Host "[start] FATAL: dist\entry.js not found" -ForegroundColor Red
@@ -27,6 +30,8 @@ Write-Host "[start] CEO proxy PID: $($proxy.Id)"
 Start-Sleep -Seconds 3
 
 Write-Host "[start] Launching OpenClaw gateway on port 5001..."
-Write-Host "[start] Open your browser to http://localhost:5000" -ForegroundColor Green
+Write-Host ""
+Write-Host "  Open your browser to: http://localhost:5000" -ForegroundColor Green
+Write-Host "  IG Dashboard:         http://localhost:5000/__openclaw__/canvas/ig-dashboard.html" -ForegroundColor Green
 Write-Host ""
 node dist/entry.js gateway --bind loopback --port 5001 --allow-unconfigured
