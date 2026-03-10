@@ -1,15 +1,13 @@
 export function buildControlUiCspHeader(): string {
-  // Control UI: block framing, block inline scripts, keep styles permissive
-  // (UI uses a lot of inline style attributes in templates).
   return [
     "default-src 'self'",
     "base-uri 'none'",
     "object-src 'none'",
     "frame-ancestors 'none'",
-    "script-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: https:",
     "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self' ws: wss:",
+    "connect-src 'self' http://127.0.0.1:* http://localhost:* ws: wss:",
   ].join("; ");
 }

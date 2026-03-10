@@ -98,15 +98,22 @@ function isLoginExempt(req) {
   return false;
 }
 function serveLoginPage(req, res) {
-  const loginPath = path.join(__dirname, "dist", "control-ui", "login.html");
-  try {
-    const html = fs.readFileSync(loginPath, "utf8");
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(html);
-  } catch (e) {
-    res.writeHead(500, { "Content-Type": "text/plain" });
-    res.end("Login page not found");
+  const candidates = [
+    path.join(__dirname, "ui", "public", "login.html"),
+    path.join(__dirname, "dist", "control-ui", "login.html"),
+  ];
+  for (const loginPath of candidates) {
+    if (fs.existsSync(loginPath)) {
+      try {
+        const html = fs.readFileSync(loginPath, "utf8");
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(html);
+        return;
+      } catch (_) {}
+    }
   }
+  res.writeHead(500, { "Content-Type": "text/plain" });
+  res.end("Login page not found");
 }
 
 // IG API persistent session
@@ -5189,6 +5196,49 @@ const LOADING_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Op
 .c{text-align:center}h2{margin-bottom:8px}</style></head>
 <body><div class="c"><h2>OpenClaw Cloud</h2><p style="color:#8b949e">Gateway is starting up. <a href="/" style="color:#58a6ff">Reload</a></p></div></body></html>`;
 
+const CUSTOM_PAGES = {
+  "/model-config.html": "model-config.html",
+  "/model-config.js": "model-config.js",
+  "/processes.html": "processes.html",
+  "/processes.js": "processes.js",
+  "/workers.html": "workers.html",
+  "/workers.js": "workers.js",
+  "/nav-inject.js": "nav-inject.js",
+  "/login.html": "login.html",
+};
+
+function serveCustomPage(req, res) {
+  const url = new URL(req.url, "http://localhost");
+  const file = CUSTOM_PAGES[url.pathname];
+  if (!file) return false;
+  const dirs = [
+    path.join(__dirname, "ui", "public"),
+    path.join(__dirname, "dist", "control-ui"),
+  ];
+  for (const dir of dirs) {
+    const fp = path.join(dir, file);
+    if (fs.existsSync(fp)) {
+      const ext = path.extname(file);
+      const ct = MIME_TYPES[ext] || "application/octet-stream";
+      let content = fs.readFileSync(fp, "utf8");
+      if (ext === ".html" && !content.includes("nav-inject.js")) {
+        const idx = content.indexOf("</body>");
+        if (idx !== -1) content = content.slice(0, idx) + NAV_INJECT_TAG + content.slice(idx);
+        else content += NAV_INJECT_TAG;
+      }
+      res.writeHead(200, {
+        "Content-Type": ct,
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      });
+      res.end(content);
+      return true;
+    }
+  }
+  return false;
+}
+
 function proxyReq(req, res, retries = 3) {
   const opts = {
     hostname: "127.0.0.1",
@@ -5201,6 +5251,10 @@ function proxyReq(req, res, retries = 3) {
   const isHtmlPage = req.url === '/' || req.url === '/index.html' || /^\/(chat|overview|channels|instances|sessions|usage|cron|agents|skills|nodes|config|debug)/i.test(req.url);
   const p = http.request(opts, (pr) => {
     const headers = { ...pr.headers };
+    if (noCache || isHtmlPage) {
+      delete headers["content-security-policy"];
+      delete headers["x-content-type-options"];
+    }
     if (noCache) {
       headers["cache-control"] = "no-cache, no-store, must-revalidate";
       headers["pragma"] = "no-cache";
@@ -5495,6 +5549,7 @@ const server = http.createServer(async (req, res) => {
       }
       return serveLoginPage(req, res);
     }
+    if (serveCustomPage(req, res)) return;
     if (serveCanvas(req, res)) return;
     if (!(await handleApi(req, res))) proxyReq(req, res);
   } catch (err) {
