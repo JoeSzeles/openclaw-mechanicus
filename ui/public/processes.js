@@ -28,7 +28,7 @@ function apiFetch(url, opts) {
   opts.headers = opts.headers || {};
   if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
   return fetch(url, opts).then(function(r) {
-    var ct = (r.headers.get('content-type') || '');
+    var ct = (r.headers.get('content-type') || '').toLowerCase();
     if (!r.ok && ct.indexOf('json') === -1) throw new Error('API not available (HTTP ' + r.status + ')');
     if (ct.indexOf('json') === -1 && ct.indexOf('javascript') === -1) throw new Error('API not available — endpoint returned non-JSON');
     return r;

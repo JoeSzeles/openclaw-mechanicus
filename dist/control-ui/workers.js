@@ -15,7 +15,7 @@ function apiFetch(url, opts) {
   opts = opts || {}; opts.headers = opts.headers || {};
   if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
   return fetch(url, opts).then(function(r) {
-    var ct = (r.headers.get('content-type') || '');
+    var ct = (r.headers.get('content-type') || '').toLowerCase();
     if (!r.ok && ct.indexOf('json') === -1) throw new Error('API not available (HTTP ' + r.status + ')');
     if (ct.indexOf('json') === -1 && ct.indexOf('javascript') === -1 && ct.indexOf('octet') === -1) throw new Error('API not available — endpoint returned non-JSON');
     return r;
@@ -176,7 +176,7 @@ function loadChat() {
       html += '<div class="chat-msg">';
       html += '<div class="chat-msg-avatar" style="background:' + col + '">' + ini + '</div>';
       html += '<div class="chat-msg-body">';
-      html += '<div class="chat-msg-from">' + escHtml(m.from) + ' <span style="font-weight:400;color:#484f58">' + (m.role || '') + '</span></div>';
+      html += '<div class="chat-msg-from">' + escHtml(m.from) + ' <span style="font-weight:400;color:#484f58">' + escHtml(m.role || '') + '</span></div>';
       html += '<div class="chat-msg-text">' + escHtml(m.text) + '</div>';
       html += '<div class="chat-msg-time">' + new Date(m.ts).toLocaleString() + '</div>';
       html += '</div></div>';

@@ -23,7 +23,7 @@ function apiFetch(url, opts) {
       showToast('Authentication failed — please hard-refresh (Ctrl+Shift+R)', 'error');
       throw new Error('Unauthorized (401) — token may be stale, hard-refresh the page');
     }
-    var ct = (r.headers.get('content-type') || '');
+    var ct = (r.headers.get('content-type') || '').toLowerCase();
     if (!r.ok) {
       if (ct.indexOf('json') === -1) throw new Error('API not available (HTTP ' + r.status + ')');
     }
