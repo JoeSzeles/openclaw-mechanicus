@@ -4,17 +4,22 @@ IG Trading system for OpenClaw. Adds 23 strategies, batch backtesting with optim
 
 ## Install
 
-**Linux / Mac:**
+**Cross-platform (Node.js — recommended):**
 ```bash
 git clone https://github.com/JoeSzeles/openclaw-mechanicus-patches.git
 cd openclaw-mechanicus-patches
+node install-node.cjs
+```
+
+The Node installer auto-detects your OpenClaw install location and works on Windows, Mac, and Linux. It patches the gateway to load `ig-local-api.mjs` at startup, enabling all IG endpoints on the raw gateway without requiring the CEO proxy.
+
+**Linux / Mac (shell):**
+```bash
 bash install.sh /path/to/openclaw
 ```
 
 **Windows (PowerShell):**
 ```powershell
-git clone https://github.com/JoeSzeles/openclaw-mechanicus-patches.git
-cd openclaw-mechanicus-patches
 .\install.ps1 C:\path\to\openclaw
 ```
 
@@ -61,6 +66,117 @@ cp .env.example .env
 - **ClawScript** — custom strategy language with editor, parser, and flow builder
 - **Signal monitor** — real-time alerts from strategy signals
 - **Trade Claw engine** — live trade execution via IG REST API
+
+## Local API (ig-local-api.mjs)
+
+The patch injects a standalone ESM module (`ig-local-api.mjs`) into the OpenClaw gateway at startup. This provides a full IG trading API layer that works on the raw gateway (port 18789) without requiring the CEO proxy.
+
+### Supported Endpoints (43 total)
+
+**IG Session & Config:**
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/ig/config` | GET | Get IG config (credentials masked) |
+| `/api/ig/config` | POST | Update config (accepts `{profiles:{...}}` or `{profile,profileName}`) |
+| `/api/ig/config/test` | POST | Test connection for a specific profile |
+| `/api/ig/session` | GET | Get session status |
+| `/api/ig/session/refresh` | POST | Force session token refresh |
+
+**Trading (proxied to IG REST API):**
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/ig/positions` | GET | List open positions with snapshots |
+| `/api/ig/positions/open` | POST | Open a new position (BUY or SELL) |
+| `/api/ig/positions/close` | POST | Close a position by dealId |
+| `/api/ig/positions/update` | PUT | Update stop/limit on a position |
+| `/api/ig/account` | GET | Account balance and details |
+| `/api/ig/markets` | GET | Search markets by term |
+| `/api/ig/markets/:epic` | GET | Get market details for an epic |
+| `/api/ig/marketnavigation` | GET | Market navigation tree |
+| `/api/ig/pricehistory/:epic` | GET | Historical price data |
+| `/api/ig/workingorders` | GET | List working orders |
+| `/api/ig/workingorders/create` | POST | Create a working order |
+| `/api/ig/workingorders/update` | PUT | Update a working order |
+| `/api/ig/workingorders/delete` | DELETE | Delete a working order |
+| `/api/ig/activity` | GET | Account activity (requires `?from=` param) |
+| `/api/ig/history` | GET | Transaction history |
+| `/api/ig/watchlists` | GET | IG account watchlists |
+| `/api/ig/refresh-snapshots` | POST | Refresh market snapshots for positions |
+
+**Streaming (local-mode stubs — requires CEO proxy for live data):**
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/ig/stream/prices` | GET | Price stream status |
+| `/api/ig/stream/status` | GET | Stream connection status |
+| `/api/ig/stream/candles` | GET | Candle data (REST polling fallback) |
+| `/api/ig/stream/candle-stats` | GET | Candle statistics |
+
+**Strategies & Scalper (local JSON file CRUD):**
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/ig/strategies` | GET | List all strategies |
+| `/api/ig/strategies/global` | POST | Update global strategy toggle |
+| `/api/ig/strategy-templates` | GET | List strategy templates |
+| `/api/ig/watchedlist` | GET | Watched instruments list |
+| `/api/ig/proofread` | GET/PUT | Proofread configuration |
+| `/api/ig/scalper` | GET | Scalper configuration |
+| `/api/ig/scalper/status` | GET | Scalper engine status |
+| `/api/ig/scalper/strategies` | GET | Scalper strategies |
+| `/api/ig/scalper/strategy-schemas` | GET | Strategy parameter schemas |
+| `/api/ig/scalper/backtests` | GET | Backtest results |
+| `/api/ig/scalper/optimization-memory` | GET | Optimization memory |
+| `/api/ig/scalper/batch-backtest` | GET | Batch backtest results |
+| `/api/ig/logs/scalper-trades` | GET | Scalper trade logs |
+
+**ClawScript:**
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/clawscript/strategies` | GET | ClawScript strategies |
+| `/api/clawscript/results` | GET | ClawScript results |
+| `/api/clawscript/scripts` | GET | ClawScript scripts |
+| `/api/clawscript/templates` | GET | ClawScript templates |
+| `/api/clawscript/ai/config` | GET | ClawScript AI configuration |
+| `/api/clawscript/logbook` | GET/POST | ClawScript logbook entries |
+
+**Bots & Processes:**
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/bots` | GET | Registered bots |
+| `/api/processes` | GET | Running processes |
+
+### Trade Execution Test Results
+
+All trade types verified on IG demo account (Silver CFD — CS.D.CFASILVER.CFA.IP):
+
+- **BUY to open** — `dealStatus: ACCEPTED`, position opened at market price
+- **SELL to close** — `dealStatus: ACCEPTED`, position fully closed with P&L
+- **SELL to open (short)** — `dealStatus: ACCEPTED`, short position opened
+- **BUY to close (cover short)** — `dealStatus: ACCEPTED`, short position fully closed
+
+### Known Limitations
+
+- **Price history** may return `exceeded-account-historical-data-allowance` on demo accounts (IG rate limit)
+- **Market navigation** returns 500 from IG API on some demo accounts
+- **Activity endpoint** requires `?from=` date parameter (e.g., `?from=2026-03-01T00:00:00`)
+- **Streaming** (Lightstreamer live prices) requires the CEO proxy — local mode returns status stubs
+- **ClawScript compile/run/AI** execution requires the CEO proxy — local mode returns helpful stubs
+- **Scalper engine start/stop** requires the CEO proxy — local mode returns status info
+
+### Config API Compatibility
+
+The `POST /api/ig/config` endpoint accepts two formats for backward compatibility:
+
+**UI format (from model-config.js):**
+```json
+{ "profiles": { "demo": { "apiKey": "...", "username": "..." } } }
+```
+
+**Direct format:**
+```json
+{ "profileName": "demo", "profile": { "apiKey": "...", "username": "..." } }
+```
+
+Masked values (`••••••••` or `****`) are automatically detected and skipped to prevent overwriting real credentials when the UI sends back masked fields.
 
 ## Database Setup (PostgreSQL)
 
