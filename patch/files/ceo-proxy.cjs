@@ -209,18 +209,20 @@ function ensureIgConfig() {
   if (config && !config.timezone) config.timezone = "Australia/Brisbane";
   if (!config) {
     config = getDefaultIgConfig();
-    if (process.env.IG_API_KEY || process.env.IG_USERNAME) {
-      const profile = (process.env.IG_BASE_URL || "").includes("demo-api") ? "demo" : "live";
-      config.activeProfile = profile;
-      config.profiles[profile].apiKey = process.env.IG_API_KEY || "";
-      config.profiles[profile].username = process.env.IG_USERNAME || "";
-      config.profiles[profile].password = process.env.IG_PASSWORD || "";
-      config.profiles[profile].accountId = process.env.IG_ACCOUNT_ID || "";
-      config.profiles[profile].baseUrl = process.env.IG_BASE_URL || config.profiles[profile].baseUrl;
-      console.log(`[ig-config] Seeded ${profile} profile from env vars`);
-    }
-    saveIgConfig(config);
   }
+  if (process.env.IG_API_KEY || process.env.IG_USERNAME || process.env.IG_PASSWORD || process.env.IG_ACCOUNT_ID || process.env.IG_BASE_URL) {
+    const profile = (process.env.IG_BASE_URL || "").includes("demo-api") || !(process.env.IG_BASE_URL || "").includes("api.ig.com") ? "demo" : "live";
+    if (!config.profiles) config.profiles = {};
+    if (!config.profiles[profile]) config.profiles[profile] = {};
+    const p = config.profiles[profile];
+    if (!p.apiKey) p.apiKey = process.env.IG_API_KEY || "";
+    if (!p.username) p.username = process.env.IG_USERNAME || "";
+    if (!p.password) p.password = process.env.IG_PASSWORD || "";
+    if (!p.accountId) p.accountId = process.env.IG_ACCOUNT_ID || "";
+    if (!p.baseUrl) p.baseUrl = process.env.IG_BASE_URL || (profile === "live" ? "https://api.ig.com/gateway/deal" : "https://demo-api.ig.com/gateway/deal");
+    if (!config.activeProfile) config.activeProfile = profile;
+  }
+  saveIgConfig(config);
   return config;
 }
 
