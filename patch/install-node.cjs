@@ -177,6 +177,49 @@ async function main() {
       gw = gw.replace("\"connect-src 'self' ws: wss:\"", "\"connect-src 'self' http://127.0.0.1:* http://localhost:* ws: wss:\"");
       changed = true;
     }
+    var IG_CONFIG_HANDLER = [
+      '/* mechanicus-ig-config-api */',
+      'const __igCfgPath = (() => { try { return path.join(os.homedir(), ".openclaw", "ig-config.json"); } catch(_) { return null; } })();',
+      'function __igCfgDefaults() { return { activeProfile: "demo", profiles: { demo: { label: "Demo Account", baseUrl: "https://demo-api.ig.com/gateway/deal", apiKey: "", username: "", password: "", accountId: "" }, live: { label: "Live Account", baseUrl: "https://api.ig.com/gateway/deal", apiKey: "", username: "", password: "", accountId: "" } }, liveStreamingAutoConnect: false, timezone: "UTC" }; }',
+      'function __igCfgRead() { if (!__igCfgPath) return __igCfgDefaults(); try { return JSON.parse(fsSync.readFileSync(__igCfgPath, "utf8")); } catch(_) { return __igCfgDefaults(); } }',
+      'function __igCfgWrite(cfg) { if (!__igCfgPath) return; try { fsSync.mkdirSync(path.dirname(__igCfgPath), { recursive: true }); fsSync.writeFileSync(__igCfgPath, JSON.stringify(cfg, null, 2)); } catch(_) {} }',
+      'function __igCfgMask(s) { if (!s || s.length < 4) return "****"; return s.slice(0,2) + "****" + s.slice(-2); }',
+      'function __handleIgConfigApi(req, res) {',
+      '  const u = new URL(req.url || "/", "http://localhost");',
+      '  if (u.pathname !== "/api/ig/config") return false;',
+      '  if (req.method === "GET") {',
+      '    const cfg = __igCfgRead();',
+      '    const masked = JSON.parse(JSON.stringify(cfg));',
+      '    for (const k of Object.keys(masked.profiles || {})) { const pr = masked.profiles[k]; pr.apiKey = __igCfgMask(pr.apiKey); pr.username = __igCfgMask(pr.username); pr.password = __igCfgMask(pr.password); pr.hasCredentials = !!(cfg.profiles[k].apiKey && cfg.profiles[k].username && cfg.profiles[k].password); }',
+      '    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(masked)); return true;',
+      '  }',
+      '  if (req.method === "POST") {',
+      '    let body = ""; req.on("data", (c) => body += c); req.on("end", () => {',
+      '      try {',
+      '        const data = JSON.parse(body || "{}");',
+      '        const cfg = __igCfgRead();',
+      '        if (data.activeProfile && cfg.profiles[data.activeProfile]) cfg.activeProfile = data.activeProfile;',
+      '        if (data.timezone) cfg.timezone = data.timezone;',
+      '        if (data.profiles) { for (const k of Object.keys(data.profiles)) { if (!cfg.profiles[k]) continue; const s = data.profiles[k]; if (s.apiKey !== undefined && !s.apiKey.includes("****")) cfg.profiles[k].apiKey = s.apiKey; if (s.username !== undefined && !s.username.includes("****")) cfg.profiles[k].username = s.username; if (s.password !== undefined && !s.password.includes("****")) cfg.profiles[k].password = s.password; if (s.accountId !== undefined) cfg.profiles[k].accountId = s.accountId; } }',
+      '        __igCfgWrite(cfg);',
+      '        res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify({ ok: true, activeProfile: cfg.activeProfile }));',
+      '      } catch(e) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: e.message })); }',
+      '    }); return true;',
+      '  }',
+      '  return false;',
+      '}',
+    ].join("\n");
+    var INJECT_MARKER = "if (controlUiEnabled) {";
+    var INJECT_REPLACEMENT = "if (__handleIgConfigApi(req, res)) return;\nif (controlUiEnabled) {";
+    if (gw.indexOf("mechanicus-ig-config-api") === -1 && gw.indexOf(INJECT_MARKER) !== -1) {
+      var funcInsertPoint = gw.indexOf("async function handleRequest(req, res)");
+      if (funcInsertPoint !== -1) {
+        gw = gw.slice(0, funcInsertPoint) + IG_CONFIG_HANDLER + "\n" + gw.slice(funcInsertPoint);
+        gw = gw.replace(INJECT_MARKER, INJECT_REPLACEMENT);
+        changed = true;
+        console.log("[+] Injected /api/ig/config handler into: " + path.basename(gatewayChunks[gc]));
+      }
+    }
     if (changed) {
       fs.writeFileSync(gatewayChunks[gc], gw);
       console.log("[+] Patched CSP in: " + path.basename(gatewayChunks[gc]));
