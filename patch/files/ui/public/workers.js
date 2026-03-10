@@ -7,21 +7,15 @@ if (!TOKEN) {
   try { var m = document.cookie.match(/openclaw_token=([^;]+)/); if (m) TOKEN = m[1]; } catch(e) {}
 }
 
-var API_BASE = (function() {
-  var port = parseInt(window.location.port, 10);
-  if (port === 18789 || port === 5001) return 'http://' + window.location.hostname + ':5000';
-  return '';
-})();
-
 var COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#2980b9'];
 function avatarColor(name) { var h = 0; for (var i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h); return COLORS[Math.abs(h) % COLORS.length]; }
 function initials(name) { var p = name.split(/[\s-]+/); return p.length > 1 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : name.slice(0,2).toUpperCase(); }
 function showToast(msg, type) { var t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast show ' + (type||''); setTimeout(function(){ t.className = 'toast'; }, 3000); }
-function apiFetch(url, opts) { opts = opts || {}; opts.headers = opts.headers || {}; if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN; return fetch(API_BASE + url, opts); }
+function apiFetch(url, opts) { opts = opts || {}; opts.headers = opts.headers || {}; if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN; return fetch(url, opts); }
 function formatSize(b) { if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1) + ' KB'; return (b/1048576).toFixed(1) + ' MB'; }
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-var BASE_URL = API_BASE || window.location.origin;
+var BASE_URL = window.location.origin;
 var lastKeys = [];
 
 function loadKeys() {
@@ -113,7 +107,7 @@ function loadExchange() {
       html += '<tr><td style="font-weight:500">' + escHtml(f.name) + '</td>';
       html += '<td>' + formatSize(f.size) + '</td>';
       html += '<td style="font-size:12px">' + new Date(f.modified).toLocaleString() + '</td>';
-      html += '<td><a href="' + API_BASE + '/api/exchange/download/' + encodeURIComponent(f.name) + '" style="color:#58a6ff;font-size:12px">Download</a></td></tr>';
+      html += '<td><a href="/api/exchange/download/' + encodeURIComponent(f.name) + '" style="color:#58a6ff;font-size:12px">Download</a></td></tr>';
     }
     html += '</table>';
     el.innerHTML = html;
@@ -133,7 +127,7 @@ function loadSharedspace() {
       html += '<span class="ss-file-name">' + escHtml(f.name) + '</span>';
       html += '<span class="ss-file-size">' + formatSize(f.size) + '</span>';
       html += '<div class="ss-file-actions">';
-      html += '<a href="' + API_BASE + '/api/sharedspace/download/' + encodeURIComponent(f.name) + '">Download</a>';
+      html += '<a href="/api/sharedspace/download/' + encodeURIComponent(f.name) + '">Download</a>';
       html += '<button data-ss-delete="' + escHtml(f.name) + '">Delete</button>';
       html += '</div>';
       html += '</div>';
@@ -387,7 +381,7 @@ function renderTree(node, depth) {
     html += '<span class="ss-file-name">📄 ' + escHtml(fileName) + '</span>';
     html += '<span class="ss-file-size">' + formatSize(f.size) + '</span>';
     html += '<div class="ss-file-actions">';
-    html += '<a href="' + API_BASE + '/api/workspace/' + encodeURIComponent(wsCurrentAgent) + '/download/' + encodeURIComponent(f.name) + '" download>Download</a>';
+    html += '<a href="/api/workspace/' + encodeURIComponent(wsCurrentAgent) + '/download/' + encodeURIComponent(f.name) + '" download>Download</a>';
     html += '<button data-ws-delete="' + escHtml(f.name) + '" data-ws-agent="' + escHtml(wsCurrentAgent) + '">Delete</button>';
     html += '</div>';
     html += '</div>';

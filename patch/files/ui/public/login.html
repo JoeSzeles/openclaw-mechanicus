@@ -43,11 +43,6 @@ body{background:#0d1117;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFo
   </form>
 </div>
 <script>
-var API_BASE = (function() {
-  var port = parseInt(window.location.port, 10);
-  if (port === 18789 || port === 5001) return 'http://' + window.location.hostname + ':5000';
-  return '';
-})();
 document.getElementById('loginForm').addEventListener('submit', function(e) {
   e.preventDefault();
   var btn = document.getElementById('btnLogin');
@@ -56,7 +51,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
   btn.textContent = 'Signing in...';
   errEl.style.display = 'none';
 
-  fetch(API_BASE + '/api/login', {
+  fetch('/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
