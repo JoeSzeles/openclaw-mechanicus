@@ -117,34 +117,76 @@ async function main() {
   }
 
   var navSrc = path.join(appRoot, "ui", "public", "nav-inject.js");
+  var distDir = path.join(appRoot, "dist");
+  var ctrlDir = path.join(distDir, "control-ui");
   if (fs.existsSync(navSrc)) {
-    var distDir = path.join(appRoot, "dist");
     if (fs.existsSync(distDir)) {
       fs.copyFileSync(navSrc, path.join(distDir, "nav-inject.js"));
       console.log("[+] Copied nav-inject.js -> dist/");
     }
-    var ctrlDir = path.join(distDir, "control-ui");
     if (fs.existsSync(ctrlDir)) {
       fs.copyFileSync(navSrc, path.join(ctrlDir, "nav-inject.js"));
       console.log("[+] Copied nav-inject.js -> dist/control-ui/");
     }
   }
 
+  var uiPublic = path.join(appRoot, "ui", "public");
+  var controlUiFiles = ["model-config.html", "model-config.js", "workers.html", "workers.js", "processes.html", "processes.js", "nav-inject.js"];
+  if (fs.existsSync(ctrlDir)) {
+    console.log("");
+    console.log("--- Copying control-ui files to dist/control-ui/ ---");
+    for (var cf = 0; cf < controlUiFiles.length; cf++) {
+      var src = path.join(uiPublic, controlUiFiles[cf]);
+      var dst = path.join(ctrlDir, controlUiFiles[cf]);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, dst);
+        console.log("[+] " + controlUiFiles[cf] + " -> dist/control-ui/");
+      }
+    }
+  }
+  if (fs.existsSync(distDir)) {
+    for (var df = 0; df < controlUiFiles.length; df++) {
+      var src2 = path.join(uiPublic, controlUiFiles[df]);
+      var dst2 = path.join(distDir, controlUiFiles[df]);
+      if (fs.existsSync(src2)) {
+        fs.copyFileSync(src2, dst2);
+      }
+    }
+    console.log("[+] Copied control files to dist/");
+  }
+
   var htmlTargets = [
     path.join(appRoot, "index.html"),
-    path.join(appRoot, "dist", "index.html"),
-    path.join(appRoot, "dist", "control-ui", "index.html")
+    path.join(distDir, "index.html"),
+    path.join(ctrlDir, "index.html")
   ];
   for (var h = 0; h < htmlTargets.length; h++) {
     if (fs.existsSync(htmlTargets[h])) {
       var html = fs.readFileSync(htmlTargets[h], "utf8");
       if (html.indexOf("nav-inject.js") === -1) {
-        html = html.replace("</head>", '<script src="/nav-inject.js" defer></script></head>');
+        html = html.replace("</head>", '<script src="nav-inject.js" defer></script></head>');
         if (html.indexOf("nav-inject.js") === -1) {
-          html = html.replace("</body>", '<script src="/nav-inject.js"></script></body>');
+          html = html.replace("</body>", '<script src="nav-inject.js"></script></body>');
         }
         fs.writeFileSync(htmlTargets[h], html);
         console.log("[+] Patched: " + htmlTargets[h]);
+      }
+    }
+  }
+  var allHtmlInCtrl = ["model-config.html", "workers.html", "processes.html"];
+  for (var ah = 0; ah < allHtmlInCtrl.length; ah++) {
+    var targets = [path.join(ctrlDir, allHtmlInCtrl[ah]), path.join(distDir, allHtmlInCtrl[ah])];
+    for (var t = 0; t < targets.length; t++) {
+      if (fs.existsSync(targets[t])) {
+        var pg = fs.readFileSync(targets[t], "utf8");
+        if (pg.indexOf("nav-inject.js") === -1) {
+          pg = pg.replace("</head>", '<script src="nav-inject.js" defer></script></head>');
+          if (pg.indexOf("nav-inject.js") === -1) {
+            pg = pg.replace("</body>", '<script src="nav-inject.js"></script></body>');
+          }
+          fs.writeFileSync(targets[t], pg);
+          console.log("[+] Patched nav into: " + targets[t]);
+        }
       }
     }
   }
