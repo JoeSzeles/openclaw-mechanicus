@@ -10,6 +10,12 @@ if (!TOKEN) {
   } catch(e) {}
 }
 
+var API_BASE = (function() {
+  var port = parseInt(window.location.port, 10);
+  if (port === 18789 || port === 5001) return 'http://' + window.location.hostname + ':5000';
+  return '';
+})();
+
 function showToast(msg, type) {
   var t = document.getElementById('toast');
   t.textContent = msg;
@@ -21,7 +27,7 @@ function apiFetch(url, opts) {
   opts = opts || {};
   opts.headers = opts.headers || {};
   if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
-  return fetch(url, opts);
+  return fetch(API_BASE + url, opts);
 }
 
 function badgeClass(type) {

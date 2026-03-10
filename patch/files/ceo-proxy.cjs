@@ -5534,7 +5534,13 @@ server.on("upgrade", (req, socket, head) => {
 
 server.listen(PROXY_PORT, "0.0.0.0", () => {
   console.log(`[ceo-proxy] listening on 0.0.0.0:${PROXY_PORT}, proxying to gateway:${GATEWAY_PORT}`);
-  ensureIgConfig();
+  const igConfig = ensureIgConfig();
+  const ap = igConfig.activeProfile || "none";
+  const hasDemo = !!(igConfig.profiles && igConfig.profiles.demo && igConfig.profiles.demo.apiKey);
+  const hasLive = !!(igConfig.profiles && igConfig.profiles.live && igConfig.profiles.live.apiKey);
+  console.log(`[startup] IG profiles: demo=${hasDemo ? "configured" : "empty"}, live=${hasLive ? "configured" : "empty"}, active=${ap}`);
+  console.log(`[startup] Database: ${process.env.DATABASE_URL ? "configured" : "not configured (file-only mode)"}`);
+  console.log(`[startup] Login: ${(LOGIN_USER && LOGIN_PASS) ? "protected (user: " + LOGIN_USER + ")" : "open (no password)"}`);
   updateCrewFile();
   writeConfigSnapshots();
   autoRegisterBotScripts();

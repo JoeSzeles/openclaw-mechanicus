@@ -14,11 +14,17 @@ function showToast(msg, type) {
   setTimeout(function(){ t.className = 'toast'; }, 3000);
 }
 
+var API_BASE = (function() {
+  var port = parseInt(window.location.port, 10);
+  if (port === 18789 || port === 5001) return 'http://' + window.location.hostname + ':5000';
+  return '';
+})();
+
 function apiFetch(url, opts) {
   opts = opts || {};
   opts.headers = opts.headers || {};
   if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
-  return fetch(url, opts).then(function(r) {
+  return fetch(API_BASE + url, opts).then(function(r) {
     if (r.status === 401) {
       showToast('Authentication failed — please hard-refresh (Ctrl+Shift+R)', 'error');
       throw new Error('Unauthorized (401) — token may be stale, hard-refresh the page');
@@ -259,7 +265,7 @@ function renderStreamingStatus(streaming) {
     reconnBtn.addEventListener('click', function() {
       reconnBtn.disabled = true;
       reconnBtn.textContent = 'Reconnecting...';
-      fetch('/api/ig/session/refresh', { method: 'POST', headers: { 'Authorization': 'Bearer ' + (window.gatewayToken || '') } })
+      fetch(API_BASE + '/api/ig/session/refresh', { method: 'POST', headers: { 'Authorization': 'Bearer ' + (window.gatewayToken || '') } })
         .then(function() { setTimeout(loadIgConfig, 2000); })
         .catch(function() { setTimeout(loadIgConfig, 2000); });
     });
