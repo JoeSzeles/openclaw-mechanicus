@@ -1,0 +1,1 @@
+Add MetaMask trading: metamask swap testnet [pair] [amount]

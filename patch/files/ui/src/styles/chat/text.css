@@ -1,0 +1,266 @@
+/* =============================================
+   CHAT TEXT STYLING
+   ============================================= */
+
+.chat-thinking {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+:root[data-theme="light"] .chat-thinking {
+  border-color: rgba(16, 24, 40, 0.25);
+  background: rgba(16, 24, 40, 0.04);
+}
+
+.chat-text {
+  font-size: 14px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.chat-text :where(p, ul, ol, pre, blockquote, table) {
+  margin: 0;
+}
+
+.chat-text :where(p + p, p + ul, p + ol, p + pre, p + blockquote) {
+  margin-top: 0.75em;
+}
+
+.chat-text :where(ul, ol) {
+  padding-left: 1.5em;
+}
+
+.chat-text :where(li + li) {
+  margin-top: 0.25em;
+}
+
+.chat-text :where(a) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.chat-text :where(a:hover) {
+  opacity: 0.8;
+}
+
+.chat-text :where(code) {
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+
+.chat-text :where(:not(pre) > code) {
+  background: rgba(0, 0, 0, 0.15);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+
+.chat-text :where(pre) {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+
+.chat-text :where(pre code) {
+  background: none;
+  padding: 0;
+}
+
+.chat-text :where(blockquote) {
+  border-left: 3px solid var(--border-strong);
+  padding-left: 12px;
+  margin-left: 0;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 12px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.chat-text :where(blockquote blockquote) {
+  margin-top: 8px;
+  border-left-color: var(--border-hover);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.chat-text :where(blockquote blockquote blockquote) {
+  border-left-color: var(--muted-strong);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+:root[data-theme="light"] .chat-text :where(blockquote) {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+:root[data-theme="light"] .chat-text :where(blockquote blockquote) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="light"] .chat-text :where(blockquote blockquote blockquote) {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="light"] .chat-text :where(:not(pre) > code) {
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+:root[data-theme="light"] .chat-text :where(pre) {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.chat-text :where(hr) {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1em 0;
+}
+
+/* =============================================
+   RTL (Right-to-Left) SUPPORT
+   ============================================= */
+
+.chat-text[dir="rtl"] {
+  text-align: right;
+}
+
+.chat-text[dir="rtl"] :where(ul, ol) {
+  padding-left: 0;
+  padding-right: 1.5em;
+}
+
+.chat-text[dir="rtl"] :where(blockquote) {
+  border-left: none;
+  border-right: 3px solid var(--border);
+  padding-left: 0;
+  padding-right: 1em;
+}
+
+/* =============================================
+   CANVAS EMBEDS
+   ============================================= */
+
+.chat-text .canvas-embed-wrapper {
+  margin: 8px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.chat-text .canvas-embed {
+  width: 100%;
+  height: 420px;
+  border: none;
+  display: block;
+  background: #0d1117;
+}
+
+.chat-text .canvas-embed-label {
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.15);
+  border-top: 1px solid var(--border);
+}
+
+/* =============================================
+   CLAWSCRIPT EMBED ACTIONS
+   ============================================= */
+
+.chat-text .clawscript-embed-action {
+  margin: 4px 0 8px 0;
+}
+
+.chat-text .clawscript-open-editor {
+  display: inline-block;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.1);
+  border: 1px solid rgba(63, 185, 80, 0.3);
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.chat-text .clawscript-open-editor:hover {
+  background: rgba(63, 185, 80, 0.2);
+  border-color: rgba(63, 185, 80, 0.5);
+}
+
+/* =============================================
+   ENHANCED TABLES
+   ============================================= */
+
+.chat-text :where(table) {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.chat-text :where(th) {
+  background: rgba(0, 0, 0, 0.2);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--muted);
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.chat-text :where(td) {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.chat-text :where(tr:nth-child(even)) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.chat-text :where(tr:hover) {
+  background: rgba(88, 166, 255, 0.04);
+}
+
+:root[data-theme="light"] .chat-text :where(th) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="light"] .chat-text :where(td) {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .chat-text :where(tr:nth-child(even)) {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+:root[data-theme="light"] .chat-text :where(tr:hover) {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="light"] .chat-text .canvas-embed-wrapper {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+:root[data-theme="light"] .chat-text .canvas-embed {
+  background: #f6f8fa;
+}
+
+:root[data-theme="light"] .chat-text .canvas-embed-label {
+  background: rgba(0, 0, 0, 0.04);
+}
