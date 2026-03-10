@@ -3305,6 +3305,7 @@ async function handleIgApi(req, res, p) {
 
     return json(res, 404, { error: "Unknown IG endpoint" });
   } catch (e) {
+    if (e.code === "NO_DATABASE") return json(res, 503, { error: "Database not configured", detail: "Set DATABASE_URL in your .env file to enable this feature" });
     return json(res, 500, { error: e.message });
   }
 }
@@ -3379,6 +3380,7 @@ async function handleAgentsApi(req, res, p) {
     }
     return json(res, 404, { error: "Unknown agent endpoint" });
   } catch (e) {
+    if (e.code === "NO_DATABASE") return json(res, 503, { error: "Database not configured", detail: "Set DATABASE_URL in your .env file to enable this feature" });
     return json(res, 500, { error: e.message });
   }
 }
@@ -5247,6 +5249,7 @@ function proxyReq(req, res, retries = 3) {
 
 const NAV_INJECT_TAG = '<script src="/nav-inject.js"></script>';
 
+
 function unescapeHtmlEntities(html) {
   return html
     .replace(/&lt;/g, "<")
@@ -5534,7 +5537,13 @@ server.on("upgrade", (req, socket, head) => {
 
 server.listen(PROXY_PORT, "0.0.0.0", () => {
   console.log(`[ceo-proxy] listening on 0.0.0.0:${PROXY_PORT}, proxying to gateway:${GATEWAY_PORT}`);
-  ensureIgConfig();
+  const igConfig = ensureIgConfig();
+  const ap = igConfig.activeProfile || "none";
+  const hasDemo = !!(igConfig.profiles && igConfig.profiles.demo && igConfig.profiles.demo.apiKey);
+  const hasLive = !!(igConfig.profiles && igConfig.profiles.live && igConfig.profiles.live.apiKey);
+  console.log(`[startup] IG profiles: demo=${hasDemo ? "configured" : "empty"}, live=${hasLive ? "configured" : "empty"}, active=${ap}`);
+  console.log(`[startup] Database: ${process.env.DATABASE_URL ? "configured" : "not configured (file-only mode)"}`);
+  console.log(`[startup] Login: ${(LOGIN_USER && LOGIN_PASS) ? "protected (user: " + LOGIN_USER + ")" : "open (no password)"}`);
   updateCrewFile();
   writeConfigSnapshots();
   autoRegisterBotScripts();

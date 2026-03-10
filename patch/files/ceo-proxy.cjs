@@ -3305,6 +3305,7 @@ async function handleIgApi(req, res, p) {
 
     return json(res, 404, { error: "Unknown IG endpoint" });
   } catch (e) {
+    if (e.code === "NO_DATABASE") return json(res, 503, { error: "Database not configured", detail: "Set DATABASE_URL in your .env file to enable this feature" });
     return json(res, 500, { error: e.message });
   }
 }
@@ -3379,6 +3380,7 @@ async function handleAgentsApi(req, res, p) {
     }
     return json(res, 404, { error: "Unknown agent endpoint" });
   } catch (e) {
+    if (e.code === "NO_DATABASE") return json(res, 503, { error: "Database not configured", detail: "Set DATABASE_URL in your .env file to enable this feature" });
     return json(res, 500, { error: e.message });
   }
 }

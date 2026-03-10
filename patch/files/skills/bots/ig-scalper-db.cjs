@@ -1,6 +1,11 @@
 const { Pool } = require("pg");
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const DB_URL = process.env.DATABASE_URL;
+const pool = DB_URL ? new Pool({ connectionString: DB_URL }) : null;
+
+function isAvailable() {
+  return !!pool;
+}
 
 function camel(row) {
   if (!row) return null;
@@ -13,6 +18,11 @@ function camel(row) {
 }
 
 async function query(sql, params) {
+  if (!pool) {
+    const err = new Error("DATABASE_URL not configured — database features unavailable");
+    err.code = "NO_DATABASE";
+    throw err;
+  }
   const client = await pool.connect();
   try {
     const res = await client.query(sql, params);
@@ -890,10 +900,11 @@ async function deleteBatch(batchId) {
 }
 
 async function close() {
-  await pool.end();
+  if (pool) await pool.end();
 }
 
 module.exports = {
+  isAvailable,
   getConfig, updateConfig,
   getStrategies, getStrategy, addStrategy, updateStrategy, deleteStrategy, toggleStrategy,
   logTrade, getTrades, getTradeStats, clearTrades,
