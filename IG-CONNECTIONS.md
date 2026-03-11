@@ -888,3 +888,361 @@ Some live accounts are `SPREADBET` (not `CFD`). System auto-detects and handles 
 | **Price Cache** | Latest bid/offer/mid | Real-time (LS) or 3sec (polling) |
 
 All connections are **automatic**—the dashboard handles authentication, token refresh, failover, and reconnection transparently.
+
+---
+
+## Part 8: IG Candle Data for Backtesting
+
+### 8.1 How IG Provides Historical Candle Data
+
+IG Markets provides historical price data via the **REST API** `/prices/{epic}` endpoint. This is used for:
+- Backtesting trading strategies (analysis of past performance)
+- Technical indicator calculation (RSI, EMA, MACD, etc.)
+- Strategy signal evaluation
+
+**Endpoint**: `GET /prices/{epic}?resolution={RES}&max={N}&pageSize={N}`
+
+```javascript
+// Example: Fetch 100 hourly candles for GBP/USD
+GET /prices/CS.D.GBPUSD.TODAY.IP?resolution=HOUR&max=100&pageSize=100
+
+// Response structure
+{
+  "instrumentName": "GBP/USD",
+  "instrumentType": "SPOT",
+  "prices": [
+    {
+      "bid": { "open": 1.2540, "high": 1.2560, "low": 1.2535, "close": 1.2555 },
+      "mid": { "open": 1.2541, "high": 1.2560, "low": 1.2536, "close": 1.2555 },
+      "ask": { "open": 1.2542, "high": 1.2561, "low": 1.2537, "close": 1.2556 },
+      "snapshotTime": "2024/01/10 12:00:00"
+    },
+    // ... more candles
+  ]
+}
+```
+
+### 8.2 Available Candle Resolutions
+
+IG supports these timeframe resolutions:
+
+```
+SECOND     (1 second)
+SECOND_2   (2 seconds)
+SECOND_5   (5 seconds)
+SECOND_10  (10 seconds)
+SECOND_20  (20 seconds)
+SECOND_30  (30 seconds)
+MINUTE     (1 minute)
+MINUTE_5   (5 minutes)
+MINUTE_15  (15 minutes)
+MINUTE_30  (30 minutes)
+HOUR       (1 hour)
+HOUR_4     (4 hours)
+DAY        (1 day)
+```
+
+### 8.3 Rate Limits & Limitations for Retail CFD Accounts
+
+**CRITICAL LIMITATIONS for retail/DEMO accounts:**
+
+| Limit | Value | Impact |
+|-------|-------|--------|
+| **Max Candles Per Request** | 250 | Only last 250 candles available in one call |
+| **API Requests Per Minute** | ~60 per minute | ~1 request/second average |
+| **Concurrent Requests** | 5-10 simultaneous | Parallel requests are throttled |
+| **Request Timeout** | 15 seconds | Timeout if IG API is slow |
+| **Historical Data Depth** | ~5 years (limited) | Varies by instrument; Forex ≥5 yrs, others less |
+| **Spread Availability** | Only with CFD/Spread instruments | Not all instruments have bid/ask; some only mid |
+| **Real-time vs Historical** | Delayed 5-15 min (DEMO only) | Real accounts: 0-2 min lag |
+
+### 8.4 Data Caching Strategy
+
+The IG Trading Dashboard implements aggressive caching to work within limits:
+
+```javascript
+// ig-local-api.mjs caching
+const IG_CACHE_TTL = 30000;  // 30 seconds
+
+// All price history requests cached
+const cacheKey = `prices:${epic}:${resolution}:${max}:${from}:${to}`;
+const cached = igCacheGet(cacheKey);
+if (cached) return cached;  // Avoid redundant API calls
+
+// Cache invalidated on:
+// - Open/close trades
+// - Manual refresh request
+// - Position update
+```
+
+**Why 30 seconds?**
+- Candles don't change every millisecond
+- Reduces API throttling risk
+- Acceptable for strategy backtesting (you're analyzing, not trading)
+
+### 8.5 Backtesting Workflow
+
+The Scalper engine backtests strategies using IG candle data:
+
+```
+1. User selects strategy & date range
+   ↓
+2. Backtester requests candles from IG via REST API
+   GET /prices/{epic}?resolution=MINUTE_5&max=250
+   ↓
+3. If date range > 250 candles, make multiple requests
+   with pagination (IG doesn't support pagination, so
+   this requires sequential requests with delays)
+   ↓
+4. Load all candles into memory
+   ↓
+5. Simulate strategy tick-by-tick through historical data
+   ↓
+6. Calculate entry/exit signals
+   ↓
+7. Track P&L, win rate, max drawdown, etc.
+   ↓
+8. Return backtest report
+```
+
+### 8.6 Backtesting Rate Limit Workaround
+
+For backtesting long date ranges (e.g., 1 year of 5-min candles):
+
+**Problem**: 1 year of 5-min candles = ~52,000 candles, but IG only gives 250/request
+- Would need 208 API calls (52,000 ÷ 250)
+- With 60 requests/min limit = 3.5 minutes minimum
+- Risk of 429 (Too Many Requests) errors
+
+**Solution**: The dashboard uses **sequential requests with delays**
+
+```javascript
+async function getCandles(epic, resolution, startDate, endDate) {
+  const allCandles = [];
+  const batchSize = 250;  // Max per IG request
+  const delayBetweenRequests = 1000;  // 1 second = safe for 60 req/min
+  
+  // Iterate backwards from endDate, requesting 250 candles at a time
+  let currentEnd = endDate;
+  
+  while (currentEnd > startDate) {
+    const batch = await igRequest('GET', 
+      `/prices/${epic}?resolution=${resolution}&max=${batchSize}&pageSize=${batchSize}&to=${currentEnd}`);
+    
+    const candles = batch.prices || [];
+    allCandles.unshift(...candles);  // Add to front
+    
+    currentEnd = new Date(candles[0].snapshotTime);  // Start from oldest candle
+    
+    // Respect rate limits
+    await sleep(delayBetweenRequests);
+  }
+  
+  return allCandles;
+}
+```
+
+### 8.7 Historical Data Availability by Instrument
+
+**Forex (Spot)**: ~5+ years usually available
+```
+GBP/USD, EUR/USD, USD/JPY, AUD/USD, etc.
+IG typically has excellent Forex history
+```
+
+**Indices**: ~3-5 years
+```
+DAX, FTSE, S&P 500, Nikkei, etc.
+Some older data may be sparse
+```
+
+**Stocks (Individual)**: ~2-3 years or less
+```
+Tech stocks, blue chips, etc.
+Newer stocks may have <1 year history
+```
+
+**Commodities**: ~2-5 years
+```
+Gold, Oil, Natural Gas, etc.
+Depends on when IG started trading it
+```
+
+**How to check**: Try requesting with very early dates
+```
+GET /prices/{epic}?resolution=DAY&max=250&from=2015-01-01
+```
+
+If you get empty or few results, that instrument doesn't have data that far back.
+
+### 8.8 The "Middle Price Problem"
+
+IG returns three price levels:
+```json
+{
+  "bid": { "open": 1.2540, "high": 1.2560, "low": 1.2535, "close": 1.2555 },
+  "mid": { "open": 1.2541, "high": 1.2560, "low": 1.2536, "close": 1.2555 },
+  "ask": { "open": 1.2542, "high": 1.2561, "low": 1.2537, "close": 1.2556 }
+}
+```
+
+**Issue**: Bid/Ask don't always match perfectly due to:
+- Market spread variability
+- Data aggregation from multiple sources
+- Time sync differences
+
+**Retail Impact**:
+- Your strategy backtests on "mid" prices
+- Actual trading executes at bid/ask
+- Slippage not fully accounted for in backtest
+- **Real trades often slightly worse than backtest** (typical: -0.3% to -1.0% slippage)
+
+### 8.9 DEMO vs LIVE Account Data Differences
+
+| Aspect | DEMO | LIVE |
+|--------|------|------|
+| **Availability** | Full 5+ year history | Same |
+| **Real-time Lag** | 5-15 minutes (synthetic) | 0-2 minutes (real market) |
+| **Spread** | Wider (simulated) | Tighter (real) |
+| **Slippage** | None (perfect fills) | Real slippage occurs |
+| **Data Reliability** | 99% | 99.9% |
+| **Use Case** | Learning, testing, backtest | Real trading validation |
+
+**Important**: A strategy that works on DEMO may fail on LIVE due to:
+- Real market spread being wider during volatility
+- Actual slippage on entry/exit
+- Order rejection during fast markets
+- Liquidity changes
+
+### 8.10 Backtesting Best Practices
+
+**1. Test on DEMO first, then LIVE**
+```
+DEMO Backtest (synthetic data)
+    ↓
+DEMO Live Forward Test (run actual strategy on demo for 1-2 weeks)
+    ↓
+LIVE Small Position (risk 0.1% account on 1 contract)
+    ↓
+LIVE Scale Up (gradually increase size if profitable)
+```
+
+**2. Account for spreads in backtest**
+```javascript
+// Instead of:
+const entryPrice = candle.mid.close;
+
+// Do this (use ask for long, bid for short):
+const entryPrice = signal === 'BUY' 
+  ? candle.ask.close 
+  : candle.bid.close;
+```
+
+**3. Add slippage factor**
+```javascript
+const estimatedSlippagePct = 0.1;  // 0.1% conservative estimate
+const slippagePoints = entryPrice * (estimatedSlippagePct / 100);
+const actualEntryPrice = signal === 'BUY'
+  ? entryPrice + slippagePoints
+  : entryPrice - slippagePoints;
+```
+
+**4. Test multiple date ranges**
+```
+- Recent data (last 3 months) → Current market conditions
+- Crisis period (March 2020, Aug 2015) → Stress test
+- Calm period (2019) → Normal conditions
+- Trending market (2021-2023) → Bull market behavior
+```
+
+**5. Check for data gaps**
+```javascript
+// Some resolutions may have gaps (weekends, holidays)
+// If candle timestamps jump >2x expected interval:
+const gaps = [];
+for (let i = 1; i < candles.length; i++) {
+  const expectedGap = resolution * 1000;
+  const actualGap = candles[i].timestamp - candles[i-1].timestamp;
+  if (actualGap > expectedGap * 2) {
+    gaps.push({ index: i, gap: actualGap });
+  }
+}
+```
+
+### 8.11 Common Backtesting Errors with IG Data
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| **"Insufficient history"** | Requested date range not available | Use closer dates or different instrument |
+| **Gaps in candles** | Market closed (weekends, holidays) | Filter out 00:00 candles from weekends |
+| **Unrealistic results (>100% return)** | Only tested on trending market, no stress tests | Test on bull, bear, and crisis periods |
+| **DEMO ≠ LIVE performance** | Simulated spreads, no slippage | Add bid/ask and slippage to backtest |
+| **Rate limit errors** | Too many concurrent requests | Add delays between requests (500-1000ms) |
+| **Stale data** | Using cached data from 30s ago | Set `max_age=0` for backtest requests (bypass cache) |
+
+### 8.12 Backtesting API Endpoint
+
+```http
+POST /api/ig/scalper/batch-backtest
+Content-Type: application/json
+
+{
+  "strategies": [
+    {
+      "id": 32,
+      "strategyType": "scalper",
+      "epic": "CS.D.GBPUSD.TODAY.IP",
+      "timeframe": "MINUTE_5",
+      "startDate": "2024-01-01",
+      "endDate": "2024-01-31"
+    }
+  ]
+}
+
+Response (after backtest completes):
+{
+  "batchId": "batch_20240110_abc123",
+  "results": [
+    {
+      "strategyId": 32,
+      "totalTrades": 157,
+      "winRate": 58.3,
+      "totalProfit": 2450.75,
+      "maxDrawdown": -850,
+      "profitFactor": 1.85,
+      "avgWin": 25.50,
+      "avgLoss": -13.80,
+      "duration": "45 seconds"
+    }
+  ]
+}
+```
+
+**Note**: On local installations, backtesting requires `ceo-proxy` with the scalper engine active. The simple `ig-local-api.mjs` can fetch candles but cannot execute backtests.
+
+---
+
+## Summary: IG Data Limitations for Retail Traders
+
+```
+✓ Strengths:
+  - 5+ years history for major forex
+  - Multiple resolutions (SECOND to DAY)
+  - Free via API (included with trading account)
+  - Bid/mid/ask data available
+
+✗ Limitations:
+  - 250 candles max per request (requires pagination)
+  - ~60 requests/minute rate limit
+  - DEMO spreads wider than real market
+  - No tick-level data (only candles)
+  - Slippage/liquidity not in backtests
+  - Weekend/holiday gaps in daily data
+
+→ Workaround:
+  - Cache aggressively (30-60 sec TTL)
+  - Batch requests with delays
+  - Add slippage estimates (0.1-1.0%)
+  - Test on multiple date ranges
+  - Always validate on LIVE with small size
+```
