@@ -891,6 +891,231 @@ All connections are **automatic**—the dashboard handles authentication, token 
 
 ---
 
+## Part 8: Instrument Search & Discovery
+
+### 8.0 How the Dashboard Searches for Instruments
+
+The IG Trading Dashboard provides real-time instrument search via dropdown/autocomplete boxes in strategy configuration.
+
+#### Frontend Implementation (Debounced Search)
+
+**Files**: `ig-dashboard.html`, `ig-scalper-ui.js`
+
+```javascript
+// User types in instrument field (e.g., "gbp" or "gold")
+epicInput.addEventListener('input', function handler() {
+  if (scalperSearchTimeout) clearTimeout(scalperSearchTimeout);
+  
+  var q = epicInput.value.trim();
+  if (q.length < 2) return;  // Only search if 2+ chars
+  
+  // Debounce: wait 400ms before sending request (reduces API calls)
+  scalperSearchTimeout = setTimeout(function() {
+    apiFetch('/api/ig/markets?q=' + encodeURIComponent(q))
+      .then(function(data) {
+        if (!data || !data.markets || data.markets.length === 0) {
+          resultsEl.innerHTML = '<div>No results</div>';
+          return;
+        }
+        
+        // Render dropdown (max 10 results)
+        var html = '';
+        for (var i = 0; i < Math.min(data.markets.length, 10); i++) {
+          var m = data.markets[i];
+          html += '<div onclick="selectScalperInstrument(\'' + 
+            m.epic + '\',\'' + (m.instrumentName || '').replace(/'/g, "\\'") + '\')">' +
+            '<span style="font-weight:600">' + (m.instrumentName || m.epic) + '</span> ' +
+            '<span style="font-size:10px">' + m.epic + '</span>' +
+          '</div>';
+        }
+        resultsEl.innerHTML = html;
+      });
+  }, 400);  // 400ms debounce delay
+});
+```
+
+#### Backend API Endpoint
+
+**Endpoint**: `GET /api/ig/markets?q=searchterm`
+
+```http
+GET /api/ig/markets?q=gbp HTTP/1.1
+
+Response:
+{
+  "markets": [
+    {
+      "epic": "CS.D.GBPUSD.TODAY.IP",
+      "instrumentName": "GBP/USD",
+      "marketStatus": "TRADEABLE",
+      "bid": 1.2555,
+      "offer": 1.2560,
+      "high": 1.2600,
+      "low": 1.2500,
+      "percentageChange": 0.5,
+      "updateTime": "2024/01/10 14:30:00"
+    },
+    {
+      "epic": "IX.D.FTSE.IFD.IP",
+      "instrumentName": "FTSE 100",
+      "marketStatus": "TRADEABLE",
+      "bid": 7850.5,
+      "offer": 7851.0,
+      "high": 7900,
+      "low": 7800,
+      "percentageChange": 1.2,
+      "updateTime": "2024/01/10 14:30:00"
+    }
+  ]
+}
+```
+
+#### Backend Implementation (ig-local-api.mjs)
+
+```javascript
+if (m === 'GET' && p === '/api/ig/markets') {
+  // Extract search query (supports both 'q' and 'searchTerm')
+  const searchTerm = url.searchParams.get('searchTerm') || url.searchParams.get('q') || '';
+  
+  if (!searchTerm) {
+    return json(res, 400, { error: 'Missing searchTerm or q param' }), true;
+  }
+  
+  // Authenticate session
+  const session = await igAuth();
+  
+  // Forward to IG API with searchTerm parameter
+  const r = await igRequest(
+    'GET', 
+    '/markets?searchTerm=' + encodeURIComponent(searchTerm),
+    igHeaders(session)
+  );
+  
+  // Return IG's response (typically caches 30 seconds)
+  if (r.status !== 200) {
+    return json(res, r.status, { error: 'IG API error', detail: r.body }), true;
+  }
+  
+  return igJsonResponse(res, 200, r.body), true;
+}
+```
+
+#### Workflow
+
+```
+User types "gold" in instrument field
+         ↓
+Frontend waits 400ms (debounce) to avoid spamming API
+         ↓
+Sends: GET /api/ig/markets?q=gold
+         ↓
+ig-local-api.mjs receives request
+         ↓
+Calls igAuth() to refresh session if needed
+         ↓
+Forwards to IG REST API: /markets?searchTerm=gold
+         ↓
+IG responds with ~10-50 matching instruments:
+  - Spot Gold (XAU/USD): CS.D.XAUUSD.TODAY.IP
+  - Gold Futures: XAUUSD_FUT
+  - Gold ETFs, etc.
+         ↓
+Frontend receives JSON array of markets
+         ↓
+Renders dropdown with top 10 results
+         ↓
+User clicks "Spot Gold" → instrument loaded
+```
+
+#### Search Behavior
+
+| Aspect | Behavior |
+|--------|----------|
+| **Minimum Characters** | 2 (don't search for "g" or "1") |
+| **Debounce Delay** | 400ms (wait after user stops typing) |
+| **Max Results Displayed** | 10 (full response may have 50+) |
+| **Search Fields** | IG searches: instrumentName, epic, type |
+| **Case Insensitive** | Yes ("GBP", "gbp", "Gbp" all work) |
+| **Caching** | 30 seconds (same search term) |
+
+#### Supported Search Patterns
+
+```
+// All these work:
+q=gbp          → GBP/USD, GBP/JPY, etc.
+q=eurusd       → EUR/USD
+q=dax          → DAX Index
+q=CS.D.        → All spot CFDs
+q=IX.D.        → All indices
+q=spot         → All spot instruments
+q=futures      → Futures contracts (may be limited)
+```
+
+#### Rate Limits on Search
+
+| Limit | Value | Impact |
+|-------|-------|--------|
+| **Search Requests/Min** | ~60 per minute | 1 search/sec acceptable |
+| **API Timeout** | 15 seconds | Slow searches timeout |
+| **Response Size** | ~50 KB typical | Usually 20-50 results |
+| **Caching** | 30 sec TTL | Identical searches served from cache |
+
+#### How Instrument Data Loads
+
+After user selects an instrument from dropdown:
+
+```javascript
+function selectScalperInstrument(epic, name) {
+  document.getElementById('scalperAddEpic').value = epic;
+  document.getElementById('scalperAddName').value = name + ' Strategy';
+  document.getElementById('scalperInstrumentSearchResults').style.display = 'none';
+}
+```
+
+Then when strategy is opened, `loadMarketData()` fetches full instrument details:
+
+```javascript
+async function loadMarketData(epic) {
+  // Fetch: GET /api/ig/markets/CS.D.GBPUSD.TODAY.IP
+  var data = await apiFetch('/api/ig/markets/' + epic);
+  
+  if (!data || data._httpError) return;
+  
+  // Extracts from response:
+  var snap = data.snapshot || {};      // bid/offer/high/low
+  var inst = data.instrument || {};    // name, type, pip value
+  var deal = data.dealingRules || {};  // min/max size, spreads
+  
+  // Update dashboard display with:
+  // - Current bid/offer
+  // - Spread in points and %
+  // - High/Low of day
+  // - Pip value (for P&L calculation)
+  // - Min/max tradeable size
+}
+```
+
+#### Why Debounce is Important
+
+**Without debounce** (400ms wait):
+```
+User types: "g-o-l-d"
+API calls:   g → go → gol → gold
+Total: 4 API requests for one word
+⚠ Triggers rate limiting faster
+```
+
+**With 400ms debounce**:
+```
+User types:    "g-o-l-d"
+User pauses:   [waiting 400ms]
+API call:      gold
+Total: 1 API request
+✓ Respects rate limits
+```
+
+---
+
 ## Part 8: IG Candle Data for Backtesting
 
 ### 8.1 How IG Provides Historical Candle Data
