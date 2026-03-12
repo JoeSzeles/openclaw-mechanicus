@@ -1,6 +1,14 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, createReadStream } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { createRequire } from 'module';
+
+const __require = createRequire(import.meta.url);
+let brainEngineBot = null;
+try {
+  const brainBotPath = join(process.cwd(), 'skills', 'bots', 'brain-engine-bot.cjs');
+  if (existsSync(brainBotPath)) brainEngineBot = __require(brainBotPath);
+} catch (_) {}
 
 const DATA_DIR = join(homedir(), '.openclaw');
 const IG_CONFIG_FILE = join(DATA_DIR, 'ig-config.json');
@@ -1989,10 +1997,16 @@ async function routeRequest(req, res, p, m, url) {
     const regPath = join(DATA_DIR, 'bot-registry.json');
     let registry = [];
     try { if (existsSync(regPath)) registry = JSON.parse(readFileSync(regPath, 'utf8')); } catch (_) {}
-    const bots = registry.map(b => ({
-      id: b.id, cmd: b.cmd, enabled: b.enabled, running: false,
-      pid: null, restarts: 0, addedBy: b.addedBy || 'unknown', addedAt: b.addedAt || null,
-    }));
+    const bots = registry.map(b => {
+      const bot = { id: b.id, cmd: b.cmd, enabled: b.enabled, running: false, pid: null, restarts: 0, addedBy: b.addedBy || 'unknown', addedAt: b.addedAt || null };
+      if (b.id === 'brain-engine' && brainEngineBot) {
+        const st = brainEngineBot.getStatus();
+        bot.running = st.running;
+        bot.pid = st.pid;
+        bot.restarts = st.restartCount;
+      }
+      return bot;
+    });
     return json(res, 200, { bots }), true;
   }
 
@@ -2013,6 +2027,17 @@ async function routeRequest(req, res, p, m, url) {
   if (botIdMatch) {
     const action = botIdMatch[2];
     if (m === 'POST' && (action === 'start' || action === 'stop')) {
+      const botId = decodeURIComponent(botIdMatch[1]);
+      if (botId === 'brain-engine' && brainEngineBot) {
+        if (action === 'start') {
+          const result = brainEngineBot.start();
+          return json(res, 200, { ok: result.ok, ...result }), true;
+        }
+        if (action === 'stop') {
+          const result = brainEngineBot.stop();
+          return json(res, 200, { ok: result.ok, ...result }), true;
+        }
+      }
       return json(res, 200, { ok: false, _localMode: true, error: 'Bot process management requires ceo-proxy' }), true;
     }
     if (m === 'DELETE' && !action) {
@@ -2039,7 +2064,12 @@ async function routeRequest(req, res, p, m, url) {
   }
 
   if (m === 'GET' && p === '/api/processes') {
-    return json(res, 200, { processes: [], _localMode: true }), true;
+    const procs = [];
+    if (brainEngineBot) {
+      const st = brainEngineBot.getStatus();
+      if (st.running) procs.push({ pid: st.pid, name: 'brain-engine', cmd: 'python3 brain_engine.py', uptime: st.lastStartedAt });
+    }
+    return json(res, 200, { processes: procs, _localMode: true }), true;
   }
 
   if (m === 'POST' && p === '/api/processes/kill') {

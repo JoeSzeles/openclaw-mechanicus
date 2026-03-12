@@ -117,7 +117,50 @@ $installedFiles | Sort-Object | Set-Content $InstalledList
 Write-Host "  Installed $installed files ($newFiles new, $backedUp updated)"
 Write-Host ""
 
-Write-Host "[3/3] Checking dependencies..."
+Write-Host "[3/4] Neural Trading (BrainJar) setup..."
+Write-Host ""
+Write-Host "  The Neural Trading tab uses BrainJar's brain engine."
+Write-Host "  This requires the Drosophila brain model (~177MB)."
+Write-Host ""
+$installBrain = Read-Host "  Install Drosophila brain model? (y/n) [n]"
+if (-not $installBrain) { $installBrain = "n" }
+
+$BrainDir = Join-Path $OpenClawRoot "openclaw-mechanicus-patches\brainjar"
+
+if ($installBrain -eq "y" -or $installBrain -eq "Y") {
+    Write-Host "  Cloning Drosophila brain model..."
+    New-Item -ItemType Directory -Path $BrainDir -Force | Out-Null
+    $brainModelDir = Join-Path $BrainDir "Drosophila_brain_model"
+    if (Test-Path $brainModelDir) {
+        Write-Host "  Brain model already present, updating..."
+        Push-Location $brainModelDir
+        git pull 2>$null
+        Pop-Location
+    } else {
+        git clone https://github.com/JoeSzeles/Drosophila_brain_model.git $brainModelDir 2>$null
+    }
+    Write-Host "  Brain model installed at $brainModelDir"
+    Write-Host ""
+    Write-Host "  To start the brain engine:"
+    Write-Host "    cd $brainModelDir && python brain_engine.py"
+    Write-Host "  Or register it as a bot in the IG Dashboard Bots tab."
+} else {
+    Write-Host "  Skipping brain model installation."
+    Write-Host "  You can install it later by cloning:"
+    Write-Host "    git clone https://github.com/JoeSzeles/Drosophila_brain_model.git $BrainDir\Drosophila_brain_model"
+}
+Write-Host ""
+
+$brainBotSrc = Join-Path $ScriptDir "..\skills\bots\brain-engine-bot.cjs"
+if (Test-Path $brainBotSrc) {
+    $botsDir = Join-Path $OpenClawRoot "skills\bots"
+    New-Item -ItemType Directory -Path $botsDir -Force | Out-Null
+    Copy-Item $brainBotSrc (Join-Path $botsDir "brain-engine-bot.cjs") -Force
+    Write-Host "  Brain engine bot manager installed."
+}
+Write-Host ""
+
+Write-Host "[4/4] Checking dependencies..."
 
 $pkgJson = Join-Path $OpenClawRoot "package.json"
 $depsNeeded = @()

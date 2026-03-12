@@ -110,7 +110,53 @@ fi
 echo "  Installed $installed files ($new_files new, $backed_up updated)"
 echo ""
 
-echo "[3/3] Checking dependencies..."
+echo "[3/4] Neural Trading (BrainJar) setup..."
+echo ""
+echo "  The Neural Trading tab uses BrainJar's brain engine."
+echo "  This requires the Drosophila brain model (~177MB)."
+echo ""
+read -p "  Install Drosophila brain model? (y/n) [n]: " install_brain
+install_brain="${install_brain:-n}"
+
+BRAIN_DIR="$OPENCLAW_ROOT/openclaw-mechanicus-patches/brainjar"
+
+if [ "$install_brain" = "y" ] || [ "$install_brain" = "Y" ]; then
+  echo "  Cloning Drosophila brain model..."
+  mkdir -p "$BRAIN_DIR"
+  if command -v git &>/dev/null; then
+    if [ -d "$BRAIN_DIR/Drosophila_brain_model" ]; then
+      echo "  Brain model already present, updating..."
+      cd "$BRAIN_DIR/Drosophila_brain_model" && git pull 2>/dev/null || true
+    else
+      git clone https://github.com/JoeSzeles/Drosophila_brain_model.git "$BRAIN_DIR/Drosophila_brain_model" 2>/dev/null
+    fi
+    echo "  Brain model installed at $BRAIN_DIR/Drosophila_brain_model"
+  else
+    echo "  WARNING: git not found. Please manually clone:"
+    echo "    git clone https://github.com/JoeSzeles/Drosophila_brain_model.git $BRAIN_DIR/Drosophila_brain_model"
+  fi
+  echo ""
+  echo "  To start the brain engine:"
+  echo "    cd $BRAIN_DIR/Drosophila_brain_model && python3 brain_engine.py"
+  echo "  Or register it as a bot in the IG Dashboard Bots tab."
+else
+  echo "  Skipping brain model installation."
+  echo "  You can install it later by cloning:"
+  echo "    git clone https://github.com/JoeSzeles/Drosophila_brain_model.git $BRAIN_DIR/Drosophila_brain_model"
+fi
+echo ""
+
+# Copy brain-engine-bot.cjs to skills/bots if it exists
+BRAIN_BOT_SRC="$SCRIPT_DIR/../skills/bots/brain-engine-bot.cjs"
+if [ -f "$BRAIN_BOT_SRC" ]; then
+  BOTS_DIR="$OPENCLAW_ROOT/skills/bots"
+  mkdir -p "$BOTS_DIR"
+  cp "$BRAIN_BOT_SRC" "$BOTS_DIR/brain-engine-bot.cjs"
+  echo "  Brain engine bot manager installed."
+fi
+echo ""
+
+echo "[4/4] Checking dependencies..."
 
 cd "$OPENCLAW_ROOT"
 deps_needed=""

@@ -1,0 +1,20 @@
+
+Compacted conversation
+
+Based on the BrainJar system structure and the conversation history, here are the main files responsible for keeping the brain simulation, dashboard, and their core functions running. I've organized them by component for clarity:
+
+Brain Engine (Neural Simulation)
+brain_engine.py - The primary FastAPI server that runs the real Drosophila brain model (630 neurons). It handles network creation, stimulation, observation, and REST API endpoints (/boot, /stimulate, /observe, /status). This file loads the actual brain data from CSV/parquet files and uses Brian2 for neural simulation.
+Dashboard (Web Interface & Trading)
+brain-jar/dashboard-v2.js - The main Node.js server for the dashboard. It serves the web interface, handles Socket.io connections for real-time updates, integrates with the brain engine via HTTP calls, and manages IG trading operations (real API calls, not simulated).
+brain-jar/index.js - Alternative/legacy dashboard entry point (may be used depending on startup configuration).
+brain-jar/ig-adapter.js - Core IG Markets API integration file. Handles authentication, real order placement (/positions/otc), market data retrieval, and rate limiting for trading functions.
+brain-jar/package.json - Defines Node.js dependencies (e.g., Socket.io, Axios) and scripts for running the dashboard.
+Supporting/Startup Files
+quickstart.bat - Batch script that automates starting both the brain engine and dashboard in sequence.
+brain-jar/start.js - Additional startup script for the dashboard server.
+Key Dependencies & Data
+Drosophila_brain_model-main/model.py - The core brain model implementation (imported by brain_engine.py).
+Drosophila_brain_model-main/2023_03_23_completeness_630_final.csv & Drosophila_brain_model-main/2023_03_23_connectivity_630_final.parquet - Real brain data files loaded by the engine.
+.env (in brain-jar/) - Contains IG API credentials for real trading.
+The system runs the brain engine on port 8000 (FastAPI) and the dashboard on port 3000 (Node.js), with CORS enabled for cross-origin communication. All components make real API calls (no mock/simulated mode) as per recent updates. If you need details on any specific file or help running them, let me know!
