@@ -508,19 +508,173 @@ function getArchitecture() {
   };
 }
 
+const MAX_BACKUPS = 5;
+const BACKUP_INTERVAL_MS = 5 * 60 * 1000;
+let lastBackupTime = 0;
+
+function sanitizeEpic(epic) {
+  return encodeURIComponent(epic).replace(/%/g, '_');
+}
+
+function atomicWrite(fpath, data) {
+  const tmp = fpath + '.tmp';
+  const fd = fs.openSync(tmp, 'w');
+  fs.writeSync(fd, data);
+  fs.fsyncSync(fd);
+  fs.closeSync(fd);
+  fs.renameSync(tmp, fpath);
+}
+
+function saveInstrumentPatterns(epic) {
+  try {
+    const mem = patternMemory[epic];
+    if (!mem) return;
+    const fname = sanitizeEpic(epic) + '.json';
+    const fpath = path.join(PATTERNS_DIR, fname);
+    const data = {
+      epic,
+      tick_count: mem.tick_count || 0,
+      last_price: mem.last_price,
+      last_signal: mem.last_signal,
+      learned_at: mem.learned_at,
+      ticks: mem.ticks || [],
+      signals: mem.signals || [],
+      savedAt: new Date().toISOString(),
+    };
+    atomicWrite(fpath, JSON.stringify(data));
+  } catch (e) { console.error('[brain-engine] Failed to save patterns for ' + epic + ':', e.message); }
+}
+
+function loadInstrumentPatterns() {
+  try {
+    const files = fs.readdirSync(PATTERNS_DIR).filter(f => f.endsWith('.json') && !f.includes('.backup-'));
+    for (const f of files) {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(PATTERNS_DIR, f), 'utf8'));
+        if (data.epic) {
+          patternMemory[data.epic] = {
+            ticks: data.ticks || [],
+            signals: data.signals || [],
+            learned_at: data.learned_at || Date.now(),
+            last_price: data.last_price,
+            last_signal: data.last_signal,
+            tick_count: data.tick_count || 0,
+          };
+        }
+      } catch (_) {}
+    }
+    console.log('[brain-engine] Loaded per-instrument patterns: ' + Object.keys(patternMemory).length + ' instruments from ' + files.length + ' files');
+  } catch (_) {}
+}
+
+function backupInstrumentPatterns() {
+  const now = Date.now();
+  if (now - lastBackupTime < BACKUP_INTERVAL_MS) return;
+  lastBackupTime = now;
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  try {
+    for (const epic of Object.keys(patternMemory)) {
+      const base = sanitizeEpic(epic);
+      const src = path.join(PATTERNS_DIR, base + '.json');
+      if (!fs.existsSync(src)) continue;
+      const backupName = base + '.backup-' + ts + '.json';
+      fs.copyFileSync(src, path.join(PATTERNS_DIR, backupName));
+      rotateBackups(base);
+    }
+    const stateBackup = path.join(DATA_DIR, 'brain-state.backup-' + ts + '.json');
+    if (fs.existsSync(BRAIN_STATE_FILE)) {
+      fs.copyFileSync(BRAIN_STATE_FILE, stateBackup);
+      rotateStateBackups();
+    }
+    console.log('[brain-engine] Backups created at ' + ts + ' for ' + Object.keys(patternMemory).length + ' instruments + state');
+  } catch (e) { console.error('[brain-engine] Backup error:', e.message); }
+}
+
+function rotateBackups(base) {
+  try {
+    const files = fs.readdirSync(PATTERNS_DIR)
+      .filter(f => f.startsWith(base + '.backup-') && f.endsWith('.json'))
+      .sort();
+    while (files.length > MAX_BACKUPS) {
+      fs.unlinkSync(path.join(PATTERNS_DIR, files.shift()));
+    }
+  } catch (_) {}
+}
+
+function rotateStateBackups() {
+  try {
+    const files = fs.readdirSync(DATA_DIR)
+      .filter(f => f.startsWith('brain-state.backup-') && f.endsWith('.json'))
+      .sort();
+    while (files.length > MAX_BACKUPS) {
+      fs.unlinkSync(path.join(DATA_DIR, files.shift()));
+    }
+  } catch (_) {}
+}
+
+function saveSynapseWeights() {
+  try {
+    if (!synapses || !synapses.length) return;
+    const compact = synapses.map(s => [s.pre, s.post, +s.w.toFixed(6), +s.base_w.toFixed(6)]);
+    const wpath = path.join(DATA_DIR, 'brain-weights.json');
+    atomicWrite(wpath, JSON.stringify({
+      architecture: { sensory: N_SENSORY, inter: N_INTER, motor: N_MOTOR },
+      count: compact.length,
+      weights: compact,
+      savedAt: new Date().toISOString(),
+    }));
+  } catch (e) { console.error('[brain-engine] Failed to save weights:', e.message); }
+}
+
+function loadSynapseWeights() {
+  try {
+    const wpath = path.join(DATA_DIR, 'brain-weights.json');
+    if (!fs.existsSync(wpath)) return false;
+    const data = JSON.parse(fs.readFileSync(wpath, 'utf8'));
+    if (!data.weights || !data.architecture) return false;
+    if (data.architecture.sensory !== N_SENSORY || data.architecture.inter !== N_INTER || data.architecture.motor !== N_MOTOR) {
+      console.log('[brain-engine] Architecture changed (' +
+        data.architecture.sensory + '/' + data.architecture.inter + '/' + data.architecture.motor +
+        ' -> ' + N_SENSORY + '/' + N_INTER + '/' + N_MOTOR + '), weights discarded');
+      return false;
+    }
+    for (var vi = 0; vi < data.weights.length; vi++) {
+      var row = data.weights[vi];
+      if (!Array.isArray(row) || row.length !== 4 ||
+          !Number.isFinite(row[0]) || !Number.isFinite(row[1]) ||
+          !Number.isFinite(row[2]) || !Number.isFinite(row[3]) ||
+          row[0] < 0 || row[0] >= N_TOTAL || row[1] < 0 || row[1] >= N_TOTAL) {
+        console.error('[brain-engine] Corrupt weight at index ' + vi + ', discarding all weights');
+        return false;
+      }
+    }
+    synapses = data.weights.map(w => ({ pre: w[0], post: w[1], w: w[2], base_w: w[3] }));
+    console.log('[brain-engine] Restored ' + synapses.length + ' synapse weights from disk (saved ' + data.savedAt + ')');
+    return true;
+  } catch (e) {
+    console.error('[brain-engine] Failed to load weights:', e.message);
+    return false;
+  }
+}
+
 function saveState() {
   try {
     const state = {
       stepCount,
       currentParams,
-      patternMemory,
       trainingFeedbackLog: trainingFeedbackLog.slice(-100),
       architecture: { sensory: N_SENSORY, inter: N_INTER, motor: N_MOTOR },
       sensoryAssignments,
       mushroomBody,
+      instrumentList: Object.keys(patternMemory),
       savedAt: new Date().toISOString(),
     };
-    fs.writeFileSync(BRAIN_STATE_FILE, JSON.stringify(state));
+    atomicWrite(BRAIN_STATE_FILE, JSON.stringify(state));
+    saveSynapseWeights();
+    for (const epic of Object.keys(patternMemory)) {
+      saveInstrumentPatterns(epic);
+    }
+    backupInstrumentPatterns();
   } catch (_) {}
 }
 
@@ -529,7 +683,13 @@ function loadState() {
     if (fs.existsSync(BRAIN_STATE_FILE)) {
       const state = JSON.parse(fs.readFileSync(BRAIN_STATE_FILE, 'utf8'));
       if (state.currentParams) currentParams = { ...currentParams, ...state.currentParams };
-      if (state.patternMemory) patternMemory = state.patternMemory;
+      if (state.patternMemory) {
+        patternMemory = state.patternMemory;
+        console.log('[brain-engine] Migrating inline patternMemory to per-instrument files...');
+        for (const epic of Object.keys(patternMemory)) {
+          saveInstrumentPatterns(epic);
+        }
+      }
       if (state.trainingFeedbackLog) trainingFeedbackLog = state.trainingFeedbackLog;
       if (state.architecture) {
         N_SENSORY = state.architecture.sensory || N_SENSORY;
@@ -539,9 +699,12 @@ function loadState() {
       }
       if (state.sensoryAssignments) sensoryAssignments = { ...sensoryAssignments, ...state.sensoryAssignments };
       if (state.mushroomBody) mushroomBody = { ...mushroomBody, ...state.mushroomBody };
-      console.log('[brain-engine] Restored state: ' + (state.stepCount || 0) + ' steps, ' + Object.keys(patternMemory).length + ' instruments, arch=' + N_SENSORY + '/' + N_INTER + '/' + N_MOTOR);
+      if (state.stepCount) stepCount = state.stepCount;
+      console.log('[brain-engine] Restored state: ' + (state.stepCount || 0) + ' steps, arch=' + N_SENSORY + '/' + N_INTER + '/' + N_MOTOR);
     }
-  } catch (_) {}
+    loadInstrumentPatterns();
+    console.log('[brain-engine] Pattern memory: ' + Object.keys(patternMemory).length + ' instruments loaded');
+  } catch (e) { console.error('[brain-engine] loadState error:', e.message); }
 }
 
 function boot(config) {
@@ -570,15 +733,19 @@ function boot(config) {
     recalcAntennaSubGroups();
   }
   initNeurons();
-  initSynapses();
+  var weightsRestored = loadSynapseWeights();
+  if (!weightsRestored) {
+    initSynapses();
+    console.log('[brain-engine] Generated fresh random synapses (no saved weights found or architecture changed)');
+  }
   isBooted = true;
   bootTime = Date.now();
-  stepCount = 0;
+  if (!weightsRestored) stepCount = 0;
   spikeHistory = [];
 
   saveState();
 
-  console.log('[brain-engine] Booted: ' + N_TOTAL + ' neurons, ' + synapses.length + ' synapses (S=' + N_SENSORY + ' I=' + N_INTER + ' M=' + N_MOTOR + ')');
+  console.log('[brain-engine] Booted: ' + N_TOTAL + ' neurons, ' + synapses.length + ' synapses (S=' + N_SENSORY + ' I=' + N_INTER + ' M=' + N_MOTOR + ')' + (weightsRestored ? ' [WEIGHTS RESTORED]' : ' [FRESH WEIGHTS]'));
   return {
     loaded: true,
     neurons_count: N_TOTAL,
@@ -629,6 +796,8 @@ async function handleRequest(req, res) {
       regions: { sensory: N_SENSORY, inter: N_INTER, motor: N_MOTOR },
       params: currentParams,
       patterns: Object.keys(patternMemory).length,
+      pattern_instruments: Object.keys(patternMemory),
+      weights_file: fs.existsSync(path.join(DATA_DIR, 'brain-weights.json')) ? 'brain-weights.json' : null,
       training_mode: trainingMode,
       sensory_assignments: sensoryAssignments,
       antenna_sub_groups: antennaSubGroups,
@@ -666,8 +835,9 @@ async function handleRequest(req, res) {
       needRebuild = true;
     }
     if (needRebuild && isBooted) {
+      saveSynapseWeights();
       initSynapses();
-      console.log('[brain-engine] Rebuilt synapses after architecture update: ' + synapses.length + ' synapses');
+      console.log('[brain-engine] Rebuilt synapses after architecture update: ' + synapses.length + ' synapses [old weights backed up]');
     }
     saveState();
     return respond(res, 200, getArchitecture());
@@ -1209,13 +1379,13 @@ async function handleRequest(req, res) {
 
   if (m === 'POST' && p === '/restart') {
     saveState();
+    saveSynapseWeights();
     isBooted = false;
     bootTime = null;
     neurons = null;
     synapses = null;
     spikeHistory = [];
-    stepCount = 0;
-    return respond(res, 200, { message: 'Brain restarted' });
+    return respond(res, 200, { message: 'Brain restarted (weights saved)' });
   }
 
   if (m === 'POST' && p === '/save') {
