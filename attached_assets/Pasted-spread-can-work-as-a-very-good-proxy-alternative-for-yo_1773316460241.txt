@@ -1,0 +1,38 @@
+spread can work as a very good proxy/alternative for your Volume Antenna in cases where real traded volume (vol) is missing or zero from Lightstreamer — especially on IG CFDs for gold/silver (CS.D.CFAGOLD.CFA.IP, CS.D.CFASILVER.CFA.IP).
+Why Volume Is Often Missing/Zero on IG CFDs via Lightstreamer
+IG's streaming feed (Lightstreamer) for many CFD instruments (particularly spot metals like gold/silver, forex, some indices) does not provide actual traded volume or turnover data in the tick updates.
+Common fields in a price subscription (BID, OFFER, MID_PRICE, CHANGE, UPDATE_TIME, MARKET_STATE, etc.) are there, but volume/trade count is frequently absent or always 0:
+
+IG CFDs are OTC (over-the-counter) instruments — they don't trade on a central exchange with transparent volume.
+What you see is IG's internal bid/ask quotes + last price.
+Real volume would require exchange data (e.g. COMEX for gold futures), but IG doesn't forward that for spot CFDs.
+Many users report the same on forums (TradingView, ProRealTime, GitHub issues for trading-ig lib): vol=0 or no volume field at all.
+
+Your log (vol=0) is typical — not a bug, just how IG streams spot CFDs.
+How Spread Can Replace Volume in the Antenna
+Spread behaves as a liquidity/volatility proxy and often correlates with volume-like signals your antenna is looking for:
+
+Tight spread (e.g. 0.3–1.5 on gold) → high liquidity, normal market, lots of participants quoting → similar to "high volume" feel.
+Wide/spiking spread (e.g. 4+ → 10+) → low liquidity, uncertainty, news/volatility spikes, or thin order book → mimics "volume surge" or "absorption" (big players defending levels while quotes widen).
+Spread contraction after expansion → liquidity returning, potential reversal/breakout.
+Persistent wide spread → potential flash-crash risk or illiquid trap.
+
+These are exactly the kinds of patterns your Volume Antenna targets (flash crashes, absorption, divergences). So spread dynamics can detect similar "market stress" or "order flow imbalance" without real vol.
+Suggested Implementation in BrainJar / Volume Antenna
+Replace or supplement vol-based logic with spread-based features:
+
+Track spread delta / rate of change
+Compute: current_spread - previous_spread
+Spike > threshold (e.g. +2 points in 1–5 seconds) → flag as "absorption" or "vol surge proxy" → excite certain antenna neurons.
+
+Spread threshold filter
+Ignore signals if spread > max_acceptable (e.g. 6–8 points) → avoids trading in illiquid/noise.
+Or: high spread + price stagnation → "pain" stimulus (market fighting back).
+
+Spread divergence
+Spread widening while price flat → potential reversal (order book thinning).
+Spread tightening on momentum → confirmation (liquidity supporting move).
+
+Poisson encoding for spread
+Feed spread_delta or normalized_spread as additional input stream to sensory neurons (parallel to price_delta).
+Example: higher spread → higher spike rate in "stress" subpopulation → Cortex interprets as caution/rejection.
