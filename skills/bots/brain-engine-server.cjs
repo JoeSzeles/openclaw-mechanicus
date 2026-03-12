@@ -772,7 +772,7 @@ function respond(res, code, data) {
   res.writeHead(code, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   });
   res.end(JSON.stringify(data));
@@ -1391,6 +1391,42 @@ async function handleRequest(req, res) {
   if (m === 'POST' && p === '/save') {
     saveState();
     return respond(res, 200, { ok: true, saved_at: new Date().toISOString() });
+  }
+
+  const CORTEX_STATE_FILE = path.join(DATA_DIR, 'cortex-state.json');
+
+  if (m === 'GET' && p === '/cortex-state') {
+    try {
+      if (fs.existsSync(CORTEX_STATE_FILE)) {
+        const raw = fs.readFileSync(CORTEX_STATE_FILE, 'utf-8');
+        return respond(res, 200, JSON.parse(raw));
+      }
+      return respond(res, 200, { tradeLog: [], openPosition: null, decisionLog: [] });
+    } catch (e) {
+      return respond(res, 200, { tradeLog: [], openPosition: null, decisionLog: [] });
+    }
+  }
+
+  if (m === 'POST' && p === '/cortex-state') {
+    const state = await parseBody(req);
+    try {
+      state.savedAt = new Date().toISOString();
+      const tmp = CORTEX_STATE_FILE + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(state));
+      fs.renameSync(tmp, CORTEX_STATE_FILE);
+      return respond(res, 200, { ok: true, savedAt: state.savedAt });
+    } catch (e) {
+      return respond(res, 500, { error: e.message });
+    }
+  }
+
+  if (m === 'DELETE' && p === '/cortex-state') {
+    try {
+      if (fs.existsSync(CORTEX_STATE_FILE)) fs.unlinkSync(CORTEX_STATE_FILE);
+      return respond(res, 200, { ok: true, cleared: true });
+    } catch (e) {
+      return respond(res, 500, { error: e.message });
+    }
   }
 
   respond(res, 404, { error: 'Not found: ' + p });
