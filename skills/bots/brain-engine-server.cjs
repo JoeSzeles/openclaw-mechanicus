@@ -546,6 +546,8 @@ function loadState() {
       if (state.mushroomBody) mushroomBody = { ...mushroomBody, ...state.mushroomBody };
       if (Array.isArray(state.synData) && state.synData.length > 0) {
         restoredSynData = state.synData;
+      } else if (Array.isArray(state.synapses) && state.synapses.length > 0) {
+        restoredSynData = state.synapses.map(s => [s.pre, s.post, s.w || 1, s.base_w || s.w || 1]);
       }
       restoredStepCount = state.stepCount || 0;
       console.log('[brain-engine] Restored state: ' + restoredStepCount + ' steps, ' + Object.keys(patternMemory).length + ' instruments, arch=' + N_SENSORY + '/' + N_INTER + '/' + N_MOTOR + (restoredSynData ? ', synapses=' + restoredSynData.length : ', no saved synapses'));
