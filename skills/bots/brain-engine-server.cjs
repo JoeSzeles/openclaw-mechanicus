@@ -911,6 +911,40 @@ async function handleRequest(req, res) {
     return respond(res, 200, getPatterns());
   }
 
+  if (m === 'GET' && p === '/patterns/export') {
+    const epic = url.searchParams.get('epic') || '';
+    if (epic) {
+      if (!patternMemory[epic]) return respond(res, 404, { error: 'No patterns for ' + epic });
+      const mem = patternMemory[epic];
+      const exportData = { epic, ticks: mem.ticks || [], signals: mem.signals || [], learned_at: mem.learned_at, last_price: mem.last_price, last_signal: mem.last_signal, tick_count: mem.tick_count || 0 };
+      return respond(res, 200, exportData);
+    }
+    const allExport = {};
+    for (const [e, mem] of Object.entries(patternMemory)) {
+      allExport[e] = { epic: e, ticks: mem.ticks || [], signals: mem.signals || [], learned_at: mem.learned_at, last_price: mem.last_price, last_signal: mem.last_signal, tick_count: mem.tick_count || 0 };
+    }
+    return respond(res, 200, allExport);
+  }
+
+  if (m === 'POST' && p === '/patterns/import') {
+    const body = await parseBody(req);
+    let imported = 0;
+    if (body && body.epic && body.ticks) {
+      patternMemory[body.epic] = { ticks: body.ticks || [], signals: body.signals || [], learned_at: body.learned_at || Date.now(), last_price: body.last_price, last_signal: body.last_signal, tick_count: body.tick_count || (body.ticks || []).length };
+      saveInstrumentPatterns(body.epic);
+      imported = 1;
+    } else if (body && typeof body === 'object') {
+      for (const [epic, data] of Object.entries(body)) {
+        if (data && data.ticks) {
+          patternMemory[epic] = { ticks: data.ticks || [], signals: data.signals || [], learned_at: data.learned_at || Date.now(), last_price: data.last_price, last_signal: data.last_signal, tick_count: data.tick_count || (data.ticks || []).length };
+          saveInstrumentPatterns(epic);
+          imported++;
+        }
+      }
+    }
+    return respond(res, 200, { ok: true, imported, total_instruments: Object.keys(patternMemory).length });
+  }
+
   if (m === 'GET' && p === '/patterns/csv') {
     const epic = url.searchParams.get('epic') || '';
     const csv = exportPatternsCSV(epic);
