@@ -6,7 +6,6 @@ const BRAIN_PORT = parseInt(process.env.BRAIN_PORT) || 0;
 const DATA_DIR = path.join(process.env.HOME || '/home/runner', '.openclaw');
 const PATTERNS_DIR = path.join(DATA_DIR, 'brain-patterns');
 const BRAIN_STATE_FILE = path.join(DATA_DIR, 'brain-state.json');
-const CORTEX_TRADES_FILE = path.join(DATA_DIR, 'cortex-trades.json');
 
 try { fs.mkdirSync(PATTERNS_DIR, { recursive: true }); } catch (_) {}
 
@@ -511,7 +510,6 @@ function getArchitecture() {
 
 function saveState() {
   try {
-    const synData = synapses ? synapses.map(s => [s.pre, s.post, Math.round(s.w * 1000) / 1000, Math.round(s.base_w * 1000) / 1000]) : null;
     const state = {
       stepCount,
       currentParams,
@@ -520,15 +518,12 @@ function saveState() {
       architecture: { sensory: N_SENSORY, inter: N_INTER, motor: N_MOTOR },
       sensoryAssignments,
       mushroomBody,
-      synData,
       savedAt: new Date().toISOString(),
     };
     fs.writeFileSync(BRAIN_STATE_FILE, JSON.stringify(state));
   } catch (_) {}
 }
 
-let restoredSynData = null;
-let restoredStepCount = 0;
 function loadState() {
   try {
     if (fs.existsSync(BRAIN_STATE_FILE)) {
@@ -544,13 +539,7 @@ function loadState() {
       }
       if (state.sensoryAssignments) sensoryAssignments = { ...sensoryAssignments, ...state.sensoryAssignments };
       if (state.mushroomBody) mushroomBody = { ...mushroomBody, ...state.mushroomBody };
-      if (Array.isArray(state.synData) && state.synData.length > 0) {
-        restoredSynData = state.synData;
-      } else if (Array.isArray(state.synapses) && state.synapses.length > 0) {
-        restoredSynData = state.synapses.map(s => [s.pre, s.post, s.w || 1, s.base_w || s.w || 1]);
-      }
-      restoredStepCount = state.stepCount || 0;
-      console.log('[brain-engine] Restored state: ' + restoredStepCount + ' steps, ' + Object.keys(patternMemory).length + ' instruments, arch=' + N_SENSORY + '/' + N_INTER + '/' + N_MOTOR + (restoredSynData ? ', synapses=' + restoredSynData.length : ', no saved synapses'));
+      console.log('[brain-engine] Restored state: ' + (state.stepCount || 0) + ' steps, ' + Object.keys(patternMemory).length + ' instruments, arch=' + N_SENSORY + '/' + N_INTER + '/' + N_MOTOR);
     }
   } catch (_) {}
 }
@@ -559,19 +548,19 @@ function boot(config) {
   const prevSensory = N_SENSORY;
   loadState();
 
-  const prevS = N_SENSORY, prevI = N_INTER, prevM = N_MOTOR;
+  let sizeChanged = false;
   if (config) {
     if (config.preset && TIMEFRAME_PRESETS[config.preset]) {
       const p = TIMEFRAME_PRESETS[config.preset];
       N_SENSORY = p.sensory;
       N_INTER = p.inter;
       N_MOTOR = p.motor;
+      sizeChanged = true;
     }
-    if (config.sensory) { N_SENSORY = Math.max(10, Math.min(50000, parseInt(config.sensory))); }
-    if (config.inter) { N_INTER = Math.max(20, Math.min(200000, parseInt(config.inter))); }
-    if (config.motor) { N_MOTOR = Math.max(6, Math.min(30000, parseInt(config.motor))); }
+    if (config.sensory) { N_SENSORY = Math.max(10, Math.min(50000, parseInt(config.sensory))); sizeChanged = true; }
+    if (config.inter) { N_INTER = Math.max(20, Math.min(200000, parseInt(config.inter))); sizeChanged = true; }
+    if (config.motor) { N_MOTOR = Math.max(6, Math.min(30000, parseInt(config.motor))); sizeChanged = true; }
   }
-  const sizeChanged = (N_SENSORY !== prevS || N_INTER !== prevI || N_MOTOR !== prevM);
 
   N_TOTAL = N_SENSORY + N_INTER + N_MOTOR;
   if (sizeChanged || N_SENSORY !== prevSensory) {
@@ -581,25 +570,15 @@ function boot(config) {
     recalcAntennaSubGroups();
   }
   initNeurons();
-  let synapsesRestored = false;
-  if (restoredSynData && !sizeChanged) {
-    synapses = restoredSynData.map(s => ({ pre: s[0], post: s[1], w: s[2], base_w: s[3] }));
-    const maxIdx = N_TOTAL - 1;
-    synapses = synapses.filter(s => s.pre <= maxIdx && s.post <= maxIdx && s.pre >= 0 && s.post >= 0);
-    synapsesRestored = true;
-    console.log('[brain-engine] Restored ' + synapses.length + ' trained synapses from saved state');
-  } else {
-    initSynapses();
-  }
-  restoredSynData = null;
+  initSynapses();
   isBooted = true;
   bootTime = Date.now();
-  stepCount = synapsesRestored ? restoredStepCount : 0;
+  stepCount = 0;
   spikeHistory = [];
 
   saveState();
 
-  console.log('[brain-engine] Booted: ' + N_TOTAL + ' neurons, ' + synapses.length + ' synapses (S=' + N_SENSORY + ' I=' + N_INTER + ' M=' + N_MOTOR + ')' + (synapsesRestored ? ' [RESTORED]' : ' [FRESH]'));
+  console.log('[brain-engine] Booted: ' + N_TOTAL + ' neurons, ' + synapses.length + ' synapses (S=' + N_SENSORY + ' I=' + N_INTER + ' M=' + N_MOTOR + ')');
   return {
     loaded: true,
     neurons_count: N_TOTAL,
@@ -608,8 +587,7 @@ function boot(config) {
     sensory_assignments: sensoryAssignments,
     mushroom_body: mushroomBody,
     boot_time_ms: 0,
-    step_count: stepCount,
-    synapses_restored: synapsesRestored,
+    step_count: 0,
   };
 }
 
@@ -1243,50 +1221,6 @@ async function handleRequest(req, res) {
   if (m === 'POST' && p === '/save') {
     saveState();
     return respond(res, 200, { ok: true, saved_at: new Date().toISOString() });
-  }
-
-  if (m === 'GET' && p === '/cortex-state') {
-    try {
-      if (fs.existsSync(CORTEX_TRADES_FILE)) {
-        const raw = fs.readFileSync(CORTEX_TRADES_FILE, 'utf-8');
-        const state = JSON.parse(raw);
-        return respond(res, 200, state);
-      }
-    } catch (e) {
-      console.log('[brain-engine] Error reading cortex state: ' + e.message);
-    }
-    return respond(res, 200, { tradeLog: [], openPosition: null, decisionLog: [], savedAt: null });
-  }
-
-  if (m === 'POST' && p === '/cortex-state') {
-    const body = await parseBody(req);
-    const state = {
-      tradeLog: Array.isArray(body.tradeLog) ? body.tradeLog.slice(-500) : [],
-      openPosition: body.openPosition || null,
-      decisionLog: Array.isArray(body.decisionLog) ? body.decisionLog.slice(-100) : [],
-      savedAt: new Date().toISOString(),
-    };
-    try {
-      fs.writeFileSync(CORTEX_TRADES_FILE, JSON.stringify(state, null, 2));
-      const csvLines = ['ts,epic,dir,price,size,tf,pnl,dealId'];
-      (state.tradeLog || []).forEach(function(t) {
-        csvLines.push([t.ts || '', t.epic || '', t.dir || '', t.price || '', t.size || '', t.tf || '', t.pnl || '', t.dealId || ''].join(','));
-      });
-      fs.writeFileSync(CORTEX_TRADES_FILE.replace('.json', '.csv'), csvLines.join('\n'));
-    } catch (e) {
-      console.log('[brain-engine] Error saving cortex state: ' + e.message);
-      return respond(res, 500, { error: 'Failed to save: ' + e.message });
-    }
-    return respond(res, 200, { ok: true, trades: state.tradeLog.length, savedAt: state.savedAt });
-  }
-
-  if (m === 'DELETE' && p === '/cortex-state') {
-    try {
-      if (fs.existsSync(CORTEX_TRADES_FILE)) fs.unlinkSync(CORTEX_TRADES_FILE);
-      const csvPath = CORTEX_TRADES_FILE.replace('.json', '.csv');
-      if (fs.existsSync(csvPath)) fs.unlinkSync(csvPath);
-    } catch (e) {}
-    return respond(res, 200, { ok: true, cleared: true });
   }
 
   respond(res, 404, { error: 'Not found: ' + p });

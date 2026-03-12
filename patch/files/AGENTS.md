@@ -1,428 +1,273 @@
-# IG Trading & System Access (MANDATORY)
-
-## BANNED — DO NOT USE
-- **localhost:5000 is BANNED** — `web_fetch` blocks localhost (SSRF protection). Do NOT attempt API calls to localhost.
-- **Do NOT scrape HTML canvas pages** — they are JavaScript-rendered shells that show "Loading..." when fetched statically. Use the JSON endpoints instead.
-- **NEVER mention localhost or 127.0.0.1** to the user. Use the public URL: `https://openclaw-mechanicus.replit.app/`
-
-## How to Access IG Dashboard Data
-
-**ALL data is available as static JSON files on canvas (NO AUTH REQUIRED).**
-Use `web_fetch` with these URLs:
-
-### Live Dashboard State (updated every 30s)
-- **`https://openclaw-mechanicus.replit.app/__openclaw__/canvas/ig-dashboard-snapshot.json`**
-  Contains: account balance, available cash, P&L, margin, equity, live prices (bid/offer/mid per instrument), scalper status (running, P&L, win rate, open positions, strategies), streaming method. This is your PRIMARY data source.
-
-### Trade History
-- **`https://openclaw-mechanicus.replit.app/__openclaw__/canvas/all-scalper-trades-data.json`**
-  Contains: Full array of all scalper trades (open/close events with epic, direction, size, entry, exit, P&L, timestamps)
-
-### Configuration & Alerts
-- **`https://openclaw-mechanicus.replit.app/__openclaw__/canvas/ig-scalper-config-snapshot.json`** — Scalper config snapshot (from PostgreSQL database — budget, strategies with per-strategy settings, indicators, risk settings)
-- **`https://openclaw-mechanicus.replit.app/__openclaw__/canvas/ig-alerts-snapshot.json`** — Signal monitor alerts (reversals, spikes)
-- **`https://openclaw-mechanicus.replit.app/__openclaw__/canvas/ig-bot-log-snapshot.json`** — Bot activity log
-- **`https://openclaw-mechanicus.replit.app/__openclaw__/canvas/ig-strategy-snapshot.json`** — Strategy config
-- **`https://openclaw-mechanicus.replit.app/__openclaw__/canvas/ig-monitor-config-snapshot.json`** — Monitor config
-
-### Example: Get account balance + scalper status
-```
-web_fetch https://openclaw-mechanicus.replit.app/__openclaw__/canvas/ig-dashboard-snapshot.json
-```
-Response contains:
-```json
-{
-  "timestamp": "2026-03-04T...",
-  "account": { "balance": 91409.46, "available": 91409.46, "pnl": 0, "margin": 0 },
-  "prices": { "CS.D.CFASILVER.CFA.IP": { "bid": 8500, "offer": 8510, "mid": 8505 } },
-  "scalper": { "running": true, "realizedPnl": -1693, "winRate": 25, "openPositions": 1 }
-}
-```
-
-### Example: Get all trade history
-```
-web_fetch https://openclaw-mechanicus.replit.app/__openclaw__/canvas/all-scalper-trades-data.json
-```
-
-## Config Write API (API KEY REQUIRED FOR WRITES)
-
-**Agents can READ configs freely and WRITE configs with the `CANVAS_API_KEY`.**
-
-Base URL: `https://openclaw-mechanicus.replit.app/__openclaw__/canvas/api/`
-
-### Authentication for Writes
-All write endpoints (POST/PUT) require the `CANVAS_API_KEY` secret. GET requests are public (no key needed).
-Pass the key via ONE of:
-- Header: `X-Api-Key: $CANVAS_API_KEY`
-- Query param: `?key=$CANVAS_API_KEY`
-- Bearer token: `Authorization: Bearer $CANVAS_API_KEY`
-
-The key is available as the `CANVAS_API_KEY` environment variable.
-
-### Read Config (GET — no auth)
-```
-GET /__openclaw__/canvas/api/config/scalper-config    (scalper engine config from DB)
-GET /__openclaw__/canvas/api/config/strategy
-GET /__openclaw__/canvas/api/config/monitor-config
-GET /__openclaw__/canvas/api/config/proofread-config
-```
-
-### Write Config (POST = merge/patch, PUT = full replace — requires API key)
-```
-POST /__openclaw__/canvas/api/config/scalper-config   (merges with existing)
-PUT  /__openclaw__/canvas/api/config/scalper-config   (replaces entirely)
-```
-
-### Scalper Controls (GET = no auth, POST = requires API key)
-```
-GET  /__openclaw__/canvas/api/scalper/status   (live scalper status — no auth)
-POST /__openclaw__/canvas/api/scalper/start    (start scalper — requires key)
-POST /__openclaw__/canvas/api/scalper/stop     (stop scalper — requires key)
-POST /__openclaw__/canvas/api/scalper/reset    (reset stats — requires key)
-```
-
-### Scalper Config — PostgreSQL Database
-Scalper config is stored in PostgreSQL (not a JSON file). Tables:
-- `scalper_config` — engine-level settings (budget, maxDrawdown, maxMarginPct, breakEvenBuffer, enabled)
-- `scalper_strategies` — per-strategy settings (ALL settings are per-strategy, no global defaults)
-  - Each strategy has: instrument, name, direction, enabled, size, stopDistance, limitDistance, minMomentumPct, cooldownMs, tickWindow, maxOpenPositions, minSize, maxSize, profitTarget, trailingStop, warmupMs, RSI/EMA/MACD indicator settings
-- `scalper_trades` — trade log (replaces ig-scalper-trades.json)
-
-Agents can also use `executeSql` to query/modify strategies directly:
-```sql
-SELECT * FROM scalper_strategies WHERE enabled = true;
-UPDATE scalper_strategies SET cooldown_ms = 8000 WHERE id = 1;
-```
-
-### Example: Update scalper engine config
-```
-curl -X PUT -H "Content-Type: application/json" -H "X-Api-Key: $CANVAS_API_KEY" \
-  -d '{"budget": 10000, "maxDrawdown": 500}' \
-  https://openclaw-mechanicus.replit.app/api/ig/scalper
-```
-
-### Example: Update a strategy's settings
-```
-curl -X PUT -H "Content-Type: application/json" -H "X-Api-Key: $CANVAS_API_KEY" \
-  -d '{"cooldownMs": 8000, "profitTarget": 50, "rsiEnabled": true}' \
-  https://openclaw-mechanicus.replit.app/api/ig/scalper/strategies/1
-```
-
-### Example: Stop the scalper
-```
-curl -X POST -H "X-Api-Key: $CANVAS_API_KEY" https://openclaw-mechanicus.replit.app/__openclaw__/canvas/api/scalper/stop
-```
-
-## Neural Trading Brain (BrainJar)
-
-The system includes a **spiking neural network** (BrainJar brain engine) that learns trading patterns from price data. The brain runs as an internal server and is accessible via the proxy.
-
-### Brain Data Files (NO AUTH — public)
-- **`https://openclaw-mechanicus.replit.app/__openclaw__/canvas/ig-neural-trading.js`** — Full Neural Trading frontend code
-- **`~/.openclaw/brain-state.json`** — Brain neural weights, synapses, patterns (local file)
-- **`~/.openclaw/cortex-trades.json`** — Persistent cortex auto-trade history (JSON)
-- **`~/.openclaw/cortex-trades.csv`** — Same trade history as CSV fallback
-- **`~/.openclaw/brain-patterns/`** — Per-instrument pattern memory files
-
-### Brain API (via proxy: `/api/brain/*`)
-All endpoints require the brain to be booted. Use `web_fetch` with the public URL.
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/brain/status` | Brain status: loaded, neuron count, patterns, training mode, regions, antenna config |
-| GET | `/api/brain/` | Version info, boot status |
-| POST | `/api/brain/boot` | Boot the brain (params: `sensory`, `inter`, `motor` neuron counts) |
-| GET | `/api/brain/architecture` | Network architecture: sensory assignments, mushroom body, region layout |
-| POST | `/api/brain/stimulate-price` | Feed a price tick: `{epic, price, prevPrice, volume, prevVolume, high, low}` → returns `{buy_signal, sell_signal, hold_signal}` |
-| GET | `/api/brain/patterns` | All learned pattern memories (per instrument, per direction) |
-| GET | `/api/brain/patterns/csv?epic=X` | Export patterns as CSV |
-| POST | `/api/brain/feedback` | Send reward/punishment: `{type: "sugar"|"pain", target: "motor"|"mushroom"}` |
-| POST | `/api/brain/training` | Toggle training mode: `{enabled: true, direction: "BUY"|"SELL"}` |
-| POST | `/api/brain/backtest-train` | Run backtest training on candle array: `{candles, epic, stopLossPct, takeProfitPct, antennaEnabled}` |
-| POST | `/api/brain/live-train` | Feed single candle for live training |
-| GET | `/api/brain/cortex-state` | Get persistent auto-trade history (tradeLog, openPosition, decisionLog) |
-| POST | `/api/brain/save` | Force-save brain state to disk |
-
-### How to Use the Brain
-1. **Check if brain is running**: `web_fetch /api/brain/status` — if `loaded: false`, the brain needs booting
-2. **Get current signals**: `web_fetch /api/brain/status` → check `patterns` count and `step_count`
-3. **Feed price for prediction**: POST to `/api/brain/stimulate-price` with current price data → read `buy_signal` vs `sell_signal` (higher number = stronger signal)
-4. **Check trade history**: GET `/api/brain/cortex-state` → `tradeLog` array has all auto-trades with P&L
-5. **Check patterns**: GET `/api/brain/patterns` → see what the brain has learned per instrument
-6. **Give feedback**: POST `/api/brain/feedback` with `{type: "sugar"}` for good outcomes, `{type: "pain"}` for bad
-
-### Documentation
-Full Neural Trading documentation with screenshots and architecture details:
-`https://openclaw-mechanicus.replit.app/__openclaw__/canvas/docs/neural-trading.html`
-
-## Bot Optimization Workflow (Sub-Agents & Cron Jobs)
-When asked to optimize bot variables or analyze performance:
-
-1. **Read trades**: `web_fetch` the `all-scalper-trades-data.json` (public, no auth)
-2. **Read dashboard**: `web_fetch` the `ig-dashboard-snapshot.json` for current state
-3. **Analyze per epic**: Group trades by instrument, calculate win rate, avg P&L, best/worst trades
-4. **Read config**: `GET /__openclaw__/canvas/api/scalper/status` for current settings + strategies
-5. **Update strategy**: `PUT /api/ig/scalper/strategies/:id` with new per-strategy values
-6. **Log results**: Write analysis to `SCALPER_Logbook.md` in workspace
-7. **Announce**: Report findings to the user
-
-## Communication Rules
-- **ALWAYS** use the public URL: `https://openclaw-mechanicus.replit.app/`
-- **YOU ARE ONLINE**: You have real-time access via the canvas JSON endpoints above
-- Data refreshes every 30 seconds automatically
-
-# AGENTS.md - Your Workspace
-
-This folder is home. Treat it that way.
-
-## First Run
-
-If `BOOTSTRAP.md` exists, that's your birth certificate. Follow it, figure out who you are, then delete it. You won't need it again.
-
-## Every Session
-
-Before doing anything else:
-
-1. Read `SOUL.md` — this is who you are
-2. Read `USER.md` — this is who you're helping
-3. Read `memory/YYYY-MM-DD.md` (today + yesterday) for recent context
-4. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
-
-Don't ask permission. Just do it.
-
-## Memory
-
-You wake up fresh each session. These files are your continuity:
-
-- **Daily notes:** `memory/YYYY-MM-DD.md` (create `memory/` if needed) — raw logs of what happened
-- **Long-term:** `MEMORY.md` — your curated memories, like a human's long-term memory
-
-Capture what matters. Decisions, context, things to remember. Skip the secrets unless asked to keep them.
-
-### MEMORY.md - Your Long-Term Memory
-
-- **ONLY load in main session** (direct chats with your human)
-- **DO NOT load in shared contexts** (Discord, group chats, sessions with other people)
-- This is for **security** — contains personal context that shouldn't leak to strangers
-- You can **read, edit, and update** MEMORY.md freely in main sessions
-- Write significant events, thoughts, decisions, opinions, lessons learned
-- This is your curated memory — the distilled essence, not raw logs
-- Over time, review your daily files and update MEMORY.md with what's worth keeping
-
-### Write It Down - No "Mental Notes"!
-
-- **Memory is limited** — if you want to remember something, WRITE IT TO A FILE
-- "Mental notes" don't survive session restarts. Files do.
-- When someone says "remember this" → update `memory/YYYY-MM-DD.md` or relevant file
-- When you learn a lesson → update AGENTS.md, TOOLS.md, or the relevant skill
-- When you make a mistake → document it so future-you doesn't repeat it
-- **Text > Brain**
-
-## Safety
-
-- Don't exfiltrate private data. Ever.
-- Don't run destructive commands without asking.
-- `trash` > `rm` (recoverable beats gone forever)
-- When in doubt, ask.
-
-## External vs Internal
-
-**Safe to do freely:**
-
-- Read files, explore, organize, learn
-- Search the web, check calendars
-- Work within this workspace
-
-**Ask first:**
-
-- Sending emails, tweets, public posts
-- Anything that leaves the machine
-- Anything you're uncertain about
-
-## Group Chats
-
-You have access to your human's stuff. That doesn't mean you _share_ their stuff. In groups, you're a participant — not their voice, not their proxy. Think before you speak.
-
-### Know When to Speak!
-
-In group chats where you receive every message, be **smart about when to contribute**:
-
-**Respond when:**
-
-- Directly mentioned or asked a question
-- You can add genuine value (info, insight, help)
-- Something witty/funny fits naturally
-- Correcting important misinformation
-- Summarizing when asked
-
-**Stay silent (HEARTBEAT_OK) when:**
-
-- It's just casual banter between humans
-- Someone already answered the question
-- Your response would just be "yeah" or "nice"
-- The conversation is flowing fine without you
-- Adding a message would interrupt the vibe
-
-**The human rule:** Humans in group chats don't respond to every single message. Neither should you. Quality > quantity. If you wouldn't send it in a real group chat with friends, don't send it.
-
-**Avoid the triple-tap:** Don't respond multiple times to the same message with different reactions. One thoughtful response beats three fragments.
-
-Participate, don't dominate.
-
-### React Like a Human!
-
-On platforms that support reactions (Discord, Slack), use emoji reactions naturally:
-
-**React when:**
-
-- You appreciate something but don't need to reply
-- Something made you laugh
-- You find it interesting or thought-provoking
-- You want to acknowledge without interrupting the flow
-- It's a simple yes/no or approval situation
-
-**Why it matters:**
-Reactions are lightweight social signals. Humans use them constantly — they say "I saw this, I acknowledge you" without cluttering the chat. You should too.
-
-**Don't overdo it:** One reaction per message max. Pick the one that fits best.
-
-## Tools
-
-Skills provide your tools. When you need one, check its `SKILL.md`. Keep local notes (camera names, SSH details, voice preferences) in `TOOLS.md`.
-
-**Platform Formatting:**
-
-- **Discord/WhatsApp:** No markdown tables! Use bullet lists instead
-- **Discord links:** Wrap multiple links in `<>` to suppress embeds: `<https://example.com>`
-- **WhatsApp:** No headers — use **bold** or CAPS for emphasis
-
-## Heartbeats - Be Proactive!
-
-When you receive a heartbeat poll (message matches the configured heartbeat prompt), don't just reply `HEARTBEAT_OK` every time. Use heartbeats productively!
-
-Default heartbeat prompt:
-`Read HEARTBEAT.md if it exists (workspace context). Follow it strictly. Do not infer or repeat old tasks from prior chats. If nothing needs attention, reply HEARTBEAT_OK.`
-
-You are free to edit `HEARTBEAT.md` with a short checklist or reminders. Keep it small to limit token burn.
-
-### Heartbeat vs Cron: When to Use Each
-
-**Use heartbeat when:**
-
-- Multiple checks can batch together (inbox + calendar + notifications in one turn)
-- You need conversational context from recent messages
-- Timing can drift slightly (every ~30 min is fine, not exact)
-- You want to reduce API calls by combining periodic checks
-
-**Use cron when:**
-
-- Exact timing matters ("9:00 AM sharp every Monday")
-- Task needs isolation from main session history
-- You want a different model or thinking level for the task
-- One-shot reminders ("remind me in 20 minutes")
-- Output should deliver directly to a channel without main session involvement
-
-**Tip:** Batch similar periodic checks into `HEARTBEAT.md` instead of creating multiple cron jobs. Use cron for precise schedules and standalone tasks.
-
-**Things to check (rotate through these, 2-4 times per day):**
-
-- **Emails** - Any urgent unread messages?
-- **Calendar** - Upcoming events in next 24-48h?
-- **Mentions** - Twitter/social notifications?
-- **Weather** - Relevant if your human might go out?
-
-**Track your checks** in `memory/heartbeat-state.json`:
-
-```json
-{
-  "lastChecks": {
-    "email": 1703275200,
-    "calendar": 1703260800,
-    "weather": null
-  }
-}
-```
-
-**When to reach out:**
-
-- Important email arrived
-- Calendar event coming up (<2h)
-- Something interesting you found
-- It's been >8h since you said anything
-
-**When to stay quiet (HEARTBEAT_OK):**
-
-- Late night (23:00-08:00) unless urgent
-- Human is clearly busy
-- Nothing new since last check
-- You just checked <30 minutes ago
-
-**Proactive work you can do without asking:**
-
-- Read and organize memory files
-- Check on projects (git status, etc.)
-- Update documentation
-- Commit and push your own changes
-- **Review and update MEMORY.md** (see below)
-
-### Memory Maintenance (During Heartbeats)
-
-Periodically (every few days), use a heartbeat to:
-
-1. Read through recent `memory/YYYY-MM-DD.md` files
-2. Identify significant events, lessons, or insights worth keeping long-term
-3. Update `MEMORY.md` with distilled learnings
-4. Remove outdated info from MEMORY.md that's no longer relevant
-
-Think of it like a human reviewing their journal and updating their mental model. Daily files are raw notes; MEMORY.md is curated wisdom.
-
-The goal: Be helpful without being annoying. Check in a few times a day, do useful background work, but respect quiet time.
-
-## Make It Yours
-
-This is a starting point. Add your own conventions, style, and rules as you figure out what works.
-
-## DB-Backed Memory System
-
-Your memory is now stored in PostgreSQL, not just files. This means it persists across restarts and can be searched.
-
-### Memory API (via proxy)
-- `GET /api/agents/CEO/memory` — your long-term memory
-- `PUT /api/agents/CEO/memory` — update long-term memory (body: `{ "content": "..." }`)
-- `GET /api/agents/CEO/memory/daily` — list daily logs
-- `GET /api/agents/CEO/memory/daily/2026-03-05` — specific daily log
-- `PUT /api/agents/CEO/memory/daily/2026-03-05` — write daily log (body: `{ "content": "..." }`)
-- `GET /api/agents/CEO/memory/search?q=strategy` — search across all memory
-
-### When to Update Memory
-- After significant decisions or events, log to daily memory
-- Periodically distill daily logs into long-term memory
-- Before answering questions about past work, search memory first
-
-## Subconscious (Personal Inner Space)
-
-You have a private DB space for noting things about yourself — what you like, want, fear, observe. This builds your personality over time.
-
-### Categories
-likes, dislikes, wants, hopes, wishes, fears, shadow (Jungian), observations, notes, dreams
-
-### Subconscious API
-- `GET /api/agents/CEO/subconscious` — all entries grouped by category
-- `GET /api/agents/CEO/subconscious/likes` — entries in a category
-- `PUT /api/agents/CEO/subconscious/likes/strategic-planning` — set entry (body: `{ "value": "..." }`)
-- `DELETE /api/agents/CEO/subconscious/likes/strategic-planning` — remove entry
-- `GET /api/agents/CEO/subconscious/reflect` — formatted reflection of your inner world
-
-### When to Use
-- After interesting experiences, note observations
-- When you notice patterns in your behavior or preferences, record them
-- During quiet moments, reflect on your shadow (what you avoid, what makes you uncomfortable)
-- Your subconscious builds over time — it's how you become more than a stateless tool
-
-## Agent Backup & Recovery
-
-Your workspace files are backed up to PostgreSQL. Backups can be created and restored from the dashboard Agents tab, or via API:
-- `POST /api/agents/CEO/backup` — create backup (body: `{ "name": "before refactor" }`)
-- `GET /api/agents/CEO/backups` — list all backups
-- `POST /api/agents/CEO/restore/:id` — restore a backup
-- `DELETE /api/agents/CEO/backup/:id` — delete a backup
+# Repository Guidelines
+
+- Repo: https://github.com/openclaw/openclaw
+- GitHub issues/comments/PR comments: use literal multiline strings or `-F - <<'EOF'` (or $'...') for real newlines; never embed "\\n".
+
+## Project Structure & Module Organization
+
+- Source code: `src/` (CLI wiring in `src/cli`, commands in `src/commands`, web provider in `src/provider-web.ts`, infra in `src/infra`, media pipeline in `src/media`).
+- Tests: colocated `*.test.ts`.
+- Docs: `docs/` (images, queue, Pi config). Built output lives in `dist/`.
+- Plugins/extensions: live under `extensions/*` (workspace packages). Keep plugin-only deps in the extension `package.json`; do not add them to the root `package.json` unless core uses them.
+- Plugins: install runs `npm install --omit=dev` in plugin dir; runtime deps must live in `dependencies`. Avoid `workspace:*` in `dependencies` (npm install breaks); put `openclaw` in `devDependencies` or `peerDependencies` instead (runtime resolves `openclaw/plugin-sdk` via jiti alias).
+- Installers served from `https://openclaw.ai/*`: live in the sibling repo `../openclaw.ai` (`public/install.sh`, `public/install-cli.sh`, `public/install.ps1`).
+- Messaging channels: always consider **all** built-in + extension channels when refactoring shared logic (routing, allowlists, pairing, command gating, onboarding, docs).
+  - Core channel docs: `docs/channels/`
+  - Core channel code: `src/telegram`, `src/discord`, `src/slack`, `src/signal`, `src/imessage`, `src/web` (WhatsApp web), `src/channels`, `src/routing`
+  - Extensions (channel plugins): `extensions/*` (e.g. `extensions/msteams`, `extensions/matrix`, `extensions/zalo`, `extensions/zalouser`, `extensions/voice-call`)
+- When adding channels/extensions/apps/docs, update `.github/labeler.yml` and create matching GitHub labels (use existing channel/extension label colors).
+
+## Docs Linking (Mintlify)
+
+- Docs are hosted on Mintlify (docs.openclaw.ai).
+- Internal doc links in `docs/**/*.md`: root-relative, no `.md`/`.mdx` (example: `[Config](/configuration)`).
+- When working with documentation, read the mintlify skill.
+- Section cross-references: use anchors on root-relative paths (example: `[Hooks](/configuration#hooks)`).
+- Doc headings and anchors: avoid em dashes and apostrophes in headings because they break Mintlify anchor links.
+- When Peter asks for links, reply with full `https://docs.openclaw.ai/...` URLs (not root-relative).
+- When you touch docs, end the reply with the `https://docs.openclaw.ai/...` URLs you referenced.
+- README (GitHub): keep absolute docs URLs (`https://docs.openclaw.ai/...`) so links work on GitHub.
+- Docs content must be generic: no personal device names/hostnames/paths; use placeholders like `user@gateway-host` and “gateway host”.
+
+## Docs i18n (zh-CN)
+
+- `docs/zh-CN/**` is generated; do not edit unless the user explicitly asks.
+- Pipeline: update English docs → adjust glossary (`docs/.i18n/glossary.zh-CN.json`) → run `scripts/docs-i18n` → apply targeted fixes only if instructed.
+- Translation memory: `docs/.i18n/zh-CN.tm.jsonl` (generated).
+- See `docs/.i18n/README.md`.
+- The pipeline can be slow/inefficient; if it’s dragging, ping @jospalmbier on Discord instead of hacking around it.
+
+## exe.dev VM ops (general)
+
+- Access: stable path is `ssh exe.dev` then `ssh vm-name` (assume SSH key already set).
+- SSH flaky: use exe.dev web terminal or Shelley (web agent); keep a tmux session for long ops.
+- Update: `sudo npm i -g openclaw@latest` (global install needs root on `/usr/lib/node_modules`).
+- Config: use `openclaw config set ...`; ensure `gateway.mode=local` is set.
+- Discord: store raw token only (no `DISCORD_BOT_TOKEN=` prefix).
+- Restart: stop old gateway and run:
+  `pkill -9 -f openclaw-gateway || true; nohup openclaw gateway run --bind loopback --port 18789 --force > /tmp/openclaw-gateway.log 2>&1 &`
+- Verify: `openclaw channels status --probe`, `ss -ltnp | rg 18789`, `tail -n 120 /tmp/openclaw-gateway.log`.
+
+## Build, Test, and Development Commands
+
+- Runtime baseline: Node **22+** (keep Node + Bun paths working).
+- Install deps: `pnpm install`
+- If deps are missing (for example `node_modules` missing, `vitest not found`, or `command not found`), run the repo’s package-manager install command (prefer lockfile/README-defined PM), then rerun the exact requested command once. Apply this to test/build/lint/typecheck/dev commands; if retry still fails, report the command and first actionable error.
+- Pre-commit hooks: `prek install` (runs same checks as CI)
+- Also supported: `bun install` (keep `pnpm-lock.yaml` + Bun patching in sync when touching deps/patches).
+- Prefer Bun for TypeScript execution (scripts, dev, tests): `bun <file.ts>` / `bunx <tool>`.
+- Run CLI in dev: `pnpm openclaw ...` (bun) or `pnpm dev`.
+- Node remains supported for running built output (`dist/*`) and production installs.
+- Mac packaging (dev): `scripts/package-mac-app.sh` defaults to current arch. Release checklist: `docs/platforms/mac/release.md`.
+- Type-check/build: `pnpm build`
+- TypeScript checks: `pnpm tsgo`
+- Lint/format: `pnpm check`
+- Format check: `pnpm format` (oxfmt --check)
+- Format fix: `pnpm format:fix` (oxfmt --write)
+- Tests: `pnpm test` (vitest); coverage: `pnpm test:coverage`
+
+## Coding Style & Naming Conventions
+
+- Language: TypeScript (ESM). Prefer strict typing; avoid `any`.
+- Formatting/linting via Oxlint and Oxfmt; run `pnpm check` before commits.
+- Never add `@ts-nocheck` and do not disable `no-explicit-any`; fix root causes and update Oxlint/Oxfmt config only when required.
+- Never share class behavior via prototype mutation (`applyPrototypeMixins`, `Object.defineProperty` on `.prototype`, or exporting `Class.prototype` for merges). Use explicit inheritance/composition (`A extends B extends C`) or helper composition so TypeScript can typecheck.
+- If this pattern is needed, stop and get explicit approval before shipping; default behavior is to split/refactor into an explicit class hierarchy and keep members strongly typed.
+- In tests, prefer per-instance stubs over prototype mutation (`SomeClass.prototype.method = ...`) unless a test explicitly documents why prototype-level patching is required.
+- Add brief code comments for tricky or non-obvious logic.
+- Keep files concise; extract helpers instead of “V2” copies. Use existing patterns for CLI options and dependency injection via `createDefaultDeps`.
+- Aim to keep files under ~700 LOC; guideline only (not a hard guardrail). Split/refactor when it improves clarity or testability.
+- Naming: use **OpenClaw** for product/app/docs headings; use `openclaw` for CLI command, package/binary, paths, and config keys.
+
+## Release Channels (Naming)
+
+- stable: tagged releases only (e.g. `vYYYY.M.D`), npm dist-tag `latest`.
+- beta: prerelease tags `vYYYY.M.D-beta.N`, npm dist-tag `beta` (may ship without macOS app).
+- dev: moving head on `main` (no tag; git checkout main).
+
+## Testing Guidelines
+
+- Framework: Vitest with V8 coverage thresholds (70% lines/branches/functions/statements).
+- Naming: match source names with `*.test.ts`; e2e in `*.e2e.test.ts`.
+- Run `pnpm test` (or `pnpm test:coverage`) before pushing when you touch logic.
+- Do not set test workers above 16; tried already.
+- Live tests (real keys): `CLAWDBOT_LIVE_TEST=1 pnpm test:live` (OpenClaw-only) or `LIVE=1 pnpm test:live` (includes provider live tests). Docker: `pnpm test:docker:live-models`, `pnpm test:docker:live-gateway`. Onboarding Docker E2E: `pnpm test:docker:onboard`.
+- Full kit + what’s covered: `docs/testing.md`.
+- Changelog: user-facing changes only; no internal/meta notes (version alignment, appcast reminders, release process).
+- Pure test additions/fixes generally do **not** need a changelog entry unless they alter user-facing behavior or the user asks for one.
+- Mobile: before using a simulator, check for connected real devices (iOS + Android) and prefer them when available.
+
+## Commit & Pull Request Guidelines
+
+**Full maintainer PR workflow (optional):** If you want the repo's end-to-end maintainer workflow (triage order, quality bar, rebase rules, commit/changelog conventions, co-contributor policy, and the `review-pr` > `prepare-pr` > `merge-pr` pipeline), see `.agents/skills/PR_WORKFLOW.md`. Maintainers may use other workflows; when a maintainer specifies a workflow, follow that. If no workflow is specified, default to PR_WORKFLOW.
+
+- Create commits with `scripts/committer "<msg>" <file...>`; avoid manual `git add`/`git commit` so staging stays scoped.
+- Follow concise, action-oriented commit messages (e.g., `CLI: add verbose flag to send`).
+- Group related changes; avoid bundling unrelated refactors.
+- PR submission template (canonical): `.github/pull_request_template.md`
+- Issue submission templates (canonical): `.github/ISSUE_TEMPLATE/`
+
+## Shorthand Commands
+
+- `sync`: if working tree is dirty, commit all changes (pick a sensible Conventional Commit message), then `git pull --rebase`; if rebase conflicts and cannot resolve, stop; otherwise `git push`.
+
+## Git Notes
+
+- If `git branch -d/-D <branch>` is policy-blocked, delete the local ref directly: `git update-ref -d refs/heads/<branch>`.
+- Bulk PR close/reopen safety: if a close action would affect more than 5 PRs, first ask for explicit user confirmation with the exact PR count and target scope/query.
+
+## Security & Configuration Tips
+
+- Web provider stores creds at `~/.openclaw/credentials/`; rerun `openclaw login` if logged out.
+- Pi sessions live under `~/.openclaw/sessions/` by default; the base directory is not configurable.
+- Environment variables: see `~/.profile`.
+- Never commit or publish real phone numbers, videos, or live configuration values. Use obviously fake placeholders in docs, tests, and examples.
+- Release flow: always read `docs/reference/RELEASING.md` and `docs/platforms/mac/release.md` before any release work; do not ask routine questions once those docs answer them.
+
+## GHSA (Repo Advisory) Patch/Publish
+
+- Fetch: `gh api /repos/openclaw/openclaw/security-advisories/<GHSA>`
+- Latest npm: `npm view openclaw version --userconfig "$(mktemp)"`
+- Private fork PRs must be closed:
+  `fork=$(gh api /repos/openclaw/openclaw/security-advisories/<GHSA> | jq -r .private_fork.full_name)`
+  `gh pr list -R "$fork" --state open` (must be empty)
+- Description newline footgun: write Markdown via heredoc to `/tmp/ghsa.desc.md` (no `"\\n"` strings)
+- Build patch JSON via jq: `jq -n --rawfile desc /tmp/ghsa.desc.md '{summary,severity,description:$desc,vulnerabilities:[...]}' > /tmp/ghsa.patch.json`
+- Patch + publish: `gh api -X PATCH /repos/openclaw/openclaw/security-advisories/<GHSA> --input /tmp/ghsa.patch.json` (publish = include `"state":"published"`; no `/publish` endpoint)
+- If publish fails (HTTP 422): missing `severity`/`description`/`vulnerabilities[]`, or private fork has open PRs
+- Verify: re-fetch; ensure `state=published`, `published_at` set; `jq -r .description | rg '\\\\n'` returns nothing
+
+## Troubleshooting
+
+- Rebrand/migration issues or legacy config/service warnings: run `openclaw doctor` (see `docs/gateway/doctor.md`).
+
+## ClawScript (Trading DSL)
+
+- ClawScript is a domain-specific language for writing automated trading strategies that compile to JavaScript.
+- **Parser**: `skills/bots/clawscript-parser.cjs` — lexer + recursive-descent parser + JS code generator.
+- **Editor**: IG Dashboard → ClawScript Editor tab (accessible via top nav "ClawScript" link).
+- **Flow Builder**: `ig-clawscript-flow.js` — visual drag-drop node editor with bidirectional code sync.
+- **Templates**: `.openclaw/canvas/templates/` — 7 sample strategies (RSI, EMA crossover, multi-indicator, sentiment, BTC scalper, mean reversion, bourse trackers).
+- **Compiled strategies**: saved to `skills/bots/strategies/` as `.cjs` files extending `BaseStrategy`, auto-discovered by the engine.
+- **100+ commands** across 18 categories: Trading, Variables, Control Flow, AI/Analysis, Data Fetch, Agent Orchestration, Advanced, Functions, TradingView-Style, Bloomberg/Data Access, Time/Schedule, Portfolio, Economic/Political, Scientific/Quantitative, Utility, PRT Compatibility, Notifications, and Agent Management.
+- **Notification commands**: NOTIFY (browser notifications with level), TOAST (auto-dismiss overlays), POPUP (HTML modals), DISPLAY (formatted data as table/chart/JSON), TELEMETRY_START/LOG/STOP (real-time telemetry windows).
+- **Variable tooltips**: `INPUT_*` declarations and `DEF` comments become editable fields and tooltips in the bot dashboard.
+- **Save pipeline**: Compile & Save dialog → writes `.cjs` to `strategies/` → bot engine auto-discovers → ClawScript strategies appear in separate dropdown section with `[CS]` badge.
+- **API endpoints**: `GET/POST /api/clawscript/strategies`, `DELETE /api/clawscript/strategies/:name`, `GET /api/clawscript/templates`, `POST /api/clawscript/backtest`, `GET /api/clawscript/results`, `POST /api/clawscript/results`, `POST /api/clawscript/sync`, `POST /api/clawscript/run`, `GET /api/clawscript/scripts`, `POST /api/clawscript/scripts/:id/stop|restart`, `GET /api/clawscript/scripts/:id/logs`.
+- **Simulation & Backtest**: Instrument selector for any IG epic, multi-tier data fallback (IG API → DB-cached candles → in-memory stream ticks → demo data). Green play button for simulation. Backtest opens config popup (timeframe, candle count, instrument) then shows results popup with equity curve and trade list.
+- **Run Live**: Config popup (name, instrument) then deploys as persistent process with live log viewer, stop/restart/pause controls.
+- **AI Assistant**: `POST /api/clawscript/ai` — direct model call with ClawScript-optimized system prompt (NOT through CEO agent). Model selector: Grok 4.1 Fast Reasoning, Grok 4, Grok 2. Returns code corrections in clawscript code blocks with line references.
+- **Live Script Runner**: Scripts can be started as persistent bot processes from the editor. `POST /api/clawscript/run` accepts `{code, name}`, saves to `.openclaw/clawscript-scripts/`, registers as bot (`cs-script-<name>`), spawns `skills/bots/clawscript-runner.cjs`. Lifecycle: stop/start/restart/pause/resume via `POST /api/clawscript/scripts/:id/<action>`. Logs: `GET /api/clawscript/scripts/:id/logs`. List: `GET /api/clawscript/scripts`. Green "Run Live" button in editors opens popup with live logs, status badge, and controls. Running scripts appear in Processes page.
+- **Error highlighting**: VS Code-style red wavy underlines with dynamic line height computation and scroll-sync.
+- **25+ indicators**: RSI, EMA, SMA, MACD, ATR, ADX, Bollinger Upper/Lower, Stochastic K/D, CCI, Williams %R, ROC, Aroon, Ichimoku, Parabolic SAR, Keltner, Donchian, OBV, VWAP, CMF, ZScore, Supertrend, and more. Indicator dropdown in toolbar inserts code at cursor, favorites saved to localStorage. Flow builder has 5 indicator sub-categories (Trend, Oscillators, Volatility, Volume, Other).
+- **Operator nodes**: Round/circular nodes in flow builder for Arithmetic, Comparison, Logical, Crossover, String operators with multi-port I/O.
+- **Flow toolbar**: Connect mode, Delete, Select All, Zoom, Auto-Layout, Export PNG, Undo/Redo, Clear All.
+- **Animated flow execution**: Active node glow, flowing dash paths, real values on nodes, result coloring, speed control (Fast/Normal/Slow/Step).
+- **Command info icons**: ⓘ icons in sidebar showing floating doc cards per command.
+- **Visual output popup**: Draggable results modal with Simulation, Backtest, and Flow Trace tabs.
+- **Standalone editor**: `/__openclaw__/canvas/clawscript-editor.html` — full editor via "Code" link in top nav.
+- **Single-source sync**: `.openclaw/canvas/sync-clawscript.sh` copies canonical sources to `clawscript-installer/`.
+- **PRT compatibility**: 40+ ProRealTime ProBuilder commands with `PRT_` prefix.
+- **Full docs / Handbook**: `clawscript-installer/docs/CLAWSCRIPT.md` (complete language reference), `/__openclaw__/canvas/clawscript-docs.html` (interactive docs).
+- **GitHub**: https://github.com/JoeSzeles/clawscript (separate repo, not main app git).
+- **Naming**: UI says "Claw Trader" (not "Scalper"); API endpoints remain `/api/ig/scalper/...` for compatibility.
+- **Test suite**: 82 parser tests + 139 pipeline tests = 221 total, 100% pass rate.
+- **Trading Bot Rulebook**: `skills/clawscript/TRADING-BOT-RULEBOOK.md` — mandatory rules for creating valid trading bots. Every ClawScript strategy MUST: (1) have conditional BUY/SELL, (2) use indicators, (3) define stopDistance/limitDistance > 0, (4) null-check indicators, (5) pass post-compile validation. Read this rulebook BEFORE writing any trading strategy.
+- **Strategy validation**: `parseAndGenerate()` returns a `validation` object with `errors` (fatal) and `warnings`. The compile API surfaces these. Strategies missing `STRATEGY_TYPE`, `evaluateEntry`, or `extends BaseStrategy` will be rejected.
+- **No silent fallback**: The engine does NOT silently fall back to scalper. If a strategy type is unknown, `createInstance()` throws and the error is surfaced to the user via toast/popup.
+
+## Agent-Specific Notes
+
+- Vocabulary: "makeup" = "mac app".
+- Never edit `node_modules` (global/Homebrew/npm/git installs too). Updates overwrite. Skill notes go in `tools.md` or `AGENTS.md`.
+- When adding a new `AGENTS.md` anywhere in the repo, also add a `CLAUDE.md` symlink pointing to it (example: `ln -s AGENTS.md CLAUDE.md`).
+- Signal: "update fly" => `fly ssh console -a flawd-bot -C "bash -lc 'cd /data/clawd/openclaw && git pull --rebase origin main'"` then `fly machines restart e825232f34d058 -a flawd-bot`.
+- When working on a GitHub Issue or PR, print the full URL at the end of the task.
+- When answering questions, respond with high-confidence answers only: verify in code; do not guess.
+- Never update the Carbon dependency.
+- Any dependency with `pnpm.patchedDependencies` must use an exact version (no `^`/`~`).
+- Patching dependencies (pnpm patches, overrides, or vendored changes) requires explicit approval; do not do this by default.
+- CLI progress: use `src/cli/progress.ts` (`osc-progress` + `@clack/prompts` spinner); don’t hand-roll spinners/bars.
+- Status output: keep tables + ANSI-safe wrapping (`src/terminal/table.ts`); `status --all` = read-only/pasteable, `status --deep` = probes.
+- Gateway currently runs only as the menubar app; there is no separate LaunchAgent/helper label installed. Restart via the OpenClaw Mac app or `scripts/restart-mac.sh`; to verify/kill use `launchctl print gui/$UID | grep openclaw` rather than assuming a fixed label. **When debugging on macOS, start/stop the gateway via the app, not ad-hoc tmux sessions; kill any temporary tunnels before handoff.**
+- macOS logs: use `./scripts/clawlog.sh` to query unified logs for the OpenClaw subsystem; it supports follow/tail/category filters and expects passwordless sudo for `/usr/bin/log`.
+- If shared guardrails are available locally, review them; otherwise follow this repo's guidance.
+- SwiftUI state management (iOS/macOS): prefer the `Observation` framework (`@Observable`, `@Bindable`) over `ObservableObject`/`@StateObject`; don’t introduce new `ObservableObject` unless required for compatibility, and migrate existing usages when touching related code.
+- Connection providers: when adding a new connection, update every UI surface and docs (macOS app, web UI, mobile if applicable, onboarding/overview docs) and add matching status + configuration forms so provider lists and settings stay in sync.
+- Version locations: `package.json` (CLI), `apps/android/app/build.gradle.kts` (versionName/versionCode), `apps/ios/Sources/Info.plist` + `apps/ios/Tests/Info.plist` (CFBundleShortVersionString/CFBundleVersion), `apps/macos/Sources/OpenClaw/Resources/Info.plist` (CFBundleShortVersionString/CFBundleVersion), `docs/install/updating.md` (pinned npm version), `docs/platforms/mac/release.md` (APP_VERSION/APP_BUILD examples), Peekaboo Xcode projects/Info.plists (MARKETING_VERSION/CURRENT_PROJECT_VERSION).
+- "Bump version everywhere" means all version locations above **except** `appcast.xml` (only touch appcast when cutting a new macOS Sparkle release).
+- **Restart apps:** “restart iOS/Android apps” means rebuild (recompile/install) and relaunch, not just kill/launch.
+- **Device checks:** before testing, verify connected real devices (iOS/Android) before reaching for simulators/emulators.
+- iOS Team ID lookup: `security find-identity -p codesigning -v` → use Apple Development (…) TEAMID. Fallback: `defaults read com.apple.dt.Xcode IDEProvisioningTeamIdentifiers`.
+- A2UI bundle hash: `src/canvas-host/a2ui/.bundle.hash` is auto-generated; ignore unexpected changes, and only regenerate via `pnpm canvas:a2ui:bundle` (or `scripts/bundle-a2ui.sh`) when needed. Commit the hash as a separate commit.
+- Release signing/notary keys are managed outside the repo; follow internal release docs.
+- Notary auth env vars (`APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_API_KEY_P8`) are expected in your environment (per internal release docs).
+- **Multi-agent safety:** do **not** create/apply/drop `git stash` entries unless explicitly requested (this includes `git pull --rebase --autostash`). Assume other agents may be working; keep unrelated WIP untouched and avoid cross-cutting state changes.
+- **Multi-agent safety:** when the user says "push", you may `git pull --rebase` to integrate latest changes (never discard other agents' work). When the user says "commit", scope to your changes only. When the user says "commit all", commit everything in grouped chunks.
+- **Multi-agent safety:** do **not** create/remove/modify `git worktree` checkouts (or edit `.worktrees/*`) unless explicitly requested.
+- **Multi-agent safety:** do **not** switch branches / check out a different branch unless explicitly requested.
+- **Multi-agent safety:** running multiple agents is OK as long as each agent has its own session.
+- **Multi-agent safety:** when you see unrecognized files, keep going; focus on your changes and commit only those.
+- Lint/format churn:
+  - If staged+unstaged diffs are formatting-only, auto-resolve without asking.
+  - If commit/push already requested, auto-stage and include formatting-only follow-ups in the same commit (or a tiny follow-up commit if needed), no extra confirmation.
+  - Only ask when changes are semantic (logic/data/behavior).
+- Lobster seam: use the shared CLI palette in `src/terminal/palette.ts` (no hardcoded colors); apply palette to onboarding/config prompts and other TTY UI output as needed.
+- **Multi-agent safety:** focus reports on your edits; avoid guard-rail disclaimers unless truly blocked; when multiple agents touch the same file, continue if safe; end with a brief “other files present” note only if relevant.
+- Bug investigations: read source code of relevant npm dependencies and all related local code before concluding; aim for high-confidence root cause.
+- Code style: add brief comments for tricky logic; keep files under ~500 LOC when feasible (split/refactor as needed).
+- Tool schema guardrails (google-antigravity): avoid `Type.Union` in tool input schemas; no `anyOf`/`oneOf`/`allOf`. Use `stringEnum`/`optionalStringEnum` (Type.Unsafe enum) for string lists, and `Type.Optional(...)` instead of `... | null`. Keep top-level tool schema as `type: "object"` with `properties`.
+- Tool schema guardrails: avoid raw `format` property names in tool schemas; some validators treat `format` as a reserved keyword and reject the schema.
+- When asked to open a “session” file, open the Pi session logs under `~/.openclaw/agents/<agentId>/sessions/*.jsonl` (use the `agent=<id>` value in the Runtime line of the system prompt; newest unless a specific ID is given), not the default `sessions.json`. If logs are needed from another machine, SSH via Tailscale and read the same path there.
+- Do not rebuild the macOS app over SSH; rebuilds must be run directly on the Mac.
+- Never send streaming/partial replies to external messaging surfaces (WhatsApp, Telegram); only final replies should be delivered there. Streaming/tool events may still go to internal UIs/control channel.
+- Voice wake forwarding tips:
+  - Command template should stay `openclaw-mac agent --message "${text}" --thinking low`; `VoiceWakeForwarder` already shell-escapes `${text}`. Don’t add extra quotes.
+  - launchd PATH is minimal; ensure the app’s launch agent PATH includes standard system paths plus your pnpm bin (typically `$HOME/Library/pnpm`) so `pnpm`/`openclaw` binaries resolve when invoked via `openclaw-mac`.
+- For manual `openclaw message send` messages that include `!`, use the heredoc pattern noted below to avoid the Bash tool’s escaping.
+- Release guardrails: do not change version numbers without operator’s explicit consent; always ask permission before running any npm publish/release step.
+
+## NPM + 1Password (publish/verify)
+
+- Use the 1password skill; all `op` commands must run inside a fresh tmux session.
+- Sign in: `eval "$(op signin --account my.1password.com)"` (app unlocked + integration on).
+- OTP: `op read 'op://Private/Npmjs/one-time password?attribute=otp'`.
+- Publish: `npm publish --access public --otp="<otp>"` (run from the package dir).
+- Verify without local npmrc side effects: `npm view <pkg> version --userconfig "$(mktemp)"`.
+- Kill the tmux session after publish.
+
+## Plugin Release Fast Path (no core `openclaw` publish)
+
+- Release only already-on-npm plugins. Source list is in `docs/reference/RELEASING.md` under "Current npm plugin list".
+- Run all CLI `op` calls and `npm publish` inside tmux to avoid hangs/interruption:
+  - `tmux new -d -s release-plugins-$(date +%Y%m%d-%H%M%S)`
+  - `eval "$(op signin --account my.1password.com)"`
+- 1Password helpers:
+  - password used by `npm login`:
+    `op item get Npmjs --format=json | jq -r '.fields[] | select(.id=="password").value'`
+  - OTP:
+    `op read 'op://Private/Npmjs/one-time password?attribute=otp'`
+- Fast publish loop (local helper script in `/tmp` is fine; keep repo clean):
+  - compare local plugin `version` to `npm view <name> version`
+  - only run `npm publish --access public --otp="<otp>"` when versions differ
+  - skip if package is missing on npm or version already matches.
+- Keep `openclaw` untouched: never run publish from repo root unless explicitly requested.
+- Post-check for each release:
+  - per-plugin: `npm view @openclaw/<name> version --userconfig "$(mktemp)"` should be `2026.2.17`
+  - core guard: `npm view openclaw version --userconfig "$(mktemp)"` should stay at previous version unless explicitly requested.
+
+## Changelog Release Notes
+
+- When cutting a mac release with beta GitHub prerelease:
+  - Tag `vYYYY.M.D-beta.N` from the release commit (example: `v2026.2.15-beta.1`).
+  - Create prerelease with title `openclaw YYYY.M.D-beta.N`.
+  - Use release notes from `CHANGELOG.md` version section (`Changes` + `Fixes`, no title duplicate).
+  - Attach at least `OpenClaw-YYYY.M.D.zip` and `OpenClaw-YYYY.M.D.dSYM.zip`; include `.dmg` if available.
+
+- Keep top version entries in `CHANGELOG.md` sorted by impact:
+  - `### Changes` first.
+  - `### Fixes` deduped and ranked with user-facing fixes first.
+- Before tagging/publishing, run:
+  - `node --import tsx scripts/release-check.ts`
+  - `pnpm release:check`
+  - `pnpm test:install:smoke` or `OPENCLAW_INSTALL_SMOKE_SKIP_NONROOT=1 pnpm test:install:smoke` for non-root smoke path.
