@@ -94,6 +94,7 @@ function isLoginExempt(req) {
       p.startsWith("/api/bots") || p.startsWith("/api/processes")) {
     if (hasValidBearerToken(req)) return true;
   }
+  if (p.startsWith("/api/brain")) return true;
   if (p.startsWith("/__openclaw__/canvas/")) return true;
   return false;
 }
@@ -5028,6 +5029,41 @@ async function handleApi(req, res) {
     });
     res.end(JSON.stringify({ ok: true }));
     return true;
+  }
+
+  if (p.startsWith("/api/brain/") || p === "/api/brain") {
+    const brainPortFile = path.join(DATA_DIR, "brain-engine-port");
+    let brainPort = 0;
+    try { brainPort = parseInt(fs.readFileSync(brainPortFile, "utf8").trim()); } catch (_) {}
+    if (!brainPort || brainPort < 1 || brainPort > 65535) return json(res, 503, { error: "Brain engine not running (no port file)" }), true;
+    const brainPath = (p.replace("/api/brain", "") || "/status") + url.search;
+    const bodyBuf = (req.method === "POST" || req.method === "PUT") ? await readBody(req) : null;
+    const opts = {
+      hostname: "127.0.0.1",
+      port: brainPort,
+      path: brainPath,
+      method: req.method,
+      headers: { "Content-Type": req.headers["content-type"] || "application/json" },
+    };
+    return new Promise((resolve) => {
+      const proxyReq = http.request(opts, (proxyRes) => {
+        let data = "";
+        proxyRes.on("data", (chunk) => (data += chunk));
+        proxyRes.on("end", () => {
+          const ct = proxyRes.headers["content-type"] || "application/json";
+          res.writeHead(proxyRes.statusCode || 200, { "Content-Type": ct, "Access-Control-Allow-Origin": "*" });
+          res.end(data);
+          resolve(true);
+        });
+      });
+      proxyReq.on("error", (e) => {
+        json(res, 502, { error: "Brain engine unreachable: " + e.message });
+        resolve(true);
+      });
+      proxyReq.setTimeout(10000, () => { proxyReq.destroy(); json(res, 504, { error: "Brain engine timeout" }); resolve(true); });
+      if (bodyBuf) proxyReq.write(bodyBuf);
+      proxyReq.end();
+    });
   }
 
   if (p === "/api/dispatch" && req.method === "POST") {
