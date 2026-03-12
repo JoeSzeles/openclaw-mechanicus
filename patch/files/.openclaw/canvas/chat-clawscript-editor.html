@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ClawScript Editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0d1117;color:#c9d1d9;padding:8px;height:100vh;overflow:auto;display:flex;flex-direction:column}
+.header{display:flex;align-items:center;gap:8px;padding:4px 0 8px;flex-shrink:0;flex-wrap:wrap}
+.header h1{font-size:13px;font-weight:700;color:#c9d1d9;white-space:nowrap}
+.header .instrument{font-size:11px;color:#8b949e;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:2px 8px;outline:none;color:#c9d1d9;width:120px}
+.header .instrument:focus{border-color:#58a6ff}
+.btn{padding:4px 12px;border-radius:4px;font-size:11px;cursor:pointer;border:1px solid #30363d;background:#21262d;color:#c9d1d9;white-space:nowrap;font-family:inherit}
+.btn:hover{border-color:#58a6ff}
+.btn-primary{background:#1f6feb;border-color:#1f6feb;color:#fff}
+.btn-primary:hover{background:#388bfd}
+.btn-success{background:#238636;border-color:#238636;color:#fff}
+.btn-success:hover{background:#2ea043}
+.btn-warn{background:#9e6a03;border-color:#9e6a03;color:#fff}
+.btn-warn:hover{background:#bb8009}
+.btn-danger{background:#da3633;border-color:#da3633;color:#fff}
+.btn-danger:hover{background:#f85149}
+.btn-toggle{font-size:10px;padding:3px 8px}
+.btn-toggle.active{background:#1f6feb;border-color:#58a6ff;color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.main{flex:1;display:flex;flex-direction:column;gap:6px;min-height:0;overflow:hidden}
+.editor-wrap{flex:1;display:flex;flex-direction:column;min-height:0;border:1px solid #30363d;border-radius:6px;overflow:hidden;background:#0d1117}
+.editor-header{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:#161b22;border-bottom:1px solid #21262d;font-size:11px;color:#8b949e;flex-shrink:0}
+.editor-body{position:relative;flex:1;min-height:0;display:flex}
+.line-numbers{padding:6px 6px 6px 4px;text-align:right;color:#484f58;font:11px/1.5 "Fira Code",Consolas,monospace;user-select:none;background:#0d1117;border-right:1px solid #21262d;min-width:28px;white-space:pre;overflow-y:hidden;flex-shrink:0}
+textarea.code-input{flex:1;padding:6px 8px;font:11px/1.5 "Fira Code",Consolas,monospace;color:#c9d1d9;background:#0d1117;border:none;outline:none;resize:none;tab-size:2;white-space:pre;overflow:auto;min-height:0}
+textarea.code-input::placeholder{color:#484f58}
+.results-panel{flex-shrink:0;border:1px solid #30363d;border-radius:6px;overflow:hidden;background:#0d1117;transition:height .2s}
+.results-panel.collapsed{height:28px}
+.results-panel.expanded{height:200px;max-height:45vh}
+.results-header{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:#161b22;border-bottom:1px solid #21262d;font-size:11px;color:#8b949e;cursor:pointer;flex-shrink:0}
+.results-header:hover{background:#21262d}
+.results-body{overflow:auto;padding:6px 8px;font:11px/1.5 "Fira Code",Consolas,monospace;flex:1;min-height:0}
+.results-panel.expanded .results-body{display:block}
+.results-panel.collapsed .results-body{display:none}
+.tab-bar{display:flex;gap:2px;flex-shrink:0}
+.tab{padding:2px 8px;font-size:10px;cursor:pointer;border:1px solid transparent;border-bottom:none;border-radius:4px 4px 0 0;color:#8b949e;background:transparent}
+.tab:hover{color:#c9d1d9}
+.tab.active{color:#c9d1d9;background:#0d1117;border-color:#30363d}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.status-bar{display:flex;justify-content:space-between;align-items:center;padding:2px 8px;font-size:10px;color:#484f58;flex-shrink:0;border-top:1px solid #21262d}
+.status-ok{color:#2dc653}
+.status-err{color:#f85149}
+.status-warn{color:#f0883e}
+.status-busy{color:#58a6ff}
+pre.ast-output{white-space:pre-wrap;word-break:break-all;color:#79c0ff;font-size:10px}
+pre.js-output{white-space:pre-wrap;word-break:break-all;color:#7ee787;font-size:10px}
+pre.error-output{white-space:pre-wrap;word-break:break-all;color:#f85149;font-size:10px}
+.trade-row{display:flex;gap:8px;padding:2px 0;border-bottom:1px solid #21262d;font-size:10px}
+.trade-buy{color:#2dc653}
+.trade-sell{color:#f85149}
+.pnl-positive{color:#2dc653;font-weight:700}
+.pnl-negative{color:#f85149;font-weight:700}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;margin-bottom:8px}
+.summary-card{background:#161b22;border:1px solid #21262d;border-radius:4px;padding:6px 8px;text-align:center}
+.summary-card .label{font-size:9px;color:#8b949e;text-transform:uppercase}
+.summary-card .value{font-size:14px;font-weight:700;color:#c9d1d9}
+.flow-container{min-height:120px;position:relative;overflow:auto}
+.flow-node{display:inline-block;padding:4px 10px;border-radius:4px;font-size:10px;font-weight:600;color:#fff;margin:2px;white-space:nowrap}
+.flow-arrow{color:#484f58;font-size:10px;vertical-align:middle}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:4px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.runner-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center}
+.runner-popup{background:#161b22;border:1px solid #30363d;border-radius:8px;width:min(90vw,520px);max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.runner-popup__header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #21262d;background:#0d1117;flex-shrink:0}
+.runner-popup__title{font-size:13px;font-weight:700;color:#c9d1d9;display:flex;align-items:center;gap:8px}
+.runner-popup__badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;text-transform:uppercase}
+.badge-running{background:#238636;color:#fff}
+.badge-stopped{background:#da3633;color:#fff}
+.badge-paused{background:#9e6a03;color:#fff}
+.badge-starting{background:#1f6feb;color:#fff}
+.runner-popup__actions{display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid #21262d;flex-shrink:0;flex-wrap:wrap}
+.runner-popup__actions .btn{font-size:10px;padding:3px 10px}
+.runner-popup__logs{flex:1;overflow-y:auto;padding:8px 14px;font:10px/1.6 "Fira Code",Consolas,monospace;color:#8b949e;min-height:150px;max-height:400px;background:#0d1117}
+.runner-popup__logs .log-info{color:#58a6ff}
+.runner-popup__logs .log-warn{color:#f0883e}
+.runner-popup__logs .log-error{color:#f85149}
+.runner-popup__logs .log-trade{color:#2dc653;font-weight:700}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>&#x1F980; ClawScript</h1>
+  <input class="instrument" id="instrumentInput" placeholder="Instrument (epic)" title="Set instrument/epic for backtest">
+  <button class="btn btn-primary" id="compileBtn" title="Compile ClawScript to AST + JS">&#x2699; Compile</button>
+  <button class="btn btn-warn" id="backtestBtn" title="Run backtest with compiled strategy">&#x25B6; Backtest</button>
+  <button class="btn btn-success" id="runLiveBtn" title="Run script live as a persistent process">&#x1F680; Run Live</button>
+  <button class="btn btn-toggle" id="flowToggle" title="Toggle flow visualization">Flow</button>
+</div>
+<div class="main">
+  <div class="editor-wrap">
+    <div class="editor-header">
+      <span>editor.cs</span>
+      <span id="charCount">0 chars</span>
+    </div>
+    <div class="editor-body">
+      <div class="line-numbers" id="lineNumbers">1</div>
+      <textarea class="code-input" id="codeInput" placeholder="// Write ClawScript here...&#10;DEF rsiPeriod = 14&#10;SET rsi = INDICATOR RSI rsiPeriod&#10;IF rsi < 30 THEN&#10;  BUY 1 AT MARKET&#10;ENDIF" spellcheck="false"></textarea>
+    </div>
+  </div>
+  <div class="results-panel expanded" id="resultsPanel">
+    <div class="results-header" id="resultsToggle">
+      <div class="tab-bar">
+        <div class="tab active" data-tab="output">Output</div>
+        <div class="tab" data-tab="ast">AST</div>
+        <div class="tab" data-tab="js">JS</div>
+        <div class="tab" data-tab="trades">Trades</div>
+        <div class="tab" data-tab="flow">Flow</div>
+      </div>
+      <span id="resultsCollapseIcon">&#x25BC;</span>
+    </div>
+    <div class="results-body">
+      <div class="tab-content active" id="tab-output"><pre class="error-output" id="outputContent">Ready. Write ClawScript and click Compile.</pre></div>
+      <div class="tab-content" id="tab-ast"><pre class="ast-output" id="astContent"></pre></div>
+      <div class="tab-content" id="tab-js"><pre class="js-output" id="jsContent"></pre></div>
+      <div class="tab-content" id="tab-trades"><div id="tradesContent"></div></div>
+      <div class="tab-content" id="tab-flow"><div class="flow-container" id="flowContent"></div></div>
+    </div>
+  </div>
+</div>
+<div class="status-bar">
+  <span id="statusText">Ready</span>
+  <span id="statusRight"></span>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+var codeInput = document.getElementById('codeInput');
+var lineNumbers = document.getElementById('lineNumbers');
+var charCount = document.getElementById('charCount');
+var instrumentInput = document.getElementById('instrumentInput');
+var compileBtn = document.getElementById('compileBtn');
+var backtestBtn = document.getElementById('backtestBtn');
+var flowToggle = document.getElementById('flowToggle');
+var resultsPanel = document.getElementById('resultsPanel');
+var resultsToggleEl = document.getElementById('resultsToggle');
+var statusText = document.getElementById('statusText');
+var statusRight = document.getElementById('statusRight');
+var outputContent = document.getElementById('outputContent');
+var astContent = document.getElementById('astContent');
+var jsContent = document.getElementById('jsContent');
+var tradesContent = document.getElementById('tradesContent');
+var flowContent = document.getElementById('flowContent');
+var collapseIcon = document.getElementById('resultsCollapseIcon');
+
+var runLiveBtn = document.getElementById('runLiveBtn');
+var lastAST = null;
+var lastJS = '';
+var lastResults = null;
+var activeScriptId = null;
+var logPollTimer = null;
+var statusPollTimer = null;
+
+var params = new URLSearchParams(window.location.search);
+if (params.get('code')) {
+  codeInput.value = decodeURIComponent(params.get('code'));
+}
+if (params.get('instrument')) {
+  instrumentInput.value = params.get('instrument');
+}
+
+function updateLineNumbers() {
+  var lines = codeInput.value.split('\n').length;
+  var nums = [];
+  for (var i = 1; i <= lines; i++) nums.push(i);
+  lineNumbers.textContent = nums.join('\n');
+  charCount.textContent = codeInput.value.length + ' chars';
+}
+
+codeInput.addEventListener('input', updateLineNumbers);
+codeInput.addEventListener('scroll', function() {
+  lineNumbers.scrollTop = codeInput.scrollTop;
+});
+codeInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    var start = codeInput.selectionStart;
+    var end = codeInput.selectionEnd;
+    codeInput.value = codeInput.value.substring(0, start) + '  ' + codeInput.value.substring(end);
+    codeInput.selectionStart = codeInput.selectionEnd = start + 2;
+    updateLineNumbers();
+  }
+});
+updateLineNumbers();
+
+function switchTab(tabName) {
+  var tabs = document.querySelectorAll('.tab');
+  var contents = document.querySelectorAll('.tab-content');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].classList.toggle('active', tabs[i].getAttribute('data-tab') === tabName);
+  }
+  for (var j = 0; j < contents.length; j++) {
+    contents[j].classList.toggle('active', contents[j].id === 'tab-' + tabName);
+  }
+}
+
+document.querySelector('.tab-bar').addEventListener('click', function(e) {
+  var tab = e.target.closest('.tab');
+  if (tab) switchTab(tab.getAttribute('data-tab'));
+});
+
+resultsToggleEl.addEventListener('click', function(e) {
+  if (e.target.closest('.tab')) return;
+  var isCollapsed = resultsPanel.classList.contains('collapsed');
+  resultsPanel.classList.toggle('collapsed', !isCollapsed);
+  resultsPanel.classList.toggle('expanded', isCollapsed);
+  collapseIcon.textContent = isCollapsed ? '\u25BC' : '\u25B6';
+});
+
+function setStatus(msg, cls) {
+  statusText.className = cls || '';
+  statusText.innerHTML = msg;
+}
+
+function setOutput(html, cls) {
+  outputContent.className = cls || '';
+  outputContent.innerHTML = html;
+}
+
+function setBusy(busy) {
+  compileBtn.disabled = busy;
+  backtestBtn.disabled = busy;
+  runLiveBtn.disabled = busy;
+}
+
+async function apiPost(url, body) {
+  var res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+async function apiGet(url) {
+  var res = await fetch(url);
+  return res.json();
+}
+
+compileBtn.addEventListener('click', async function() {
+  var code = codeInput.value.trim();
+  if (!code) { setOutput('No code to compile.', 'error-output'); return; }
+  setBusy(true);
+  setStatus('<span class="spinner"></span> Compiling...', 'status-busy');
+  switchTab('output');
+  try {
+    var data = await apiPost('/api/clawscript/compile', { code: code });
+    if (data.error) {
+      setOutput('Compile Error:\n' + data.error, 'error-output');
+      setStatus('\u2718 Compile failed', 'status-err');
+      lastAST = null;
+      lastJS = '';
+    } else {
+      lastAST = data.ast || data.AST || null;
+      lastJS = data.js || data.generatedJS || '';
+      astContent.textContent = JSON.stringify(lastAST, null, 2);
+      jsContent.textContent = lastJS;
+      var nodeCount = lastAST ? (Array.isArray(lastAST) ? lastAST.length : (lastAST.body ? lastAST.body.length : 0)) : 0;
+      setOutput('Compiled successfully.\n' + nodeCount + ' AST node(s), ' + lastJS.length + ' chars JS generated.', 'js-output');
+      setStatus('\u2714 Compiled (' + nodeCount + ' nodes)', 'status-ok');
+      renderFlow(lastAST);
+    }
+  } catch (err) {
+    setOutput('Network error: ' + err.message, 'error-output');
+    setStatus('\u2718 Error', 'status-err');
+  }
+  setBusy(false);
+});
+
+backtestBtn.addEventListener('click', async function() {
+  var code = codeInput.value.trim();
+  if (!code) { setOutput('No code to backtest.', 'error-output'); return; }
+  var instrument = instrumentInput.value.trim();
+  setBusy(true);
+  setStatus('<span class="spinner"></span> Running backtest...', 'status-busy');
+  switchTab('output');
+  try {
+    var body = { code: code };
+    if (instrument) body.instrument = instrument;
+    var data = await apiPost('/api/clawscript/backtest', body);
+    if (data.error) {
+      setOutput('Backtest Error:\n' + data.error, 'error-output');
+      setStatus('\u2718 Backtest failed', 'status-err');
+    } else {
+      lastResults = data;
+      renderBacktestResults(data);
+      setStatus('\u2714 Backtest complete', 'status-ok');
+    }
+  } catch (err) {
+    setOutput('Network error: ' + err.message, 'error-output');
+    setStatus('\u2718 Error', 'status-err');
+  }
+  setBusy(false);
+});
+
+flowToggle.addEventListener('click', function() {
+  flowToggle.classList.toggle('active');
+  if (flowToggle.classList.contains('active')) {
+    switchTab('flow');
+    if (lastAST) renderFlow(lastAST);
+  } else {
+    switchTab('output');
+  }
+});
+
+function renderBacktestResults(data) {
+  var trades = data.trades || data.results || [];
+  var summary = data.summary || {};
+  var pnl = summary.totalPnl || summary.pnl || 0;
+  var winRate = summary.winRate || 0;
+  var totalTrades = trades.length || summary.totalTrades || 0;
+
+  var summaryHtml = '<div class="summary-grid">' +
+    card('Total P&L', formatPnl(pnl)) +
+    card('Trades', totalTrades) +
+    card('Win Rate', (winRate * 100).toFixed(1) + '%') +
+    card('Instrument', instrumentInput.value || 'N/A') +
+    '</div>';
+
+  setOutput(summaryHtml + '<div style="color:#8b949e;font-size:10px">See Trades tab for details</div>', '');
+
+  var tradesHtml = '';
+  if (trades.length) {
+    tradesHtml = '<div style="margin-bottom:4px;font-size:10px;color:#8b949e">' + trades.length + ' trade(s)</div>';
+    for (var i = 0; i < trades.length; i++) {
+      var t = trades[i];
+      var dir = (t.direction || t.type || 'BUY').toUpperCase();
+      var cls = dir === 'BUY' || dir === 'LONG' ? 'trade-buy' : 'trade-sell';
+      var tp = t.pnl || t.profit || 0;
+      var pnlCls = tp >= 0 ? 'pnl-positive' : 'pnl-negative';
+      tradesHtml += '<div class="trade-row">' +
+        '<span class="' + cls + '" style="min-width:40px">' + dir + '</span>' +
+        '<span style="min-width:50px">' + (t.price || t.entryPrice || '-') + '</span>' +
+        '<span style="min-width:50px">' + (t.exitPrice || '-') + '</span>' +
+        '<span class="' + pnlCls + '" style="min-width:60px">' + formatPnl(tp) + '</span>' +
+        '<span style="color:#484f58">' + (t.reason || t.date || '') + '</span>' +
+        '</div>';
+    }
+  } else {
+    tradesHtml = '<div style="color:#484f58;font-size:10px">No trades generated</div>';
+  }
+  tradesContent.innerHTML = tradesHtml;
+}
+
+function card(label, value) {
+  return '<div class="summary-card"><div class="label">' + esc(label) + '</div><div class="value">' + value + '</div></div>';
+}
+
+function formatPnl(v) {
+  var n = parseFloat(v) || 0;
+  var cls = n >= 0 ? 'pnl-positive' : 'pnl-negative';
+  return '<span class="' + cls + '">' + (n >= 0 ? '+' : '') + n.toFixed(2) + '</span>';
+}
+
+var CMD_COLORS = {
+  BUY:'#2dc653',SELL:'#f85149',SELLSHORT:'#f85149',EXIT:'#f0883e',CLOSE:'#f0883e',
+  IF:'#58a6ff',LOOP:'#58a6ff',WHILE:'#58a6ff',TRY:'#58a6ff',
+  DEF:'#8b949e',SET:'#8b949e',
+  AI_QUERY:'#bc8cff',AI_GENERATE_SCRIPT:'#bc8cff',ANALYZE_LOG:'#bc8cff',RUN_ML:'#bc8cff',
+  TASK_DEFINE:'#e3b341',TASK_ASSIGN:'#e3b341',TASK_CHAIN:'#e3b341',TASK_PARALLEL:'#e3b341',TASK_LOG:'#e3b341',
+  AGENT_SPAWN:'#f0883e',AGENT_CALL:'#f0883e',AGENT_PASS:'#f0883e',AGENT_TERMINATE:'#f0883e',
+  SKILL_CALL:'#3fb950',CRON_CREATE:'#3fb950',CRON_CALL:'#3fb950',
+  WEB_FETCH:'#79c0ff',FILE_READ:'#a5d6ff',FILE_WRITE:'#a5d6ff',DATA_TRANSFORM:'#a5d6ff',
+  CHANNEL_SEND:'#d2a8ff',EMAIL_SEND:'#d2a8ff',PUBLISH_CANVAS:'#d2a8ff',
+  INDICATOR:'#ffa657',OPTIMIZE:'#ffa657',TRAILSTOP:'#2dc653'
+};
+
+function renderFlow(ast) {
+  if (!ast) { flowContent.innerHTML = '<div style="color:#484f58;font-size:10px">No AST data</div>'; return; }
+  var nodes = Array.isArray(ast) ? ast : (ast.body || []);
+  if (!nodes.length) { flowContent.innerHTML = '<div style="color:#484f58;font-size:10px">Empty AST</div>'; return; }
+  var html = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:4px">';
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i];
+    var cmd = n.type || n.command || n.cmd || 'UNKNOWN';
+    var color = CMD_COLORS[cmd.toUpperCase()] || '#484f58';
+    if (i > 0) html += '<span class="flow-arrow">\u2192</span>';
+    html += '<div class="flow-node" style="background:' + color + '20;border:1px solid ' + color + ';color:' + color + '">' + esc(cmd) + '</div>';
+  }
+  html += '</div>';
+  flowContent.innerHTML = html;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+runLiveBtn.addEventListener('click', async function() {
+  var code = codeInput.value.trim();
+  if (!code) { setOutput('No code to run.', 'error-output'); return; }
+  setBusy(true);
+  setStatus('<span class="spinner"></span> Starting live script...', 'status-busy');
+  try {
+    var ts = Date.now().toString(36);
+    var data = await apiPost('/api/clawscript/run', { code: code, name: 'editor-' + ts });
+    if (data.error) {
+      setOutput('Run Error:\n' + data.error, 'error-output');
+      setStatus('\u2718 Run failed', 'status-err');
+    } else {
+      activeScriptId = data.scriptId || data.name;
+      setStatus('\u2714 Script started: ' + (data.name || activeScriptId), 'status-ok');
+      openRunnerPopup(data.name || activeScriptId, data.scriptId);
+    }
+  } catch (err) {
+    setOutput('Network error: ' + err.message, 'error-output');
+    setStatus('\u2718 Error', 'status-err');
+  }
+  setBusy(false);
+});
+
+function openRunnerPopup(name, scriptId) {
+  closeRunnerPopup();
+  var fullId = scriptId || name;
+  var shortId = fullId.replace(/^cs-script-/, '');
+  var overlay = document.createElement('div');
+  overlay.className = 'runner-overlay';
+  overlay.id = 'runnerOverlay';
+  overlay.innerHTML =
+    '<div class="runner-popup">' +
+      '<div class="runner-popup__header">' +
+        '<div class="runner-popup__title">' +
+          '<span>\uD83E\uDD80 ' + esc(shortId) + '</span>' +
+          '<span class="runner-popup__badge badge-starting" id="rpBadge">STARTING</span>' +
+        '</div>' +
+        '<button class="btn" id="rpClose" title="Close" style="padding:2px 8px;font-size:14px">\u2715</button>' +
+      '</div>' +
+      '<div class="runner-popup__actions">' +
+        '<button class="btn btn-danger" id="rpStop">\u25A0 Stop</button>' +
+        '<button class="btn btn-primary" id="rpRestart">\u21BB Restart</button>' +
+        '<button class="btn btn-warn" id="rpPause">\u23F8 Pause</button>' +
+        '<button class="btn btn-success" id="rpResume" style="display:none">\u25B6 Resume</button>' +
+      '</div>' +
+      '<div class="runner-popup__logs" id="rpLogs">Waiting for logs...</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) closeRunnerPopup(); });
+  document.getElementById('rpClose').addEventListener('click', closeRunnerPopup);
+  document.getElementById('rpStop').addEventListener('click', function() {
+    apiPost('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/stop', {});
+  });
+  document.getElementById('rpRestart').addEventListener('click', function() {
+    apiPost('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/restart', {});
+  });
+  document.getElementById('rpPause').addEventListener('click', function() {
+    apiPost('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/pause', {});
+    document.getElementById('rpPause').style.display = 'none';
+    document.getElementById('rpResume').style.display = '';
+  });
+  document.getElementById('rpResume').addEventListener('click', function() {
+    apiPost('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/resume', {});
+    document.getElementById('rpResume').style.display = 'none';
+    document.getElementById('rpPause').style.display = '';
+  });
+
+  pollLogs(shortId);
+  pollStatus(fullId);
+}
+
+function pollLogs(shortId) {
+  if (logPollTimer) clearInterval(logPollTimer);
+  var logsEl = document.getElementById('rpLogs');
+  async function fetch_() {
+    try {
+      var data = await apiGet('/api/clawscript/scripts/' + encodeURIComponent(shortId) + '/logs');
+      if (data.lines && logsEl) {
+        var html = data.lines.map(function(l) {
+          var cls = '';
+          if (l.indexOf('[ERROR]') > -1) cls = 'log-error';
+          else if (l.indexOf('[WARN]') > -1) cls = 'log-warn';
+          else if (l.indexOf('[TRADE]') > -1) cls = 'log-trade';
+          else if (l.indexOf('[INFO]') > -1) cls = 'log-info';
+          return '<div class="' + cls + '">' + esc(l) + '</div>';
+        }).join('');
+        logsEl.innerHTML = html || '<div style="color:#484f58">No logs yet</div>';
+        logsEl.scrollTop = logsEl.scrollHeight;
+      }
+    } catch (_) {}
+  }
+  fetch_();
+  logPollTimer = setInterval(fetch_, 2000);
+}
+
+function pollStatus(fullId) {
+  if (statusPollTimer) clearInterval(statusPollTimer);
+  async function fetch_() {
+    try {
+      var data = await apiGet('/api/clawscript/scripts');
+      var scripts = data.scripts || [];
+      var s = scripts.find(function(x) { return x.id === fullId; });
+      var badge = document.getElementById('rpBadge');
+      if (!badge) return;
+      if (!s) {
+        badge.className = 'runner-popup__badge badge-stopped';
+        badge.textContent = 'NOT FOUND';
+      } else if (s.running) {
+        badge.className = 'runner-popup__badge badge-running';
+        badge.textContent = 'RUNNING';
+      } else {
+        badge.className = 'runner-popup__badge badge-stopped';
+        badge.textContent = 'STOPPED';
+      }
+    } catch (_) {}
+  }
+  fetch_();
+  statusPollTimer = setInterval(fetch_, 3000);
+}
+
+function closeRunnerPopup() {
+  if (logPollTimer) { clearInterval(logPollTimer); logPollTimer = null; }
+  if (statusPollTimer) { clearInterval(statusPollTimer); statusPollTimer = null; }
+  var overlay = document.getElementById('runnerOverlay');
+  if (overlay) overlay.remove();
+}
+
+if (codeInput.value) updateLineNumbers();
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{
+  "enabled": true,
+  "budget": 50100,
+  "maxMarginPct": 10,
+  "maxDrawdown": 2000,
+  "breakEvenBuffer": 1.5,
+  "maxOpenPositions": 2,
+  "cooldownMs": 6000,
+  "tickWindow": 15,
+  "minMomentumPct": 0.03,
+  "minSize": 10,
+  "maxSize": 20,
+  "profitTarget": 200,
+  "trailingStop": 200,
+  "warmupMs": 60000,
+  "indicators": {
+    "rsi": {
+      "enabled": true,
+      "period": 14,
+      "overbought": 70,
+      "oversold": 30
+    },
+    "ema": {
+      "enabled": false,
+      "shortPeriod": 9,
+      "longPeriod": 21
+    },
+    "macd": {
+      "enabled": true,
+      "fast": 12,
+      "slow": 26,
+      "signal": 9
+    }
+  },
+  "strategies": [
+    {
+      "instrument": "CS.D.CFAGOLD.CFA.IP",
+      "name": "Gold Scalp",
+      "direction": "BOTH",
+      "size": 0.5,
+      "enabled": false,
+      "stopDistance": 50,
+      "limitDistance": 80,
+      "minMomentumPct": 0.03
+    }
+  ],
+  "_drawdownTripped": false
+}

@@ -1,0 +1,3252 @@
+[
+  {
+    "timestamp": "2026-03-03T23:41:38.489Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8288.6,
+    "liveOffer": 8296.1,
+    "spread": 7.5,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8288.6, Offer: 8296.1, Mid: 8292.35000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 0s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 7.50000 (0.090%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 7.50000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.56% from mid 8292.35000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:42:38.738Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8289.5,
+    "liveOffer": 8296.7,
+    "spread": 7.200000000000728,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8289.5, Offer: 8296.7, Mid: 8293.10000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 3s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 7.20000 (0.087%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 7.20000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.55% from mid 8293.10000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:43:38.983Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8294.5,
+    "liveOffer": 8301.7,
+    "spread": 7.200000000000728,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8294.5, Offer: 8301.7, Mid: 8298.10000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 2s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 7.20000 (0.087%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 7.20000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.48% from mid 8298.10000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:44:42.150Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8300,
+    "liveOffer": 8308,
+    "spread": 8,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8300, Offer: 8308, Mid: 8304.00000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 3s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.00000 (0.096%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.00000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.40% from mid 8304.00000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:45:42.394Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8302.5,
+    "liveOffer": 8309.6,
+    "spread": 7.100000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8302.5, Offer: 8309.6, Mid: 8306.05000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 1s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 7.10000 (0.085%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 7.10000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.37% from mid 8306.05000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:46:42.670Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8302.6,
+    "liveOffer": 8310.1,
+    "spread": 7.5,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8302.6, Offer: 8310.1, Mid: 8306.35000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 14s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 7.50000 (0.090%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 7.50000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.37% from mid 8306.35000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:47:43.177Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8304.8,
+    "liveOffer": 8312,
+    "spread": 7.200000000000728,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8304.8, Offer: 8312, Mid: 8308.40000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 1s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 7.20000 (0.087%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 7.20000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.34% from mid 8308.40000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:48:44.860Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8306.1,
+    "liveOffer": 8313.2,
+    "spread": 7.100000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8306.1, Offer: 8313.2, Mid: 8309.65000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 3s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 7.10000 (0.085%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 7.10000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.32% from mid 8309.65000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:49:45.211Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8300.5,
+    "liveOffer": 8308.1,
+    "spread": 7.600000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8300.5, Offer: 8308.1, Mid: 8304.30000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 19s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 7.60000 (0.092%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 7.60000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.40% from mid 8304.30000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:50:45.547Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8292.3,
+    "liveOffer": 8300.4,
+    "spread": 8.100000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8292.3, Offer: 8300.4, Mid: 8296.35000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 25s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.10000 (0.098%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.10000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.51% from mid 8296.35000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:51:45.814Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8300.2,
+    "liveOffer": 8308.5,
+    "spread": 8.299999999999272,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8300.2, Offer: 8308.5, Mid: 8304.35000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 19s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.30000 (0.100%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.30000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.40% from mid 8304.35000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:52:46.109Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8297.2,
+    "liveOffer": 8305.9,
+    "spread": 8.699999999998909,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8297.2, Offer: 8305.9, Mid: 8301.55000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 17s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.70000 (0.105%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.70000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.44% from mid 8301.55000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:53:46.465Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8296.1,
+    "liveOffer": 8304.8,
+    "spread": 8.699999999998909,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8296.1, Offer: 8304.8, Mid: 8300.45000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 31s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.70000 (0.105%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.70000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.45% from mid 8300.45000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:54:46.754Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8300.5,
+    "liveOffer": 8309.3,
+    "spread": 8.799999999999272,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8300.5, Offer: 8309.3, Mid: 8304.90000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 32s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.80000 (0.106%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.80000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.39% from mid 8304.90000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:55:46.994Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8309.2,
+    "liveOffer": 8317.9,
+    "spread": 8.699999999998909,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8309.2, Offer: 8317.9, Mid: 8313.55000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 12s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.70000 (0.105%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.70000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.27% from mid 8313.55000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:56:47.569Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8303,
+    "liveOffer": 8311.6,
+    "spread": 8.600000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8303, Offer: 8311.6, Mid: 8307.30000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 17s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.60000 (0.104%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.60000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.36% from mid 8307.30000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:57:47.895Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8303.8,
+    "liveOffer": 8311.9,
+    "spread": 8.100000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8303.8, Offer: 8311.9, Mid: 8307.85000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 8s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.10000 (0.097%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.10000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.35% from mid 8307.85000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:58:48.152Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8297.7,
+    "liveOffer": 8305.8,
+    "spread": 8.099999999998545,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8297.7, Offer: 8305.8, Mid: 8301.75000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 21s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.10000 (0.098%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.10000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.43% from mid 8301.75000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-03T23:59:48.229Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8292.3,
+    "liveOffer": 8300.6,
+    "spread": 8.300000000001091,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8292.3, Offer: 8300.6, Mid: 8296.45000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 6s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.30000 (0.100%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.30000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89531.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.51% from mid 8296.45000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:00:09.448Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8294.9,
+    "liveOffer": 8303.2,
+    "spread": 8.300000000001091,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8294.9, Offer: 8303.2, Mid: 8299.05000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 1s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.30000 (0.100%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.30000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89631.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.47% from mid 8299.05000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:02:18.319Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8247.8,
+    "liveOffer": 8255.8,
+    "spread": 8,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8247.8, Offer: 8255.8, Mid: 8251.80000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 1s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.00000 (0.097%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.00000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89631.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 15.13% from mid 8251.80000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:03:19.758Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8221.8,
+    "liveOffer": 8229.1,
+    "spread": 7.300000000001091,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8221.8, Offer: 8229.1, Mid: 8225.45000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 0s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 7.30000 (0.089%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 7.30000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 89631.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 15.50% from mid 8225.45000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:04:08.935Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8235.6,
+    "liveOffer": 8244.6,
+    "spread": 9,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8235.6, Offer: 8244.6, Mid: 8240.10000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 2s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.00000 (0.109%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.00000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90131.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 15.29% from mid 8240.10000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:05:10.181Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8222.8,
+    "liveOffer": 8230.7,
+    "spread": 7.900000000001455,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8222.8, Offer: 8230.7, Mid: 8226.75000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 2s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 7.90000 (0.096%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 7.90000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90131.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 15.48% from mid 8226.75000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:06:10.430Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8195.9,
+    "liveOffer": 8204.1,
+    "spread": 8.200000000000728,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8195.9, Offer: 8204.1, Mid: 8200.00000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 2s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.20000 (0.100%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.20000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90131.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 15.85% from mid 8200.00000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:07:10.667Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8191.7,
+    "liveOffer": 8200.9,
+    "spread": 9.199999999999818,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8191.7, Offer: 8200.9, Mid: 8196.30000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 2s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.20000 (0.112%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.20000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90131.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 15.91% from mid 8196.30000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:07:14.108Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8191.6,
+    "liveOffer": 8201.2,
+    "spread": 9.600000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8191.6, Offer: 8201.2, Mid: 8196.40000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 1s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.60000 (0.117%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.60000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90131.81)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "No existing position in same direction"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 15.90% from mid 8196.40000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:20:40.034Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8285.5,
+    "liveOffer": 8293.1,
+    "spread": 7.600000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8285.5, Offer: 8293.1, Mid: 8289.30000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 6s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 7.60000 (0.092%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 7.60000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90826.02)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.61% from mid 8289.30000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:21:41.480Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8296.5,
+    "liveOffer": 8304.2,
+    "spread": 7.700000000000728,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8296.5, Offer: 8304.2, Mid: 8300.35000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 1s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 7.70000 (0.093%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 7.70000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90826.02)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.45% from mid 8300.35000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:22:41.713Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8287.2,
+    "liveOffer": 8296.5,
+    "spread": 9.299999999999272,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8287.2, Offer: 8296.5, Mid: 8291.85000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 2s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.30000 (0.112%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.30000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90826.02)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.57% from mid 8291.85000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:23:07.434Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8291.2,
+    "liveOffer": 8299.8,
+    "spread": 8.599999999998545,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8291.2, Offer: 8299.8, Mid: 8295.50000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 1s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.60000 (0.104%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.60000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90826.02)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.52% from mid 8295.50000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:24:08.863Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8289.1,
+    "liveOffer": 8298.2,
+    "spread": 9.100000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8289.1, Offer: 8298.2, Mid: 8293.65000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 1s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.10000 (0.110%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.10000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90826.02)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.55% from mid 8293.65000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:25:09.143Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8287.6,
+    "liveOffer": 8296.7,
+    "spread": 9.100000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8287.6, Offer: 8296.7, Mid: 8292.15000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 1s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.10000 (0.110%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.10000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90826.02)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.57% from mid 8292.15000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:26:09.383Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8286.1,
+    "liveOffer": 8295.4,
+    "spread": 9.299999999999272,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8286.1, Offer: 8295.4, Mid: 8290.75000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 0s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.30000 (0.112%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.30000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90826.02)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.59% from mid 8290.75000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:27:09.664Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8292.5,
+    "liveOffer": 8301.5,
+    "spread": 9,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8292.5, Offer: 8301.5, Mid: 8297.00000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 3s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.00000 (0.108%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.00000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90826.02)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "2 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.50% from mid 8297.00000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:28:09.748Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8307,
+    "liveOffer": 8316.6,
+    "spread": 9.600000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8307, Offer: 8316.6, Mid: 8311.80000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 2s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.60000 (0.115%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.60000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90826.02)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "2 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.30% from mid 8311.80000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:52:21.968Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8319.8,
+    "liveOffer": 8328.8,
+    "spread": 9,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8319.8, Offer: 8328.8, Mid: 8324.30000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 2s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.00000 (0.108%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.00000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.12% from mid 8324.30000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:53:23.310Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8307,
+    "liveOffer": 8316.5,
+    "spread": 9.5,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8307, Offer: 8316.5, Mid: 8311.75000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 15s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.50000 (0.114%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.50000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.30% from mid 8311.75000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:54:23.383Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8303.9,
+    "liveOffer": 8313,
+    "spread": 9.100000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8303.9, Offer: 8313, Mid: 8308.45000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 12s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.10000 (0.110%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.10000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.34% from mid 8308.45000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:55:23.456Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8299.9,
+    "liveOffer": 8308.8,
+    "spread": 8.899999999999636,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8299.9, Offer: 8308.8, Mid: 8304.35000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 6s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.90000 (0.107%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.90000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.40% from mid 8304.35000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:56:23.542Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8306,
+    "liveOffer": 8315,
+    "spread": 9,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8306, Offer: 8315, Mid: 8310.50000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 0s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.00000 (0.108%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.00000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.31% from mid 8310.50000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:57:23.893Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8304.3,
+    "liveOffer": 8313.3,
+    "spread": 9,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8304.3, Offer: 8313.3, Mid: 8308.80000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 3s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.00000 (0.108%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.00000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.34% from mid 8308.80000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:58:23.976Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8314.6,
+    "liveOffer": 8324,
+    "spread": 9.399999999999636,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8314.6, Offer: 8324, Mid: 8319.30000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 2s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.40000 (0.113%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.40000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.19% from mid 8319.30000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T00:59:24.052Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8321.4,
+    "liveOffer": 8330.2,
+    "spread": 8.800000000001091,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8321.4, Offer: 8330.2, Mid: 8325.80000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 1s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.80000 (0.106%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.80000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 14.10% from mid 8325.80000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T01:00:24.130Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8356.9,
+    "liveOffer": 8365.6,
+    "spread": 8.700000000000728,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8356.9, Offer: 8365.6, Mid: 8361.25000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 1s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 8.70000 (0.104%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 8.70000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 13.62% from mid 8361.25000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T01:01:24.206Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8374.7,
+    "liveOffer": 8384.3,
+    "spread": 9.599999999998545,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8374.7, Offer: 8384.3, Mid: 8379.50000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 3s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.60000 (0.115%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.60000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 13.37% from mid 8379.50000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T01:02:24.312Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8385.1,
+    "liveOffer": 8395.2,
+    "spread": 10.100000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8385.1, Offer: 8395.2, Mid: 8390.15000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 3s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 10.10000 (0.120%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 10.10000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 13.23% from mid 8390.15000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T01:03:24.412Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8363.8,
+    "liveOffer": 8373.7,
+    "spread": 9.900000000001455,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8363.8, Offer: 8373.7, Mid: 8368.75000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 3s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 9.90000 (0.118%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 9.90000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 13.52% from mid 8368.75000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T01:04:19.961Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8354,
+    "liveOffer": 8364.1,
+    "spread": 10.100000000000364,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8354, Offer: 8364.1, Mid: 8359.05000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 2s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 10.10000 (0.121%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 10.10000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 13.65% from mid 8359.05000 — possible stale/hallucinated value"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-03-04T01:05:21.200Z",
+    "instrument": "CS.D.CFASILVER.CFA.IP",
+    "name": "Silver Dip Buy",
+    "direction": "BUY",
+    "size": 0.5,
+    "stopDistance": 50,
+    "limitDistance": 100,
+    "liveBid": 8347.2,
+    "liveOffer": 8357.3,
+    "spread": 10.099999999998545,
+    "verdict": "REJECTED",
+    "checks": [
+      {
+        "check": "Market tradeable",
+        "pass": true,
+        "detail": "Status: TRADEABLE"
+      },
+      {
+        "check": "Price validity",
+        "pass": true,
+        "detail": "Bid: 8347.2, Offer: 8357.3, Mid: 8352.25000"
+      },
+      {
+        "check": "Price staleness",
+        "pass": true,
+        "detail": "Snapshot age 2s (< 120s limit)"
+      },
+      {
+        "check": "Spread limit",
+        "pass": true,
+        "detail": "Spread 10.10000 (0.121%)"
+      },
+      {
+        "check": "Stop-loss set",
+        "pass": true,
+        "detail": "50 pts (> spread 10.10000)"
+      },
+      {
+        "check": "Risk:reward ratio",
+        "pass": true,
+        "detail": "1:2.00"
+      },
+      {
+        "check": "Position size",
+        "pass": true,
+        "detail": "0.5 contracts"
+      },
+      {
+        "check": "Risk % of balance",
+        "pass": true,
+        "detail": "0.03% (risk: 25.00, balance: 90384.92)"
+      },
+      {
+        "check": "No duplicate position",
+        "pass": true,
+        "detail": "1 existing — duplicates allowed by config"
+      },
+      {
+        "check": "Entry price sanity",
+        "pass": false,
+        "detail": "Entry 9500 is 13.74% from mid 8352.25000 — possible stale/hallucinated value"
+      }
+    ]
+  }
+]

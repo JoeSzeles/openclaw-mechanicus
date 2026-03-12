@@ -1,0 +1,50 @@
+[
+  {
+    "name": "IG Trading Dashboard",
+    "file": "ig-dashboard.html",
+    "description": "Live monitoring of IG signal monitor, trading bot, alerts, and strategies",
+    "category": "Trading"
+  },
+  {
+    "name": "Gold BB Squeeze Backtest",
+    "file": "gold-backtest.html",
+    "description": "10k 1H BB Squeeze breakout backtest (Sharpe 2.15)",
+    "category": "Trading"
+  },
+  {
+    "name": "Trades Test",
+    "file": "trades-test.html",
+    "description": "Sample trades dashboard test output",
+    "category": "Trading"
+  },
+  {
+    "name": "MetaMask Connect",
+    "file": "metamask-connect.html",
+    "description": "MetaMask wallet connection interface",
+    "category": "Crypto"
+  },
+  {
+    "name": "MetaMask Skill",
+    "file": "metamask-skill.html",
+    "description": "MetaMask skill output and wallet tools",
+    "category": "Crypto"
+  },
+  {
+    "name": "WDK Skill",
+    "file": "wdk-skill.html",
+    "description": "WDK skill output page",
+    "category": "Skills"
+  },
+  {
+    "name": "Gann EURUSD Bot",
+    "file": "gann-bot-status.html",
+    "description": "Gann angle + ATR/RSI/Volume backtest prototype (300x 5m EURUSD sim)",
+    "category": "Trading"
+  },
+  {
+    "name": "ClawScript Documentation",
+    "file": "clawscript-docs.html",
+    "description": "Comprehensive ClawScript language reference: all commands, grammar, editor usage, flow builder, and sample strategies",
+    "category": "Documentation"
+  }
+]

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenClaw Canvas</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 20px; padding-top: 64px; }
+.container { max-width: 1100px; margin: 0 auto; }
+h1 { color: #58a6ff; margin-bottom: 4px; font-size: 26px; }
+.subtitle { color: #8b949e; font-size: 13px; margin-bottom: 24px; }
+h2 { color: #8b949e; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; margin-top: 28px; border-bottom: 1px solid #21262d; padding-bottom: 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px; text-decoration: none; color: #c9d1d9; transition: border-color 0.2s, transform 0.15s; display: block; position: relative; }
+.card:hover { border-color: #58a6ff; transform: translateY(-2px); }
+.card-title { font-size: 16px; font-weight: 600; color: #e6edf3; margin-bottom: 6px; padding-right: 28px; }
+.card-desc { font-size: 13px; color: #8b949e; line-height: 1.4; }
+.card-cat { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; }
+.cat-trading { background: #1b4332; color: #2dc653; }
+.cat-crypto { background: #1c2541; color: #79c0ff; }
+.cat-skills { background: #2d1b4e; color: #bc8cff; }
+.cat-other { background: #3d1f00; color: #f0883e; }
+.btn-delete { position: absolute; top: 10px; right: 10px; background: transparent; border: 1px solid transparent; color: #484f58; cursor: pointer; font-size: 16px; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; z-index: 2; }
+.btn-delete:hover { background: #da3633; color: #fff; border-color: #da3633; }
+.info-box { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 18px; margin-top: 28px; }
+.info-box h3 { color: #58a6ff; font-size: 15px; margin-bottom: 8px; }
+.info-box p, .info-box li { font-size: 13px; color: #8b949e; line-height: 1.6; }
+.info-box code { background: #0d1117; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #79c0ff; }
+.info-box ul { padding-left: 20px; margin-top: 6px; }
+.empty { color: #484f58; font-style: italic; padding: 20px; text-align: center; }
+.toast { position: fixed; bottom: 20px; right: 20px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px 20px; color: #c9d1d9; font-size: 13px; z-index: 10000; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.toast.show { opacity: 1; }
+.toast.error { border-color: #da3633; }
+.toast.success { border-color: #2dc653; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Canvas</h1>
+  <p class="subtitle">Visual output hub — dashboards, charts, and skill results from your agents</p>
+  <div id="pages"></div>
+
+  <div class="info-box">
+    <h3>Publishing to Canvas</h3>
+    <p>Any agent or skill can display visual results here:</p>
+    <ul>
+      <li>Write an HTML file to <code>.openclaw/canvas/your-page.html</code></li>
+      <li>It becomes accessible at <code>/__openclaw__/canvas/your-page.html</code></li>
+      <li>Register it in <code>.openclaw/canvas/manifest.json</code> so it appears on this hub</li>
+      <li>Use Chart.js, D3, or any CDN library — external scripts are allowed</li>
+      <li>Never start a custom web server or use custom ports</li>
+    </ul>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var TOKEN = '';
+try {
+  var s = localStorage.getItem('openclaw.control.settings.v1');
+  if (s) { var obj = JSON.parse(s); TOKEN = obj.token || ''; }
+} catch(e) {}
+if (!TOKEN) {
+  try { var m = document.cookie.match(/openclaw_token=([^;]+)/); if (m) TOKEN = m[1]; } catch(e) {}
+}
+
+var CAT_CLASSES = { Trading: 'cat-trading', Crypto: 'cat-crypto', Skills: 'cat-skills' };
+var PROTECTED = ['index.html', 'manifest.json', 'ig-dashboard.html'];
+
+function showToast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (type || '');
+  setTimeout(function() { t.className = 'toast'; }, 3000);
+}
+
+function loadManifest() {
+  return fetch('/__openclaw__/canvas/manifest.json')
+    .then(function(res) { return res.ok ? res.json() : []; })
+    .catch(function() { return []; });
+}
+
+function groupBy(arr, key) {
+  var groups = {};
+  for (var i = 0; i < arr.length; i++) {
+    var g = arr[i][key] || 'Other';
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(arr[i]);
+  }
+  return groups;
+}
+
+function deletePage(filename, name) {
+  if (!confirm('Delete "' + name + '"?\nThis will remove the page and its file.')) return;
+  fetch('/api/canvas/page/' + encodeURIComponent(filename), {
+    method: 'DELETE',
+    headers: TOKEN ? { 'Authorization': 'Bearer ' + TOKEN } : {}
+  }).then(function(res) {
+    return res.json().then(function(data) {
+      if (res.ok) {
+        showToast('Deleted: ' + name, 'success');
+        render();
+      } else {
+        showToast('Error: ' + (data.error || 'Failed'), 'error');
+      }
+    });
+  }).catch(function(e) {
+    showToast('Error: ' + e.message, 'error');
+  });
+}
+
+function render() {
+  loadManifest().then(function(pages) {
+    var container = document.getElementById('pages');
+    if (pages.length === 0) {
+      container.innerHTML = '<p class="empty">No canvas pages published yet</p>';
+      return;
+    }
+    var groups = groupBy(pages, 'category');
+    var order = ['Trading', 'Crypto', 'Skills', 'Other'];
+    var html = '';
+    for (var o = 0; o < order.length; o++) {
+      var cat = order[o];
+      if (!groups[cat]) continue;
+      html += '<h2>' + cat + '</h2><div class="grid">';
+      for (var i = 0; i < groups[cat].length; i++) {
+        var page = groups[cat][i];
+        var catClass = CAT_CLASSES[cat] || 'cat-other';
+        var isProtected = PROTECTED.indexOf(page.file) >= 0;
+        html += '<a class="card" href="/__openclaw__/canvas/' + page.file + '">';
+        if (!isProtected) {
+          html += '<button class="btn-delete" data-file="' + page.file + '" data-name="' + (page.name || '').replace(/"/g, '&quot;') + '" title="Delete this page">&times;</button>';
+        }
+        html += '<span class="card-cat ' + catClass + '">' + cat + '</span>';
+        html += '<div class="card-title">' + page.name + '</div>';
+        html += '<div class="card-desc">' + (page.description || '') + '</div>';
+        html += '</a>';
+      }
+      html += '</div>';
+    }
+    container.innerHTML = html;
+  });
+}
+
+document.getElementById('pages').addEventListener('click', function(e) {
+  var btn = e.target.closest('.btn-delete');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  var file = btn.getAttribute('data-file');
+  var name = btn.getAttribute('data-name');
+  deletePage(file, name);
+});
+
+render();
+</script>
+</body>
+</html>

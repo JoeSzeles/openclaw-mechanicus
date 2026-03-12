@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="30">
+<title>IG Trading Bot Status</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 960px; margin: 0 auto; padding: 20px; background: #0d1117; color: #c9d1d9; }
+h1 { color: #58a6ff; }
+h2 { color: #8b949e; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #21262d; }
+th { background: #161b22; color: #8b949e; font-weight: 600; }
+tr:hover { background: #161b22; }
+.status { padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+.on { background: #1b4332; color: #2dc653; }
+.off { background: #3d1f00; color: #f0883e; }
+.test { background: #1c2541; color: #79c0ff; }
+.meta { color: #8b949e; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>IG Trading Bot</h1>
+<p class="meta">Last updated: 2026-03-01T13:16:04.355Z <span class="status on">LIVE</span></p>
+
+<h2>Strategies</h2>
+<table>
+<tr><th>Name</th><th>Instrument</th><th>Direction</th><th>Size</th><th>Status</th></tr>
+<tr><td>EURCHF Swing Reversion</td><td>CS.D.EURCHF.CFD.IP</td><td>BUY</td><td>0.5</td><td>🟢 Enabled</td></tr>
+<tr><td>EURCHF Swing Reversion Short</td><td>CS.D.EURCHF.CFD.IP</td><td>SELL</td><td>0.5</td><td>🟢 Enabled</td></tr>
+<tr><td>BTC Dip Buy</td><td>CS.D.BITCOIN.CFD.IP</td><td>BUY</td><td>0.1</td><td>🟢 Enabled</td></tr>
+<tr><td>BTC Spike Sell</td><td>CS.D.BITCOIN.CFD.IP</td><td>SELL</td><td>0.1</td><td>🟢 Enabled</td></tr>
+<tr><td>ETH Dip Buy</td><td>CS.D.ETHUSD.CFD.IP</td><td>BUY</td><td>2</td><td>🟢 Enabled</td></tr>
+<tr><td>ETH Spike Sell</td><td>CS.D.ETHUSD.CFD.IP</td><td>SELL</td><td>2</td><td>🟢 Enabled</td></tr>
+<tr><td>SOL Dip Buy</td><td>CS.D.SOLUSD.CFD.IP</td><td>BUY</td><td>5</td><td>🟢 Enabled</td></tr>
+<tr><td>SOL Spike Sell</td><td>CS.D.SOLUSD.CFD.IP</td><td>SELL</td><td>5</td><td>🟢 Enabled</td></tr>
+<tr><td>Gold Dip Buy Shlomo</td><td>CS.D.USCGC.TODAY.IP</td><td>BUY</td><td>1</td><td>🟢 Enabled</td></tr>
+<tr><td>Gold Spike Sell Shlomo</td><td>CS.D.USCGC.TODAY.IP</td><td>SELL</td><td>1</td><td>🟢 Enabled</td></tr>
+<tr><td>CL Oil War Buy</td><td>CC.D.CL.UME.IP</td><td>BUY</td><td>0.2</td><td>🟢 Enabled</td></tr>
+<tr><td>USOil War Buy</td><td>CS.D.USOIL</td><td>BUY</td><td>1</td><td>🟢 Enabled</td></tr>
+</table>
+
+<h2>Open Positions</h2>
+<table>
+<tr><th>Instrument</th><th>Direction</th><th>Size</th><th>Entry</th><th>Current Bid</th></tr>
+<tr><td>Spot Silver (A$1 Contract)</td><td>BUY</td><td>5</td><td>9288.8</td><td>9359.7</td></tr>
+<tr><td>Spot Gold (A$1 Contract)</td><td>BUY</td><td>5</td><td>5234.08</td><td>5276.46</td></tr>
+<tr><td>Ether ($1)</td><td>BUY</td><td>1.5</td><td>1996.3</td><td>1978.8</td></tr>
+<tr><td>Bitcoin ($1)</td><td>SELL</td><td>0.05</td><td>66465</td><td>66324</td></tr>
+<tr><td>Solana ($1)</td><td>SELL</td><td>5</td><td>84.62</td><td>84.62</td></tr>
+</table>
+
+<h2>Recent Activity</h2>
+<table>
+<tr><th>Time</th><th>Level</th><th>Message</th></tr>
+<tr><td>2026-03-01T13:16:04.353Z</td><td>WARN</td><td>Skipping CS.D.USOIL — could not fetch price.</td></tr>
+<tr><td>2026-03-01T13:16:04.352Z</td><td>ERROR</td><td>Failed to fetch price for CS.D.USOIL</td></tr>
+<tr><td>2026-03-01T13:16:04.136Z</td><td>WARN</td><td>RATE LIMIT: 10 calls in last minute, pausing 1s</td></tr>
+<tr><td>2026-03-01T13:16:01.083Z</td><td>INFO</td><td>Evaluating: USOil War Buy</td></tr>
+<tr><td>2026-03-01T13:16:01.081Z</td><td>INFO</td><td>CC.D.CL.UME.IP: Market not tradeable (EDITS_ONLY)</td></tr>
+<tr><td>2026-03-01T13:15:53.859Z</td><td>WARN</td><td>RATE LIMIT: 10 calls in last minute, pausing 8s</td></tr>
+<tr><td>2026-03-01T13:15:50.844Z</td><td>INFO</td><td>Evaluating: CL Oil War Buy</td></tr>
+<tr><td>2026-03-01T13:15:50.842Z</td><td>INFO</td><td>CS.D.USCGC.TODAY.IP: Market not tradeable (EDITS_ONLY)</td></tr>
+<tr><td>2026-03-01T13:15:43.629Z</td><td>WARN</td><td>RATE LIMIT: 10 calls in last minute, pausing 8s</td></tr>
+<tr><td>2026-03-01T13:15:40.626Z</td><td>INFO</td><td>Evaluating: Gold Spike Sell Shlomo</td></tr>
+<tr><td>2026-03-01T13:15:40.625Z</td><td>INFO</td><td>CS.D.USCGC.TODAY.IP: Market not tradeable (EDITS_ONLY)</td></tr>
+<tr><td>2026-03-01T13:15:40.065Z</td><td>WARN</td><td>RATE LIMIT: 10 calls in last minute, pausing 1s</td></tr>
+<tr><td>2026-03-01T13:15:37.052Z</td><td>INFO</td><td>Evaluating: Gold Dip Buy Shlomo</td></tr>
+<tr><td>2026-03-01T13:15:37.050Z</td><td>WARN</td><td>CS.D.SOLUSD.CFD.IP: Blocked — Already have an open position on CS.D.SOLUSD.CFD.IP</td></tr>
+<tr><td>2026-03-01T13:15:37.049Z</td><td>INFO</td><td>CS.D.SOLUSD.CFD.IP: Mid 84.97999999999999 above entry 82</td></tr>
+<tr><td>2026-03-01T13:15:33.777Z</td><td>INFO</td><td>Evaluating: SOL Spike Sell</td></tr>
+<tr><td>2026-03-01T13:15:33.775Z</td><td>INFO</td><td>CS.D.SOLUSD.CFD.IP: Mid 84.97999999999999 above entry 78</td></tr>
+<tr><td>2026-03-01T13:15:26.573Z</td><td>WARN</td><td>RATE LIMIT: 10 calls in last minute, pausing 7s</td></tr>
+<tr><td>2026-03-01T13:15:23.560Z</td><td>INFO</td><td>Evaluating: SOL Dip Buy</td></tr>
+<tr><td>2026-03-01T13:15:23.558Z</td><td>WARN</td><td>CS.D.ETHUSD.CFD.IP: Blocked — Already have an open position on CS.D.ETHUSD.CFD.IP</td></tr>
+</table>
+
+<p class="meta">Account balance: 102507.66 | Max positions: 20 | Risk limit: 5%</p>
+</body>
+</html>

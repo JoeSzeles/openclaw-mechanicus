@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claw Trader Trades — OpenClaw</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.header h1 { font-size: 20px; color: #58a6ff; }
+.back { color: #58a6ff; text-decoration: none; font-size: 13px; }
+.back:hover { text-decoration: underline; }
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; text-align: center; }
+.stat-card .val { font-size: 22px; font-weight: 700; }
+.stat-card .lbl { font-size: 11px; color: #8b949e; margin-top: 4px; }
+.pos { color: #3fb950; }
+.neg { color: #f85149; }
+.controls { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.controls select, .controls input { background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 6px 10px; font-size: 12px; }
+.btn { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.btn:hover { background: #30363d; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { background: #161b22; color: #8b949e; padding: 8px 10px; text-align: left; position: sticky; top: 0; border-bottom: 1px solid #30363d; }
+td { padding: 6px 10px; border-bottom: 1px solid #21262d; }
+tr:hover { background: rgba(88,166,255,0.04); }
+.badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.badge-open { background: rgba(56,142,60,0.2); color: #3fb950; }
+.badge-close { background: rgba(88,166,255,0.15); color: #58a6ff; }
+.badge-buy { background: rgba(56,142,60,0.2); color: #3fb950; }
+.badge-sell { background: rgba(248,81,73,0.2); color: #f85149; }
+.empty { color: #484f58; text-align: center; padding: 40px; }
+#loading { text-align: center; padding: 60px; color: #484f58; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Claw Trader Trade History</h1>
+    <div>
+      <a href="/__openclaw__/canvas/ig-dashboard.html" class="back">← Dashboard</a>
+      <a href="/__openclaw__/canvas/" class="back" style="margin-left:16px">Canvas</a>
+    </div>
+  </div>
+
+  <div class="stats-row" id="statsRow"></div>
+
+  <div class="controls">
+    <select id="filterType">
+      <option value="all">All Types</option>
+      <option value="open">Opens Only</option>
+      <option value="close">Closes Only</option>
+    </select>
+    <select id="filterEpic">
+      <option value="all">All Instruments</option>
+    </select>
+    <select id="filterDir">
+      <option value="all">All Directions</option>
+      <option value="BUY">BUY</option>
+      <option value="SELL">SELL</option>
+    </select>
+    <button class="btn" onclick="downloadJSON()">Download JSON</button>
+    <span id="countLabel" style="font-size:11px;color:#8b949e;margin-left:auto"></span>
+  </div>
+
+  <div id="loading">Loading trade data...</div>
+  <table id="tradesTable" style="display:none">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Type</th>
+        <th>Instrument</th>
+        <th>Direction</th>
+        <th>Size</th>
+        <th>Entry</th>
+        <th>Exit</th>
+        <th>P&L</th>
+        <th>Running Total</th>
+      </tr>
+    </thead>
+    <tbody id="tradesBody"></tbody>
+  </table>
+</div>
+
+<script>
+var allTrades = [];
+
+function epicShort(e) {
+  if (!e) return '?';
+  var parts = e.split('.');
+  if (parts.length >= 3) return parts[2];
+  return e;
+}
+
+function fmtNum(n, d) {
+  if (n == null || isNaN(n)) return '-';
+  return parseFloat(n).toFixed(d != null ? d : 2);
+}
+
+function renderStats(trades) {
+  var closes = trades.filter(function(t) { return t.type === 'close'; });
+  var wins = closes.filter(function(t) { return t.pnl >= 0; });
+  var losses = closes.filter(function(t) { return t.pnl < 0; });
+  var totalPnl = closes.reduce(function(s, t) { return s + (t.pnl || 0); }, 0);
+  var winRate = closes.length > 0 ? Math.round((wins.length / closes.length) * 100) : 0;
+  var avgWin = wins.length > 0 ? wins.reduce(function(s, t) { return s + t.pnl; }, 0) / wins.length : 0;
+  var avgLoss = losses.length > 0 ? losses.reduce(function(s, t) { return s + t.pnl; }, 0) / losses.length : 0;
+
+  var html = '';
+  html += '<div class="stat-card"><div class="val">' + trades.length + '</div><div class="lbl">Total Trades</div></div>';
+  html += '<div class="stat-card"><div class="val">' + closes.length + '</div><div class="lbl">Closed Trades</div></div>';
+  html += '<div class="stat-card"><div class="val ' + (totalPnl >= 0 ? 'pos' : 'neg') + '">' + (totalPnl >= 0 ? '+' : '') + fmtNum(totalPnl) + '</div><div class="lbl">Total P&L</div></div>';
+  html += '<div class="stat-card"><div class="val">' + winRate + '%</div><div class="lbl">Win Rate</div></div>';
+  html += '<div class="stat-card"><div class="val pos">+' + fmtNum(avgWin) + '</div><div class="lbl">Avg Win</div></div>';
+  html += '<div class="stat-card"><div class="val neg">' + fmtNum(avgLoss) + '</div><div class="lbl">Avg Loss</div></div>';
+  document.getElementById('statsRow').innerHTML = html;
+}
+
+function renderTable(trades) {
+  var tbody = document.getElementById('tradesBody');
+  if (trades.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">No trades match filters</td></tr>';
+    document.getElementById('countLabel').textContent = '0 trades';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < trades.length; i++) {
+    var t = trades[i];
+    var ts = t.timestamp ? new Date(t.timestamp).toLocaleString('en-GB', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '-';
+    html += '<tr>';
+    html += '<td style="font-size:10px;white-space:nowrap">' + ts + '</td>';
+    html += '<td><span class="badge ' + (t.type === 'open' ? 'badge-open' : 'badge-close') + '">' + (t.type || '-').toUpperCase() + '</span></td>';
+    html += '<td>' + epicShort(t.epic) + '</td>';
+    html += '<td><span class="badge ' + (t.direction === 'BUY' ? 'badge-buy' : 'badge-sell') + '">' + (t.direction || '-') + '</span></td>';
+    html += '<td>' + fmtNum(t.size, 1) + '</td>';
+    html += '<td>' + fmtNum(t.entry, 2) + '</td>';
+    html += '<td>' + (t.exit ? fmtNum(t.exit, 2) : '-') + '</td>';
+    html += '<td class="' + (t.pnl != null ? (t.pnl >= 0 ? 'pos' : 'neg') : '') + '">' + (t.pnl != null ? (t.pnl >= 0 ? '+' : '') + fmtNum(t.pnl) : '-') + '</td>';
+    html += '<td class="' + (t.realizedTotal != null ? (t.realizedTotal >= 0 ? 'pos' : 'neg') : '') + '">' + (t.realizedTotal != null ? (t.realizedTotal >= 0 ? '+' : '') + fmtNum(t.realizedTotal) : '-') + '</td>';
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+  document.getElementById('countLabel').textContent = trades.length + ' trades';
+}
+
+function applyFilters() {
+  var type = document.getElementById('filterType').value;
+  var epic = document.getElementById('filterEpic').value;
+  var dir = document.getElementById('filterDir').value;
+  var filtered = allTrades.filter(function(t) {
+    if (type !== 'all' && t.type !== type) return false;
+    if (epic !== 'all' && t.epic !== epic) return false;
+    if (dir !== 'all' && t.direction !== dir) return false;
+    return true;
+  });
+  renderStats(filtered);
+  renderTable(filtered);
+}
+
+function populateEpicFilter(trades) {
+  var epics = {};
+  trades.forEach(function(t) { if (t.epic) epics[t.epic] = true; });
+  var sel = document.getElementById('filterEpic');
+  Object.keys(epics).sort().forEach(function(e) {
+    var opt = document.createElement('option');
+    opt.value = e;
+    opt.textContent = epicShort(e);
+    sel.appendChild(opt);
+  });
+}
+
+function downloadJSON() {
+  var blob = new Blob([JSON.stringify(allTrades, null, 2)], {type: 'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'scalper-trades-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+}
+
+async function loadTrades() {
+  try {
+    var resp = await fetch('/__openclaw__/canvas/all-scalper-trades-data.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var data = await resp.json();
+    if (!Array.isArray(data)) data = [];
+    allTrades = data.slice().reverse();
+    populateEpicFilter(allTrades);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('tradesTable').style.display = 'table';
+    applyFilters();
+  } catch (e) {
+    document.getElementById('loading').textContent = 'Failed to load trades: ' + e.message;
+  }
+}
+
+document.getElementById('filterType').addEventListener('change', applyFilters);
+document.getElementById('filterEpic').addEventListener('change', applyFilters);
+document.getElementById('filterDir').addEventListener('change', applyFilters);
+
+loadTrades();
+</script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+{
+  "description": "BrainJar Configuration - Neuron Mappings & Simulation Parameters",
+  "version": "0.1.0",
+  "neuron_mappings": {
+    "optic_lobe": [720575940619341000],
+    "mechanosensory": [720575940619404000, 720575940611936100],
+    "gustatory_sugar": [720575940624963800, 720575940630233900, 720575940621778400],
+    "motor_command": [720575940660219300],
+    "default_stimulus": [720575940619341000]
+  },
+  "tasks": {
+    "price_monitor": "optic_lobe",
+    "volume_pressure": "mechanosensory"
+  },
+  "simulation": {
+    "step_duration_ms": 100,
+    "default_intensity_hz": 100,
+    "motor_neuron_id": 720575940660219300,
+    "connectome_version": "v630"
+  },
+  "ui": {
+    "dashboard_port": 3000,
+    "api_port": 8000,
+    "api_host": "127.0.0.1",
+    "refresh_interval_ms": 1000
+  },
+  "performance": {
+    "enable_metrics": true,
+    "max_history_points": 100,
+    "log_requests": false
+  },
+  "goals": {
+    "stop_loss_pips": 50,
+    "profit_target_pips": 100,
+    "min_profit_pct": 5,
+    "risk_reward_ratio": 1.5
+  },
+  "ig": {
+    "epics": ["CS.D.CFASILVER.CFA.IP"],
+    "default_epic": "CS.D.CFASILVER.CFA.IP"
+  },
+  "instrument_configs": {
+    "_defaults": {
+      "r_poi": 250,
+      "tau_syn": 10,
+      "w_syn": 1,
+      "observer_baseline": [],
+      "backtest_score": 0,
+      "last_updated": ""
+    }
+  },
+  "brain_process": {
+    "auto_start": false,
+    "auto_restart": true,
+    "restart_delay_ms": 3000,
+    "max_restarts": 10,
+    "python_cmd": "python",
+    "script": "brain_engine.py",
+    "port": 8000,
+    "host": "127.0.0.1"
+  }
+}

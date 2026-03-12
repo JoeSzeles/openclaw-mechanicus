@@ -1,0 +1,1 @@
+{"instruments":[{"epic":"CS.D.EURCHF.CFD.IP","name":"EUR/CHF"},{"epic":"CS.D.USCGC.TODAY.IP","name":"Gold USD"},{"epic":"CS.D.XAGUSD.CFD.IP","name":"Silver USD"},{"epic":"CS.D.EURUSD.CFD.IP","name":"EUR/USD (USD proxy)"}],"signals":{"dropPercent":0.4,"spikePercent":0.4,"windowSeconds":1800},"intervalSeconds":30,"enabled":true}

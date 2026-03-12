@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Gann EURUSD Bot</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 20px; }
+  h1 { color: #58a6ff; font-size: 20px; margin-bottom: 10px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 12px; }
+  .stats { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 12px; }
+  .stat { text-align: center; }
+  .stat .value { font-size: 22px; font-weight: 700; color: #58a6ff; }
+  .stat .label { font-size: 11px; color: #8b949e; }
+  .pos { color: #3fb950; }
+  .neg { color: #f85149; }
+  pre { background: #161b22; border: 1px solid #30363d; border-radius: 4px; padding: 10px; font-size: 11px; color: #8b949e; overflow-x: auto; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+  canvas { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1>Gann EURUSD Bot — Prototype Backtest</h1>
+
+<div class="card">
+  <div class="stats">
+    <div class="stat"><div class="value" id="finalBalance">--</div><div class="label">Final Balance</div></div>
+    <div class="stat"><div class="value" id="returnPct">--</div><div class="label">Return %</div></div>
+    <div class="stat"><div class="value" id="totalTrades">--</div><div class="label">Total Trades</div></div>
+    <div class="stat"><div class="value" id="winRate">--</div><div class="label">Win Rate</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <canvas id="equityChart" height="250"></canvas>
+</div>
+
+<div class="card">
+  <h3 style="font-size:13px;color:#8b949e;margin:0 0 8px 0">Backtest Log</h3>
+  <pre id="log">Running backtest...</pre>
+</div>
+
+<div class="card" style="font-size:11px;color:#8b949e">
+  <strong>Config:</strong> ATR Period: 14 | ZigZag: 0.5% | Risk: 1% per trade | Lot: 0.5 | SL: 1.5×ATR | TP: 2×R
+  <br><strong>Source:</strong> gann-eurusd-proto-fixed.js (300× 5m EURUSD simulated bars)
+</div>
+
+<script>
+var atrPeriod = 14;
+var zigzagPct = 0.005;
+var startBalance = 105000;
+
+var data = [];
+for (var i = 0; i < 300; i++) {
+  data.push({
+    time: i,
+    open: 1.085 + (Math.sin(i/20)*0.002) - (i/300*0.001),
+    high: 1.085 + Math.random()*0.001,
+    low: 1.085 - Math.random()*0.001,
+    close: 1.085 + (Math.sin(i/20)*0.002) - (i/300*0.001) + (Math.random()-0.5)*0.0005,
+    volume: 1000 + Math.random()*500
+  });
+}
+
+function calcATR(d, period) {
+  var trs = [];
+  for (var i = 1; i < d.length; i++) {
+    var hl = d[i].high - d[i].low;
+    var hc = Math.abs(d[i].high - d[i-1].close);
+    var lc = Math.abs(d[i].low - d[i-1].close);
+    trs.push(Math.max(hl, hc, lc));
+  }
+  return trs.slice(-period).reduce(function(a,b){return a+b},0) / period;
+}
+
+function detectSwingLow(d, pct) {
+  var lows = d.map(function(x){return x.low});
+  for (var i = atrPeriod; i < lows.length - atrPeriod; i++) {
+    var isLow = true;
+    for (var j = 1; j <= atrPeriod; j++) {
+      if (lows[i] > lows[i-j] * (1 - pct) || lows[i] > lows[i+j] * (1 - pct)) {
+        isLow = false;
+        break;
+      }
+    }
+    if (isLow) return {idx: i, price: lows[i]};
+  }
+  return null;
+}
+
+var balance = startBalance;
+var trades = [];
+var equityCurve = [startBalance];
+var logLines = [];
+
+data.forEach(function(bar, i) {
+  if (i < atrPeriod * 2) { equityCurve.push(balance); return; }
+  var sliceData = data.slice(0, i);
+  var atr = calcATR(sliceData, atrPeriod);
+  var swingLow = detectSwingLow(sliceData, zigzagPct);
+  if (!swingLow) { equityCurve.push(balance); return; }
+
+  var timeDelta = i - swingLow.idx;
+  var angle1x1 = swingLow.price + timeDelta * atr * 0.1;
+  var rsiSim = 50 + Math.sin(i/10)*30;
+  var volAvg = data.slice(Math.max(0,i-20),i).reduce(function(s,d){return s+d.volume},0)/20;
+
+  if (bar.close > angle1x1 && rsiSim > 50 && bar.volume > volAvg) {
+    var risk = balance * 0.01;
+    var slDistPips = atr * 1.5 / 0.0001;
+    var entry = bar.close;
+    var sl = entry - slDistPips * 0.0001;
+    var tp = entry + slDistPips * 2 * 0.0001;
+    var pnl = 0;
+    var exitBar = i;
+    for (var j = i+1; j < Math.min(i+50, data.length); j++) {
+      if (data[j].low <= sl) { pnl = -risk; exitBar = j; break; }
+      if (data[j].high >= tp) { pnl = risk * 2; exitBar = j; break; }
+    }
+    balance += pnl;
+    trades.push({bar: i, entry: entry.toFixed(5), pnl: pnl, result: pnl > 0 ? 'WIN' : 'LOSS', exitBar: exitBar});
+    logLines.push('Bar ' + i + ': BUY @ ' + entry.toFixed(5) + ' → ' + (pnl > 0 ? 'WIN +' : 'LOSS ') + 'A$' + pnl.toFixed(0) + ' (exit bar ' + exitBar + ')');
+  }
+  equityCurve.push(balance);
+});
+
+var wins = trades.filter(function(t){return t.result === 'WIN'}).length;
+var returnPct = ((balance - startBalance) / startBalance * 100).toFixed(2);
+
+document.getElementById('finalBalance').textContent = 'A$' + balance.toLocaleString();
+document.getElementById('finalBalance').className = balance >= startBalance ? 'value pos' : 'value neg';
+document.getElementById('returnPct').textContent = (returnPct >= 0 ? '+' : '') + returnPct + '%';
+document.getElementById('returnPct').className = returnPct >= 0 ? 'value pos' : 'value neg';
+document.getElementById('totalTrades').textContent = trades.length;
+document.getElementById('winRate').textContent = trades.length > 0 ? (wins / trades.length * 100).toFixed(0) + '%' : 'N/A';
+document.getElementById('log').textContent = logLines.length > 0 ? logLines.join('\n') : 'No trades triggered in this sim run.';
+
+var labels = [];
+for (var k = 0; k < equityCurve.length; k++) labels.push(k);
+
+new Chart(document.getElementById('equityChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'Equity (A$)',
+      data: equityCurve,
+      borderColor: balance >= startBalance ? '#3fb950' : '#f85149',
+      backgroundColor: 'rgba(63,185,80,0.05)',
+      fill: true,
+      tension: 0.2,
+      pointRadius: 0,
+      borderWidth: 2
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#8b949e' } } },
+    scales: {
+      x: { display: false },
+      y: { beginAtZero: false, ticks: { color: '#8b949e' }, grid: { color: 'rgba(48,54,61,0.5)' } }
+    }
+  }
+});
+</script>
+</body>
+</html>

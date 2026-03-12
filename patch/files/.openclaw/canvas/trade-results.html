@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trade Results</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.3.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 16px; }
+.container { max-width: 960px; margin: 0 auto; }
+.header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+h1 { color: #58a6ff; font-size: 20px; }
+.back { color: #8b949e; text-decoration: none; font-size: 13px; }
+.back:hover { color: #58a6ff; }
+.subtitle { color: #8b949e; font-size: 12px; margin-bottom: 16px; }
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; text-align: center; }
+.stat-value { font-size: 20px; font-weight: 700; }
+.stat-label { font-size: 11px; color: #8b949e; margin-top: 4px; }
+.pos { color: #2dc653; }
+.neg { color: #f85149; }
+.neutral { color: #58a6ff; }
+.card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.card h2 { color: #8b949e; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; border-bottom: 1px solid #21262d; padding-bottom: 6px; }
+.chart-wrap { position: relative; height: 260px; }
+.chart-wrap canvas { width: 100% !important; height: 100% !important; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th, td { padding: 5px 8px; text-align: left; border-bottom: 1px solid #21262d; }
+th { color: #8b949e; font-weight: 600; font-size: 11px; text-transform: uppercase; }
+tr:hover { background: rgba(88,166,255,0.04); }
+.badge { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; font-weight: 600; }
+.badge-buy { background: #1b4332; color: #2dc653; }
+.badge-sell { background: #3d1a1a; color: #f85149; }
+.badge-win { background: #1b4332; color: #2dc653; }
+.badge-loss { background: #3d1a1a; color: #f85149; }
+.empty { color: #484f58; font-style: italic; padding: 20px; text-align: center; }
+.params-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; }
+.param-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #21262d; }
+.param-key { color: #8b949e; }
+.param-val { color: #c9d1d9; font-weight: 600; }
+.tabs { display: flex; gap: 0; border-bottom: 2px solid #21262d; margin-bottom: 12px; }
+.tab { padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: #8b949e; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+.tab:hover { color: #c9d1d9; }
+.tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.loading { text-align: center; padding: 40px; color: #8b949e; }
+.btn-refresh { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 4px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; }
+.btn-refresh:hover { border-color: #58a6ff; }
+@media (max-width: 600px) {
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .params-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Trade Results</h1>
+    <a href="/__openclaw__/canvas/" class="back">Canvas</a>
+    <button class="btn-refresh" onclick="loadResults()">Refresh</button>
+  </div>
+  <div class="subtitle" id="subtitle">Loading results...</div>
+
+  <div class="stats-row" id="statsRow"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('equity')">Equity Curve</button>
+    <button class="tab" onclick="switchTab('trades')">Trades</button>
+    <button class="tab" onclick="switchTab('params')">Strategy</button>
+  </div>
+
+  <div id="equityTab" class="tab-content active">
+    <div class="card">
+      <h2>Equity Curve</h2>
+      <div class="chart-wrap"><canvas id="equityChart"></canvas></div>
+    </div>
+  </div>
+
+  <div id="tradesTab" class="tab-content">
+    <div class="card">
+      <h2>Trade List</h2>
+      <div style="max-height:400px;overflow-y:auto" id="tradeTableWrap">
+        <table>
+          <thead><tr><th>#</th><th>Direction</th><th>Entry</th><th>Exit</th><th>P&L</th><th>Result</th></tr></thead>
+          <tbody id="tradeBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="paramsTab" class="tab-content">
+    <div class="card">
+      <h2>Strategy Parameters</h2>
+      <div class="params-grid" id="paramsGrid"></div>
+    </div>
+  </div>
+
+  <div id="loadingMsg" class="loading">Loading results from server...</div>
+</div>
+
+<script>
+let equityChartInstance = null;
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab')].find(t => t.textContent.toLowerCase().includes(name));
+  if (btn) btn.classList.add('active');
+  const tab = document.getElementById(name + 'Tab');
+  if (tab) tab.classList.add('active');
+}
+
+function fmt(n, dec) {
+  if (n == null || isNaN(n)) return '--';
+  return Number(n).toFixed(dec != null ? dec : 2);
+}
+
+function pctClass(v) {
+  if (v == null) return 'neutral';
+  return v >= 0 ? 'pos' : 'neg';
+}
+
+function renderStats(data) {
+  const trades = data.trades || [];
+  const totalTrades = trades.length;
+  const wins = trades.filter(t => (t.pnl || t.profit || 0) > 0).length;
+  const losses = trades.filter(t => (t.pnl || t.profit || 0) < 0).length;
+  const winRate = totalTrades > 0 ? ((wins / totalTrades) * 100) : 0;
+  const totalPnl = trades.reduce((s, t) => s + (t.pnl || t.profit || 0), 0);
+  const grossWin = trades.filter(t => (t.pnl || t.profit || 0) > 0).reduce((s, t) => s + (t.pnl || t.profit || 0), 0);
+  const grossLoss = Math.abs(trades.filter(t => (t.pnl || t.profit || 0) < 0).reduce((s, t) => s + (t.pnl || t.profit || 0), 0));
+  const profitFactor = grossLoss > 0 ? (grossWin / grossLoss) : grossWin > 0 ? Infinity : 0;
+
+  const equity = data.equity || data.equityCurve || [];
+  let maxDD = 0;
+  if (equity.length > 0) {
+    let peak = equity[0];
+    for (const v of equity) {
+      if (v > peak) peak = v;
+      const dd = peak > 0 ? ((peak - v) / peak) * 100 : 0;
+      if (dd > maxDD) maxDD = dd;
+    }
+  }
+
+  const stats = [
+    { label: 'Total Trades', value: totalTrades, cls: 'neutral' },
+    { label: 'Win Rate', value: fmt(winRate, 1) + '%', cls: winRate >= 50 ? 'pos' : 'neg' },
+    { label: 'Total P&L', value: fmt(totalPnl), cls: pctClass(totalPnl) },
+    { label: 'Wins / Losses', value: wins + ' / ' + losses, cls: 'neutral' },
+    { label: 'Profit Factor', value: profitFactor === Infinity ? '∞' : fmt(profitFactor, 2), cls: profitFactor >= 1 ? 'pos' : 'neg' },
+    { label: 'Max Drawdown', value: fmt(maxDD, 1) + '%', cls: 'neg' }
+  ];
+
+  if (data.sharpe != null) stats.push({ label: 'Sharpe', value: fmt(data.sharpe, 2), cls: data.sharpe >= 1 ? 'pos' : 'neg' });
+  if (data.totalReturn != null) stats.push({ label: 'Return', value: fmt(data.totalReturn, 1) + '%', cls: pctClass(data.totalReturn) });
+
+  const row = document.getElementById('statsRow');
+  row.innerHTML = stats.map(s =>
+    `<div class="stat-card"><div class="stat-value ${s.cls}">${s.value}</div><div class="stat-label">${s.label}</div></div>`
+  ).join('');
+}
+
+function renderEquity(data) {
+  const equity = data.equity || data.equityCurve || [];
+  if (equity.length === 0) return;
+
+  const ctx = document.getElementById('equityChart').getContext('2d');
+  if (equityChartInstance) equityChartInstance.destroy();
+
+  const labels = equity.map((_, i) => i + 1);
+  const colors = [];
+  for (let i = 0; i < equity.length; i++) {
+    colors.push(i === 0 ? '#58a6ff' : equity[i] >= equity[i-1] ? '#2dc653' : '#f85149');
+  }
+
+  equityChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Equity',
+        data: equity,
+        borderColor: '#58a6ff',
+        backgroundColor: 'rgba(88,166,255,0.1)',
+        borderWidth: 2,
+        fill: true,
+        pointRadius: 0,
+        tension: 0.1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#161b22',
+          borderColor: '#30363d',
+          borderWidth: 1,
+          titleColor: '#c9d1d9',
+          bodyColor: '#c9d1d9',
+          callbacks: {
+            label: ctx => 'Equity: ' + fmt(ctx.raw)
+          }
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          title: { display: true, text: 'Trade #', color: '#8b949e', font: { size: 11 } },
+          ticks: { color: '#484f58', font: { size: 10 } },
+          grid: { color: '#21262d' }
+        },
+        y: {
+          display: true,
+          title: { display: true, text: 'Equity', color: '#8b949e', font: { size: 11 } },
+          ticks: { color: '#484f58', font: { size: 10 } },
+          grid: { color: '#21262d' }
+        }
+      }
+    }
+  });
+}
+
+function renderTrades(data) {
+  const trades = data.trades || [];
+  const tbody = document.getElementById('tradeBody');
+  if (trades.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">No trades found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = trades.map((t, i) => {
+    const pnl = t.pnl || t.profit || 0;
+    const dir = (t.direction || t.side || 'BUY').toUpperCase();
+    const dirCls = dir === 'SELL' || dir === 'SHORT' ? 'badge-sell' : 'badge-buy';
+    const resCls = pnl >= 0 ? 'badge-win' : 'badge-loss';
+    const entry = t.entryPrice || t.entry || '--';
+    const exit = t.exitPrice || t.exit || '--';
+    return `<tr>
+      <td>${i + 1}</td>
+      <td><span class="badge ${dirCls}">${dir}</span></td>
+      <td>${fmt(entry, 4)}</td>
+      <td>${fmt(exit, 4)}</td>
+      <td class="${pnl >= 0 ? 'pos' : 'neg'}">${fmt(pnl)}</td>
+      <td><span class="badge ${resCls}">${pnl >= 0 ? 'WIN' : 'LOSS'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderParams(data) {
+  const grid = document.getElementById('paramsGrid');
+  const params = data.params || data.parameters || data.strategy || data.config || {};
+  const entries = Object.entries(params);
+  if (entries.length === 0 && !data.instrument && !data.timeframe) {
+    grid.innerHTML = '<p class="empty">No strategy parameters available</p>';
+    return;
+  }
+
+  const allParams = {};
+  if (data.instrument) allParams['Instrument'] = data.instrument;
+  if (data.epic) allParams['Epic'] = data.epic;
+  if (data.timeframe) allParams['Timeframe'] = data.timeframe;
+  if (data.resolution) allParams['Resolution'] = data.resolution;
+  if (data.period) allParams['Period'] = data.period;
+  if (data.startDate) allParams['Start Date'] = data.startDate;
+  if (data.endDate) allParams['End Date'] = data.endDate;
+  Object.assign(allParams, params);
+
+  grid.innerHTML = Object.entries(allParams).map(([k, v]) => {
+    const display = typeof v === 'object' ? JSON.stringify(v) : String(v);
+    return `<div class="param-row"><span class="param-key">${k}</span><span class="param-val">${display}</span></div>`;
+  }).join('');
+}
+
+function renderResults(data) {
+  document.getElementById('loadingMsg').style.display = 'none';
+
+  if (!data || (!data.trades && !data.equity && !data.equityCurve)) {
+    document.getElementById('subtitle').textContent = 'No results available yet. Run a backtest to see results here.';
+    document.getElementById('statsRow').innerHTML = '<div class="stat-card" style="grid-column:1/-1"><div class="empty">No backtest results found. Run a strategy backtest first.</div></div>';
+    return;
+  }
+
+  const trades = data.trades || [];
+  const instrument = data.instrument || data.epic || 'Unknown';
+  const timeframe = data.timeframe || data.resolution || '';
+  document.getElementById('subtitle').textContent = `${instrument}${timeframe ? ' • ' + timeframe : ''} • ${trades.length} trades`;
+
+  renderStats(data);
+  renderEquity(data);
+  renderTrades(data);
+  renderParams(data);
+}
+
+async function loadResults() {
+  try {
+    document.getElementById('loadingMsg').style.display = 'block';
+    const resp = await fetch('/api/clawscript/results');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const body = await resp.json();
+    const data = body.results || body;
+    renderResults(data);
+  } catch (e) {
+    document.getElementById('loadingMsg').style.display = 'none';
+    document.getElementById('subtitle').textContent = 'Failed to load results: ' + e.message;
+  }
+}
+
+const params = new URLSearchParams(window.location.search);
+if (params.get('data')) {
+  try {
+    const inline = JSON.parse(decodeURIComponent(params.get('data')));
+    renderResults(inline);
+  } catch (_) {
+    loadResults();
+  }
+} else {
+  loadResults();
+}
+</script>
+</body>
+</html>

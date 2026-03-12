@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neural Trading Documentation — OpenClaw Mechanicus</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;line-height:1.6}
+.container{max-width:1100px;margin:0 auto;padding:20px 30px 60px}
+h1{color:#58a6ff;font-size:2em;margin:30px 0 10px;border-bottom:1px solid #30363d;padding-bottom:12px}
+h2{color:#79c0ff;font-size:1.5em;margin:28px 0 12px;border-bottom:1px solid #21262d;padding-bottom:8px}
+h3{color:#d2a8ff;font-size:1.2em;margin:20px 0 8px}
+p,li{color:#c9d1d9;margin:6px 0}
+ul,ol{margin:8px 0 16px 24px}
+a{color:#58a6ff;text-decoration:none}
+a:hover{text-decoration:underline}
+code{background:#161b22;color:#f0883e;padding:2px 6px;border-radius:4px;font-size:0.9em}
+pre{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;overflow-x:auto;margin:12px 0}
+pre code{background:none;padding:0}
+.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:0.8em;font-weight:600;margin:2px 4px}
+.badge-green{background:#238636;color:#fff}
+.badge-blue{background:#1f6feb;color:#fff}
+.badge-purple{background:#8957e5;color:#fff}
+.badge-orange{background:#d29922;color:#fff}
+.badge-red{background:#da3633;color:#fff}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+th,td{border:1px solid #30363d;padding:8px 12px;text-align:left}
+th{background:#161b22;color:#79c0ff;font-weight:600}
+tr:nth-child(even){background:#0d1117}
+tr:nth-child(odd){background:#161b22}
+.screenshot{width:100%;max-width:1000px;border:1px solid #30363d;border-radius:8px;margin:16px 0;cursor:pointer;transition:transform 0.2s}
+.screenshot:hover{transform:scale(1.02)}
+.nav{background:#161b22;border-bottom:1px solid #30363d;padding:12px 30px;position:sticky;top:0;z-index:100}
+.nav a{color:#58a6ff;margin-right:20px;font-weight:500}
+.toc{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px 24px;margin:20px 0}
+.toc h3{margin:0 0 8px;color:#58a6ff}
+.toc ol{margin:4px 0 0 20px}
+.toc li{margin:4px 0;font-size:0.95em}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:16px 0}
+.feature-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px}
+.feature-card h4{color:#79c0ff;margin-bottom:6px}
+.back-link{display:inline-block;margin:12px 0;padding:6px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#58a6ff;font-size:0.9em}
+.back-link:hover{background:#30363d;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="nav">
+<a href="#overview">Overview</a>
+<a href="#tabs">Tabs</a>
+<a href="#architecture">Architecture</a>
+<a href="#training">Training</a>
+<a href="#antenna">Antenna</a>
+<a href="#cortex">Cortex</a>
+<a href="#api">API</a>
+</div>
+
+<div class="container">
+<a class="back-link" href="/">&larr; Back to OpenClaw</a>
+
+<h1>Neural Trading Documentation</h1>
+<p>BrainJar integration for the IG Trading Dashboard — a biologically-inspired spiking neural network for autonomous market analysis and trading.</p>
+
+<div class="toc">
+<h3>Contents</h3>
+<ol>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#tabs">Dashboard Tabs</a></li>
+<li><a href="#architecture">Network Architecture</a></li>
+<li><a href="#training">Training Modes</a></li>
+<li><a href="#antenna">Volume Antenna System</a></li>
+<li><a href="#cortex">Cortex Auto-Trade</a></li>
+<li><a href="#mushroom">Mushroom Body Memory</a></li>
+<li><a href="#sizing">Network Sizing Guide</a></li>
+<li><a href="#api">API Reference</a></li>
+<li><a href="#config">Configuration Defaults</a></li>
+</ol>
+</div>
+
+<h2 id="overview">Overview</h2>
+<p>Neural Trading uses a <strong>Leaky Integrate-and-Fire (LIF)</strong> spiking neural network inspired by the <em>Drosophila</em> (fruit fly) connectome. Unlike traditional neural networks that use backpropagation, this brain works through biological spiking dynamics:</p>
+<ul>
+<li><strong>Spiking neurons</strong> — each neuron accumulates input until it fires (spikes), then resets</li>
+<li><strong>Synaptic connections</strong> — spikes propagate through weighted synapses to connected neurons</li>
+<li><strong>Poisson input</strong> — market data is converted to spike trains via stochastic Poisson processes</li>
+<li><strong>Reward learning</strong> — sugar (positive) and pain (negative) feedback modulate synaptic weights</li>
+<li><strong>Volume Antenna</strong> — 180 neurons across 7 sub-groups sense market pressure (flash crashes, dead cat bounces, absorption, divergence)</li>
+</ul>
+
+<p>The brain engine runs as an internal Node.js server (<code>skills/bots/brain-engine-server.cjs</code>), auto-spawned by the bot manager, communicating via <code>/api/brain/*</code> proxy routes.</p>
+
+<h2 id="tabs">Dashboard Tabs</h2>
+<p>The Neural Trading interface has four sub-tabs accessible from the IG Dashboard:</p>
+
+<h3>1. Neural Dashboard</h3>
+<p>The main overview — instrument selector, live tick feed, connection status, price/volume charts, and manual trade triggers (Force Buy/Sell).</p>
+<img src="images/neural-dashboard.png" alt="Neural Dashboard showing live tick feed, price chart, and connection status" class="screenshot">
+
+<h3>2. Brain Tab (Neural Cortex)</h3>
+<p>The cortex auto-trade view — per-instrument pattern cards with maturity tracking, signal summary table, auto-trade execution panel with cortex controls, trade log, training controls, and auto-calibration.</p>
+<img src="images/neural-brain.png" alt="Brain tab showing Neural Cortex with instrument cards, auto-trade controls, and training" class="screenshot">
+
+<h3>3. Brain Config</h3>
+<p>Full network configuration — dynamic architecture with configurable neuron counts, timeframe presets, sensory assignments, mushroom body settings, motor region layout, timeframe budget calculator, and neural backtest training.</p>
+<img src="images/neural-brain-config.png" alt="Brain Config tab showing network architecture, sensory assignments, mushroom body, and training" class="screenshot">
+
+<h3>4. Dev Console</h3>
+<p>Real-time brain activity logs for debugging and monitoring brain engine internals.</p>
+
+<h2 id="architecture">Network Architecture</h2>
+<p>The network consists of three layers of neurons with configurable sizes:</p>
+
+<table>
+<tr><th>Layer</th><th>Role</th><th>Default (1s)</th><th>Configurable</th></tr>
+<tr><td>Sensory</td><td>Input — receives market data stimuli</td><td>600 neurons</td><td>Yes</td></tr>
+<tr><td>Interneurons</td><td>Processing — pattern recognition core</td><td>3600 neurons</td><td>Yes</td></tr>
+<tr><td>Motor</td><td>Output — buy/sell/hold decisions</td><td>800 neurons</td><td>Yes</td></tr>
+</table>
+
+<h3>Sensory Neuron Groups</h3>
+<table>
+<tr><th>Group</th><th>Default %</th><th>Purpose</th></tr>
+<tr><td>Price Up</td><td>20%</td><td>Fires stronger when price increases</td></tr>
+<tr><td>Price Down</td><td>20%</td><td>Fires stronger when price decreases</td></tr>
+<tr><td>Volume</td><td>20%</td><td>Encodes trade volume intensity</td></tr>
+<tr><td>Spread</td><td>20%</td><td>Encodes bid-ask spread width (liquidity)</td></tr>
+<tr><td>Momentum</td><td>10%</td><td>Fires on price acceleration / rapid moves</td></tr>
+<tr><td>Antenna</td><td>10%</td><td>Pressure sensing — flash crashes, volume spikes, rapid directional moves</td></tr>
+</table>
+
+<h3>Motor Region</h3>
+<p>Motor neurons are split into three equal populations. The population with the highest average firing rate over the last 10 steps determines the brain's output signal:</p>
+<ul>
+<li><span class="badge badge-green">BUY</span> — first 1/3 of motor layer</li>
+<li><span class="badge badge-red">SELL</span> — middle 1/3 of motor layer</li>
+<li><span class="badge badge-blue">HOLD</span> — final 1/3 of motor layer</li>
+</ul>
+
+<h3>Timeframe Presets</h3>
+<table>
+<tr><th>Preset</th><th>Neurons</th><th>Synapses</th><th>Use Case</th></tr>
+<tr><td>1s Scalp</td><td>350</td><td>~5,000</td><td>Ultra-fast scalping</td></tr>
+<tr><td>5s Quick</td><td>700</td><td>~15,000</td><td>Quick scalping</td></tr>
+<tr><td>30s Med</td><td>1,500</td><td>~45,000</td><td>Medium-speed trading</td></tr>
+<tr><td>1min Full</td><td>5,000</td><td>~148,000</td><td>Standard operation</td></tr>
+<tr><td>5min Deep</td><td>10,000</td><td>~400,000</td><td>Deep analysis</td></tr>
+<tr><td>15min Ultra</td><td>20,000</td><td>~1,200,000</td><td>Maximum pattern depth</td></tr>
+</table>
+
+<h2 id="training">Training Modes</h2>
+<p>The brain supports multiple training approaches, all integrated with the Volume Antenna system:</p>
+
+<div class="feature-grid">
+<div class="feature-card">
+<h4><span class="badge badge-green">Backtest Training</span></h4>
+<p>Feed historical candles through the brain. Automatic sugar/pain feedback based on P&L outcomes. Configurable stop-loss, take-profit, min hold candles, signal threshold, and confirmation candles.</p>
+</div>
+<div class="feature-card">
+<h4><span class="badge badge-blue">Live Training</span></h4>
+<p>Train on live market data candle-by-candle. The frontend computes real antenna pressure from the tick accumulator and sends it with each candle. Brain returns signals with antenna alerts.</p>
+</div>
+<div class="feature-card">
+<h4><span class="badge badge-purple">Auto-Test</span></h4>
+<p>Multi-cycle autonomous backtest training with calibration. Runs multiple passes over historical data, adjusting parameters between cycles for optimal performance.</p>
+</div>
+<div class="feature-card">
+<h4><span class="badge badge-orange">Proof Test</span></h4>
+<p>Quick validation — stimulates the brain with a small dataset and reports buy/sell accuracy without modifying weights.</p>
+</div>
+</div>
+
+<h3>Training Parameters</h3>
+<table>
+<tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+<tr><td>Min Hold (candles)</td><td>5</td><td>Minimum candles to hold a position before evaluating exit</td></tr>
+<tr><td>Signal Threshold</td><td>10</td><td>Motor rate difference required to generate a buy/sell signal</td></tr>
+<tr><td>Confirm (candles)</td><td>3</td><td>Consecutive same-direction candles before entering a trade</td></tr>
+<tr><td>Stop Loss %</td><td>1.0</td><td>Maximum loss before forced exit</td></tr>
+<tr><td>Take Profit %</td><td>2.0</td><td>Target profit for position exit</td></tr>
+<tr><td>P&L Multiplier</td><td>1</td><td>Scales sugar/pain feedback intensity</td></tr>
+</table>
+
+<h2 id="antenna">Volume Antenna System</h2>
+<p>The Volume Antenna is a market pressure sensing system with 180 antenna neurons organized into 7 sub-groups. It detects anomalous market conditions and feeds pressure data into the brain's spiking network.</p>
+
+<img src="images/neural-cortex-antenna.png" alt="Volume Antenna panel with pressure gauges and cortex decision monitor" class="screenshot">
+
+<h3>Antenna Sub-Groups (180 neurons total)</h3>
+<table>
+<tr><th>Sub-Group</th><th>Neurons</th><th>What it Detects</th></tr>
+<tr><td>Tick Velocity</td><td>26</td><td>Speed of incoming price ticks</td></tr>
+<tr><td>Volume Acceleration</td><td>26</td><td>Rate of change in volume</td></tr>
+<tr><td>Buy/Sell Pressure</td><td>26</td><td>Directional bias from order flow</td></tr>
+<tr><td>Absorption</td><td>26</td><td>Large orders absorbing opposing flow</td></tr>
+<tr><td>Flash Crash</td><td>26</td><td>Sudden price drops with volume spikes</td></tr>
+<tr><td>Dead Cat Bounce</td><td>26</td><td>Temporary recovery after sharp decline</td></tr>
+<tr><td>Divergence</td><td>24</td><td>Price/volume divergence patterns</td></tr>
+</table>
+
+<h3>Pressure Data Fields</h3>
+<pre><code>{
+  tickVelocity,       // ticks per second
+  volumeAccel,        // volume acceleration %
+  buySellRatio,       // 0=all sell, 1=all buy
+  absorptionScore,    // 0-1 absorption detection
+  flashCrashScore,    // 0-5+ flash crash severity
+  deadCatScore,       // 0-1 dead cat bounce probability
+  fallingKnifeScore,  // 0-1 falling knife detection
+  divergenceScore,    // 0-1 price/volume divergence
+  priceVelocity,      // price change rate
+  priceDelta          // raw price delta
+}</code></pre>
+
+<h3>Antenna-Cortex Integration</h3>
+<ul>
+<li><strong>Emergency Exit</strong> — closes positions immediately when flash crash score exceeds threshold (default 3.0)</li>
+<li><strong>Breakout Rider</strong> — enters trades on strong absorption + volume acceleration signals</li>
+<li><strong>Entry Blocking</strong> — prevents new positions during dead cat bounces or falling knife patterns (sensitivity default 0.5)</li>
+<li><strong>Training Integration</strong> — all training modes (backtest, live, auto-test) now feed antenna pressure data to the brain's 180 antenna neurons</li>
+</ul>
+
+<h2 id="cortex">Cortex Auto-Trade</h2>
+<p>The Cortex is the autonomous trading execution layer that reads brain signals and manages positions on the IG platform.</p>
+
+<h3>Cortex Parameters</h3>
+<table>
+<tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+<tr><td>Hold Zone</td><td>2</td><td>Signal spread threshold — signals within this range are treated as HOLD</td></tr>
+<tr><td>Min Hold (ticks)</td><td>5</td><td>Minimum ticks to hold a position before considering exit</td></tr>
+<tr><td>Signal Confirm</td><td>3</td><td>Consecutive ticks with same signal before entering a trade</td></tr>
+<tr><td>Exit Confirm</td><td>2</td><td>Consecutive opposing ticks before closing a position</td></tr>
+<tr><td>Buy/Sell Threshold</td><td>5</td><td>Minimum motor rate to trigger a signal</td></tr>
+<tr><td>Stop Loss (pips)</td><td>50</td><td>Maximum loss per trade</td></tr>
+<tr><td>Take Profit (pips)</td><td>100</td><td>Target profit per trade</td></tr>
+</table>
+
+<h2 id="mushroom">Mushroom Body Memory</h2>
+<p>The Mushroom Body is a densely-connected sub-cluster within the interneuron layer, inspired by the insect brain structure responsible for associative learning and memory consolidation.</p>
+<ul>
+<li><strong>Size</strong>: 20% of interneurons (configurable)</li>
+<li><strong>Internal connectivity</strong>: 0.3 (30% of possible internal connections, configurable)</li>
+<li><strong>Pattern memory</strong>: Per-instrument pattern storage persists across restarts in <code>~/.openclaw/brain-state.json</code></li>
+<li><strong>Sugar feedback</strong>: Winning trades strengthen mushroom body connections, reinforcing learned patterns</li>
+</ul>
+
+<h2 id="sizing">Network Sizing Guide</h2>
+<p>The key constraint is <strong>timeframe budget</strong> — each candle timeframe gives you a processing window. Larger networks provide deeper pattern recognition but require more time per step.</p>
+<p>Use the <strong>Timeframe Budget Calculator</strong> in the Brain Config tab to see exactly how many simulation steps you can run per candle at your current network size. The calculator shows feasibility for each timeframe.</p>
+
+<h3>Critical Parameter</h3>
+<p>The synaptic weight <code>w_syn</code> <strong>must be 12.0</strong> for motor neurons to spike. This is the default and should not be changed unless you understand the LIF dynamics.</p>
+
+<h2 id="api">API Reference</h2>
+<p>All brain endpoints are proxied through <code>/api/brain/*</code> on the CEO proxy (port 5000). The brain engine port is stored in <code>~/.openclaw/brain-engine-port</code>.</p>
+
+<table>
+<tr><th>Endpoint</th><th>Method</th><th>Description</th></tr>
+<tr><td><code>/api/brain/status</code></td><td>GET</td><td>Brain engine status, architecture info</td></tr>
+<tr><td><code>/api/brain/stimulate-price</code></td><td>POST</td><td>Feed a price tick with optional pressure data</td></tr>
+<tr><td><code>/api/brain/backtest-train</code></td><td>POST</td><td>Backtest training with historical candles</td></tr>
+<tr><td><code>/api/brain/live-train</code></td><td>POST</td><td>Live training with single candle + pressure</td></tr>
+<tr><td><code>/api/brain/configure</code></td><td>POST</td><td>Update network architecture (neuron counts)</td></tr>
+<tr><td><code>/api/brain/test-fire</code></td><td>POST</td><td>Benchmark — measure processing time per step</td></tr>
+<tr><td><code>/api/brain/sugar</code></td><td>POST</td><td>Positive reward feedback</td></tr>
+<tr><td><code>/api/brain/pain</code></td><td>POST</td><td>Negative punishment feedback</td></tr>
+<tr><td><code>/api/brain/save-state</code></td><td>POST</td><td>Save brain state to disk</td></tr>
+<tr><td><code>/api/brain/load-state</code></td><td>POST</td><td>Load brain state from disk</td></tr>
+<tr><td><code>/api/brain/reset</code></td><td>POST</td><td>Reset brain (clear all weights)</td></tr>
+<tr><td><code>/api/brain/cortex-status</code></td><td>GET</td><td>Cortex pattern memory for all instruments</td></tr>
+</table>
+
+<h3>stimulate-price Request</h3>
+<pre><code>POST /api/brain/stimulate-price
+{
+  "epic": "CS.D.CFASILVER.CFA.IP",
+  "price": 5185.0,
+  "prevPrice": 5180.0,
+  "volume": 800,
+  "spread": 4.2,
+  "pressure": {
+    "tickVelocity": 2.5,
+    "volumeAccel": 0.8,
+    "buySellRatio": 0.65,
+    "absorptionScore": 0.5,
+    "flashCrashScore": 0.3,
+    "deadCatScore": 0,
+    "fallingKnifeScore": 0,
+    "divergenceScore": 0
+  }
+}</code></pre>
+
+<h3>backtest-train Request</h3>
+<pre><code>POST /api/brain/backtest-train
+{
+  "epic": "CS.D.CFASILVER.CFA.IP",
+  "candles": [...],
+  "stopLossPct": 1.0,
+  "takeProfitPct": 2.0,
+  "minHoldCandles": 5,
+  "signalThreshold": 10,
+  "confirmCandles": 3,
+  "antennaEnabled": true
+}</code></pre>
+
+<h2 id="config">Configuration Defaults</h2>
+<h3>Brain State File</h3>
+<p>Pattern memory and brain weights persist at <code>~/.openclaw/brain-state.json</code>. This file is loaded on boot and saved on demand or automatically after training sessions.</p>
+
+<h3>Key Defaults Summary</h3>
+<table>
+<tr><th>Category</th><th>Parameter</th><th>Value</th></tr>
+<tr><td>Network</td><td>Default neurons</td><td>5,000 (S:600 I:3600 M:800)</td></tr>
+<tr><td>Network</td><td>w_syn</td><td>12.0</td></tr>
+<tr><td>Network</td><td>Poisson rate</td><td>150 Hz</td></tr>
+<tr><td>Cortex</td><td>Hold Zone</td><td>2</td></tr>
+<tr><td>Cortex</td><td>Min Hold</td><td>5 ticks</td></tr>
+<tr><td>Cortex</td><td>Signal Confirm</td><td>3</td></tr>
+<tr><td>Cortex</td><td>Exit Confirm</td><td>2</td></tr>
+<tr><td>Antenna</td><td>Flash Threshold</td><td>3.0</td></tr>
+<tr><td>Antenna</td><td>Dead Cat Sensitivity</td><td>0.5</td></tr>
+<tr><td>Training</td><td>Min Hold Candles</td><td>5</td></tr>
+<tr><td>Training</td><td>Signal Threshold</td><td>10</td></tr>
+<tr><td>Training</td><td>Confirm Candles</td><td>3</td></tr>
+</table>
+
+<hr style="margin:40px 0;border-color:#30363d">
+<p style="color:#8b949e;font-size:0.85em">OpenClaw Mechanicus — Neural Trading Documentation. Generated 2026-03-12.</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="30">
+<title>IG Trading Bot Status</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 960px; margin: 0 auto; padding: 20px; background: #0d1117; color: #c9d1d9; }
+h1 { color: #58a6ff; }
+h2 { color: #8b949e; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #21262d; }
+th { background: #161b22; color: #8b949e; font-weight: 600; }
+tr:hover { background: #161b22; }
+.status { padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+.on { background: #1b4332; color: #2dc653; }
+.off { background: #3d1f00; color: #f0883e; }
+.test { background: #1c2541; color: #79c0ff; }
+.meta { color: #8b949e; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>IG Trading Bot</h1>
+<p class="meta">Last updated: 2026-03-04T01:05:21.208Z <span class="status on">LIVE</span></p>
+
+<h2>Strategies</h2>
+<table>
+<tr><th>Name</th><th>Instrument</th><th>Direction</th><th>Size</th><th>Status</th></tr>
+<tr><td>Silver Dip Buy</td><td>CS.D.CFASILVER.CFA.IP</td><td>BUY</td><td>0.5</td><td>🟢 Enabled</td></tr>
+<tr><td>Oil Dip Buy</td><td>CC.D.CL.UNC.IP</td><td>BUY</td><td>1</td><td>🟢 Enabled</td></tr>
+</table>
+
+<h2>Open Positions</h2>
+<table>
+<tr><th>Instrument</th><th>Direction</th><th>Size</th><th>Entry</th><th>Current Bid</th></tr>
+<tr><td>Spot Silver (A$1 Contract)</td><td>BUY</td><td>0.5</td><td>8303.2</td><td>8346.5</td></tr>
+<tr><td>EUR/USD Mini</td><td>SELL</td><td>10</td><td>1.15938</td><td>1.15934</td></tr>
+</table>
+
+<h2>Recent Activity</h2>
+<table>
+<tr><th>Time</th><th>Level</th><th>Message</th></tr>
+<tr><td>2026-03-04T01:05:21.208Z</td><td>INFO</td><td>CC.D.CL.UNC.IP [STREAM]: Mid 7453.4 above entry 68</td></tr>
+<tr><td>2026-03-04T01:05:21.205Z</td><td>INFO</td><td>Evaluating: Oil Dip Buy</td></tr>
+<tr><td>2026-03-04T01:05:21.202Z</td><td>WARN</td><td>TRADE BLOCKED by proof reader: CS.D.CFASILVER.CFA.IP — Entry price sanity: Entry 9500 is 13.74% from mid 8352.25000 — possible stale/hallucinated value</td></tr>
+<tr><td>2026-03-04T01:05:21.202Z</td><td>WARN</td><td>PROOF READ REJECTED: Silver Dip Buy
+  ✅ Market tradeable: Status: TRADEABLE
+  ✅ Price validity: Bid: 8347.2, Offer: 8357.3, Mid: 8352.25000
+  ✅ Price staleness: Snapshot age 2s (< 120s limit)
+  ✅ Spread limit: Spread 10.10000 (0.121%)
+  ✅ Stop-loss set: 50 pts (> spread 10.10000)
+  ✅ Risk:reward ratio: 1:2.00
+  ✅ Position size: 0.5 contracts
+  ✅ Risk % of balance: 0.03% (risk: 25.00, balance: 90384.92)
+  ✅ No duplicate position: 1 existing — duplicates allowed by config
+  ❌ Entry price sanity: Entry 9500 is 13.74% from mid 8352.25000 — possible stale/hallucinated value</td></tr>
+<tr><td>2026-03-04T01:05:21.200Z</td><td>INFO</td><td>Signal alert found for CS.D.CFASILVER.CFA.IP: reversal_down</td></tr>
+<tr><td>2026-03-04T01:05:21.197Z</td><td>WARN</td><td>Duplicate BUY position on CS.D.CFASILVER.CFA.IP — allowed by proofread config</td></tr>
+<tr><td>2026-03-04T01:05:21.197Z</td><td>INFO</td><td>CS.D.CFASILVER.CFA.IP [STREAM]: Mid 8352.25 below entry 9500</td></tr>
+<tr><td>2026-03-04T01:05:21.186Z</td><td>INFO</td><td>Evaluating: Silver Dip Buy</td></tr>
+<tr><td>2026-03-04T01:05:21.186Z</td><td>INFO</td><td>Open positions: 2. ProofReader: ON (dupes:yes, maxRisk:2%)</td></tr>
+<tr><td>2026-03-04T01:04:21.127Z</td><td>INFO</td><td>CC.D.CL.UNC.IP [REST]: Mid 7414.9 above entry 68</td></tr>
+<tr><td>2026-03-04T01:04:19.964Z</td><td>INFO</td><td>Evaluating: Oil Dip Buy</td></tr>
+<tr><td>2026-03-04T01:04:19.964Z</td><td>WARN</td><td>TRADE BLOCKED by proof reader: CS.D.CFASILVER.CFA.IP — Entry price sanity: Entry 9500 is 13.65% from mid 8359.05000 — possible stale/hallucinated value</td></tr>
+<tr><td>2026-03-04T01:04:19.963Z</td><td>WARN</td><td>PROOF READ REJECTED: Silver Dip Buy
+  ✅ Market tradeable: Status: TRADEABLE
+  ✅ Price validity: Bid: 8354, Offer: 8364.1, Mid: 8359.05000
+  ✅ Price staleness: Snapshot age 2s (< 120s limit)
+  ✅ Spread limit: Spread 10.10000 (0.121%)
+  ✅ Stop-loss set: 50 pts (> spread 10.10000)
+  ✅ Risk:reward ratio: 1:2.00
+  ✅ Position size: 0.5 contracts
+  ✅ Risk % of balance: 0.03% (risk: 25.00, balance: 90384.92)
+  ✅ No duplicate position: 1 existing — duplicates allowed by config
+  ❌ Entry price sanity: Entry 9500 is 13.65% from mid 8359.05000 — possible stale/hallucinated value</td></tr>
+<tr><td>2026-03-04T01:04:19.960Z</td><td>INFO</td><td>Signal alert found for CS.D.CFASILVER.CFA.IP: reversal_down</td></tr>
+<tr><td>2026-03-04T01:04:19.958Z</td><td>WARN</td><td>Duplicate BUY position on CS.D.CFASILVER.CFA.IP — allowed by proofread config</td></tr>
+<tr><td>2026-03-04T01:04:19.957Z</td><td>INFO</td><td>CS.D.CFASILVER.CFA.IP [REST]: Mid 8359.05 below entry 9500</td></tr>
+<tr><td>2026-03-04T01:04:19.955Z</td><td>INFO</td><td>Evaluating: Silver Dip Buy</td></tr>
+<tr><td>2026-03-04T01:04:19.954Z</td><td>INFO</td><td>Open positions: 3. ProofReader: ON (dupes:yes, maxRisk:2%)</td></tr>
+<tr><td>2026-03-04T01:04:19.133Z</td><td>INFO</td><td>Starting bot loop (interval: 60s). Press Ctrl+C to stop.</td></tr>
+<tr><td>2026-03-04T01:04:19.133Z</td><td>INFO</td><td>Account: YOUR_ACCOUNT_ID, Balance: 90384.92</td></tr>
+</table>
+
+<p class="meta">Account balance: 90384.92 | Max positions: 6 | Risk limit: 10%</p>
+</body>
+</html>

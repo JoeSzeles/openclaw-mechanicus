@@ -1,0 +1,5002 @@
+[
+  {
+    "timestamp": "2026-03-09T14:06:03.938Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 68760.50 (range: 68760.50 – 69215.50, span: 455.00)",
+    "bid": 68738,
+    "offer": 68783,
+    "mid": 68760.5
+  },
+  {
+    "timestamp": "2026-03-09T14:06:33.968Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8365.60, now 8374.40 (+0.105%)",
+    "bid": 8371.9,
+    "offer": 8376.9,
+    "mid": 8374.4
+  },
+  {
+    "timestamp": "2026-03-09T14:06:33.969Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68726.50, now 68785.50 (+0.086%)",
+    "bid": 68763,
+    "offer": 68808,
+    "mid": 68785.5
+  },
+  {
+    "timestamp": "2026-03-09T14:07:19.018Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5076.85, now 5078.52 (+0.033%)",
+    "bid": 5077.95,
+    "offer": 5079.1,
+    "mid": 5078.525
+  },
+  {
+    "timestamp": "2026-03-09T14:07:49.047Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "high_volatility",
+    "message": "Spot Silver (A$1 Contract) high volatility: stddev 17.84 (0.213% of price) over 20 ticks",
+    "bid": 8358.6,
+    "offer": 8363.6,
+    "mid": 8361.1
+  },
+  {
+    "timestamp": "2026-03-09T14:08:49.112Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68840.50, now 68789.50 (-0.074%)",
+    "bid": 68767,
+    "offer": 68812,
+    "mid": 68789.5
+  },
+  {
+    "timestamp": "2026-03-09T14:10:04.187Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8371.55, now 8364.05 (-0.090%)",
+    "bid": 8361.2,
+    "offer": 8366.9,
+    "mid": 8364.05
+  },
+  {
+    "timestamp": "2026-03-09T14:10:04.188Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5076.77, now 5074.92 (-0.036%)",
+    "bid": 5074.3,
+    "offer": 5075.54,
+    "mid": 5074.92
+  },
+  {
+    "timestamp": "2026-03-09T14:11:04.247Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_low",
+    "message": "Spot Silver (A$1 Contract) new session LOW 8339.65 (range: 8339.65 – 8413.15, span: 73.50)",
+    "bid": 8337,
+    "offer": 8342.3,
+    "mid": 8339.65
+  },
+  {
+    "timestamp": "2026-03-09T14:11:04.249Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_low",
+    "message": "CFAGOLD new session LOW 5068.07 (range: 5068.07 – 5088.12, span: 20.05)",
+    "bid": 5067.51,
+    "offer": 5068.63,
+    "mid": 5068.07
+  },
+  {
+    "timestamp": "2026-03-09T14:11:19.270Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 68717.50 (range: 68717.50 – 69215.50, span: 498.00)",
+    "bid": 68695,
+    "offer": 68740,
+    "mid": 68717.5
+  },
+  {
+    "timestamp": "2026-03-09T14:11:34.292Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68717.50, now 68777.50 (+0.087%)",
+    "bid": 68755,
+    "offer": 68800,
+    "mid": 68777.5
+  },
+  {
+    "timestamp": "2026-03-09T14:12:19.341Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8313.55, now 8326.70 (+0.158%)",
+    "bid": 8324.5,
+    "offer": 8328.9,
+    "mid": 8326.7
+  },
+  {
+    "timestamp": "2026-03-09T14:12:49.369Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "high_volatility",
+    "message": "Spot Silver (A$1 Contract) high volatility: stddev 15.94 (0.191% of price) over 20 ticks",
+    "bid": 8325.1,
+    "offer": 8330.3,
+    "mid": 8327.7
+  },
+  {
+    "timestamp": "2026-03-09T14:13:19.405Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5061.63, now 5065.15 (+0.070%)",
+    "bid": 5064.57,
+    "offer": 5065.72,
+    "mid": 5065.145
+  },
+  {
+    "timestamp": "2026-03-09T14:14:49.489Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68889.50, now 68842.50 (-0.068%)",
+    "bid": 68820,
+    "offer": 68865,
+    "mid": 68842.5
+  },
+  {
+    "timestamp": "2026-03-09T14:15:19.523Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8353.50, now 8349.05 (-0.053%)",
+    "bid": 8346.5,
+    "offer": 8351.6,
+    "mid": 8349.05
+  },
+  {
+    "timestamp": "2026-03-09T14:15:19.524Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5072.94, now 5070.91 (-0.040%)",
+    "bid": 5070.3,
+    "offer": 5071.51,
+    "mid": 5070.905000000001
+  },
+  {
+    "timestamp": "2026-03-09T14:16:34.586Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68862.50, now 68964.50 (+0.148%)",
+    "bid": 68942,
+    "offer": 68987,
+    "mid": 68964.5
+  },
+  {
+    "timestamp": "2026-03-09T14:16:49.600Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "high_volatility",
+    "message": "Bitcoin ($0.1) high volatility: stddev 105.77 (0.154% of price) over 20 ticks",
+    "bid": 69172,
+    "offer": 69217,
+    "mid": 69194.5
+  },
+  {
+    "timestamp": "2026-03-09T14:17:04.611Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_high",
+    "message": "Bitcoin ($0.1) new session HIGH 69226.50 (range: 68717.50 – 69226.50, span: 509.00)",
+    "bid": 69204,
+    "offer": 69249,
+    "mid": 69226.5
+  },
+  {
+    "timestamp": "2026-03-09T14:17:19.629Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8336.25, now 8361.35 (+0.301%)",
+    "bid": 8358.8,
+    "offer": 8363.9,
+    "mid": 8361.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T14:17:49.655Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "high_volatility",
+    "message": "Spot Silver (A$1 Contract) high volatility: stddev 13.06 (0.156% of price) over 20 ticks",
+    "bid": 8369.2,
+    "offer": 8374.2,
+    "mid": 8371.7
+  },
+  {
+    "timestamp": "2026-03-09T14:18:19.685Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5073.30, now 5077.39 (+0.081%)",
+    "bid": 5076.81,
+    "offer": 5077.96,
+    "mid": 5077.385
+  },
+  {
+    "timestamp": "2026-03-09T14:20:50.631Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8366.35, now 8383.25 (+0.202%)",
+    "bid": 8380.7,
+    "offer": 8385.8,
+    "mid": 8383.25
+  },
+  {
+    "timestamp": "2026-03-09T14:20:50.633Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5074.76, now 5078.33 (+0.070%)",
+    "bid": 5078.08,
+    "offer": 5078.58,
+    "mid": 5078.33
+  },
+  {
+    "timestamp": "2026-03-09T14:20:50.633Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69099.50, now 69045.50 (-0.078%)",
+    "bid": 69023,
+    "offer": 69068,
+    "mid": 69045.5
+  },
+  {
+    "timestamp": "2026-03-09T14:20:50.633Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69019.50, now 69045.50 (+0.038%)",
+    "bid": 69023,
+    "offer": 69068,
+    "mid": 69045.5
+  },
+  {
+    "timestamp": "2026-03-09T14:21:05.650Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8383.25, now 8360.80 (-0.268%)",
+    "bid": 8358.3,
+    "offer": 8363.3,
+    "mid": 8360.8
+  },
+  {
+    "timestamp": "2026-03-09T14:21:05.651Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5078.94, now 5073.05 (-0.116%)",
+    "bid": 5072.8,
+    "offer": 5073.3,
+    "mid": 5073.05
+  },
+  {
+    "timestamp": "2026-03-09T14:24:50.869Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5078.98 (range: 5073.05 – 5078.98, span: 5.93)",
+    "bid": 5078.43,
+    "offer": 5079.53,
+    "mid": 5078.98
+  },
+  {
+    "timestamp": "2026-03-09T14:25:05.886Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8386.45 (range: 8354.60 – 8386.45, span: 31.85)",
+    "bid": 8383.9,
+    "offer": 8389,
+    "mid": 8386.45
+  },
+  {
+    "timestamp": "2026-03-09T14:25:20.900Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_high",
+    "message": "Bitcoin ($0.1) new session HIGH 69236.50 (range: 69012.50 – 69236.50, span: 224.00)",
+    "bid": 69214,
+    "offer": 69259,
+    "mid": 69236.5
+  },
+  {
+    "timestamp": "2026-03-09T14:25:50.929Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69252.50, now 69221.50 (-0.045%)",
+    "bid": 69199,
+    "offer": 69244,
+    "mid": 69221.5
+  },
+  {
+    "timestamp": "2026-03-09T14:26:05.945Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8390.35, now 8381.95 (-0.100%)",
+    "bid": 8379.4,
+    "offer": 8384.5,
+    "mid": 8381.95
+  },
+  {
+    "timestamp": "2026-03-09T14:26:20.965Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5082.99, now 5080.25 (-0.054%)",
+    "bid": 5079.71,
+    "offer": 5080.79,
+    "mid": 5080.25
+  },
+  {
+    "timestamp": "2026-03-09T14:26:35.982Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69145.50, now 69192.50 (+0.068%)",
+    "bid": 69170,
+    "offer": 69215,
+    "mid": 69192.5
+  },
+  {
+    "timestamp": "2026-03-09T14:26:50.999Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8371.40, now 8382.85 (+0.137%)",
+    "bid": 8380.3,
+    "offer": 8385.4,
+    "mid": 8382.849999999999
+  },
+  {
+    "timestamp": "2026-03-09T14:26:50.999Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5079.80, now 5082.52 (+0.054%)",
+    "bid": 5081.98,
+    "offer": 5083.07,
+    "mid": 5082.525
+  },
+  {
+    "timestamp": "2026-03-09T14:30:51.238Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69199.50, now 69174.50 (-0.036%)",
+    "bid": 69152,
+    "offer": 69197,
+    "mid": 69174.5
+  },
+  {
+    "timestamp": "2026-03-09T14:31:21.275Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_high",
+    "message": "Bitcoin ($0.1) new session HIGH 69275.50 (range: 69012.50 – 69275.50, span: 263.00)",
+    "bid": 69253,
+    "offer": 69298,
+    "mid": 69275.5
+  },
+  {
+    "timestamp": "2026-03-09T14:31:36.295Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69168.50, now 69284.50 (+0.168%)",
+    "bid": 69262,
+    "offer": 69307,
+    "mid": 69284.5
+  },
+  {
+    "timestamp": "2026-03-09T14:31:51.313Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8382.70, now 8385.35 (+0.032%)",
+    "bid": 8383,
+    "offer": 8387.7,
+    "mid": 8385.35
+  },
+  {
+    "timestamp": "2026-03-09T14:32:06.332Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8413.60 (range: 8354.60 – 8413.60, span: 59.00)",
+    "bid": 8411.1,
+    "offer": 8416.1,
+    "mid": 8413.6
+  },
+  {
+    "timestamp": "2026-03-09T14:32:06.333Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5088.95 (range: 5073.05 – 5088.95, span: 15.90)",
+    "bid": 5088.43,
+    "offer": 5089.47,
+    "mid": 5088.950000000001
+  },
+  {
+    "timestamp": "2026-03-09T14:32:06.333Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5081.93, now 5088.95 (+0.138%)",
+    "bid": 5088.43,
+    "offer": 5089.47,
+    "mid": 5088.950000000001
+  },
+  {
+    "timestamp": "2026-03-09T14:32:21.348Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "high_volatility",
+    "message": "Spot Silver (A$1 Contract) high volatility: stddev 13.94 (0.166% of price) over 20 ticks",
+    "bid": 8414.7,
+    "offer": 8419.7,
+    "mid": 8417.2
+  },
+  {
+    "timestamp": "2026-03-09T14:32:51.376Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8422.50, now 8415.80 (-0.080%)",
+    "bid": 8413.3,
+    "offer": 8418.3,
+    "mid": 8415.8
+  },
+  {
+    "timestamp": "2026-03-09T14:33:06.394Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5090.94, now 5088.05 (-0.057%)",
+    "bid": 5087.54,
+    "offer": 5088.55,
+    "mid": 5088.045
+  },
+  {
+    "timestamp": "2026-03-09T14:35:51.560Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69252.50, now 69195.50 (-0.082%)",
+    "bid": 69173,
+    "offer": 69218,
+    "mid": 69195.5
+  },
+  {
+    "timestamp": "2026-03-09T14:36:36.603Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_high",
+    "message": "Bitcoin ($0.1) new session HIGH 69304.50 (range: 69012.50 – 69304.50, span: 292.00)",
+    "bid": 69282,
+    "offer": 69327,
+    "mid": 69304.5
+  },
+  {
+    "timestamp": "2026-03-09T14:36:36.603Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69195.50, now 69304.50 (+0.158%)",
+    "bid": 69282,
+    "offer": 69327,
+    "mid": 69304.5
+  },
+  {
+    "timestamp": "2026-03-09T14:37:06.627Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8398.75, now 8412.85 (+0.168%)",
+    "bid": 8410.3,
+    "offer": 8415.4,
+    "mid": 8412.849999999999
+  },
+  {
+    "timestamp": "2026-03-09T14:37:06.628Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5088.15, now 5090.26 (+0.042%)",
+    "bid": 5089.73,
+    "offer": 5090.8,
+    "mid": 5090.264999999999
+  },
+  {
+    "timestamp": "2026-03-09T14:37:51.676Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5091.68 (range: 5073.05 – 5091.68, span: 18.63)",
+    "bid": 5091.43,
+    "offer": 5091.93,
+    "mid": 5091.68
+  },
+  {
+    "timestamp": "2026-03-09T14:38:06.696Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8422.45, now 8413.85 (-0.102%)",
+    "bid": 8411.3,
+    "offer": 8416.4,
+    "mid": 8413.849999999999
+  },
+  {
+    "timestamp": "2026-03-09T14:40:36.825Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5097.45, now 5095.45 (-0.039%)",
+    "bid": 5094.85,
+    "offer": 5096.06,
+    "mid": 5095.455
+  },
+  {
+    "timestamp": "2026-03-09T14:41:06.852Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8423.85 (range: 8354.60 – 8423.85, span: 69.25)",
+    "bid": 8421.3,
+    "offer": 8426.4,
+    "mid": 8423.849999999999
+  },
+  {
+    "timestamp": "2026-03-09T14:41:36.886Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_high",
+    "message": "Bitcoin ($0.1) new session HIGH 69451.50 (range: 69012.50 – 69451.50, span: 439.00)",
+    "bid": 69429,
+    "offer": 69474,
+    "mid": 69451.5
+  },
+  {
+    "timestamp": "2026-03-09T14:41:36.886Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69280.50, now 69451.50 (+0.247%)",
+    "bid": 69429,
+    "offer": 69474,
+    "mid": 69451.5
+  },
+  {
+    "timestamp": "2026-03-09T14:41:51.898Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69451.50, now 69380.50 (-0.102%)",
+    "bid": 69358,
+    "offer": 69403,
+    "mid": 69380.5
+  },
+  {
+    "timestamp": "2026-03-09T14:42:36.939Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8410.05, now 8417.15 (+0.084%)",
+    "bid": 8414.6,
+    "offer": 8419.7,
+    "mid": 8417.150000000001
+  },
+  {
+    "timestamp": "2026-03-09T14:42:36.940Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5099.32, now 5101.40 (+0.041%)",
+    "bid": 5101.15,
+    "offer": 5101.65,
+    "mid": 5101.4
+  },
+  {
+    "timestamp": "2026-03-09T14:43:06.973Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5102.57 (range: 5073.05 – 5102.57, span: 29.52)",
+    "bid": 5102.32,
+    "offer": 5102.82,
+    "mid": 5102.57
+  },
+  {
+    "timestamp": "2026-03-09T14:43:21.991Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8420.85, now 8414.25 (-0.078%)",
+    "bid": 8411.7,
+    "offer": 8416.8,
+    "mid": 8414.25
+  },
+  {
+    "timestamp": "2026-03-09T14:45:37.119Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5116.03, now 5112.35 (-0.072%)",
+    "bid": 5111.78,
+    "offer": 5112.93,
+    "mid": 5112.355
+  },
+  {
+    "timestamp": "2026-03-09T14:47:07.199Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69370.50, now 69318.50 (-0.075%)",
+    "bid": 69296,
+    "offer": 69341,
+    "mid": 69318.5
+  },
+  {
+    "timestamp": "2026-03-09T14:47:52.239Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8415.70, now 8418.40 (+0.032%)",
+    "bid": 8415.9,
+    "offer": 8420.9,
+    "mid": 8418.4
+  },
+  {
+    "timestamp": "2026-03-09T14:47:52.240Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69287.50, now 69320.50 (+0.048%)",
+    "bid": 69298,
+    "offer": 69343,
+    "mid": 69320.5
+  },
+  {
+    "timestamp": "2026-03-09T14:48:52.297Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8425.00, now 8420.60 (-0.052%)",
+    "bid": 8418.1,
+    "offer": 8423.1,
+    "mid": 8420.6
+  },
+  {
+    "timestamp": "2026-03-09T14:50:37.401Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5101.00, now 5096.89 (-0.081%)",
+    "bid": 5096.36,
+    "offer": 5097.41,
+    "mid": 5096.885
+  },
+  {
+    "timestamp": "2026-03-09T14:50:52.421Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5096.89, now 5100.06 (+0.062%)",
+    "bid": 5099.81,
+    "offer": 5100.31,
+    "mid": 5100.06
+  },
+  {
+    "timestamp": "2026-03-09T14:51:37.460Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8446.55 (range: 8354.60 – 8446.55, span: 91.95)",
+    "bid": 8444,
+    "offer": 8449.1,
+    "mid": 8446.55
+  },
+  {
+    "timestamp": "2026-03-09T14:53:17.332Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "trend_down",
+    "message": "Spot Silver (A$1 Contract) trending DOWN over 5 ticks (-0.408%, 8440.00 → 8405.55)",
+    "bid": 8403,
+    "offer": 8408.1,
+    "mid": 8405.55
+  },
+  {
+    "timestamp": "2026-03-09T14:53:17.333Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "trend_down",
+    "message": "CFAGOLD trending DOWN over 5 ticks (-0.195%, 5101.63 → 5091.67)",
+    "bid": 5091.11,
+    "offer": 5092.24,
+    "mid": 5091.674999999999
+  },
+  {
+    "timestamp": "2026-03-09T14:53:32.343Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8405.55, now 8411.10 (+0.066%)",
+    "bid": 8408.6,
+    "offer": 8413.6,
+    "mid": 8411.1
+  },
+  {
+    "timestamp": "2026-03-09T14:53:32.344Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69332.50, now 69222.50 (-0.159%)",
+    "bid": 69200,
+    "offer": 69245,
+    "mid": 69222.5
+  },
+  {
+    "timestamp": "2026-03-09T14:53:47.363Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69222.50, now 69250.50 (+0.040%)",
+    "bid": 69228,
+    "offer": 69273,
+    "mid": 69250.5
+  },
+  {
+    "timestamp": "2026-03-09T14:54:02.375Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5091.67, now 5093.25 (+0.031%)",
+    "bid": 5092.73,
+    "offer": 5093.78,
+    "mid": 5093.254999999999
+  },
+  {
+    "timestamp": "2026-03-09T14:54:32.412Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8421.95, now 8417.00 (-0.059%)",
+    "bid": 8414.5,
+    "offer": 8419.5,
+    "mid": 8417
+  },
+  {
+    "timestamp": "2026-03-09T14:54:32.412Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5093.25, now 5091.35 (-0.037%)",
+    "bid": 5090.63,
+    "offer": 5092.07,
+    "mid": 5091.35
+  },
+  {
+    "timestamp": "2026-03-09T14:57:20.100Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8425.10, now 8419.50 (-0.066%)",
+    "bid": 8417,
+    "offer": 8422,
+    "mid": 8419.5
+  },
+  {
+    "timestamp": "2026-03-09T14:57:20.100Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8407.95, now 8419.50 (+0.137%)",
+    "bid": 8417,
+    "offer": 8422,
+    "mid": 8419.5
+  },
+  {
+    "timestamp": "2026-03-09T14:57:20.101Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5088.56, now 5092.38 (+0.075%)",
+    "bid": 5091.76,
+    "offer": 5093,
+    "mid": 5092.38
+  },
+  {
+    "timestamp": "2026-03-09T14:57:35.117Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69247.50, now 69173.50 (-0.107%)",
+    "bid": 69151,
+    "offer": 69196,
+    "mid": 69173.5
+  },
+  {
+    "timestamp": "2026-03-09T14:58:05.148Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5094.31, now 5092.58 (-0.034%)",
+    "bid": 5091.98,
+    "offer": 5093.19,
+    "mid": 5092.584999999999
+  },
+  {
+    "timestamp": "2026-03-09T14:59:35.247Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69080.50, now 69102.50 (+0.032%)",
+    "bid": 69080,
+    "offer": 69125,
+    "mid": 69102.5
+  },
+  {
+    "timestamp": "2026-03-09T15:02:20.416Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8434.25, now 8428.35 (-0.070%)",
+    "bid": 8425.8,
+    "offer": 8430.9,
+    "mid": 8428.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T15:02:20.416Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8421.25, now 8428.35 (+0.084%)",
+    "bid": 8425.8,
+    "offer": 8430.9,
+    "mid": 8428.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T15:02:50.453Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_low",
+    "message": "CFAGOLD new session LOW 5087.99 (range: 5087.99 – 5096.58, span: 8.59)",
+    "bid": 5087.74,
+    "offer": 5088.24,
+    "mid": 5087.99
+  },
+  {
+    "timestamp": "2026-03-09T15:03:05.470Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69205.50, now 69155.50 (-0.072%)",
+    "bid": 69133,
+    "offer": 69178,
+    "mid": 69155.5
+  },
+  {
+    "timestamp": "2026-03-09T15:03:20.491Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5091.37, now 5086.61 (-0.093%)",
+    "bid": 5086,
+    "offer": 5087.22,
+    "mid": 5086.610000000001
+  },
+  {
+    "timestamp": "2026-03-09T15:03:35.506Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 69078.50 (range: 69078.50 – 69247.50, span: 169.00)",
+    "bid": 69056,
+    "offer": 69101,
+    "mid": 69078.5
+  },
+  {
+    "timestamp": "2026-03-09T15:04:05.536Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5086.09, now 5088.33 (+0.044%)",
+    "bid": 5087.76,
+    "offer": 5088.89,
+    "mid": 5088.325000000001
+  },
+  {
+    "timestamp": "2026-03-09T15:04:35.568Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69078.50, now 69157.50 (+0.114%)",
+    "bid": 69135,
+    "offer": 69180,
+    "mid": 69157.5
+  },
+  {
+    "timestamp": "2026-03-09T15:08:36.628Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "trend_down",
+    "message": "Bitcoin ($0.1) trending DOWN over 5 ticks (-0.082%, 69206.50 → 69149.50)",
+    "bid": 69127,
+    "offer": 69172,
+    "mid": 69149.5
+  },
+  {
+    "timestamp": "2026-03-09T15:08:51.646Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8424.55, now 8415.45 (-0.108%)",
+    "bid": 8412.9,
+    "offer": 8418,
+    "mid": 8415.45
+  },
+  {
+    "timestamp": "2026-03-09T15:08:51.647Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5087.80, now 5082.93 (-0.096%)",
+    "bid": 5082.34,
+    "offer": 5083.52,
+    "mid": 5082.93
+  },
+  {
+    "timestamp": "2026-03-09T15:09:06.665Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8415.00, now 8419.95 (+0.059%)",
+    "bid": 8417.4,
+    "offer": 8422.5,
+    "mid": 8419.95
+  },
+  {
+    "timestamp": "2026-03-09T15:09:21.684Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5082.93, now 5085.47 (+0.050%)",
+    "bid": 5084.86,
+    "offer": 5086.07,
+    "mid": 5085.465
+  },
+  {
+    "timestamp": "2026-03-09T15:10:06.765Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69149.50, now 69021.50 (-0.185%)",
+    "bid": 68999,
+    "offer": 69044,
+    "mid": 69021.5
+  },
+  {
+    "timestamp": "2026-03-09T15:10:36.937Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69011.50, now 69033.50 (+0.032%)",
+    "bid": 69011,
+    "offer": 69056,
+    "mid": 69033.5
+  },
+  {
+    "timestamp": "2026-03-09T15:12:54.677Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8428.90 (range: 8406.50 – 8428.90, span: 22.40)",
+    "bid": 8426.4,
+    "offer": 8431.4,
+    "mid": 8428.9
+  },
+  {
+    "timestamp": "2026-03-09T15:13:09.695Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5089.95 (range: 5080.28 – 5089.95, span: 9.67)",
+    "bid": 5089.39,
+    "offer": 5090.52,
+    "mid": 5089.955
+  },
+  {
+    "timestamp": "2026-03-09T15:13:39.720Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "high_volatility",
+    "message": "Spot Silver (A$1 Contract) high volatility: stddev 13.03 (0.155% of price) over 20 ticks",
+    "bid": 8450.7,
+    "offer": 8455.8,
+    "mid": 8453.25
+  },
+  {
+    "timestamp": "2026-03-09T15:13:54.738Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8453.25, now 8446.35 (-0.082%)",
+    "bid": 8444.3,
+    "offer": 8448.4,
+    "mid": 8446.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T15:13:54.738Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5091.97, now 5089.82 (-0.042%)",
+    "bid": 5089.23,
+    "offer": 5090.41,
+    "mid": 5089.82
+  },
+  {
+    "timestamp": "2026-03-09T15:14:39.777Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5087.10, now 5088.90 (+0.035%)",
+    "bid": 5088.27,
+    "offer": 5089.52,
+    "mid": 5088.895
+  },
+  {
+    "timestamp": "2026-03-09T15:14:54.799Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8438.70, now 8448.00 (+0.110%)",
+    "bid": 8445.5,
+    "offer": 8450.5,
+    "mid": 8448
+  },
+  {
+    "timestamp": "2026-03-09T15:15:54.863Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69091.50, now 69186.50 (+0.137%)",
+    "bid": 69164,
+    "offer": 69209,
+    "mid": 69186.5
+  },
+  {
+    "timestamp": "2026-03-09T15:16:24.893Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69192.50, now 69160.50 (-0.046%)",
+    "bid": 69138,
+    "offer": 69183,
+    "mid": 69160.5
+  },
+  {
+    "timestamp": "2026-03-09T15:19:10.071Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5088.58, now 5084.40 (-0.082%)",
+    "bid": 5083.79,
+    "offer": 5085,
+    "mid": 5084.395
+  },
+  {
+    "timestamp": "2026-03-09T15:19:10.072Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 68997.50 (range: 68997.50 – 69197.50, span: 200.00)",
+    "bid": 68975,
+    "offer": 69020,
+    "mid": 68997.5
+  },
+  {
+    "timestamp": "2026-03-09T15:19:55.112Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8426.60, now 8415.65 (-0.130%)",
+    "bid": 8413.1,
+    "offer": 8418.2,
+    "mid": 8415.650000000001
+  },
+  {
+    "timestamp": "2026-03-09T15:20:10.137Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8415.65, now 8420.45 (+0.057%)",
+    "bid": 8418.2,
+    "offer": 8422.7,
+    "mid": 8420.45
+  },
+  {
+    "timestamp": "2026-03-09T15:20:25.175Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5082.81, now 5087.47 (+0.092%)",
+    "bid": 5086.86,
+    "offer": 5088.08,
+    "mid": 5087.469999999999
+  },
+  {
+    "timestamp": "2026-03-09T15:20:55.221Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68970.50, now 69018.50 (+0.070%)",
+    "bid": 68996,
+    "offer": 69041,
+    "mid": 69018.5
+  },
+  {
+    "timestamp": "2026-03-09T15:21:25.257Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69018.50, now 68968.50 (-0.072%)",
+    "bid": 68946,
+    "offer": 68991,
+    "mid": 68968.5
+  },
+  {
+    "timestamp": "2026-03-09T15:23:40.396Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5094.48 (range: 5080.28 – 5094.48, span: 14.19)",
+    "bid": 5094.23,
+    "offer": 5094.73,
+    "mid": 5094.48
+  },
+  {
+    "timestamp": "2026-03-09T15:25:10.489Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8448.25, now 8455.00 (+0.080%)",
+    "bid": 8452.5,
+    "offer": 8457.5,
+    "mid": 8455
+  },
+  {
+    "timestamp": "2026-03-09T15:25:40.523Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8460.60 (range: 8406.50 – 8460.60, span: 54.10)",
+    "bid": 8458.1,
+    "offer": 8463.1,
+    "mid": 8460.6
+  },
+  {
+    "timestamp": "2026-03-09T15:25:40.524Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5096.23, now 5099.72 (+0.068%)",
+    "bid": 5099.47,
+    "offer": 5099.97,
+    "mid": 5099.72
+  },
+  {
+    "timestamp": "2026-03-09T15:25:55.537Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8460.60, now 8455.60 (-0.059%)",
+    "bid": 8453.1,
+    "offer": 8458.1,
+    "mid": 8455.6
+  },
+  {
+    "timestamp": "2026-03-09T15:26:10.559Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69082.50, now 69131.50 (+0.071%)",
+    "bid": 69109,
+    "offer": 69154,
+    "mid": 69131.5
+  },
+  {
+    "timestamp": "2026-03-09T15:26:25.577Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69131.50, now 69101.50 (-0.043%)",
+    "bid": 69079,
+    "offer": 69124,
+    "mid": 69101.5
+  },
+  {
+    "timestamp": "2026-03-09T15:27:55.662Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5100.11, now 5098.23 (-0.037%)",
+    "bid": 5097.98,
+    "offer": 5098.48,
+    "mid": 5098.23
+  },
+  {
+    "timestamp": "2026-03-09T15:30:10.809Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5100.61 (range: 5080.28 – 5100.61, span: 20.33)",
+    "bid": 5100.09,
+    "offer": 5101.14,
+    "mid": 5100.615
+  },
+  {
+    "timestamp": "2026-03-09T15:30:40.847Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5098.94, now 5101.02 (+0.041%)",
+    "bid": 5100.5,
+    "offer": 5101.54,
+    "mid": 5101.02
+  },
+  {
+    "timestamp": "2026-03-09T15:30:55.861Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8447.40, now 8443.00 (-0.052%)",
+    "bid": 8440.5,
+    "offer": 8445.5,
+    "mid": 8443
+  },
+  {
+    "timestamp": "2026-03-09T15:31:10.880Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8443.00, now 8446.80 (+0.045%)",
+    "bid": 8444.3,
+    "offer": 8449.3,
+    "mid": 8446.8
+  },
+  {
+    "timestamp": "2026-03-09T15:31:10.881Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69044.50, now 69071.50 (+0.039%)",
+    "bid": 69049,
+    "offer": 69094,
+    "mid": 69071.5
+  },
+  {
+    "timestamp": "2026-03-09T15:32:10.930Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69131.50, now 69086.50 (-0.065%)",
+    "bid": 69064,
+    "offer": 69109,
+    "mid": 69086.5
+  },
+  {
+    "timestamp": "2026-03-09T15:33:26.011Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5099.39, now 5097.63 (-0.035%)",
+    "bid": 5097.12,
+    "offer": 5098.13,
+    "mid": 5097.625
+  },
+  {
+    "timestamp": "2026-03-09T15:33:41.030Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 68880.50 (range: 68880.50 – 69197.50, span: 317.00)",
+    "bid": 68858,
+    "offer": 68903,
+    "mid": 68880.5
+  },
+  {
+    "timestamp": "2026-03-09T15:35:56.159Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8450.55, now 8441.60 (-0.106%)",
+    "bid": 8439.1,
+    "offer": 8444.1,
+    "mid": 8441.6
+  },
+  {
+    "timestamp": "2026-03-09T15:35:56.161Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "high_volatility",
+    "message": "Bitcoin ($0.1) high volatility: stddev 108.52 (0.157% of price) over 20 ticks",
+    "bid": 68775,
+    "offer": 68820,
+    "mid": 68797.5
+  },
+  {
+    "timestamp": "2026-03-09T15:36:11.176Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8441.60, now 8444.60 (+0.036%)",
+    "bid": 8442.1,
+    "offer": 8447.1,
+    "mid": 8444.6
+  },
+  {
+    "timestamp": "2026-03-09T15:37:11.229Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68812.50, now 68767.50 (-0.065%)",
+    "bid": 68745,
+    "offer": 68790,
+    "mid": 68767.5
+  },
+  {
+    "timestamp": "2026-03-09T15:37:26.248Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68763.50, now 68794.50 (+0.045%)",
+    "bid": 68772,
+    "offer": 68817,
+    "mid": 68794.5
+  },
+  {
+    "timestamp": "2026-03-09T15:39:11.357Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 68755.50 (range: 68755.50 – 69197.50, span: 442.00)",
+    "bid": 68733,
+    "offer": 68778,
+    "mid": 68755.5
+  },
+  {
+    "timestamp": "2026-03-09T15:39:26.376Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5096.56, now 5094.56 (-0.039%)",
+    "bid": 5094.31,
+    "offer": 5094.81,
+    "mid": 5094.56
+  },
+  {
+    "timestamp": "2026-03-09T15:40:26.429Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5094.25, now 5097.37 (+0.061%)",
+    "bid": 5097.12,
+    "offer": 5097.62,
+    "mid": 5097.37
+  },
+  {
+    "timestamp": "2026-03-09T15:40:56.457Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8452.45, now 8449.45 (-0.035%)",
+    "bid": 8446.9,
+    "offer": 8452,
+    "mid": 8449.45
+  },
+  {
+    "timestamp": "2026-03-09T15:42:11.538Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8441.40, now 8447.30 (+0.070%)",
+    "bid": 8444.8,
+    "offer": 8449.8,
+    "mid": 8447.3
+  },
+  {
+    "timestamp": "2026-03-09T15:44:41.928Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5095.88, now 5094.33 (-0.030%)",
+    "bid": 5094.08,
+    "offer": 5094.58,
+    "mid": 5094.33
+  },
+  {
+    "timestamp": "2026-03-09T15:45:11.969Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 68733.50 (range: 68733.50 – 69197.50, span: 464.00)",
+    "bid": 68711,
+    "offer": 68756,
+    "mid": 68733.5
+  },
+  {
+    "timestamp": "2026-03-09T15:45:11.969Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68759.50, now 68733.50 (-0.038%)",
+    "bid": 68711,
+    "offer": 68756,
+    "mid": 68733.5
+  },
+  {
+    "timestamp": "2026-03-09T15:45:42.008Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68730.50, now 68764.50 (+0.049%)",
+    "bid": 68742,
+    "offer": 68787,
+    "mid": 68764.5
+  },
+  {
+    "timestamp": "2026-03-09T15:46:27.064Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5094.48, now 5097.30 (+0.055%)",
+    "bid": 5097.05,
+    "offer": 5097.55,
+    "mid": 5097.3
+  },
+  {
+    "timestamp": "2026-03-09T15:46:42.081Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8441.70, now 8435.60 (-0.072%)",
+    "bid": 8433.1,
+    "offer": 8438.1,
+    "mid": 8435.6
+  },
+  {
+    "timestamp": "2026-03-09T15:47:27.130Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8435.60, now 8438.65 (+0.036%)",
+    "bid": 8436.1,
+    "offer": 8441.2,
+    "mid": 8438.650000000001
+  },
+  {
+    "timestamp": "2026-03-09T15:50:12.284Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68847.50, now 68826.50 (-0.031%)",
+    "bid": 68804,
+    "offer": 68849,
+    "mid": 68826.5
+  },
+  {
+    "timestamp": "2026-03-09T15:51:42.374Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8447.25, now 8437.35 (-0.117%)",
+    "bid": 8434.8,
+    "offer": 8439.9,
+    "mid": 8437.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T15:51:42.375Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5099.30, now 5097.27 (-0.040%)",
+    "bid": 5096.66,
+    "offer": 5097.88,
+    "mid": 5097.27
+  },
+  {
+    "timestamp": "2026-03-09T15:51:42.375Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68791.50, now 68825.50 (+0.049%)",
+    "bid": 68803,
+    "offer": 68848,
+    "mid": 68825.5
+  },
+  {
+    "timestamp": "2026-03-09T15:52:27.417Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8437.35, now 8441.75 (+0.052%)",
+    "bid": 8439.2,
+    "offer": 8444.3,
+    "mid": 8441.75
+  },
+  {
+    "timestamp": "2026-03-09T15:52:27.418Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5097.27, now 5098.84 (+0.031%)",
+    "bid": 5098.24,
+    "offer": 5099.45,
+    "mid": 5098.844999999999
+  },
+  {
+    "timestamp": "2026-03-09T15:54:12.527Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5102.66 (range: 5080.28 – 5102.66, span: 22.37)",
+    "bid": 5102.14,
+    "offer": 5103.17,
+    "mid": 5102.655000000001
+  },
+  {
+    "timestamp": "2026-03-09T15:57:12.696Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5103.02, now 5099.54 (-0.068%)",
+    "bid": 5098.96,
+    "offer": 5100.12,
+    "mid": 5099.54
+  },
+  {
+    "timestamp": "2026-03-09T15:57:12.697Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69020.50, now 68974.50 (-0.067%)",
+    "bid": 68952,
+    "offer": 68997,
+    "mid": 68974.5
+  },
+  {
+    "timestamp": "2026-03-09T15:57:27.716Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5099.54, now 5101.27 (+0.034%)",
+    "bid": 5100.72,
+    "offer": 5101.82,
+    "mid": 5101.27
+  },
+  {
+    "timestamp": "2026-03-09T15:57:57.749Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8445.90, now 8452.10 (+0.073%)",
+    "bid": 8449.6,
+    "offer": 8454.6,
+    "mid": 8452.1
+  },
+  {
+    "timestamp": "2026-03-09T15:58:12.763Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68974.50, now 68995.50 (+0.030%)",
+    "bid": 68973,
+    "offer": 69018,
+    "mid": 68995.5
+  },
+  {
+    "timestamp": "2026-03-09T15:59:12.821Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8459.40, now 8454.15 (-0.062%)",
+    "bid": 8451.6,
+    "offer": 8456.7,
+    "mid": 8454.150000000001
+  },
+  {
+    "timestamp": "2026-03-09T16:02:28.014Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5096.81, now 5100.46 (+0.072%)",
+    "bid": 5100.21,
+    "offer": 5100.71,
+    "mid": 5100.46
+  },
+  {
+    "timestamp": "2026-03-09T16:03:43.075Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8440.55, now 8447.85 (+0.086%)",
+    "bid": 8445.3,
+    "offer": 8450.4,
+    "mid": 8447.849999999999
+  },
+  {
+    "timestamp": "2026-03-09T16:03:58.095Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5104.84 (range: 5080.28 – 5104.84, span: 24.56)",
+    "bid": 5104.33,
+    "offer": 5105.35,
+    "mid": 5104.84
+  },
+  {
+    "timestamp": "2026-03-09T16:03:58.095Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68852.50, now 68979.50 (+0.184%)",
+    "bid": 68957,
+    "offer": 69002,
+    "mid": 68979.5
+  },
+  {
+    "timestamp": "2026-03-09T16:04:28.130Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68979.50, now 68941.50 (-0.055%)",
+    "bid": 68919,
+    "offer": 68964,
+    "mid": 68941.5
+  },
+  {
+    "timestamp": "2026-03-09T16:04:43.147Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8462.60 (range: 8406.50 – 8462.60, span: 56.10)",
+    "bid": 8460.1,
+    "offer": 8465.1,
+    "mid": 8462.6
+  },
+  {
+    "timestamp": "2026-03-09T16:05:13.181Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8463.50, now 8458.50 (-0.059%)",
+    "bid": 8456,
+    "offer": 8461,
+    "mid": 8458.5
+  },
+  {
+    "timestamp": "2026-03-09T16:05:13.182Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5107.14, now 5105.53 (-0.031%)",
+    "bid": 5105.28,
+    "offer": 5105.78,
+    "mid": 5105.53
+  },
+  {
+    "timestamp": "2026-03-09T16:08:43.690Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8456.65, now 8459.75 (+0.037%)",
+    "bid": 8457.2,
+    "offer": 8462.3,
+    "mid": 8459.75
+  },
+  {
+    "timestamp": "2026-03-09T16:09:28.735Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68954.50, now 68834.50 (-0.174%)",
+    "bid": 68812,
+    "offer": 68857,
+    "mid": 68834.5
+  },
+  {
+    "timestamp": "2026-03-09T16:10:28.788Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5105.98, now 5107.90 (+0.038%)",
+    "bid": 5107.29,
+    "offer": 5108.51,
+    "mid": 5107.9
+  },
+  {
+    "timestamp": "2026-03-09T16:10:58.811Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8469.05 (range: 8406.50 – 8469.05, span: 62.55)",
+    "bid": 8466.5,
+    "offer": 8471.6,
+    "mid": 8469.05
+  },
+  {
+    "timestamp": "2026-03-09T16:10:58.812Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5109.33 (range: 5080.28 – 5109.33, span: 29.05)",
+    "bid": 5109.08,
+    "offer": 5109.58,
+    "mid": 5109.33
+  },
+  {
+    "timestamp": "2026-03-09T16:11:28.844Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8469.05, now 8462.65 (-0.076%)",
+    "bid": 8460.1,
+    "offer": 8465.2,
+    "mid": 8462.650000000001
+  },
+  {
+    "timestamp": "2026-03-09T16:11:28.845Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5109.33, now 5106.78 (-0.050%)",
+    "bid": 5106.28,
+    "offer": 5107.28,
+    "mid": 5106.78
+  },
+  {
+    "timestamp": "2026-03-09T16:12:43.924Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68743.50, now 68768.50 (+0.036%)",
+    "bid": 68746,
+    "offer": 68791,
+    "mid": 68768.5
+  },
+  {
+    "timestamp": "2026-03-09T16:13:43.985Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8458.45, now 8462.30 (+0.046%)",
+    "bid": 8459.8,
+    "offer": 8464.8,
+    "mid": 8462.3
+  },
+  {
+    "timestamp": "2026-03-09T16:16:14.150Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68767.50, now 68745.50 (-0.032%)",
+    "bid": 68723,
+    "offer": 68768,
+    "mid": 68745.5
+  },
+  {
+    "timestamp": "2026-03-09T16:17:14.209Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8445.55, now 8439.40 (-0.073%)",
+    "bid": 8436.9,
+    "offer": 8441.9,
+    "mid": 8439.4
+  },
+  {
+    "timestamp": "2026-03-09T16:17:14.209Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5099.21, now 5096.78 (-0.048%)",
+    "bid": 5096.25,
+    "offer": 5097.31,
+    "mid": 5096.780000000001
+  },
+  {
+    "timestamp": "2026-03-09T16:18:14.276Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68740.50, now 68773.50 (+0.048%)",
+    "bid": 68751,
+    "offer": 68796,
+    "mid": 68773.5
+  },
+  {
+    "timestamp": "2026-03-09T16:18:44.301Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8432.75, now 8439.70 (+0.082%)",
+    "bid": 8437.2,
+    "offer": 8442.2,
+    "mid": 8439.7
+  },
+  {
+    "timestamp": "2026-03-09T16:19:29.344Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5096.64, now 5098.46 (+0.036%)",
+    "bid": 5098.21,
+    "offer": 5098.71,
+    "mid": 5098.46
+  },
+  {
+    "timestamp": "2026-03-09T16:21:14.693Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 68730.50 (range: 68730.50 – 69197.50, span: 467.00)",
+    "bid": 68708,
+    "offer": 68753,
+    "mid": 68730.5
+  },
+  {
+    "timestamp": "2026-03-09T16:21:14.693Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68803.50, now 68730.50 (-0.106%)",
+    "bid": 68708,
+    "offer": 68753,
+    "mid": 68730.5
+  },
+  {
+    "timestamp": "2026-03-09T16:22:29.773Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8430.00, now 8426.10 (-0.046%)",
+    "bid": 8423.6,
+    "offer": 8428.6,
+    "mid": 8426.1
+  },
+  {
+    "timestamp": "2026-03-09T16:22:29.773Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5098.43, now 5096.01 (-0.047%)",
+    "bid": 5095.76,
+    "offer": 5096.26,
+    "mid": 5096.01
+  },
+  {
+    "timestamp": "2026-03-09T16:23:29.839Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68761.50, now 68782.50 (+0.031%)",
+    "bid": 68760,
+    "offer": 68805,
+    "mid": 68782.5
+  },
+  {
+    "timestamp": "2026-03-09T16:23:44.858Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8425.90, now 8436.55 (+0.126%)",
+    "bid": 8434,
+    "offer": 8439.1,
+    "mid": 8436.55
+  },
+  {
+    "timestamp": "2026-03-09T16:24:44.913Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5096.74, now 5098.40 (+0.032%)",
+    "bid": 5098.15,
+    "offer": 5098.65,
+    "mid": 5098.4
+  },
+  {
+    "timestamp": "2026-03-09T16:27:00.039Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68890.50, now 68860.50 (-0.044%)",
+    "bid": 68838,
+    "offer": 68883,
+    "mid": 68860.5
+  },
+  {
+    "timestamp": "2026-03-09T16:28:30.331Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68869.50, now 68979.50 (+0.160%)",
+    "bid": 68957,
+    "offer": 69002,
+    "mid": 68979.5
+  },
+  {
+    "timestamp": "2026-03-09T16:28:45.342Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8447.95, now 8453.20 (+0.062%)",
+    "bid": 8450.7,
+    "offer": 8455.7,
+    "mid": 8453.2
+  },
+  {
+    "timestamp": "2026-03-09T16:29:00.362Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8453.20, now 8450.30 (-0.034%)",
+    "bid": 8447.8,
+    "offer": 8452.8,
+    "mid": 8450.3
+  },
+  {
+    "timestamp": "2026-03-09T16:30:45.470Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5104.46, now 5106.41 (+0.038%)",
+    "bid": 5106.16,
+    "offer": 5106.66,
+    "mid": 5106.41
+  },
+  {
+    "timestamp": "2026-03-09T16:32:15.573Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68910.50, now 68862.50 (-0.070%)",
+    "bid": 68840,
+    "offer": 68885,
+    "mid": 68862.5
+  },
+  {
+    "timestamp": "2026-03-09T16:32:30.594Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5109.01, now 5106.23 (-0.054%)",
+    "bid": 5105.98,
+    "offer": 5106.48,
+    "mid": 5106.23
+  },
+  {
+    "timestamp": "2026-03-09T16:32:45.613Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8469.10 (range: 8406.50 – 8469.10, span: 62.60)",
+    "bid": 8466.6,
+    "offer": 8471.6,
+    "mid": 8469.1
+  },
+  {
+    "timestamp": "2026-03-09T16:33:45.683Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 68709.50 (range: 68709.50 – 69197.50, span: 488.00)",
+    "bid": 68687,
+    "offer": 68732,
+    "mid": 68709.5
+  },
+  {
+    "timestamp": "2026-03-09T16:34:15.726Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8470.05, now 8466.05 (-0.047%)",
+    "bid": 8463.5,
+    "offer": 8468.6,
+    "mid": 8466.05
+  },
+  {
+    "timestamp": "2026-03-09T16:34:45.752Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8464.80, now 8468.95 (+0.049%)",
+    "bid": 8466.4,
+    "offer": 8471.5,
+    "mid": 8468.95
+  },
+  {
+    "timestamp": "2026-03-09T16:34:45.753Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "high_volatility",
+    "message": "Bitcoin ($0.1) high volatility: stddev 104.38 (0.152% of price) over 20 ticks",
+    "bid": 68625,
+    "offer": 68670,
+    "mid": 68647.5
+  },
+  {
+    "timestamp": "2026-03-09T16:34:45.753Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68621.50, now 68647.50 (+0.038%)",
+    "bid": 68625,
+    "offer": 68670,
+    "mid": 68647.5
+  },
+  {
+    "timestamp": "2026-03-09T16:37:01.526Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5102.77, now 5104.67 (+0.037%)",
+    "bid": 5104.42,
+    "offer": 5104.92,
+    "mid": 5104.67
+  },
+  {
+    "timestamp": "2026-03-09T16:37:16.558Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68891.50, now 68839.50 (-0.075%)",
+    "bid": 68817,
+    "offer": 68862,
+    "mid": 68839.5
+  },
+  {
+    "timestamp": "2026-03-09T16:39:16.668Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8465.35, now 8458.50 (-0.081%)",
+    "bid": 8456,
+    "offer": 8461,
+    "mid": 8458.5
+  },
+  {
+    "timestamp": "2026-03-09T16:40:01.701Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8457.00, now 8462.45 (+0.064%)",
+    "bid": 8459.9,
+    "offer": 8465,
+    "mid": 8462.45
+  },
+  {
+    "timestamp": "2026-03-09T16:41:46.807Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5109.36 (range: 5080.28 – 5109.36, span: 29.08)",
+    "bid": 5108.79,
+    "offer": 5109.94,
+    "mid": 5109.365
+  },
+  {
+    "timestamp": "2026-03-09T16:42:16.845Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8470.65 (range: 8406.50 – 8470.65, span: 64.15)",
+    "bid": 8468.1,
+    "offer": 8473.2,
+    "mid": 8470.650000000001
+  },
+  {
+    "timestamp": "2026-03-09T16:42:16.846Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69011.50, now 69032.50 (+0.030%)",
+    "bid": 69010,
+    "offer": 69055,
+    "mid": 69032.5
+  },
+  {
+    "timestamp": "2026-03-09T16:43:46.943Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5110.13, now 5108.24 (-0.037%)",
+    "bid": 5107.99,
+    "offer": 5108.49,
+    "mid": 5108.24
+  },
+  {
+    "timestamp": "2026-03-09T16:44:01.956Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69098.50, now 69071.50 (-0.039%)",
+    "bid": 69049,
+    "offer": 69094,
+    "mid": 69071.5
+  },
+  {
+    "timestamp": "2026-03-09T16:45:17.037Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8470.20, now 8473.40 (+0.038%)",
+    "bid": 8470.9,
+    "offer": 8475.9,
+    "mid": 8473.4
+  },
+  {
+    "timestamp": "2026-03-09T16:46:02.077Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8474.05, now 8467.30 (-0.080%)",
+    "bid": 8464.8,
+    "offer": 8469.8,
+    "mid": 8467.3
+  },
+  {
+    "timestamp": "2026-03-09T16:47:32.159Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68935.50, now 68967.50 (+0.046%)",
+    "bid": 68945,
+    "offer": 68990,
+    "mid": 68967.5
+  },
+  {
+    "timestamp": "2026-03-09T16:49:17.255Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5104.79, now 5106.41 (+0.032%)",
+    "bid": 5106.16,
+    "offer": 5106.66,
+    "mid": 5106.41
+  },
+  {
+    "timestamp": "2026-03-09T16:50:17.316Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69009.50, now 68979.50 (-0.043%)",
+    "bid": 68957,
+    "offer": 69002,
+    "mid": 68979.5
+  },
+  {
+    "timestamp": "2026-03-09T16:50:32.338Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8462.70, now 8466.55 (+0.045%)",
+    "bid": 8464,
+    "offer": 8469.1,
+    "mid": 8466.55
+  },
+  {
+    "timestamp": "2026-03-09T16:51:02.368Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8467.75, now 8464.60 (-0.037%)",
+    "bid": 8462.1,
+    "offer": 8467.1,
+    "mid": 8464.6
+  },
+  {
+    "timestamp": "2026-03-09T16:52:32.456Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5107.80, now 5105.93 (-0.037%)",
+    "bid": 5105.68,
+    "offer": 5106.18,
+    "mid": 5105.93
+  },
+  {
+    "timestamp": "2026-03-09T16:52:32.457Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69017.50, now 69074.50 (+0.083%)",
+    "bid": 69052,
+    "offer": 69097,
+    "mid": 69074.5
+  },
+  {
+    "timestamp": "2026-03-09T16:53:02.488Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_high",
+    "message": "Bitcoin ($0.1) new session HIGH 69210.50 (range: 68621.50 – 69210.50, span: 589.00)",
+    "bid": 69188,
+    "offer": 69233,
+    "mid": 69210.5
+  },
+  {
+    "timestamp": "2026-03-09T16:55:32.624Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8454.80, now 8459.30 (+0.053%)",
+    "bid": 8456.8,
+    "offer": 8461.8,
+    "mid": 8459.3
+  },
+  {
+    "timestamp": "2026-03-09T16:56:02.651Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8460.85, now 8455.35 (-0.065%)",
+    "bid": 8452.8,
+    "offer": 8457.9,
+    "mid": 8455.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T16:57:17.725Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68996.50, now 68973.50 (-0.033%)",
+    "bid": 68951,
+    "offer": 68996,
+    "mid": 68973.5
+  },
+  {
+    "timestamp": "2026-03-09T16:58:17.778Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5103.62, now 5105.73 (+0.041%)",
+    "bid": 5105.16,
+    "offer": 5106.29,
+    "mid": 5105.725
+  },
+  {
+    "timestamp": "2026-03-09T16:58:17.779Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68917.50, now 68952.50 (+0.051%)",
+    "bid": 68930,
+    "offer": 68975,
+    "mid": 68952.5
+  },
+  {
+    "timestamp": "2026-03-09T16:59:17.834Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5106.32, now 5104.73 (-0.031%)",
+    "bid": 5104.48,
+    "offer": 5104.98,
+    "mid": 5104.73
+  },
+  {
+    "timestamp": "2026-03-09T17:00:47.914Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8465.00, now 8468.80 (+0.045%)",
+    "bid": 8466.3,
+    "offer": 8471.3,
+    "mid": 8468.8
+  },
+  {
+    "timestamp": "2026-03-09T17:01:02.931Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8468.80, now 8465.35 (-0.041%)",
+    "bid": 8462.8,
+    "offer": 8467.9,
+    "mid": 8465.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T17:01:47.979Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8479.60 (range: 8406.50 – 8479.60, span: 73.10)",
+    "bid": 8477.1,
+    "offer": 8482.1,
+    "mid": 8479.6
+  },
+  {
+    "timestamp": "2026-03-09T17:02:18.007Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69002.50, now 68913.50 (-0.129%)",
+    "bid": 68891,
+    "offer": 68936,
+    "mid": 68913.5
+  },
+  {
+    "timestamp": "2026-03-09T17:03:18.067Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68875.50, now 68935.50 (+0.087%)",
+    "bid": 68913,
+    "offer": 68958,
+    "mid": 68935.5
+  },
+  {
+    "timestamp": "2026-03-09T17:03:48.100Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5103.26, now 5105.94 (+0.052%)",
+    "bid": 5105.69,
+    "offer": 5106.19,
+    "mid": 5105.94
+  },
+  {
+    "timestamp": "2026-03-09T17:05:18.174Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5105.88, now 5103.63 (-0.044%)",
+    "bid": 5103.38,
+    "offer": 5103.88,
+    "mid": 5103.63
+  },
+  {
+    "timestamp": "2026-03-09T17:05:48.202Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8463.65, now 8466.20 (+0.030%)",
+    "bid": 8463.7,
+    "offer": 8468.7,
+    "mid": 8466.2
+  },
+  {
+    "timestamp": "2026-03-09T17:06:18.227Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8469.80, now 8465.55 (-0.050%)",
+    "bid": 8463,
+    "offer": 8468.1,
+    "mid": 8465.55
+  },
+  {
+    "timestamp": "2026-03-09T17:08:18.604Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69007.50, now 69049.50 (+0.061%)",
+    "bid": 69027,
+    "offer": 69072,
+    "mid": 69049.5
+  },
+  {
+    "timestamp": "2026-03-09T17:08:48.629Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69054.50, now 69010.50 (-0.064%)",
+    "bid": 68988,
+    "offer": 69033,
+    "mid": 69010.5
+  },
+  {
+    "timestamp": "2026-03-09T17:09:48.680Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5100.54, now 5102.47 (+0.038%)",
+    "bid": 5101.97,
+    "offer": 5102.97,
+    "mid": 5102.47
+  },
+  {
+    "timestamp": "2026-03-09T17:10:48.731Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5103.47, now 5101.49 (-0.039%)",
+    "bid": 5100.99,
+    "offer": 5102,
+    "mid": 5101.495
+  },
+  {
+    "timestamp": "2026-03-09T17:11:18.762Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8444.25, now 8448.30 (+0.048%)",
+    "bid": 8445.8,
+    "offer": 8450.8,
+    "mid": 8448.3
+  },
+  {
+    "timestamp": "2026-03-09T17:12:03.816Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8451.05, now 8448.10 (-0.035%)",
+    "bid": 8445.6,
+    "offer": 8450.6,
+    "mid": 8448.1
+  },
+  {
+    "timestamp": "2026-03-09T17:13:48.911Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68986.50, now 68948.50 (-0.055%)",
+    "bid": 68926,
+    "offer": 68971,
+    "mid": 68948.5
+  },
+  {
+    "timestamp": "2026-03-09T17:14:33.956Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68942.50, now 68963.50 (+0.030%)",
+    "bid": 68941,
+    "offer": 68986,
+    "mid": 68963.5
+  },
+  {
+    "timestamp": "2026-03-09T17:17:19.160Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8441.95, now 8431.95 (-0.118%)",
+    "bid": 8429.4,
+    "offer": 8434.5,
+    "mid": 8431.95
+  },
+  {
+    "timestamp": "2026-03-09T17:18:19.220Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8423.00, now 8431.05 (+0.096%)",
+    "bid": 8428.5,
+    "offer": 8433.6,
+    "mid": 8431.05
+  },
+  {
+    "timestamp": "2026-03-09T17:18:49.245Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5102.51, now 5100.88 (-0.032%)",
+    "bid": 5100.63,
+    "offer": 5101.13,
+    "mid": 5100.88
+  },
+  {
+    "timestamp": "2026-03-09T17:18:49.245Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69030.50, now 69003.50 (-0.039%)",
+    "bid": 68981,
+    "offer": 69026,
+    "mid": 69003.5
+  },
+  {
+    "timestamp": "2026-03-09T17:20:04.324Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68876.50, now 68906.50 (+0.044%)",
+    "bid": 68884,
+    "offer": 68929,
+    "mid": 68906.5
+  },
+  {
+    "timestamp": "2026-03-09T17:20:19.334Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5097.20, now 5098.88 (+0.033%)",
+    "bid": 5098.31,
+    "offer": 5099.45,
+    "mid": 5098.88
+  },
+  {
+    "timestamp": "2026-03-09T17:22:34.455Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_low",
+    "message": "Spot Silver (A$1 Contract) new session LOW 8406.50 (range: 8406.50 – 8479.60, span: 73.10)",
+    "bid": 8404,
+    "offer": 8409,
+    "mid": 8406.5
+  },
+  {
+    "timestamp": "2026-03-09T17:22:34.455Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8412.65, now 8406.50 (-0.073%)",
+    "bid": 8404,
+    "offer": 8409,
+    "mid": 8406.5
+  },
+  {
+    "timestamp": "2026-03-09T17:23:19.500Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8406.50, now 8423.60 (+0.203%)",
+    "bid": 8421.1,
+    "offer": 8426.1,
+    "mid": 8423.6
+  },
+  {
+    "timestamp": "2026-03-09T17:23:49.528Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5095.81, now 5093.20 (-0.051%)",
+    "bid": 5092.95,
+    "offer": 5093.45,
+    "mid": 5093.2
+  },
+  {
+    "timestamp": "2026-03-09T17:23:49.529Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68777.50, now 68732.50 (-0.065%)",
+    "bid": 68710,
+    "offer": 68755,
+    "mid": 68732.5
+  },
+  {
+    "timestamp": "2026-03-09T17:25:04.592Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68702.50, now 68751.50 (+0.071%)",
+    "bid": 68729,
+    "offer": 68774,
+    "mid": 68751.5
+  },
+  {
+    "timestamp": "2026-03-09T17:27:04.711Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5093.52, now 5095.28 (+0.035%)",
+    "bid": 5095.03,
+    "offer": 5095.53,
+    "mid": 5095.28
+  },
+  {
+    "timestamp": "2026-03-09T17:28:19.787Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8420.40, now 8410.10 (-0.122%)",
+    "bid": 8407.6,
+    "offer": 8412.6,
+    "mid": 8410.1
+  },
+  {
+    "timestamp": "2026-03-09T17:29:04.835Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_low",
+    "message": "Spot Silver (A$1 Contract) new session LOW 8401.70 (range: 8401.70 – 8479.60, span: 77.90)",
+    "bid": 8399.2,
+    "offer": 8404.2,
+    "mid": 8401.7
+  },
+  {
+    "timestamp": "2026-03-09T17:29:04.836Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68715.50, now 68675.50 (-0.058%)",
+    "bid": 68653,
+    "offer": 68698,
+    "mid": 68675.5
+  },
+  {
+    "timestamp": "2026-03-09T17:29:19.853Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8401.70, now 8406.90 (+0.062%)",
+    "bid": 8404.4,
+    "offer": 8409.4,
+    "mid": 8406.9
+  },
+  {
+    "timestamp": "2026-03-09T17:30:04.888Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 68602.50 (range: 68602.50 – 69210.50, span: 608.00)",
+    "bid": 68580,
+    "offer": 68625,
+    "mid": 68602.5
+  },
+  {
+    "timestamp": "2026-03-09T17:30:19.906Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5096.54, now 5094.78 (-0.035%)",
+    "bid": 5094.24,
+    "offer": 5095.32,
+    "mid": 5094.78
+  },
+  {
+    "timestamp": "2026-03-09T17:30:19.906Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68602.50, now 68640.50 (+0.055%)",
+    "bid": 68618,
+    "offer": 68663,
+    "mid": 68640.5
+  },
+  {
+    "timestamp": "2026-03-09T17:33:20.075Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5090.20, now 5093.22 (+0.059%)",
+    "bid": 5092.65,
+    "offer": 5093.78,
+    "mid": 5093.215
+  },
+  {
+    "timestamp": "2026-03-09T17:34:20.126Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68735.50, now 68711.50 (-0.035%)",
+    "bid": 68689,
+    "offer": 68734,
+    "mid": 68711.5
+  },
+  {
+    "timestamp": "2026-03-09T17:35:35.191Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68633.50, now 68657.50 (+0.035%)",
+    "bid": 68635,
+    "offer": 68680,
+    "mid": 68657.5
+  },
+  {
+    "timestamp": "2026-03-09T17:36:05.404Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8419.35, now 8424.05 (+0.056%)",
+    "bid": 8421.5,
+    "offer": 8426.6,
+    "mid": 8424.05
+  },
+  {
+    "timestamp": "2026-03-09T17:36:35.440Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 68597.50 (range: 68597.50 – 69210.50, span: 613.00)",
+    "bid": 68575,
+    "offer": 68620,
+    "mid": 68597.5
+  },
+  {
+    "timestamp": "2026-03-09T17:37:50.515Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8430.95, now 8426.55 (-0.052%)",
+    "bid": 8424,
+    "offer": 8429.1,
+    "mid": 8426.55
+  },
+  {
+    "timestamp": "2026-03-09T17:39:50.625Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5095.18, now 5093.54 (-0.032%)",
+    "bid": 5093.29,
+    "offer": 5093.79,
+    "mid": 5093.54
+  },
+  {
+    "timestamp": "2026-03-09T17:39:50.625Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68497.50, now 68427.50 (-0.102%)",
+    "bid": 68405,
+    "offer": 68450,
+    "mid": 68427.5
+  },
+  {
+    "timestamp": "2026-03-09T17:40:35.673Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68427.50, now 68449.50 (+0.032%)",
+    "bid": 68427,
+    "offer": 68472,
+    "mid": 68449.5
+  },
+  {
+    "timestamp": "2026-03-09T17:41:20.720Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8412.65, now 8415.25 (+0.031%)",
+    "bid": 8412.9,
+    "offer": 8417.6,
+    "mid": 8415.25
+  },
+  {
+    "timestamp": "2026-03-09T17:41:35.742Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5089.65, now 5091.85 (+0.043%)",
+    "bid": 5091.6,
+    "offer": 5092.1,
+    "mid": 5091.85
+  },
+  {
+    "timestamp": "2026-03-09T17:43:05.824Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 68401.50 (range: 68401.50 – 69210.50, span: 809.00)",
+    "bid": 68379,
+    "offer": 68424,
+    "mid": 68401.5
+  },
+  {
+    "timestamp": "2026-03-09T17:43:20.843Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8425.00, now 8422.00 (-0.036%)",
+    "bid": 8419.5,
+    "offer": 8424.5,
+    "mid": 8422
+  },
+  {
+    "timestamp": "2026-03-09T17:46:36.432Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8429.15, now 8432.35 (+0.038%)",
+    "bid": 8429.8,
+    "offer": 8434.9,
+    "mid": 8432.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T17:46:51.451Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5092.47, now 5095.90 (+0.067%)",
+    "bid": 5095.38,
+    "offer": 5096.41,
+    "mid": 5095.895
+  },
+  {
+    "timestamp": "2026-03-09T17:47:21.487Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68446.50, now 68421.50 (-0.037%)",
+    "bid": 68399,
+    "offer": 68444,
+    "mid": 68421.5
+  },
+  {
+    "timestamp": "2026-03-09T17:47:51.514Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68420.50, now 68452.50 (+0.047%)",
+    "bid": 68430,
+    "offer": 68475,
+    "mid": 68452.5
+  },
+  {
+    "timestamp": "2026-03-09T17:49:06.586Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8439.60, now 8434.85 (-0.056%)",
+    "bid": 8432.3,
+    "offer": 8437.4,
+    "mid": 8434.849999999999
+  },
+  {
+    "timestamp": "2026-03-09T17:49:21.605Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5095.74, now 5094.21 (-0.030%)",
+    "bid": 5093.96,
+    "offer": 5094.46,
+    "mid": 5094.21
+  },
+  {
+    "timestamp": "2026-03-09T17:52:36.780Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8439.60, now 8443.80 (+0.050%)",
+    "bid": 8441.3,
+    "offer": 8446.3,
+    "mid": 8443.8
+  },
+  {
+    "timestamp": "2026-03-09T17:53:06.815Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68593.50, now 68564.50 (-0.042%)",
+    "bid": 68542,
+    "offer": 68587,
+    "mid": 68564.5
+  },
+  {
+    "timestamp": "2026-03-09T17:53:21.828Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68538.50, now 68579.50 (+0.060%)",
+    "bid": 68557,
+    "offer": 68602,
+    "mid": 68579.5
+  },
+  {
+    "timestamp": "2026-03-09T17:54:51.914Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5098.02, now 5099.63 (+0.032%)",
+    "bid": 5099.38,
+    "offer": 5099.88,
+    "mid": 5099.63
+  },
+  {
+    "timestamp": "2026-03-09T17:55:06.930Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8449.15, now 8446.30 (-0.034%)",
+    "bid": 8443.8,
+    "offer": 8448.8,
+    "mid": 8446.3
+  },
+  {
+    "timestamp": "2026-03-09T17:59:22.472Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5098.87, now 5097.14 (-0.034%)",
+    "bid": 5096.89,
+    "offer": 5097.39,
+    "mid": 5097.14
+  },
+  {
+    "timestamp": "2026-03-09T17:59:37.493Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68664.50, now 68614.50 (-0.073%)",
+    "bid": 68592,
+    "offer": 68637,
+    "mid": 68614.5
+  },
+  {
+    "timestamp": "2026-03-09T18:00:22.728Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8430.25, now 8434.55 (+0.051%)",
+    "bid": 8432,
+    "offer": 8437.1,
+    "mid": 8434.55
+  },
+  {
+    "timestamp": "2026-03-09T18:00:22.728Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5095.99, now 5097.74 (+0.034%)",
+    "bid": 5097.49,
+    "offer": 5097.99,
+    "mid": 5097.74
+  },
+  {
+    "timestamp": "2026-03-09T18:01:22.791Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8435.30, now 8430.20 (-0.060%)",
+    "bid": 8427.7,
+    "offer": 8432.7,
+    "mid": 8430.2
+  },
+  {
+    "timestamp": "2026-03-09T18:04:37.956Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5095.76, now 5093.81 (-0.038%)",
+    "bid": 5093.56,
+    "offer": 5094.06,
+    "mid": 5093.81
+  },
+  {
+    "timestamp": "2026-03-09T18:05:53.022Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8414.40, now 8420.80 (+0.076%)",
+    "bid": 8418.3,
+    "offer": 8423.3,
+    "mid": 8420.8
+  },
+  {
+    "timestamp": "2026-03-09T18:05:53.023Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5093.05, now 5095.00 (+0.038%)",
+    "bid": 5094.75,
+    "offer": 5095.25,
+    "mid": 5095
+  },
+  {
+    "timestamp": "2026-03-09T18:06:23.058Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68396.50, now 68421.50 (+0.037%)",
+    "bid": 68399,
+    "offer": 68444,
+    "mid": 68421.5
+  },
+  {
+    "timestamp": "2026-03-09T18:06:38.075Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8420.80, now 8416.30 (-0.053%)",
+    "bid": 8413.8,
+    "offer": 8418.8,
+    "mid": 8416.3
+  },
+  {
+    "timestamp": "2026-03-09T18:06:53.095Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68421.50, now 68364.50 (-0.083%)",
+    "bid": 68342,
+    "offer": 68387,
+    "mid": 68364.5
+  },
+  {
+    "timestamp": "2026-03-09T18:08:23.416Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 68278.50 (range: 68278.50 – 69210.50, span: 932.00)",
+    "bid": 68256,
+    "offer": 68301,
+    "mid": 68278.5
+  },
+  {
+    "timestamp": "2026-03-09T18:10:53.544Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8413.45, now 8418.20 (+0.056%)",
+    "bid": 8415.7,
+    "offer": 8420.7,
+    "mid": 8418.2
+  },
+  {
+    "timestamp": "2026-03-09T18:10:53.544Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5095.32, now 5093.17 (-0.042%)",
+    "bid": 5092.92,
+    "offer": 5093.42,
+    "mid": 5093.17
+  },
+  {
+    "timestamp": "2026-03-09T18:11:38.587Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8424.35, now 8421.70 (-0.031%)",
+    "bid": 8419.2,
+    "offer": 8424.2,
+    "mid": 8421.7
+  },
+  {
+    "timestamp": "2026-03-09T18:11:53.607Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68456.50, now 68422.50 (-0.050%)",
+    "bid": 68400,
+    "offer": 68445,
+    "mid": 68422.5
+  },
+  {
+    "timestamp": "2026-03-09T18:12:38.653Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68385.50, now 68406.50 (+0.031%)",
+    "bid": 68384,
+    "offer": 68429,
+    "mid": 68406.5
+  },
+  {
+    "timestamp": "2026-03-09T18:13:53.733Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5094.31, now 5096.31 (+0.039%)",
+    "bid": 5096.06,
+    "offer": 5096.56,
+    "mid": 5096.31
+  },
+  {
+    "timestamp": "2026-03-09T18:15:53.848Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8433.80, now 8437.00 (+0.038%)",
+    "bid": 8434.5,
+    "offer": 8439.5,
+    "mid": 8437
+  },
+  {
+    "timestamp": "2026-03-09T18:17:23.937Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8451.90, now 8448.85 (-0.036%)",
+    "bid": 8446.3,
+    "offer": 8451.4,
+    "mid": 8448.849999999999
+  },
+  {
+    "timestamp": "2026-03-09T18:19:39.063Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5101.01, now 5103.38 (+0.047%)",
+    "bid": 5103.13,
+    "offer": 5103.63,
+    "mid": 5103.38
+  },
+  {
+    "timestamp": "2026-03-09T18:20:09.248Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68612.50, now 68571.50 (-0.060%)",
+    "bid": 68549,
+    "offer": 68594,
+    "mid": 68571.5
+  },
+  {
+    "timestamp": "2026-03-09T18:21:09.307Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5104.05, now 5102.18 (-0.037%)",
+    "bid": 5101.59,
+    "offer": 5102.76,
+    "mid": 5102.175
+  },
+  {
+    "timestamp": "2026-03-09T18:21:24.326Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8462.00, now 8470.35 (+0.099%)",
+    "bid": 8467.8,
+    "offer": 8472.9,
+    "mid": 8470.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T18:21:24.327Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68517.50, now 68580.50 (+0.092%)",
+    "bid": 68558,
+    "offer": 68603,
+    "mid": 68580.5
+  },
+  {
+    "timestamp": "2026-03-09T18:22:24.377Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8470.35, now 8464.30 (-0.071%)",
+    "bid": 8461.8,
+    "offer": 8466.8,
+    "mid": 8464.3
+  },
+  {
+    "timestamp": "2026-03-09T18:25:09.545Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68568.50, now 68530.50 (-0.055%)",
+    "bid": 68508,
+    "offer": 68553,
+    "mid": 68530.5
+  },
+  {
+    "timestamp": "2026-03-09T18:26:54.639Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68533.50, now 68567.50 (+0.050%)",
+    "bid": 68545,
+    "offer": 68590,
+    "mid": 68567.5
+  },
+  {
+    "timestamp": "2026-03-09T18:27:09.657Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8469.70, now 8473.50 (+0.045%)",
+    "bid": 8471,
+    "offer": 8476,
+    "mid": 8473.5
+  },
+  {
+    "timestamp": "2026-03-09T18:28:11.283Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8474.20, now 8471.25 (-0.035%)",
+    "bid": 8468.7,
+    "offer": 8473.8,
+    "mid": 8471.25
+  },
+  {
+    "timestamp": "2026-03-09T18:30:11.401Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5104.89, now 5106.71 (+0.036%)",
+    "bid": 5106.46,
+    "offer": 5106.96,
+    "mid": 5106.71
+  },
+  {
+    "timestamp": "2026-03-09T18:31:56.503Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68629.50, now 68603.50 (-0.038%)",
+    "bid": 68581,
+    "offer": 68626,
+    "mid": 68603.5
+  },
+  {
+    "timestamp": "2026-03-09T18:32:11.521Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8467.25, now 8472.60 (+0.063%)",
+    "bid": 8470.1,
+    "offer": 8475.1,
+    "mid": 8472.6
+  },
+  {
+    "timestamp": "2026-03-09T18:34:11.647Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68543.50, now 68570.50 (+0.039%)",
+    "bid": 68548,
+    "offer": 68593,
+    "mid": 68570.5
+  },
+  {
+    "timestamp": "2026-03-09T18:34:26.664Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8480.90 (range: 8390.10 – 8480.90, span: 90.80)",
+    "bid": 8478.4,
+    "offer": 8483.4,
+    "mid": 8480.9
+  },
+  {
+    "timestamp": "2026-03-09T18:34:56.693Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5110.43 (range: 5080.28 – 5110.43, span: 30.14)",
+    "bid": 5109.84,
+    "offer": 5111.01,
+    "mid": 5110.425
+  },
+  {
+    "timestamp": "2026-03-09T18:35:41.731Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5107.93, now 5109.53 (+0.031%)",
+    "bid": 5108.92,
+    "offer": 5110.14,
+    "mid": 5109.530000000001
+  },
+  {
+    "timestamp": "2026-03-09T18:36:56.796Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68608.50, now 68565.50 (-0.063%)",
+    "bid": 68543,
+    "offer": 68588,
+    "mid": 68565.5
+  },
+  {
+    "timestamp": "2026-03-09T18:37:26.823Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5116.02, now 5114.20 (-0.036%)",
+    "bid": 5113.59,
+    "offer": 5114.81,
+    "mid": 5114.200000000001
+  },
+  {
+    "timestamp": "2026-03-09T18:37:41.842Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8502.80, now 8497.30 (-0.065%)",
+    "bid": 8494.8,
+    "offer": 8499.8,
+    "mid": 8497.3
+  },
+  {
+    "timestamp": "2026-03-09T18:38:11.868Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8497.30, now 8500.95 (+0.043%)",
+    "bid": 8498.4,
+    "offer": 8503.5,
+    "mid": 8500.95
+  },
+  {
+    "timestamp": "2026-03-09T18:39:26.940Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68464.50, now 68488.50 (+0.035%)",
+    "bid": 68466,
+    "offer": 68511,
+    "mid": 68488.5
+  },
+  {
+    "timestamp": "2026-03-09T18:40:11.985Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8503.90 (range: 8390.10 – 8503.90, span: 113.80)",
+    "bid": 8501.4,
+    "offer": 8506.4,
+    "mid": 8503.9
+  },
+  {
+    "timestamp": "2026-03-09T18:40:57.035Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5117.46 (range: 5080.28 – 5117.46, span: 37.18)",
+    "bid": 5116.95,
+    "offer": 5117.97,
+    "mid": 5117.46
+  },
+  {
+    "timestamp": "2026-03-09T18:40:57.035Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5114.41, now 5117.46 (+0.060%)",
+    "bid": 5116.95,
+    "offer": 5117.97,
+    "mid": 5117.46
+  },
+  {
+    "timestamp": "2026-03-09T18:42:27.133Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5120.47, now 5117.87 (-0.051%)",
+    "bid": 5117.62,
+    "offer": 5118.12,
+    "mid": 5117.87
+  },
+  {
+    "timestamp": "2026-03-09T18:42:42.152Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8527.40, now 8523.60 (-0.045%)",
+    "bid": 8521.1,
+    "offer": 8526.1,
+    "mid": 8523.6
+  },
+  {
+    "timestamp": "2026-03-09T18:42:42.153Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68530.50, now 68484.50 (-0.067%)",
+    "bid": 68462,
+    "offer": 68507,
+    "mid": 68484.5
+  },
+  {
+    "timestamp": "2026-03-09T18:43:12.186Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "high_volatility",
+    "message": "Spot Silver (A$1 Contract) high volatility: stddev 13.42 (0.158% of price) over 20 ticks",
+    "bid": 8530.6,
+    "offer": 8535.6,
+    "mid": 8533.1
+  },
+  {
+    "timestamp": "2026-03-09T18:43:12.186Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8523.60, now 8533.10 (+0.111%)",
+    "bid": 8530.6,
+    "offer": 8535.6,
+    "mid": 8533.1
+  },
+  {
+    "timestamp": "2026-03-09T18:46:57.420Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68481.50, now 68508.50 (+0.039%)",
+    "bid": 68486,
+    "offer": 68531,
+    "mid": 68508.5
+  },
+  {
+    "timestamp": "2026-03-09T18:47:42.472Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5117.86, now 5116.21 (-0.032%)",
+    "bid": 5115.64,
+    "offer": 5116.78,
+    "mid": 5116.21
+  },
+  {
+    "timestamp": "2026-03-09T18:47:57.492Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68520.50, now 68492.50 (-0.041%)",
+    "bid": 68470,
+    "offer": 68515,
+    "mid": 68492.5
+  },
+  {
+    "timestamp": "2026-03-09T18:48:12.510Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8517.65, now 8532.20 (+0.171%)",
+    "bid": 8529.7,
+    "offer": 8534.7,
+    "mid": 8532.2
+  },
+  {
+    "timestamp": "2026-03-09T18:49:12.573Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8534.40, now 8528.85 (-0.065%)",
+    "bid": 8526.3,
+    "offer": 8531.4,
+    "mid": 8528.849999999999
+  },
+  {
+    "timestamp": "2026-03-09T18:50:27.657Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5116.63, now 5118.81 (+0.043%)",
+    "bid": 5118.24,
+    "offer": 5119.37,
+    "mid": 5118.805
+  },
+  {
+    "timestamp": "2026-03-09T18:51:27.716Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8546.75 (range: 8390.10 – 8546.75, span: 156.65)",
+    "bid": 8544.2,
+    "offer": 8549.3,
+    "mid": 8546.75
+  },
+  {
+    "timestamp": "2026-03-09T18:52:12.764Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68366.50, now 68400.50 (+0.050%)",
+    "bid": 68378,
+    "offer": 68423,
+    "mid": 68400.5
+  },
+  {
+    "timestamp": "2026-03-09T18:52:27.780Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "high_volatility",
+    "message": "Spot Silver (A$1 Contract) high volatility: stddev 13.78 (0.161% of price) over 20 ticks",
+    "bid": 8568.7,
+    "offer": 8573.8,
+    "mid": 8571.25
+  },
+  {
+    "timestamp": "2026-03-09T18:52:42.800Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5120.64 (range: 5080.28 – 5120.64, span: 40.36)",
+    "bid": 5120.39,
+    "offer": 5120.89,
+    "mid": 5120.64
+  },
+  {
+    "timestamp": "2026-03-09T18:53:27.835Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68415.50, now 68383.50 (-0.047%)",
+    "bid": 68361,
+    "offer": 68406,
+    "mid": 68383.5
+  },
+  {
+    "timestamp": "2026-03-09T18:54:12.869Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8601.90, now 8595.80 (-0.071%)",
+    "bid": 8593.3,
+    "offer": 8598.3,
+    "mid": 8595.8
+  },
+  {
+    "timestamp": "2026-03-09T18:54:42.900Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8595.80, now 8605.15 (+0.109%)",
+    "bid": 8602.6,
+    "offer": 8607.7,
+    "mid": 8605.150000000001
+  },
+  {
+    "timestamp": "2026-03-09T18:55:42.953Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5125.66, now 5123.65 (-0.039%)",
+    "bid": 5123.03,
+    "offer": 5124.27,
+    "mid": 5123.65
+  },
+  {
+    "timestamp": "2026-03-09T18:56:12.986Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5123.07, now 5126.96 (+0.076%)",
+    "bid": 5126.4,
+    "offer": 5127.52,
+    "mid": 5126.96
+  },
+  {
+    "timestamp": "2026-03-09T18:58:28.107Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68383.50, now 68320.50 (-0.092%)",
+    "bid": 68298,
+    "offer": 68343,
+    "mid": 68320.5
+  },
+  {
+    "timestamp": "2026-03-09T18:59:43.183Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68311.50, now 68345.50 (+0.050%)",
+    "bid": 68323,
+    "offer": 68368,
+    "mid": 68345.5
+  },
+  {
+    "timestamp": "2026-03-09T19:00:28.222Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8579.45, now 8584.85 (+0.063%)",
+    "bid": 8582.3,
+    "offer": 8587.4,
+    "mid": 8584.849999999999
+  },
+  {
+    "timestamp": "2026-03-09T19:01:28.276Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5128.55 (range: 5080.28 – 5128.55, span: 48.26)",
+    "bid": 5127.94,
+    "offer": 5129.16,
+    "mid": 5128.549999999999
+  },
+  {
+    "timestamp": "2026-03-09T19:01:43.286Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8612.90 (range: 8390.10 – 8612.90, span: 222.80)",
+    "bid": 8610.4,
+    "offer": 8615.4,
+    "mid": 8612.9
+  },
+  {
+    "timestamp": "2026-03-09T19:02:13.311Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8612.90, now 8605.25 (-0.089%)",
+    "bid": 8602.7,
+    "offer": 8607.8,
+    "mid": 8605.25
+  },
+  {
+    "timestamp": "2026-03-09T19:02:43.341Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5131.13, now 5129.05 (-0.041%)",
+    "bid": 5128.44,
+    "offer": 5129.65,
+    "mid": 5129.045
+  },
+  {
+    "timestamp": "2026-03-09T19:05:43.508Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68469.50, now 68447.50 (-0.032%)",
+    "bid": 68425,
+    "offer": 68470,
+    "mid": 68447.5
+  },
+  {
+    "timestamp": "2026-03-09T19:06:43.562Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8571.75, now 8574.95 (+0.037%)",
+    "bid": 8572.4,
+    "offer": 8577.5,
+    "mid": 8574.95
+  },
+  {
+    "timestamp": "2026-03-09T19:06:58.580Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "high_volatility",
+    "message": "Spot Silver (A$1 Contract) high volatility: stddev 13.07 (0.152% of price) over 20 ticks",
+    "bid": 8572.1,
+    "offer": 8577.1,
+    "mid": 8574.6
+  },
+  {
+    "timestamp": "2026-03-09T19:07:28.609Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5118.98, now 5121.37 (+0.047%)",
+    "bid": 5120.76,
+    "offer": 5121.98,
+    "mid": 5121.37
+  },
+  {
+    "timestamp": "2026-03-09T19:07:28.609Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68393.50, now 68428.50 (+0.051%)",
+    "bid": 68406,
+    "offer": 68451,
+    "mid": 68428.5
+  },
+  {
+    "timestamp": "2026-03-09T19:08:28.669Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8592.80, now 8587.00 (-0.067%)",
+    "bid": 8584.5,
+    "offer": 8589.5,
+    "mid": 8587
+  },
+  {
+    "timestamp": "2026-03-09T19:10:13.778Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5123.62, now 5121.84 (-0.035%)",
+    "bid": 5121.23,
+    "offer": 5122.45,
+    "mid": 5121.84
+  },
+  {
+    "timestamp": "2026-03-09T19:13:13.945Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8605.75, now 8611.10 (+0.062%)",
+    "bid": 8608.6,
+    "offer": 8613.6,
+    "mid": 8611.1
+  },
+  {
+    "timestamp": "2026-03-09T19:13:13.947Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68477.50, now 68426.50 (-0.074%)",
+    "bid": 68404,
+    "offer": 68449,
+    "mid": 68426.5
+  },
+  {
+    "timestamp": "2026-03-09T19:13:28.960Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8615.75 (range: 8390.10 – 8615.75, span: 225.65)",
+    "bid": 8613.2,
+    "offer": 8618.3,
+    "mid": 8615.75
+  },
+  {
+    "timestamp": "2026-03-09T19:13:43.977Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8615.75, now 8613.05 (-0.031%)",
+    "bid": 8610.5,
+    "offer": 8615.6,
+    "mid": 8613.05
+  },
+  {
+    "timestamp": "2026-03-09T19:16:14.528Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68352.50, now 68373.50 (+0.031%)",
+    "bid": 68351,
+    "offer": 68396,
+    "mid": 68373.5
+  },
+  {
+    "timestamp": "2026-03-09T19:17:29.598Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5119.33, now 5121.97 (+0.051%)",
+    "bid": 5121.37,
+    "offer": 5122.56,
+    "mid": 5121.965
+  },
+  {
+    "timestamp": "2026-03-09T19:18:14.648Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8599.55, now 8621.10 (+0.251%)",
+    "bid": 8618.6,
+    "offer": 8623.6,
+    "mid": 8621.1
+  },
+  {
+    "timestamp": "2026-03-09T19:18:29.668Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68497.50, now 68464.50 (-0.048%)",
+    "bid": 68442,
+    "offer": 68487,
+    "mid": 68464.5
+  },
+  {
+    "timestamp": "2026-03-09T19:18:44.684Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8621.10, now 8614.60 (-0.075%)",
+    "bid": 8612.1,
+    "offer": 8617.1,
+    "mid": 8614.6
+  },
+  {
+    "timestamp": "2026-03-09T19:19:14.719Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8621.15 (range: 8390.10 – 8621.15, span: 231.05)",
+    "bid": 8618.6,
+    "offer": 8623.7,
+    "mid": 8621.150000000001
+  },
+  {
+    "timestamp": "2026-03-09T19:19:44.757Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5131.89 (range: 5080.28 – 5131.89, span: 51.60)",
+    "bid": 5131.28,
+    "offer": 5132.5,
+    "mid": 5131.889999999999
+  },
+  {
+    "timestamp": "2026-03-09T19:20:14.787Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "high_volatility",
+    "message": "Spot Silver (A$1 Contract) high volatility: stddev 13.64 (0.158% of price) over 20 ticks",
+    "bid": 8646.9,
+    "offer": 8651.9,
+    "mid": 8649.4
+  },
+  {
+    "timestamp": "2026-03-09T19:20:14.788Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "high_volatility",
+    "message": "Bitcoin ($0.1) high volatility: stddev 121.76 (0.178% of price) over 20 ticks",
+    "bid": 68750,
+    "offer": 68795,
+    "mid": 68772.5
+  },
+  {
+    "timestamp": "2026-03-09T19:21:14.842Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5138.80, now 5136.51 (-0.045%)",
+    "bid": 5135.89,
+    "offer": 5137.13,
+    "mid": 5136.51
+  },
+  {
+    "timestamp": "2026-03-09T19:21:14.843Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68705.50, now 68860.50 (+0.226%)",
+    "bid": 68838,
+    "offer": 68883,
+    "mid": 68860.5
+  },
+  {
+    "timestamp": "2026-03-09T19:23:14.961Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8650.35, now 8662.65 (+0.142%)",
+    "bid": 8660.1,
+    "offer": 8665.2,
+    "mid": 8662.650000000001
+  },
+  {
+    "timestamp": "2026-03-09T19:24:15.006Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8665.20, now 8654.70 (-0.121%)",
+    "bid": 8652.2,
+    "offer": 8657.2,
+    "mid": 8654.7
+  },
+  {
+    "timestamp": "2026-03-09T19:24:15.007Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5137.85, now 5139.64 (+0.035%)",
+    "bid": 5139.03,
+    "offer": 5140.24,
+    "mid": 5139.635
+  },
+  {
+    "timestamp": "2026-03-09T19:24:30.020Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68965.50, now 68941.50 (-0.035%)",
+    "bid": 68919,
+    "offer": 68964,
+    "mid": 68941.5
+  },
+  {
+    "timestamp": "2026-03-09T19:25:00.045Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5140.11 (range: 5080.28 – 5140.11, span: 59.83)",
+    "bid": 5139.51,
+    "offer": 5140.72,
+    "mid": 5140.115
+  },
+  {
+    "timestamp": "2026-03-09T19:25:30.076Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "high_volatility",
+    "message": "Bitcoin ($0.1) high volatility: stddev 105.21 (0.153% of price) over 20 ticks",
+    "bid": 69086,
+    "offer": 69131,
+    "mid": 69108.5
+  },
+  {
+    "timestamp": "2026-03-09T19:26:00.108Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_high",
+    "message": "Bitcoin ($0.1) new session HIGH 69238.50 (range: 68237.50 – 69238.50, span: 1001.00)",
+    "bid": 69216,
+    "offer": 69261,
+    "mid": 69238.5
+  },
+  {
+    "timestamp": "2026-03-09T19:26:45.149Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8665.40 (range: 8390.10 – 8665.40, span: 275.30)",
+    "bid": 8662.9,
+    "offer": 8667.9,
+    "mid": 8665.4
+  },
+  {
+    "timestamp": "2026-03-09T19:27:15.177Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5139.88, now 5138.19 (-0.033%)",
+    "bid": 5137.59,
+    "offer": 5138.8,
+    "mid": 5138.195
+  },
+  {
+    "timestamp": "2026-03-09T19:27:30.194Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69276.50, now 69320.50 (+0.064%)",
+    "bid": 69298,
+    "offer": 69343,
+    "mid": 69320.5
+  },
+  {
+    "timestamp": "2026-03-09T19:28:30.247Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8643.45, now 8655.95 (+0.145%)",
+    "bid": 8653.4,
+    "offer": 8658.5,
+    "mid": 8655.95
+  },
+  {
+    "timestamp": "2026-03-09T19:29:15.295Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5136.67, now 5139.45 (+0.054%)",
+    "bid": 5138.84,
+    "offer": 5140.06,
+    "mid": 5139.450000000001
+  },
+  {
+    "timestamp": "2026-03-09T19:29:30.306Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69285.50, now 69235.50 (-0.072%)",
+    "bid": 69213,
+    "offer": 69258,
+    "mid": 69235.5
+  },
+  {
+    "timestamp": "2026-03-09T19:30:15.349Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8663.75, now 8652.90 (-0.125%)",
+    "bid": 8650.4,
+    "offer": 8655.4,
+    "mid": 8652.9
+  },
+  {
+    "timestamp": "2026-03-09T19:32:45.677Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69225.50, now 69257.50 (+0.046%)",
+    "bid": 69235,
+    "offer": 69280,
+    "mid": 69257.5
+  },
+  {
+    "timestamp": "2026-03-09T19:33:15.707Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5135.18, now 5133.15 (-0.039%)",
+    "bid": 5132.57,
+    "offer": 5133.74,
+    "mid": 5133.155
+  },
+  {
+    "timestamp": "2026-03-09T19:33:30.719Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8655.60, now 8662.85 (+0.084%)",
+    "bid": 8660.3,
+    "offer": 8665.4,
+    "mid": 8662.849999999999
+  },
+  {
+    "timestamp": "2026-03-09T19:34:30.769Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5129.78, now 5131.74 (+0.038%)",
+    "bid": 5131.13,
+    "offer": 5132.34,
+    "mid": 5131.735000000001
+  },
+  {
+    "timestamp": "2026-03-09T19:34:30.770Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69354.50, now 69238.50 (-0.167%)",
+    "bid": 69216,
+    "offer": 69261,
+    "mid": 69238.5
+  },
+  {
+    "timestamp": "2026-03-09T19:35:30.815Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8650.65, now 8638.60 (-0.139%)",
+    "bid": 8636,
+    "offer": 8641.2,
+    "mid": 8638.6
+  },
+  {
+    "timestamp": "2026-03-09T19:37:16.713Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "high_volatility",
+    "message": "Spot Silver (A$1 Contract) high volatility: stddev 13.82 (0.160% of price) over 20 ticks",
+    "bid": 8614.5,
+    "offer": 8619.5,
+    "mid": 8617
+  },
+  {
+    "timestamp": "2026-03-09T19:38:01.758Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "high_volatility",
+    "message": "Bitcoin ($0.1) high volatility: stddev 104.67 (0.151% of price) over 20 ticks",
+    "bid": 69040,
+    "offer": 69085,
+    "mid": 69062.5
+  },
+  {
+    "timestamp": "2026-03-09T19:38:16.778Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69054.50, now 69090.50 (+0.052%)",
+    "bid": 69068,
+    "offer": 69113,
+    "mid": 69090.5
+  },
+  {
+    "timestamp": "2026-03-09T19:39:31.849Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5128.25, now 5126.19 (-0.040%)",
+    "bid": 5125.94,
+    "offer": 5126.44,
+    "mid": 5126.19
+  },
+  {
+    "timestamp": "2026-03-09T19:39:46.857Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8602.05, now 8605.20 (+0.037%)",
+    "bid": 8602.5,
+    "offer": 8607.9,
+    "mid": 8605.2
+  },
+  {
+    "timestamp": "2026-03-09T19:39:46.858Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5126.19, now 5129.43 (+0.063%)",
+    "bid": 5128.93,
+    "offer": 5129.94,
+    "mid": 5129.4349999999995
+  },
+  {
+    "timestamp": "2026-03-09T19:40:16.891Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69089.50, now 69045.50 (-0.064%)",
+    "bid": 69023,
+    "offer": 69068,
+    "mid": 69045.5
+  },
+  {
+    "timestamp": "2026-03-09T19:40:46.928Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8605.65, now 8598.35 (-0.085%)",
+    "bid": 8595.8,
+    "offer": 8600.9,
+    "mid": 8598.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T19:43:32.051Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68856.50, now 68913.50 (+0.083%)",
+    "bid": 68891,
+    "offer": 68936,
+    "mid": 68913.5
+  },
+  {
+    "timestamp": "2026-03-09T19:44:32.112Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5136.59, now 5134.19 (-0.047%)",
+    "bid": 5133.68,
+    "offer": 5134.71,
+    "mid": 5134.195
+  },
+  {
+    "timestamp": "2026-03-09T19:44:47.129Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "high_volatility",
+    "message": "Spot Silver (A$1 Contract) high volatility: stddev 13.76 (0.160% of price) over 20 ticks",
+    "bid": 8637,
+    "offer": 8642,
+    "mid": 8639.5
+  },
+  {
+    "timestamp": "2026-03-09T19:45:17.160Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69034.50, now 68930.50 (-0.151%)",
+    "bid": 68908,
+    "offer": 68953,
+    "mid": 68930.5
+  },
+  {
+    "timestamp": "2026-03-09T19:45:32.173Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5134.19, now 5135.95 (+0.034%)",
+    "bid": 5135.7,
+    "offer": 5136.2,
+    "mid": 5135.95
+  },
+  {
+    "timestamp": "2026-03-09T19:45:47.190Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8640.15, now 8630.25 (-0.115%)",
+    "bid": 8627.7,
+    "offer": 8632.8,
+    "mid": 8630.25
+  },
+  {
+    "timestamp": "2026-03-09T19:48:02.318Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8609.95, now 8615.45 (+0.064%)",
+    "bid": 8612.9,
+    "offer": 8618,
+    "mid": 8615.45
+  },
+  {
+    "timestamp": "2026-03-09T19:49:32.394Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5134.71, now 5132.09 (-0.051%)",
+    "bid": 5131.53,
+    "offer": 5132.65,
+    "mid": 5132.09
+  },
+  {
+    "timestamp": "2026-03-09T19:49:47.412Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68935.50, now 68956.50 (+0.030%)",
+    "bid": 68934,
+    "offer": 68979,
+    "mid": 68956.5
+  },
+  {
+    "timestamp": "2026-03-09T19:50:32.459Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5132.09, now 5135.23 (+0.061%)",
+    "bid": 5134.98,
+    "offer": 5135.48,
+    "mid": 5135.23
+  },
+  {
+    "timestamp": "2026-03-09T19:50:32.459Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 68956.50, now 68918.50 (-0.055%)",
+    "bid": 68896,
+    "offer": 68941,
+    "mid": 68918.5
+  },
+  {
+    "timestamp": "2026-03-09T19:51:32.506Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8620.00, now 8613.95 (-0.070%)",
+    "bid": 8611.4,
+    "offer": 8616.5,
+    "mid": 8613.95
+  },
+  {
+    "timestamp": "2026-03-09T19:53:47.637Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8607.65, now 8613.40 (+0.067%)",
+    "bid": 8610.9,
+    "offer": 8615.9,
+    "mid": 8613.4
+  },
+  {
+    "timestamp": "2026-03-09T19:54:47.694Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5136.87, now 5135.23 (-0.032%)",
+    "bid": 5134.98,
+    "offer": 5135.48,
+    "mid": 5135.23
+  },
+  {
+    "timestamp": "2026-03-09T19:55:32.739Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69012.50, now 68943.50 (-0.100%)",
+    "bid": 68921,
+    "offer": 68966,
+    "mid": 68943.5
+  },
+  {
+    "timestamp": "2026-03-09T19:55:47.757Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5135.23, now 5136.98 (+0.034%)",
+    "bid": 5136.44,
+    "offer": 5137.53,
+    "mid": 5136.985
+  },
+  {
+    "timestamp": "2026-03-09T19:56:32.797Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68943.50, now 68974.50 (+0.045%)",
+    "bid": 68952,
+    "offer": 68997,
+    "mid": 68974.5
+  },
+  {
+    "timestamp": "2026-03-09T19:58:32.887Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8643.35, now 8639.40 (-0.046%)",
+    "bid": 8636.9,
+    "offer": 8641.9,
+    "mid": 8639.4
+  },
+  {
+    "timestamp": "2026-03-09T19:59:02.912Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5142.31 (range: 5080.28 – 5142.31, span: 62.03)",
+    "bid": 5142.06,
+    "offer": 5142.56,
+    "mid": 5142.31
+  },
+  {
+    "timestamp": "2026-03-09T19:59:17.929Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8638.85, now 8643.50 (+0.054%)",
+    "bid": 8641,
+    "offer": 8646,
+    "mid": 8643.5
+  },
+  {
+    "timestamp": "2026-03-09T20:00:48.015Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5142.22, now 5144.75 (+0.049%)",
+    "bid": 5144.5,
+    "offer": 5145,
+    "mid": 5144.75
+  },
+  {
+    "timestamp": "2026-03-09T20:01:03.029Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5144.75, now 5142.65 (-0.041%)",
+    "bid": 5142.4,
+    "offer": 5142.9,
+    "mid": 5142.65
+  },
+  {
+    "timestamp": "2026-03-09T20:01:18.048Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69152.50, now 69124.50 (-0.040%)",
+    "bid": 69102,
+    "offer": 69147,
+    "mid": 69124.5
+  },
+  {
+    "timestamp": "2026-03-09T20:01:33.066Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69040.50, now 69131.50 (+0.132%)",
+    "bid": 69109,
+    "offer": 69154,
+    "mid": 69131.5
+  },
+  {
+    "timestamp": "2026-03-09T20:02:33.127Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8668.60 (range: 8390.10 – 8668.60, span: 278.50)",
+    "bid": 8666.1,
+    "offer": 8671.1,
+    "mid": 8668.6
+  },
+  {
+    "timestamp": "2026-03-09T20:04:03.215Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8670.35, now 8667.50 (-0.033%)",
+    "bid": 8665,
+    "offer": 8670,
+    "mid": 8667.5
+  },
+  {
+    "timestamp": "2026-03-09T20:05:18.290Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8654.95, now 8664.90 (+0.115%)",
+    "bid": 8662.4,
+    "offer": 8667.4,
+    "mid": 8664.9
+  },
+  {
+    "timestamp": "2026-03-09T20:05:48.317Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5139.14, now 5141.98 (+0.055%)",
+    "bid": 5141.37,
+    "offer": 5142.58,
+    "mid": 5141.975
+  },
+  {
+    "timestamp": "2026-03-09T20:06:18.350Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5145.57 (range: 5080.28 – 5145.57, span: 65.29)",
+    "bid": 5144.98,
+    "offer": 5146.17,
+    "mid": 5145.575
+  },
+  {
+    "timestamp": "2026-03-09T20:06:18.351Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69030.50, now 68980.50 (-0.072%)",
+    "bid": 68958,
+    "offer": 69003,
+    "mid": 68980.5
+  },
+  {
+    "timestamp": "2026-03-09T20:07:03.392Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5146.75, now 5144.65 (-0.041%)",
+    "bid": 5144.04,
+    "offer": 5145.26,
+    "mid": 5144.65
+  },
+  {
+    "timestamp": "2026-03-09T20:07:18.408Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68968.50, now 69022.50 (+0.078%)",
+    "bid": 69000,
+    "offer": 69045,
+    "mid": 69022.5
+  },
+  {
+    "timestamp": "2026-03-09T20:07:33.421Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8681.35 (range: 8390.10 – 8681.35, span: 291.25)",
+    "bid": 8678.8,
+    "offer": 8683.9,
+    "mid": 8681.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T20:09:03.507Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8686.30, now 8673.55 (-0.147%)",
+    "bid": 8671,
+    "offer": 8676.1,
+    "mid": 8673.55
+  },
+  {
+    "timestamp": "2026-03-09T20:11:03.620Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5141.80, now 5143.37 (+0.031%)",
+    "bid": 5143.12,
+    "offer": 5143.62,
+    "mid": 5143.37
+  },
+  {
+    "timestamp": "2026-03-09T20:12:48.724Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5142.81, now 5141.14 (-0.033%)",
+    "bid": 5140.53,
+    "offer": 5141.74,
+    "mid": 5141.135
+  },
+  {
+    "timestamp": "2026-03-09T20:12:48.724Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69036.50, now 69005.50 (-0.045%)",
+    "bid": 68983,
+    "offer": 69028,
+    "mid": 69005.5
+  },
+  {
+    "timestamp": "2026-03-09T20:13:18.750Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8654.70, now 8663.65 (+0.103%)",
+    "bid": 8661.1,
+    "offer": 8666.2,
+    "mid": 8663.650000000001
+  },
+  {
+    "timestamp": "2026-03-09T20:14:33.828Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 68968.50, now 69001.50 (+0.048%)",
+    "bid": 68979,
+    "offer": 69024,
+    "mid": 69001.5
+  },
+  {
+    "timestamp": "2026-03-09T20:15:33.885Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8671.85, now 8668.25 (-0.042%)",
+    "bid": 8665.7,
+    "offer": 8670.8,
+    "mid": 8668.25
+  },
+  {
+    "timestamp": "2026-03-09T20:16:18.933Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5137.50, now 5139.19 (+0.033%)",
+    "bid": 5138.59,
+    "offer": 5139.8,
+    "mid": 5139.195
+  },
+  {
+    "timestamp": "2026-03-09T20:19:49.128Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69033.50, now 69064.50 (+0.045%)",
+    "bid": 69042,
+    "offer": 69087,
+    "mid": 69064.5
+  },
+  {
+    "timestamp": "2026-03-09T20:20:19.421Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69072.50, now 69021.50 (-0.074%)",
+    "bid": 68999,
+    "offer": 69044,
+    "mid": 69021.5
+  },
+  {
+    "timestamp": "2026-03-09T20:20:34.435Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8661.95, now 8656.50 (-0.063%)",
+    "bid": 8654,
+    "offer": 8659,
+    "mid": 8656.5
+  },
+  {
+    "timestamp": "2026-03-09T20:20:49.450Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8656.50, now 8662.30 (+0.067%)",
+    "bid": 8659.8,
+    "offer": 8664.8,
+    "mid": 8662.3
+  },
+  {
+    "timestamp": "2026-03-09T20:22:34.550Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5139.92, now 5138.33 (-0.031%)",
+    "bid": 5137.76,
+    "offer": 5138.89,
+    "mid": 5138.325000000001
+  },
+  {
+    "timestamp": "2026-03-09T20:25:49.725Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8654.65, now 8646.35 (-0.096%)",
+    "bid": 8643.8,
+    "offer": 8648.9,
+    "mid": 8646.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T20:25:49.725Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8640.35, now 8646.35 (+0.069%)",
+    "bid": 8643.8,
+    "offer": 8648.9,
+    "mid": 8646.349999999999
+  },
+  {
+    "timestamp": "2026-03-09T20:25:49.725Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5135.11, now 5137.17 (+0.040%)",
+    "bid": 5136.61,
+    "offer": 5137.73,
+    "mid": 5137.17
+  },
+  {
+    "timestamp": "2026-03-09T20:28:04.850Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 69011.50, now 68986.50 (-0.036%)",
+    "bid": 68964,
+    "offer": 69009,
+    "mid": 68986.5
+  },
+  {
+    "timestamp": "2026-03-09T20:28:19.863Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5138.68, now 5137.09 (-0.031%)",
+    "bid": 5136.49,
+    "offer": 5137.7,
+    "mid": 5137.094999999999
+  },
+  {
+    "timestamp": "2026-03-10T05:17:38.285Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8875.85, now 8867.10 (-0.099%)",
+    "bid": 8864.2,
+    "offer": 8870,
+    "mid": 8867.1
+  },
+  {
+    "timestamp": "2026-03-10T05:17:38.285Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5173.39, now 5170.87 (-0.049%)",
+    "bid": 5170.62,
+    "offer": 5171.12,
+    "mid": 5170.87
+  },
+  {
+    "timestamp": "2026-03-10T05:18:08.321Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 70302.50, now 70279.50 (-0.033%)",
+    "bid": 70257,
+    "offer": 70302,
+    "mid": 70279.5
+  },
+  {
+    "timestamp": "2026-03-10T05:18:08.321Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 70173.50, now 70279.50 (+0.151%)",
+    "bid": 70257,
+    "offer": 70302,
+    "mid": 70279.5
+  },
+  {
+    "timestamp": "2026-03-10T05:19:08.378Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8859.00, now 8862.05 (+0.034%)",
+    "bid": 8859.3,
+    "offer": 8864.8,
+    "mid": 8862.05
+  },
+  {
+    "timestamp": "2026-03-10T05:20:24.766Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5169.65, now 5171.44 (+0.035%)",
+    "bid": 5170.92,
+    "offer": 5171.97,
+    "mid": 5171.445
+  },
+  {
+    "timestamp": "2026-03-10T05:22:26.069Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 70149.50 (range: 70149.50 – 70302.50, span: 153.00)",
+    "bid": 70127,
+    "offer": 70172,
+    "mid": 70149.5
+  },
+  {
+    "timestamp": "2026-03-10T05:23:26.128Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 70173.50, now 70129.50 (-0.063%)",
+    "bid": 70107,
+    "offer": 70152,
+    "mid": 70129.5
+  },
+  {
+    "timestamp": "2026-03-10T05:23:56.188Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8867.90, now 8861.30 (-0.074%)",
+    "bid": 8858.4,
+    "offer": 8864.2,
+    "mid": 8861.3
+  },
+  {
+    "timestamp": "2026-03-10T05:24:56.247Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_low",
+    "message": "Spot Silver (A$1 Contract) new session LOW 8854.45 (range: 8854.45 – 8875.85, span: 21.40)",
+    "bid": 8851.7,
+    "offer": 8857.2,
+    "mid": 8854.45
+  },
+  {
+    "timestamp": "2026-03-10T05:25:26.274Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8853.75, now 8857.80 (+0.046%)",
+    "bid": 8855.6,
+    "offer": 8860,
+    "mid": 8857.8
+  },
+  {
+    "timestamp": "2026-03-10T05:25:41.298Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 70115.50, now 70144.50 (+0.041%)",
+    "bid": 70122,
+    "offer": 70167,
+    "mid": 70144.5
+  },
+  {
+    "timestamp": "2026-03-10T05:27:26.421Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 70070.50 (range: 70070.50 – 70302.50, span: 232.00)",
+    "bid": 70048,
+    "offer": 70093,
+    "mid": 70070.5
+  },
+  {
+    "timestamp": "2026-03-10T05:28:56.520Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 70062.50, now 70028.50 (-0.049%)",
+    "bid": 70006,
+    "offer": 70051,
+    "mid": 70028.5
+  },
+  {
+    "timestamp": "2026-03-10T05:29:11.538Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8857.80, now 8854.95 (-0.032%)",
+    "bid": 8852.4,
+    "offer": 8857.5,
+    "mid": 8854.95
+  },
+  {
+    "timestamp": "2026-03-10T05:30:11.606Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8876.80 (range: 8853.75 – 8876.80, span: 23.05)",
+    "bid": 8874,
+    "offer": 8879.6,
+    "mid": 8876.8
+  },
+  {
+    "timestamp": "2026-03-10T05:30:11.607Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5171.15, now 5173.15 (+0.039%)",
+    "bid": 5172.57,
+    "offer": 5173.74,
+    "mid": 5173.155
+  },
+  {
+    "timestamp": "2026-03-10T05:30:41.633Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8856.65, now 8885.85 (+0.330%)",
+    "bid": 8883.3,
+    "offer": 8888.4,
+    "mid": 8885.849999999999
+  },
+  {
+    "timestamp": "2026-03-10T05:30:56.647Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_high",
+    "message": "CFAGOLD new session HIGH 5174.18 (range: 5169.65 – 5174.18, span: 4.54)",
+    "bid": 5173.67,
+    "offer": 5174.7,
+    "mid": 5174.1849999999995
+  },
+  {
+    "timestamp": "2026-03-10T05:31:11.661Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "high_volatility",
+    "message": "Spot Silver (A$1 Contract) high volatility: stddev 13.74 (0.155% of price) over 20 ticks",
+    "bid": 8890.5,
+    "offer": 8896.3,
+    "mid": 8893.4
+  },
+  {
+    "timestamp": "2026-03-10T05:31:11.662Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5174.18, now 5170.74 (-0.067%)",
+    "bid": 5170.22,
+    "offer": 5171.25,
+    "mid": 5170.735000000001
+  },
+  {
+    "timestamp": "2026-03-10T05:32:11.726Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "session_low",
+    "message": "CFAGOLD new session LOW 5169.43 (range: 5169.43 – 5174.18, span: 4.75)",
+    "bid": 5168.9,
+    "offer": 5169.96,
+    "mid": 5169.43
+  },
+  {
+    "timestamp": "2026-03-10T05:32:11.727Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 70080.50, now 70114.50 (+0.049%)",
+    "bid": 70092,
+    "offer": 70137,
+    "mid": 70114.5
+  },
+  {
+    "timestamp": "2026-03-10T05:33:56.836Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 70128.50, now 70105.50 (-0.033%)",
+    "bid": 70083,
+    "offer": 70128,
+    "mid": 70105.5
+  },
+  {
+    "timestamp": "2026-03-10T05:34:11.856Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8889.15, now 8884.85 (-0.048%)",
+    "bid": 8882.5,
+    "offer": 8887.2,
+    "mid": 8884.85
+  },
+  {
+    "timestamp": "2026-03-10T05:35:41.946Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8878.45, now 8883.25 (+0.054%)",
+    "bid": 8880.9,
+    "offer": 8885.6,
+    "mid": 8883.25
+  },
+  {
+    "timestamp": "2026-03-10T05:36:42.003Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_up",
+    "message": "CFAGOLD reversal UP: bottomed at 5167.36, now 5169.08 (+0.033%)",
+    "bid": 5168.55,
+    "offer": 5169.61,
+    "mid": 5169.08
+  },
+  {
+    "timestamp": "2026-03-10T05:36:42.003Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "session_low",
+    "message": "Bitcoin ($0.1) new session LOW 70018.50 (range: 70018.50 – 70302.50, span: 284.00)",
+    "bid": 69996,
+    "offer": 70041,
+    "mid": 70018.5
+  },
+  {
+    "timestamp": "2026-03-10T05:37:57.074Z",
+    "epic": "CS.D.CFAGOLD.CFA.IP",
+    "name": "CFAGOLD",
+    "type": "reversal_down",
+    "message": "CFAGOLD reversal DOWN: peaked at 5169.83, now 5168.12 (-0.033%)",
+    "bid": 5167.59,
+    "offer": 5168.65,
+    "mid": 5168.12
+  },
+  {
+    "timestamp": "2026-03-10T05:38:57.136Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_up",
+    "message": "Bitcoin ($0.1) reversal UP: bottomed at 69961.50, now 69996.50 (+0.050%)",
+    "bid": 69974,
+    "offer": 70019,
+    "mid": 69996.5
+  },
+  {
+    "timestamp": "2026-03-10T05:39:27.174Z",
+    "epic": "CS.D.BITCOIN.CFM.IP",
+    "name": "Bitcoin ($0.1)",
+    "type": "reversal_down",
+    "message": "Bitcoin ($0.1) reversal DOWN: peaked at 70008.50, now 69975.50 (-0.047%)",
+    "bid": 69953,
+    "offer": 69998,
+    "mid": 69975.5
+  },
+  {
+    "timestamp": "2026-03-10T05:39:57.209Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_down",
+    "message": "Spot Silver (A$1 Contract) reversal DOWN: peaked at 8894.65, now 8891.85 (-0.031%)",
+    "bid": 8889.5,
+    "offer": 8894.2,
+    "mid": 8891.85
+  },
+  {
+    "timestamp": "2026-03-10T05:40:27.244Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "session_high",
+    "message": "Spot Silver (A$1 Contract) new session HIGH 8897.85 (range: 8853.75 – 8897.85, span: 44.10)",
+    "bid": 8895.5,
+    "offer": 8900.2,
+    "mid": 8897.85
+  },
+  {
+    "timestamp": "2026-03-10T05:40:57.278Z",
+    "epic": "CS.D.CFASILVER.CFA.IP",
+    "name": "Spot Silver (A$1 Contract)",
+    "type": "reversal_up",
+    "message": "Spot Silver (A$1 Contract) reversal UP: bottomed at 8891.65, now 8896.75 (+0.057%)",
+    "bid": 8894.4,
+    "offer": 8899.1,
+    "mid": 8896.75
+  }
+]

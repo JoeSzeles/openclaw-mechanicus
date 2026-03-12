@@ -1,0 +1,7 @@
+{
+  "strategies": [],
+  "maxOpenPositions": 6,
+  "maxRiskPercent": 10,
+  "checkIntervalSeconds": 60,
+  "enabled": true
+}

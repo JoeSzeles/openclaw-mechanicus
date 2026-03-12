@@ -1,0 +1,23 @@
+{
+  "instruments": [
+    {
+      "epic": "CS.D.CFASILVER.CFA.IP",
+      "name": "Spot Silver (A$1 Contract)"
+    },
+    {
+      "epic": "CS.D.CFAGOLD.CFA.IP",
+      "name": "CFAGOLD"
+    },
+    {
+      "epic": "CS.D.BITCOIN.CFM.IP",
+      "name": "Bitcoin ($0.1)"
+    }
+  ],
+  "signals": {
+    "dropPercent": 0.5,
+    "spikePercent": 0.5,
+    "windowSeconds": 30
+  },
+  "intervalSeconds": 15,
+  "enabled": true
+}

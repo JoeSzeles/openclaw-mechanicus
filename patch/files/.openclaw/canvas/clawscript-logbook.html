@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ClawScript Logbook</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 20px; }
+.container { max-width: 960px; margin: 0 auto; }
+.header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+h1 { color: #58a6ff; font-size: 22px; }
+.back { color: #8b949e; text-decoration: none; font-size: 13px; }
+.back:hover { color: #58a6ff; }
+.subtitle { color: #8b949e; font-size: 13px; margin-bottom: 16px; }
+
+.filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.filter-btn { padding: 4px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid #30363d; background: #21262d; color: #8b949e; transition: all 0.15s; }
+.filter-btn:hover { border-color: #58a6ff; color: #c9d1d9; }
+.filter-btn.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+.filter-sep { width: 1px; height: 20px; background: #30363d; }
+
+.card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+.card h2 { color: #8b949e; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; border-bottom: 1px solid #21262d; padding-bottom: 8px; }
+
+.entry { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; margin-bottom: 8px; transition: border-color 0.15s; }
+.entry:hover { border-color: #484f58; }
+.entry.resolved { opacity: 0.55; }
+.entry-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.entry-type { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.type-error { background: #3d1a1a; color: #f85149; }
+.type-fix { background: #1b4332; color: #2dc653; }
+.type-iteration { background: #1c2541; color: #79c0ff; }
+.type-trade { background: #2d1b4e; color: #bc8cff; }
+.entry-time { font-size: 11px; color: #484f58; }
+.entry-meta { font-size: 11px; color: #8b949e; display: flex; gap: 10px; }
+.entry-meta span { display: inline-flex; align-items: center; gap: 3px; }
+.entry-message { font-size: 14px; color: #c9d1d9; margin: 6px 0; line-height: 1.4; }
+.entry-details { font-size: 12px; color: #8b949e; background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 8px 10px; margin-top: 6px; white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, monospace; max-height: 120px; overflow-y: auto; }
+.entry-actions { display: flex; gap: 6px; margin-top: 8px; }
+
+.badge-resolved { background: #1b4332; color: #2dc653; font-size: 10px; padding: 2px 6px; border-radius: 8px; font-weight: 600; }
+.badge-open { background: #3d1f00; color: #f0883e; font-size: 10px; padding: 2px 6px; border-radius: 8px; font-weight: 600; }
+
+.btn { padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid; transition: all 0.15s; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-resolve { background: #1b4332; color: #2dc653; border-color: #2dc653; }
+.btn-resolve:hover { background: #2a5a42; }
+.btn-unresolve { background: #3d1f00; color: #f0883e; border-color: #f0883e; }
+.btn-unresolve:hover { background: #5a3000; }
+.btn-primary { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+.btn-primary:hover { background: #388bfd; }
+.btn-secondary { background: #21262d; color: #c9d1d9; border-color: #30363d; }
+.btn-secondary:hover { border-color: #58a6ff; }
+
+.form-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: flex-end; flex-wrap: wrap; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.3px; }
+.form-group input, .form-group select, .form-group textarea { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-family: inherit; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #58a6ff; outline: none; }
+.form-group textarea { resize: vertical; min-height: 60px; }
+
+.empty { color: #484f58; font-style: italic; padding: 24px; text-align: center; }
+.count-badge { font-size: 11px; color: #8b949e; font-weight: 400; }
+
+.toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 9999; animation: fadeIn 0.3s; }
+.toast-ok { background: #1b4332; color: #2dc653; border: 1px solid #2dc653; }
+.toast-err { background: #3d1a1a; color: #f85149; border: 1px solid #f85149; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.stats-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 16px; text-align: center; min-width: 100px; }
+.stat-card .val { font-size: 20px; font-weight: 700; color: #58a6ff; }
+.stat-card .lbl { font-size: 11px; color: #8b949e; margin-top: 2px; }
+
+.toggle-form { font-size: 12px; color: #58a6ff; cursor: pointer; margin-left: auto; }
+.toggle-form:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>ClawScript Logbook</h1>
+    <a href="/__openclaw__/canvas/" class="back">Canvas</a>
+  </div>
+  <p class="subtitle">Persistent error & iteration logbook for ClawScript strategies</p>
+
+  <div class="stats-row" id="statsRow">
+    <div class="stat-card"><div class="val" id="statTotal">-</div><div class="lbl">Total</div></div>
+    <div class="stat-card"><div class="val" id="statOpen" style="color:#f0883e">-</div><div class="lbl">Open</div></div>
+    <div class="stat-card"><div class="val" id="statResolved" style="color:#2dc653">-</div><div class="lbl">Resolved</div></div>
+    <div class="stat-card"><div class="val" id="statErrors" style="color:#f85149">-</div><div class="lbl">Errors</div></div>
+  </div>
+
+  <div class="filters">
+    <button class="filter-btn active" data-filter="all" onclick="setFilter('type','all')">All</button>
+    <button class="filter-btn" data-filter="error" onclick="setFilter('type','error')">Error</button>
+    <button class="filter-btn" data-filter="fix" onclick="setFilter('type','fix')">Fix</button>
+    <button class="filter-btn" data-filter="iteration" onclick="setFilter('type','iteration')">Iteration</button>
+    <button class="filter-btn" data-filter="trade" onclick="setFilter('type','trade')">Trade</button>
+    <div class="filter-sep"></div>
+    <button class="filter-btn active" data-status="all" onclick="setFilter('status','all')">All Status</button>
+    <button class="filter-btn" data-status="open" onclick="setFilter('status','open')">Open</button>
+    <button class="filter-btn" data-status="resolved" onclick="setFilter('status','resolved')">Resolved</button>
+    <div class="filter-sep"></div>
+    <button class="btn btn-secondary" onclick="loadLogbook()">Refresh</button>
+    <span class="toggle-form" onclick="toggleAddForm()">+ Add Entry</span>
+  </div>
+
+  <div class="card" id="addFormCard" style="display:none">
+    <h2>Add Logbook Entry</h2>
+    <div class="form-row">
+      <div class="form-group" style="flex:0 0 120px">
+        <label>Type</label>
+        <select id="addType">
+          <option value="error">Error</option>
+          <option value="fix">Fix</option>
+          <option value="iteration">Iteration</option>
+          <option value="trade">Trade</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:0 0 140px">
+        <label>Epic</label>
+        <input id="addEpic" type="text" placeholder="e.g. IX.D.FTSE.DAILY.IP">
+      </div>
+      <div class="form-group" style="flex:0 0 140px">
+        <label>Strategy</label>
+        <input id="addStrategy" type="text" placeholder="e.g. scalper-v2">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label>Message</label>
+      <input id="addMessage" type="text" placeholder="Describe the entry...">
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label>Details (optional)</label>
+      <textarea id="addDetails" placeholder="Stack trace, notes, context..."></textarea>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="addEntry()">Add Entry</button>
+      <button class="btn btn-secondary" onclick="toggleAddForm()">Cancel</button>
+    </div>
+  </div>
+
+  <div id="entries"></div>
+</div>
+
+<script>
+let logbook = [];
+let filterType = 'all';
+let filterStatus = 'all';
+
+async function api(method, url, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+function toast(msg, ok) {
+  const d = document.createElement('div');
+  d.className = 'toast ' + (ok ? 'toast-ok' : 'toast-err');
+  d.textContent = msg;
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 3000);
+}
+
+function setFilter(kind, value) {
+  if (kind === 'type') {
+    filterType = value;
+    document.querySelectorAll('[data-filter]').forEach(b => b.classList.toggle('active', b.dataset.filter === value));
+  } else {
+    filterStatus = value;
+    document.querySelectorAll('[data-status]').forEach(b => b.classList.toggle('active', b.dataset.status === value));
+  }
+  renderEntries();
+}
+
+function toggleAddForm() {
+  const f = document.getElementById('addFormCard');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+function typeClass(t) {
+  return 'type-' + (t || 'error');
+}
+
+function fmtTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function getFiltered() {
+  let items = logbook.slice().reverse();
+  if (filterType !== 'all') items = items.filter(e => e.type === filterType);
+  if (filterStatus === 'open') items = items.filter(e => !e.resolved);
+  if (filterStatus === 'resolved') items = items.filter(e => e.resolved);
+  return items;
+}
+
+function updateStats() {
+  document.getElementById('statTotal').textContent = logbook.length;
+  document.getElementById('statOpen').textContent = logbook.filter(e => !e.resolved).length;
+  document.getElementById('statResolved').textContent = logbook.filter(e => e.resolved).length;
+  document.getElementById('statErrors').textContent = logbook.filter(e => e.type === 'error' && !e.resolved).length;
+}
+
+function renderEntries() {
+  const items = getFiltered();
+  const el = document.getElementById('entries');
+  if (items.length === 0) {
+    el.innerHTML = '<div class="empty">No logbook entries match current filters</div>';
+    return;
+  }
+  el.innerHTML = items.map(e => {
+    const resolvedBadge = e.resolved
+      ? '<span class="badge-resolved">RESOLVED</span>'
+      : '<span class="badge-open">OPEN</span>';
+    const metaParts = [];
+    if (e.epic) metaParts.push('<span>\u{1F4C8} ' + esc(e.epic) + '</span>');
+    if (e.strategy) metaParts.push('<span>\u{1F9E0} ' + esc(e.strategy) + '</span>');
+    const detailsHtml = e.details ? '<div class="entry-details">' + esc(e.details) + '</div>' : '';
+    const resolveBtn = e.resolved
+      ? '<button class="btn btn-unresolve" onclick="toggleResolved(\'' + esc(e.id) + '\',false)">Unresolve</button>'
+      : '<button class="btn btn-resolve" onclick="toggleResolved(\'' + esc(e.id) + '\',true)">Resolve</button>';
+    return '<div class="entry' + (e.resolved ? ' resolved' : '') + '">'
+      + '<div class="entry-header">'
+      + '<span class="entry-type ' + typeClass(e.type) + '">' + esc(e.type || 'error') + '</span>'
+      + resolvedBadge
+      + '<span class="entry-time">' + fmtTime(e.timestamp) + '</span>'
+      + (e.updatedAt ? '<span class="entry-time">(edited ' + fmtTime(e.updatedAt) + ')</span>' : '')
+      + '</div>'
+      + (metaParts.length ? '<div class="entry-meta">' + metaParts.join('') + '</div>' : '')
+      + '<div class="entry-message">' + esc(e.message) + '</div>'
+      + detailsHtml
+      + '<div class="entry-actions">' + resolveBtn + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"').replace(/'/g,''');
+}
+
+async function loadLogbook() {
+  try {
+    const data = await api('GET', '/api/clawscript/logbook');
+    logbook = data.entries || [];
+    updateStats();
+    renderEntries();
+  } catch (e) {
+    toast('Failed to load logbook: ' + e.message, false);
+  }
+}
+
+async function addEntry() {
+  const message = document.getElementById('addMessage').value.trim();
+  if (!message) { toast('Message is required', false); return; }
+  const body = {
+    type: document.getElementById('addType').value,
+    epic: document.getElementById('addEpic').value.trim() || undefined,
+    strategy: document.getElementById('addStrategy').value.trim() || undefined,
+    message,
+    details: document.getElementById('addDetails').value.trim() || undefined
+  };
+  try {
+    const r = await api('POST', '/api/clawscript/logbook', body);
+    if (r.ok) {
+      toast('Entry added', true);
+      document.getElementById('addMessage').value = '';
+      document.getElementById('addDetails').value = '';
+      toggleAddForm();
+      await loadLogbook();
+    } else {
+      toast(r.error || 'Failed to add', false);
+    }
+  } catch (e) {
+    toast('Error: ' + e.message, false);
+  }
+}
+
+async function toggleResolved(id, resolved) {
+  try {
+    const r = await api('PATCH', '/api/clawscript/logbook/' + encodeURIComponent(id), { resolved });
+    if (r.ok) {
+      toast(resolved ? 'Marked resolved' : 'Marked open', true);
+      await loadLogbook();
+    } else {
+      toast(r.error || 'Failed', false);
+    }
+  } catch (e) {
+    toast('Error: ' + e.message, false);
+  }
+}
+
+loadLogbook();
+setInterval(loadLogbook, 30000);
+</script>
+</body>
+</html>
