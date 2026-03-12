@@ -96,6 +96,7 @@ function isLoginExempt(req) {
   }
   if (p.startsWith("/api/brain")) return true;
   if (p.startsWith("/__openclaw__/canvas/")) return true;
+  if (p === "/nav-inject.js") return true;
   return false;
 }
 function serveLoginPage(req, res) {
