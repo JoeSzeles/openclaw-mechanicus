@@ -38,10 +38,20 @@ let actualPort = null;
 let sensoryAssignments = {
   price_up:   { start: 0, count: 20, desc: 'Price increase detection' },
   price_down: { start: 20, count: 20, desc: 'Price decrease detection' },
-  volume:     { start: 40, count: 20, desc: 'Volume/trade activity' },
-  spread:     { start: 60, count: 20, desc: 'Spread width / liquidity' },
-  momentum:   { start: 80, count: 10, desc: 'Price momentum / acceleration' },
-  antenna:    { start: 90, count: 10, desc: 'Pressure sensing (vol spikes, rapid moves)' },
+  volume:     { start: 40, count: 15, desc: 'Volume/trade activity' },
+  spread:     { start: 55, count: 10, desc: 'Spread width / liquidity' },
+  momentum:   { start: 65, count: 10, desc: 'Price momentum / acceleration' },
+  antenna:    { start: 75, count: 25, desc: 'Pressure sensing (vol spikes, rapid moves)' },
+};
+
+let antennaSubGroups = {
+  tickVelocity:   { offset: 0, count: 5, desc: 'Tick rate / speed of market' },
+  volumeAccel:    { offset: 5, count: 4, desc: 'Volume acceleration (increasing/decreasing)' },
+  buySellPressure:{ offset: 9, count: 4, desc: 'Uptick vs downtick ratio' },
+  absorption:     { offset: 13, count: 3, desc: 'High volume + small price move' },
+  flashCrash:     { offset: 16, count: 3, desc: 'Flash crash / breakout spike' },
+  deadCat:        { offset: 19, count: 3, desc: 'Dead cat bounce / falling knife' },
+  divergence:     { offset: 22, count: 3, desc: 'Volume-price divergence' },
 };
 
 let mushroomBody = {
@@ -63,12 +73,12 @@ const TIMEFRAME_PRESETS = {
 
 function recalcSensoryAssignments() {
   const n = N_SENSORY;
-  const priceUp = Math.max(4, Math.floor(n * 0.20));
-  const priceDown = Math.max(4, Math.floor(n * 0.20));
-  const vol = Math.max(4, Math.floor(n * 0.20));
-  const spr = Math.max(4, Math.floor(n * 0.20));
+  const priceUp = Math.max(4, Math.floor(n * 0.18));
+  const priceDown = Math.max(4, Math.floor(n * 0.18));
+  const vol = Math.max(4, Math.floor(n * 0.14));
+  const spr = Math.max(2, Math.floor(n * 0.10));
   const mom = Math.max(2, Math.floor(n * 0.10));
-  const ant = Math.max(2, n - priceUp - priceDown - vol - spr - mom);
+  const ant = Math.max(7, n - priceUp - priceDown - vol - spr - mom);
 
   let offset = 0;
   sensoryAssignments.price_up   = { ...sensoryAssignments.price_up,   start: offset, count: priceUp };   offset += priceUp;
@@ -77,6 +87,28 @@ function recalcSensoryAssignments() {
   sensoryAssignments.spread     = { ...sensoryAssignments.spread,     start: offset, count: spr };        offset += spr;
   sensoryAssignments.momentum   = { ...sensoryAssignments.momentum,   start: offset, count: mom };        offset += mom;
   sensoryAssignments.antenna    = { ...sensoryAssignments.antenna,    start: offset, count: ant };
+
+  recalcAntennaSubGroups();
+}
+
+function recalcAntennaSubGroups() {
+  const ant = sensoryAssignments.antenna;
+  const n = ant.count;
+  const tv = Math.max(1, Math.floor(n * 0.20));
+  const va = Math.max(1, Math.floor(n * 0.16));
+  const bp = Math.max(1, Math.floor(n * 0.16));
+  const ab = Math.max(1, Math.floor(n * 0.12));
+  const fc = Math.max(1, Math.floor(n * 0.12));
+  const dc = Math.max(1, Math.floor(n * 0.12));
+  const dv = Math.max(1, n - tv - va - bp - ab - fc - dc);
+  let off = 0;
+  antennaSubGroups.tickVelocity    = { offset: off, count: tv, desc: antennaSubGroups.tickVelocity.desc };    off += tv;
+  antennaSubGroups.volumeAccel     = { offset: off, count: va, desc: antennaSubGroups.volumeAccel.desc };     off += va;
+  antennaSubGroups.buySellPressure = { offset: off, count: bp, desc: antennaSubGroups.buySellPressure.desc }; off += bp;
+  antennaSubGroups.absorption      = { offset: off, count: ab, desc: antennaSubGroups.absorption.desc };      off += ab;
+  antennaSubGroups.flashCrash      = { offset: off, count: fc, desc: antennaSubGroups.flashCrash.desc };      off += fc;
+  antennaSubGroups.deadCat         = { offset: off, count: dc, desc: antennaSubGroups.deadCat.desc };         off += dc;
+  antennaSubGroups.divergence      = { offset: off, count: dv, desc: antennaSubGroups.divergence.desc };
 }
 
 function recalcMushroomBody() {
@@ -231,6 +263,7 @@ function getMotorRates() {
 function stimulateFromPrice(priceData) {
   const inputs = [];
   const { price, prevPrice, volume, spread, epic } = priceData;
+  const pressure = priceData.pressure || {};
   const pu = sensoryAssignments.price_up;
   const pd = sensoryAssignments.price_down;
   const vol = sensoryAssignments.volume;
@@ -258,12 +291,6 @@ function stimulateFromPrice(priceData) {
     for (let i = vol.start; i < vol.start + vol.count; i++) {
       inputs.push([i, volIntensity]);
     }
-    if (volume > 500) {
-      const spikeIntensity = Math.min(volume / 50, 500);
-      for (let i = ant.start; i < ant.start + ant.count; i++) {
-        inputs.push([i, spikeIntensity]);
-      }
-    }
   }
 
   if (spread) {
@@ -273,13 +300,84 @@ function stimulateFromPrice(priceData) {
     }
   }
 
+  encodeAntennaPressure(inputs, ant, pressure, volume);
+
   const stepsToRun = 10;
   for (let s = 0; s < stepsToRun; s++) {
     step(inputs);
   }
   const rates = getMotorRates();
+
+  let alerts = {};
+  if (pressure.flashCrashScore > 0 || pressure.deadCatScore > 0 || pressure.absorptionScore > 0 || pressure.divergenceScore > 0) {
+    alerts = {
+      flashCrash: pressure.flashCrashScore || 0,
+      deadCat: pressure.deadCatScore || 0,
+      absorption: pressure.absorptionScore || 0,
+      divergence: pressure.divergenceScore || 0,
+      tickVelocity: pressure.tickVelocity || 0,
+      volumeAccel: pressure.volumeAccel || 0,
+      buySellRatio: pressure.buySellRatio || 0.5,
+    };
+  }
+  rates.antenna_alerts = alerts;
+  rates.pressure_fed = Object.keys(pressure).length > 0;
+
   if (epic) recordPattern(epic, price, rates);
   return rates;
+}
+
+function encodeAntennaPressure(inputs, ant, pressure, volumeFallback) {
+  const antStart = ant.start;
+  const sg = antennaSubGroups;
+
+  const tvI = Math.min((pressure.tickVelocity || 0) * 50, 500);
+  for (let i = 0; i < sg.tickVelocity.count; i++) {
+    inputs.push([antStart + sg.tickVelocity.offset + i, tvI]);
+  }
+
+  const vaRaw = pressure.volumeAccel || 0;
+  const vaI = Math.min(Math.abs(vaRaw) * 100, 500) * (vaRaw >= 0 ? 1 : 0.3);
+  for (let i = 0; i < sg.volumeAccel.count; i++) {
+    inputs.push([antStart + sg.volumeAccel.offset + i, vaI]);
+  }
+
+  const bsRatio = pressure.buySellRatio != null ? pressure.buySellRatio : 0.5;
+  const bsBias = (bsRatio - 0.5) * 2;
+  const bsI = Math.abs(bsBias) * 200;
+  for (let i = 0; i < sg.buySellPressure.count; i++) {
+    const half = Math.floor(sg.buySellPressure.count / 2);
+    const isBuyNeuron = i < half;
+    const w = isBuyNeuron ? (bsBias > 0 ? bsI * 1.5 : bsI * 0.3) : (bsBias < 0 ? bsI * 1.5 : bsI * 0.3);
+    inputs.push([antStart + sg.buySellPressure.offset + i, w]);
+  }
+
+  const absI = Math.min((pressure.absorptionScore || 0) * 150, 500);
+  for (let i = 0; i < sg.absorption.count; i++) {
+    inputs.push([antStart + sg.absorption.offset + i, absI]);
+  }
+
+  const fcI = Math.min((pressure.flashCrashScore || 0) * 200, 500);
+  for (let i = 0; i < sg.flashCrash.count; i++) {
+    inputs.push([antStart + sg.flashCrash.offset + i, fcI]);
+  }
+
+  const dcI = Math.min((pressure.deadCatScore || 0) * 200, 500);
+  for (let i = 0; i < sg.deadCat.count; i++) {
+    inputs.push([antStart + sg.deadCat.offset + i, dcI]);
+  }
+
+  const dvI = Math.min((pressure.divergenceScore || 0) * 150, 500);
+  for (let i = 0; i < sg.divergence.count; i++) {
+    inputs.push([antStart + sg.divergence.offset + i, dvI]);
+  }
+
+  if (!Object.keys(pressure).length && volumeFallback && volumeFallback > 500) {
+    const spikeI = Math.min(volumeFallback / 50, 500);
+    for (let i = antStart; i < antStart + ant.count; i++) {
+      inputs.push([i, spikeI]);
+    }
+  }
 }
 
 function applyFeedback(type, options) {
@@ -398,6 +496,7 @@ function getArchitecture() {
     total: N_TOTAL,
     synapses: synapses ? synapses.length : 0,
     sensory_assignments: sensoryAssignments,
+    antenna_sub_groups: antennaSubGroups,
     mushroom_body: mushroomBody,
     motor_regions: {
       buy:  { start: 0, count: Math.floor(N_MOTOR / 3) },
@@ -467,6 +566,8 @@ function boot(config) {
   if (sizeChanged || N_SENSORY !== prevSensory) {
     recalcSensoryAssignments();
     recalcMushroomBody();
+  } else {
+    recalcAntennaSubGroups();
   }
   initNeurons();
   initSynapses();
@@ -530,6 +631,7 @@ async function handleRequest(req, res) {
       patterns: Object.keys(patternMemory).length,
       training_mode: trainingMode,
       sensory_assignments: sensoryAssignments,
+      antenna_sub_groups: antennaSubGroups,
       mushroom_body: mushroomBody,
     });
   }
