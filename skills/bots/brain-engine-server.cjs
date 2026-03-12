@@ -659,6 +659,9 @@ async function handleRequest(req, res) {
     const plMultiplier = body.plMultiplier || 1;
     const size = body.size || 1;
     const epic = body.epic || 'BACKTEST';
+    const minHoldCandles = Math.max(0, parseInt(body.minHoldCandles) || 0);
+    const signalThreshold = Math.max(0, parseFloat(body.signalThreshold) || 5);
+    const confirmCandles = Math.max(1, parseInt(body.confirmCandles) || 1);
 
     if (!candles.length) return respond(res, 400, { error: 'No candles provided' });
 
@@ -674,6 +677,8 @@ async function handleRequest(req, res) {
 
     let prevPrice = null;
     let openTrade = null;
+    let consecutiveSignal = null;
+    let consecutiveCount = 0;
 
     for (let ci = 0; ci < candles.length; ci++) {
       const c = candles[ci];
@@ -698,9 +703,19 @@ async function handleRequest(req, res) {
         ? 'BUY' : rates.sell_signal > rates.buy_signal && rates.sell_signal > rates.hold_signal
         ? 'SELL' : 'HOLD';
 
+      if (signal !== 'HOLD' && signal === consecutiveSignal) {
+        consecutiveCount++;
+      } else if (signal !== 'HOLD') {
+        consecutiveSignal = signal;
+        consecutiveCount = 1;
+      } else {
+        consecutiveCount = 0;
+      }
+
       results.signals.push({ idx: ci, price: closePrice, signal, buy: rates.buy_signal, sell: rates.sell_signal, hold: rates.hold_signal });
 
       if (openTrade) {
+        openTrade.candlesHeld = (openTrade.candlesHeld || 0) + 1;
         const dir = openTrade.direction === 'BUY' ? 1 : -1;
         const slPrice = openTrade.entry - dir * openTrade.entry * stopLossPct / 100;
         const tpPrice = openTrade.entry + dir * openTrade.entry * takeProfitPct / 100;
@@ -716,7 +731,7 @@ async function handleRequest(req, res) {
           else if (lowPrice <= tpPrice) { exitPrice = tpPrice; exitReason = 'TP'; }
         }
 
-        if (signal !== openTrade.direction && signal !== 'HOLD' && !exitPrice) {
+        if (signal !== openTrade.direction && signal !== 'HOLD' && !exitPrice && openTrade.candlesHeld >= minHoldCandles) {
           exitPrice = closePrice;
           exitReason = 'SIGNAL';
         }
@@ -732,6 +747,7 @@ async function handleRequest(req, res) {
             reason: exitReason,
             entry_idx: openTrade.entry_idx,
             exit_idx: ci,
+            candles_held: openTrade.candlesHeld,
           });
 
           if (pnl > 0) {
@@ -746,8 +762,9 @@ async function handleRequest(req, res) {
         }
       }
 
-      if (!openTrade && signal !== 'HOLD' && (rates.buy_signal > 5 || rates.sell_signal > 5)) {
-        openTrade = { direction: signal, entry: closePrice, entry_idx: ci };
+      const signalConfirmed = consecutiveCount >= confirmCandles;
+      if (!openTrade && signal !== 'HOLD' && signalConfirmed && (rates.buy_signal > signalThreshold || rates.sell_signal > signalThreshold)) {
+        openTrade = { direction: signal, entry: closePrice, entry_idx: ci, candlesHeld: 0 };
       }
 
       prevPrice = closePrice;
@@ -789,6 +806,9 @@ async function handleRequest(req, res) {
     const takeProfitPct = body.takeProfitPct || 2.0;
     const plMultiplier = body.plMultiplier || 1;
     const size = body.size || 1;
+    const minHoldCandles = Math.max(0, parseInt(body.minHoldCandles) || 0);
+    const signalThreshold = Math.max(0, parseFloat(body.signalThreshold) || 5);
+    const confirmCandles = Math.max(1, parseInt(body.confirmCandles) || 1);
 
     if (!candle || !candle.close) return respond(res, 400, { error: 'Candle with close price required' });
 
@@ -821,6 +841,7 @@ async function handleRequest(req, res) {
 
     if (body.openTrade) {
       const ot = body.openTrade;
+      const candlesHeld = (ot.candlesHeld || 0) + 1;
       const dir = ot.direction === 'BUY' ? 1 : -1;
       const slPrice = ot.entry - dir * ot.entry * stopLossPct / 100;
       const tpPrice = ot.entry + dir * ot.entry * takeProfitPct / 100;
@@ -835,7 +856,7 @@ async function handleRequest(req, res) {
         else if (lowPrice <= tpPrice) { exitPrice = tpPrice; exitReason = 'TP'; }
       }
 
-      if (signal !== ot.direction && signal !== 'HOLD' && !exitPrice) {
+      if (signal !== ot.direction && signal !== 'HOLD' && !exitPrice && candlesHeld >= minHoldCandles) {
         exitPrice = closePrice;
         exitReason = 'SIGNAL';
       }
@@ -848,6 +869,7 @@ async function handleRequest(req, res) {
           exit: exitPrice,
           pnl: parseFloat(pnl.toFixed(2)),
           reason: exitReason,
+          candles_held: candlesHeld,
         };
         if (pnl > 0) {
           applyFeedback('sugar', { target: 'motor' });
@@ -857,11 +879,28 @@ async function handleRequest(req, res) {
           applyFeedback('pain', { target: 'motor' });
           result.feedback = 'pain';
         }
+      } else {
+        result.held_trade = { direction: ot.direction, entry: ot.entry, candlesHeld: candlesHeld };
       }
     }
 
-    if (!body.openTrade && signal !== 'HOLD' && (rates.buy_signal > 5 || rates.sell_signal > 5)) {
-      result.open_trade = { direction: signal, entry: closePrice };
+    const liveConfirmCount = body.consecutiveCount || 0;
+    let newConsecutiveSignal = body.consecutiveSignal || null;
+    let newConsecutiveCount = liveConfirmCount;
+    if (signal !== 'HOLD' && signal === newConsecutiveSignal) {
+      newConsecutiveCount++;
+    } else if (signal !== 'HOLD') {
+      newConsecutiveSignal = signal;
+      newConsecutiveCount = 1;
+    } else {
+      newConsecutiveCount = 0;
+    }
+    result.consecutiveSignal = newConsecutiveSignal;
+    result.consecutiveCount = newConsecutiveCount;
+
+    const signalConfirmed = newConsecutiveCount >= confirmCandles;
+    if (!body.openTrade && signal !== 'HOLD' && signalConfirmed && (rates.buy_signal > signalThreshold || rates.sell_signal > signalThreshold)) {
+      result.open_trade = { direction: signal, entry: closePrice, candlesHeld: 0 };
     }
 
     return respond(res, 200, result);
