@@ -767,6 +767,8 @@ async function handleRequest(req, res) {
 
     if (!candles.length) return respond(res, 400, { error: 'No candles provided' });
 
+    const antennaEnabled = body.antennaEnabled || false;
+
     const results = {
       total_candles: candles.length,
       trades: [],
@@ -775,12 +777,15 @@ async function handleRequest(req, res) {
       pain_count: 0,
       steps_run: 0,
       signals: [],
+      antenna_used: antennaEnabled,
     };
 
     let prevPrice = null;
     let openTrade = null;
     let consecutiveSignal = null;
     let consecutiveCount = 0;
+    let prevVol = 0;
+    let volHistory = [];
 
     for (let ci = 0; ci < candles.length; ci++) {
       const c = candles[ci];
@@ -792,12 +797,67 @@ async function handleRequest(req, res) {
 
       if (!closePrice || closePrice <= 0) continue;
 
+      let pressure = {};
+      if (antennaEnabled && prevPrice) {
+        const priceDelta = closePrice - prevPrice;
+        const priceRange = highPrice - lowPrice;
+        const priceVelocity = Math.abs(priceDelta);
+        volHistory.push(vol);
+        if (volHistory.length > 10) volHistory.shift();
+        const avgVol = volHistory.reduce((a, b) => a + b, 0) / volHistory.length;
+        const volumeAccel = prevVol > 0 ? (vol - prevVol) / prevVol : 0;
+        const buySellRatio = priceDelta > 0 ? 0.6 + Math.min(Math.abs(priceDelta) / (priceRange + 0.001) * 0.2, 0.2) :
+                             priceDelta < 0 ? 0.4 - Math.min(Math.abs(priceDelta) / (priceRange + 0.001) * 0.2, 0.2) : 0.5;
+        const absorptionScore = vol > avgVol * 1.5 && priceRange < Math.abs(priceDelta) * 3 ?
+                                Math.min((vol / (avgVol + 1)) * (1 / (priceRange + 0.01)), 3.0) : 0;
+        const flashCrashScore = priceVelocity > 0 && vol > avgVol * 2 ?
+                                Math.min(priceVelocity * (vol / (avgVol + 1)) / 20, 5.0) : 0;
+        let deadCatScore = 0;
+        if (ci >= 3) {
+          const prevPrev = candles[ci - 2];
+          const pp2Price = prevPrev.closePrice ? (prevPrev.closePrice.bid + prevPrev.closePrice.ask) / 2 : prevPrev.close || prevPrev.mid || 0;
+          if (pp2Price > prevPrice && closePrice > prevPrice && closePrice < pp2Price) {
+            const drop = pp2Price - prevPrice;
+            const bounce = closePrice - prevPrice;
+            const bounceRatio = drop > 0 ? bounce / drop : 0;
+            if (bounceRatio > 0.1 && bounceRatio < 0.5 && vol < prevVol * 0.7) {
+              deadCatScore = Math.min((1 - bounceRatio) * 2, 3.0);
+            }
+          }
+        }
+        const fallingKnifeScore = priceDelta < 0 && volumeAccel > 0.3 ?
+                                  Math.min(Math.abs(priceDelta) * volumeAccel / 5, 3.0) : 0;
+        const divergenceScore = ci >= 5 ? (() => {
+          const recent5 = candles.slice(Math.max(0, ci - 4), ci + 1);
+          const prices5 = recent5.map(cc => cc.closePrice ? (cc.closePrice.bid + cc.closePrice.ask) / 2 : cc.close || cc.mid || 0);
+          const vols5 = recent5.map(cc => cc.lastTradedVolume || cc.volume || 0);
+          const priceUp = prices5[prices5.length - 1] > prices5[0];
+          const volDown = vols5[vols5.length - 1] < vols5[0] * 0.8;
+          return priceUp && volDown ? Math.min(Math.abs(1 - vols5[vols5.length - 1] / (vols5[0] + 1)) * 2, 3.0) : 0;
+        })() : 0;
+
+        pressure = {
+          tickVelocity: priceVelocity * 10,
+          volumeAccel,
+          buySellRatio,
+          absorptionScore,
+          flashCrashScore,
+          deadCatScore,
+          fallingKnifeScore,
+          divergenceScore,
+          priceVelocity,
+          priceDelta,
+        };
+      }
+      prevVol = vol;
+
       const rates = stimulateFromPrice({
         price: closePrice,
         prevPrice: prevPrice || closePrice,
         volume: vol,
         spread: c.spread || 0,
         epic: epic,
+        pressure: pressure,
       });
       results.steps_run += 10;
 
@@ -920,12 +980,15 @@ async function handleRequest(req, res) {
     const vol = candle.volume || 0;
     const prevPrice = candle.prevClose || closePrice;
 
+    const pressure = body.pressure || {};
+
     const rates = stimulateFromPrice({
       price: closePrice,
       prevPrice: prevPrice,
       volume: vol,
       spread: candle.spread || 0,
       epic: epic,
+      pressure: pressure,
     });
 
     const signal = rates.buy_signal > rates.sell_signal && rates.buy_signal > rates.hold_signal
@@ -939,6 +1002,8 @@ async function handleRequest(req, res) {
       hold_signal: rates.hold_signal,
       price: closePrice,
       step: stepCount,
+      antenna_alerts: rates.antenna_alerts || {},
+      pressure_fed: rates.pressure_fed || false,
     };
 
     if (body.openTrade) {
