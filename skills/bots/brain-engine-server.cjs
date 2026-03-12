@@ -511,6 +511,7 @@ function getArchitecture() {
 
 function saveState() {
   try {
+    const synData = synapses ? synapses.map(s => [s.pre, s.post, Math.round(s.w * 1000) / 1000, Math.round(s.base_w * 1000) / 1000]) : null;
     const state = {
       stepCount,
       currentParams,
@@ -519,12 +520,15 @@ function saveState() {
       architecture: { sensory: N_SENSORY, inter: N_INTER, motor: N_MOTOR },
       sensoryAssignments,
       mushroomBody,
+      synData,
       savedAt: new Date().toISOString(),
     };
     fs.writeFileSync(BRAIN_STATE_FILE, JSON.stringify(state));
   } catch (_) {}
 }
 
+let restoredSynData = null;
+let restoredStepCount = 0;
 function loadState() {
   try {
     if (fs.existsSync(BRAIN_STATE_FILE)) {
@@ -540,7 +544,11 @@ function loadState() {
       }
       if (state.sensoryAssignments) sensoryAssignments = { ...sensoryAssignments, ...state.sensoryAssignments };
       if (state.mushroomBody) mushroomBody = { ...mushroomBody, ...state.mushroomBody };
-      console.log('[brain-engine] Restored state: ' + (state.stepCount || 0) + ' steps, ' + Object.keys(patternMemory).length + ' instruments, arch=' + N_SENSORY + '/' + N_INTER + '/' + N_MOTOR);
+      if (Array.isArray(state.synData) && state.synData.length > 0) {
+        restoredSynData = state.synData;
+      }
+      restoredStepCount = state.stepCount || 0;
+      console.log('[brain-engine] Restored state: ' + restoredStepCount + ' steps, ' + Object.keys(patternMemory).length + ' instruments, arch=' + N_SENSORY + '/' + N_INTER + '/' + N_MOTOR + (restoredSynData ? ', synapses=' + restoredSynData.length : ', no saved synapses'));
     }
   } catch (_) {}
 }
@@ -549,19 +557,19 @@ function boot(config) {
   const prevSensory = N_SENSORY;
   loadState();
 
-  let sizeChanged = false;
+  const prevS = N_SENSORY, prevI = N_INTER, prevM = N_MOTOR;
   if (config) {
     if (config.preset && TIMEFRAME_PRESETS[config.preset]) {
       const p = TIMEFRAME_PRESETS[config.preset];
       N_SENSORY = p.sensory;
       N_INTER = p.inter;
       N_MOTOR = p.motor;
-      sizeChanged = true;
     }
-    if (config.sensory) { N_SENSORY = Math.max(10, Math.min(50000, parseInt(config.sensory))); sizeChanged = true; }
-    if (config.inter) { N_INTER = Math.max(20, Math.min(200000, parseInt(config.inter))); sizeChanged = true; }
-    if (config.motor) { N_MOTOR = Math.max(6, Math.min(30000, parseInt(config.motor))); sizeChanged = true; }
+    if (config.sensory) { N_SENSORY = Math.max(10, Math.min(50000, parseInt(config.sensory))); }
+    if (config.inter) { N_INTER = Math.max(20, Math.min(200000, parseInt(config.inter))); }
+    if (config.motor) { N_MOTOR = Math.max(6, Math.min(30000, parseInt(config.motor))); }
   }
+  const sizeChanged = (N_SENSORY !== prevS || N_INTER !== prevI || N_MOTOR !== prevM);
 
   N_TOTAL = N_SENSORY + N_INTER + N_MOTOR;
   if (sizeChanged || N_SENSORY !== prevSensory) {
@@ -571,15 +579,25 @@ function boot(config) {
     recalcAntennaSubGroups();
   }
   initNeurons();
-  initSynapses();
+  let synapsesRestored = false;
+  if (restoredSynData && !sizeChanged) {
+    synapses = restoredSynData.map(s => ({ pre: s[0], post: s[1], w: s[2], base_w: s[3] }));
+    const maxIdx = N_TOTAL - 1;
+    synapses = synapses.filter(s => s.pre <= maxIdx && s.post <= maxIdx && s.pre >= 0 && s.post >= 0);
+    synapsesRestored = true;
+    console.log('[brain-engine] Restored ' + synapses.length + ' trained synapses from saved state');
+  } else {
+    initSynapses();
+  }
+  restoredSynData = null;
   isBooted = true;
   bootTime = Date.now();
-  stepCount = 0;
+  stepCount = synapsesRestored ? restoredStepCount : 0;
   spikeHistory = [];
 
   saveState();
 
-  console.log('[brain-engine] Booted: ' + N_TOTAL + ' neurons, ' + synapses.length + ' synapses (S=' + N_SENSORY + ' I=' + N_INTER + ' M=' + N_MOTOR + ')');
+  console.log('[brain-engine] Booted: ' + N_TOTAL + ' neurons, ' + synapses.length + ' synapses (S=' + N_SENSORY + ' I=' + N_INTER + ' M=' + N_MOTOR + ')' + (synapsesRestored ? ' [RESTORED]' : ' [FRESH]'));
   return {
     loaded: true,
     neurons_count: N_TOTAL,
@@ -588,7 +606,8 @@ function boot(config) {
     sensory_assignments: sensoryAssignments,
     mushroom_body: mushroomBody,
     boot_time_ms: 0,
-    step_count: 0,
+    step_count: stepCount,
+    synapses_restored: synapsesRestored,
   };
 }
 
