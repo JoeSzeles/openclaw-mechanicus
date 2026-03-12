@@ -1,6 +1,6 @@
 # OpenClaw Mechanicus Patch
 
-IG Trading system for OpenClaw. Adds 23 strategies, batch backtesting with optimization memory, AI calibration, equity curve visualization, live signal monitoring, and the IG Trading Dashboard.
+IG Trading system for OpenClaw. Adds 23 strategies, batch backtesting with optimization memory, AI calibration, equity curve visualization, live signal monitoring, Neural Trading (BrainJar spiking neural network), and the IG Trading Dashboard.
 
 ## Install
 
@@ -66,6 +66,32 @@ cp .env.example .env
 - **ClawScript** — custom strategy language with editor, parser, and flow builder
 - **Signal monitor** — real-time alerts from strategy signals
 - **Trade Claw engine** — live trade execution via IG REST API
+- **Neural Trading (BrainJar)** — biologically-inspired spiking neural network with LIF neurons, dynamic architecture, Volume Antenna pressure sensing, Cortex auto-trade, mushroom body memory, backtest/live/auto-test training modes
+
+### Neural Trading
+
+The Neural Trading system integrates BrainJar's spiking neural network into the IG Dashboard as four sub-tabs:
+
+| Tab | Purpose |
+|---|---|
+| Neural Dashboard | Live tick feed, price/volume charts, connection status, manual trade triggers |
+| Brain (Neural Cortex) | Per-instrument pattern cards, auto-trade execution, training controls, calibration |
+| Brain Config | Network architecture, timeframe presets, sensory assignments, mushroom body, backtest training |
+| Dev Console | Real-time brain activity logs |
+
+**Key features:**
+- **LIF Spiking Network** — 5,000 neurons (configurable 350–20,000), Poisson-encoded market data, synaptic weight learning
+- **Volume Antenna** — 180 neurons in 7 sub-groups detect flash crashes, dead cat bounces, absorption, divergence, falling knives
+- **Cortex Auto-Trade** — autonomous position management with signal confirmation, hold zones, emergency exit on flash crashes
+- **Mushroom Body** — dense interneuron cluster for memory consolidation, per-instrument pattern persistence across restarts
+- **Training** — backtest (historical candles with P&L feedback), live (real-time with antenna pressure), auto-test (multi-cycle calibration)
+
+Documentation: open the **Docs** link in the Neural Trading tab bar, or view `neural-trading.html` in the canvas directory.
+
+![Neural Dashboard](files/.openclaw/canvas/images/neural-dashboard.png)
+![Neural Cortex](files/.openclaw/canvas/images/neural-brain.png)
+![Brain Config](files/.openclaw/canvas/images/neural-brain-config.png)
+![Auto-Trade with Antenna](files/.openclaw/canvas/images/neural-cortex-antenna.png)
 
 ## Local API (ig-local-api.mjs)
 
