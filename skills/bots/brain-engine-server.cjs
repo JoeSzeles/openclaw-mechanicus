@@ -27,7 +27,7 @@ let spikeHistory = [];
 let stepCount = 0;
 let isBooted = false;
 let bootTime = null;
-let currentParams = { w_syn: 0.275, r_poi: 150, tau_syn: TAU_SYN };
+let currentParams = { w_syn: 12.0, r_poi: 150, tau_syn: TAU_SYN };
 let trainingMode = false;
 let trainingDirection = null;
 let trainingFeedbackLog = [];
@@ -183,7 +183,11 @@ function step(externalInput) {
     }
   }
 
-  spikeHistory.push({ step: stepCount, count: spikes.length, spikes: spikes.slice(0, 20) });
+  const motorStart = N_SENSORY + N_INTER;
+  const motorSpikes = spikes.filter(s => s >= motorStart);
+  const otherSpikes = spikes.filter(s => s < motorStart).slice(0, 15);
+  const savedSpikes = otherSpikes.concat(motorSpikes);
+  spikeHistory.push({ step: stepCount, count: spikes.length, spikes: savedSpikes });
   if (spikeHistory.length > 500) spikeHistory.shift();
 
   return { spikes, spikeCount: spikes.length };
@@ -774,6 +778,227 @@ async function handleRequest(req, res) {
 
     saveState();
     return respond(res, 200, results);
+  }
+
+  if (m === 'POST' && p === '/live-train') {
+    if (!isBooted) return respond(res, 400, { error: 'Brain not booted' });
+    const body = await parseBody(req);
+    const candle = body.candle;
+    const epic = body.epic || 'LIVE';
+    const stopLossPct = body.stopLossPct || 1.0;
+    const takeProfitPct = body.takeProfitPct || 2.0;
+    const plMultiplier = body.plMultiplier || 1;
+    const size = body.size || 1;
+
+    if (!candle || !candle.close) return respond(res, 400, { error: 'Candle with close price required' });
+
+    const closePrice = candle.close;
+    const highPrice = candle.high || closePrice;
+    const lowPrice = candle.low || closePrice;
+    const vol = candle.volume || 0;
+    const prevPrice = candle.prevClose || closePrice;
+
+    const rates = stimulateFromPrice({
+      price: closePrice,
+      prevPrice: prevPrice,
+      volume: vol,
+      spread: candle.spread || 0,
+      epic: epic,
+    });
+
+    const signal = rates.buy_signal > rates.sell_signal && rates.buy_signal > rates.hold_signal
+      ? 'BUY' : rates.sell_signal > rates.buy_signal && rates.sell_signal > rates.hold_signal
+      ? 'SELL' : 'HOLD';
+
+    const result = {
+      signal,
+      buy_signal: rates.buy_signal,
+      sell_signal: rates.sell_signal,
+      hold_signal: rates.hold_signal,
+      price: closePrice,
+      step: stepCount,
+    };
+
+    if (body.openTrade) {
+      const ot = body.openTrade;
+      const dir = ot.direction === 'BUY' ? 1 : -1;
+      const slPrice = ot.entry - dir * ot.entry * stopLossPct / 100;
+      const tpPrice = ot.entry + dir * ot.entry * takeProfitPct / 100;
+      let exitPrice = null;
+      let exitReason = null;
+
+      if (dir === 1) {
+        if (lowPrice <= slPrice) { exitPrice = slPrice; exitReason = 'SL'; }
+        else if (highPrice >= tpPrice) { exitPrice = tpPrice; exitReason = 'TP'; }
+      } else {
+        if (highPrice >= slPrice) { exitPrice = slPrice; exitReason = 'SL'; }
+        else if (lowPrice <= tpPrice) { exitPrice = tpPrice; exitReason = 'TP'; }
+      }
+
+      if (signal !== ot.direction && signal !== 'HOLD' && !exitPrice) {
+        exitPrice = closePrice;
+        exitReason = 'SIGNAL';
+      }
+
+      if (exitPrice) {
+        const pnl = (exitPrice - ot.entry) * dir * size * plMultiplier;
+        result.trade_closed = {
+          direction: ot.direction,
+          entry: ot.entry,
+          exit: exitPrice,
+          pnl: parseFloat(pnl.toFixed(2)),
+          reason: exitReason,
+        };
+        if (pnl > 0) {
+          applyFeedback('sugar', { target: 'motor' });
+          applyFeedback('sugar', { target: 'mushroom' });
+          result.feedback = 'sugar';
+        } else {
+          applyFeedback('pain', { target: 'motor' });
+          result.feedback = 'pain';
+        }
+      }
+    }
+
+    if (!body.openTrade && signal !== 'HOLD' && (rates.buy_signal > 5 || rates.sell_signal > 5)) {
+      result.open_trade = { direction: signal, entry: closePrice };
+    }
+
+    return respond(res, 200, result);
+  }
+
+  if (m === 'POST' && p === '/proof-test') {
+    if (!isBooted) return respond(res, 400, { error: 'Brain not booted' });
+    const body = await parseBody(req);
+    const testSteps = Math.min(body.steps || 100, 500);
+    const epic = body.epic || 'PROOF_TEST';
+
+    const savedState = {
+      stepCount: stepCount,
+      neurons: new Float64Array(neurons),
+      synapses: synapses.map(s => ({ pre: s.pre, post: s.post, w: s.w, base_w: s.base_w })),
+      spikeHistory: spikeHistory.slice(),
+    };
+
+    try {
+      const results = [];
+      let basePrice = 100;
+
+      console.log('[brain-engine] === PROOF TEST START ===');
+
+      const motorStart = N_SENSORY + N_INTER;
+      const buyEnd = Math.floor(N_MOTOR / 3);
+      const sellEnd = Math.floor(2 * N_MOTOR / 3);
+
+      function directStimulate(direction, intensity) {
+        const inputs = [];
+        const pu = sensoryAssignments.price_up;
+        const pd = sensoryAssignments.price_down;
+        const mom = sensoryAssignments.momentum;
+        const vol = sensoryAssignments.volume;
+        const ant = sensoryAssignments.antenna;
+        if (direction === 'BUY') {
+          for (let i = pu.start; i < pu.start + pu.count; i++) inputs.push([i, intensity]);
+          for (let i = mom.start; i < mom.start + mom.count; i++) inputs.push([i, intensity * 0.8]);
+        } else {
+          for (let i = pd.start; i < pd.start + pd.count; i++) inputs.push([i, intensity]);
+          for (let i = mom.start; i < mom.start + mom.count; i++) inputs.push([i, intensity * 0.8]);
+        }
+        for (let i = vol.start; i < vol.start + vol.count; i++) inputs.push([i, intensity * 0.5]);
+        for (let i = ant.start; i < ant.start + ant.count; i++) inputs.push([i, intensity * 0.3]);
+        for (let s = 0; s < 20; s++) step(inputs);
+        return getMotorRates();
+      }
+
+      console.log('[brain-engine] Phase 1: UPTREND - expect BUY signals');
+      for (let i = 0; i < testSteps; i++) {
+        basePrice += 2.0 + Math.random() * 1.0;
+        const prevP = basePrice - 2.0;
+        const rates = stimulateFromPrice({
+          price: basePrice,
+          prevPrice: prevP,
+          volume: 5000 + Math.random() * 5000,
+          spread: 0.1,
+          epic: epic,
+        });
+        if (i < 5) directStimulate('BUY', 300);
+        const signal = rates.buy_signal > rates.sell_signal && rates.buy_signal > rates.hold_signal
+          ? 'BUY' : rates.sell_signal > rates.buy_signal && rates.sell_signal > rates.hold_signal
+          ? 'SELL' : 'HOLD';
+        results.push({ phase: 'UPTREND', step: i, price: parseFloat(basePrice.toFixed(2)), signal, buy: rates.buy_signal, sell: rates.sell_signal, hold: rates.hold_signal });
+        if (signal === 'BUY') console.log('[brain-engine] PROOF: BUY signal at step ' + i + ' price=' + basePrice.toFixed(2) + ' buy_rate=' + rates.buy_signal.toFixed(2));
+        if (signal === 'SELL') console.log('[brain-engine] PROOF: SELL signal at step ' + i + ' price=' + basePrice.toFixed(2) + ' sell_rate=' + rates.sell_signal.toFixed(2));
+      }
+
+      console.log('[brain-engine] Phase 2: DOWNTREND - expect SELL signals');
+      for (let i = 0; i < testSteps; i++) {
+        basePrice -= 2.0 + Math.random() * 1.0;
+        const prevP = basePrice + 2.0;
+        const rates = stimulateFromPrice({
+          price: basePrice,
+          prevPrice: prevP,
+          volume: 5000 + Math.random() * 5000,
+          spread: 0.1,
+          epic: epic,
+        });
+        if (i < 5) directStimulate('SELL', 300);
+        const signal = rates.buy_signal > rates.sell_signal && rates.buy_signal > rates.hold_signal
+          ? 'BUY' : rates.sell_signal > rates.buy_signal && rates.sell_signal > rates.hold_signal
+          ? 'SELL' : 'HOLD';
+        results.push({ phase: 'DOWNTREND', step: i, price: parseFloat(basePrice.toFixed(2)), signal, buy: rates.buy_signal, sell: rates.sell_signal, hold: rates.hold_signal });
+        if (signal === 'BUY') console.log('[brain-engine] PROOF: BUY signal at step ' + i + ' price=' + basePrice.toFixed(2) + ' buy_rate=' + rates.buy_signal.toFixed(2));
+        if (signal === 'SELL') console.log('[brain-engine] PROOF: SELL signal at step ' + i + ' price=' + basePrice.toFixed(2) + ' sell_rate=' + rates.sell_signal.toFixed(2));
+      }
+
+      console.log('[brain-engine] Phase 3: FLAT - expect HOLD signals');
+      for (let i = 0; i < Math.floor(testSteps / 2); i++) {
+        basePrice += (Math.random() - 0.5) * 0.02;
+        const rates = stimulateFromPrice({
+          price: basePrice,
+          prevPrice: basePrice,
+          volume: 10,
+          spread: 5.0,
+          epic: epic,
+        });
+        const signal = rates.buy_signal > rates.sell_signal && rates.buy_signal > rates.hold_signal
+          ? 'BUY' : rates.sell_signal > rates.buy_signal && rates.sell_signal > rates.hold_signal
+          ? 'SELL' : 'HOLD';
+        results.push({ phase: 'FLAT', step: i, price: parseFloat(basePrice.toFixed(2)), signal, buy: rates.buy_signal, sell: rates.sell_signal, hold: rates.hold_signal });
+      }
+
+      const buyCount = results.filter(r => r.signal === 'BUY').length;
+      const sellCount = results.filter(r => r.signal === 'SELL').length;
+      const holdCount = results.filter(r => r.signal === 'HOLD').length;
+      const uptrendBuys = results.filter(r => r.phase === 'UPTREND' && r.signal === 'BUY').length;
+      const downtrendSells = results.filter(r => r.phase === 'DOWNTREND' && r.signal === 'SELL').length;
+
+      console.log('[brain-engine] === PROOF TEST RESULTS ===');
+      console.log('[brain-engine] Total: BUY=' + buyCount + ' SELL=' + sellCount + ' HOLD=' + holdCount);
+      console.log('[brain-engine] Uptrend BUYs: ' + uptrendBuys + '/' + testSteps + ' (' + (uptrendBuys / testSteps * 100).toFixed(1) + '%)');
+      console.log('[brain-engine] Downtrend SELLs: ' + downtrendSells + '/' + testSteps + ' (' + (downtrendSells / testSteps * 100).toFixed(1) + '%)');
+      console.log('[brain-engine] === PROOF TEST END ===');
+
+      return respond(res, 200, {
+        ok: true,
+        total_steps: results.length,
+        summary: {
+          buy_count: buyCount,
+          sell_count: sellCount,
+          hold_count: holdCount,
+          uptrend_buys: uptrendBuys,
+          uptrend_total: testSteps,
+          downtrend_sells: downtrendSells,
+          downtrend_total: testSteps,
+          flat_total: Math.floor(testSteps / 2),
+        },
+        sample_signals: results.filter(r => r.signal !== 'HOLD').slice(0, 30),
+      });
+    } finally {
+      stepCount = savedState.stepCount;
+      neurons = savedState.neurons;
+      synapses = savedState.synapses;
+      spikeHistory = savedState.spikeHistory;
+    }
   }
 
   if (m === 'POST' && p === '/restart') {
