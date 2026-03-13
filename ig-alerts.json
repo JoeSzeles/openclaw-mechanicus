@@ -3455,6 +3455,22 @@
       "level": "debug",
       "channel": "default",
       "timestamp": "2026-03-13T02:24:09.573Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-13T02:54:42.053Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-13T02:54:42.162Z"
     }
   ]
 }

@@ -656,6 +656,17 @@ function neuralSelectInstrument(inst) {
   startNeuralTickPolling();
   loadPatternMemory(inst.epic);
   refreshStreamInstruments();
+  if (window._cortexPendingAutoTrade && window._cortexPendingAutoTrade.epic === inst.epic && !cortexAutoTradeEnabled) {
+    var pending = window._cortexPendingAutoTrade;
+    window._cortexPendingAutoTrade = null;
+    if (pending.timeframe) {
+      cortexTimeframe = pending.timeframe;
+      var tfEl = document.getElementById('cortex-timeframe');
+      if (tfEl) tfEl.value = pending.timeframe;
+    }
+    addBrainLog('CORTEX', 'Instrument matched pending auto-trade — resuming for ' + inst.epic);
+    setTimeout(function() { toggleCortexAutoTrade(); }, 1500);
+  }
 }
 
 async function neuralPlaceOrder(direction) {
@@ -3583,7 +3594,22 @@ async function cortexLoadState() {
     }
     if (state && state.autoTradeState && !cortexAutoTradeEnabled) {
       var ats = state.autoTradeState;
-      addBrainLog('CORTEX', 'Saved auto-trade state found for ' + (ats.epic || '--') + ' (was ' + (ats.enabled ? 'ENABLED' : 'DISABLED') + ')');
+      if (ats.timeframe) {
+        cortexTimeframe = ats.timeframe;
+        var tfEl = document.getElementById('cortex-timeframe');
+        if (tfEl) tfEl.value = ats.timeframe;
+      }
+      if (ats.enabled && ats.epic && neuralCurrentEpic === ats.epic) {
+        addBrainLog('CORTEX', 'Resuming auto-trade for ' + ats.epic + ' (TF=' + (ats.timeframe || 'MINUTE_5') + ')');
+        toggleCortexAutoTrade();
+      } else if (ats.enabled && ats.epic) {
+        addBrainLog('CORTEX', 'Auto-trade was ON for ' + ats.epic + ' — will resume when instrument is selected');
+        if (!window._cortexPendingAutoTrade) {
+          window._cortexPendingAutoTrade = { epic: ats.epic, timeframe: ats.timeframe };
+        }
+      } else {
+        addBrainLog('CORTEX', 'Saved auto-trade state found (was ' + (ats.enabled ? 'ENABLED' : 'DISABLED') + ')');
+      }
     }
     if (state && state.decisionLog && state.decisionLog.length > 0) {
       cortexDecisionLog = state.decisionLog;
