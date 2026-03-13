@@ -2840,10 +2840,11 @@ async function cortexPlaceOrder(direction) {
     var result = await apiPost('/api/ig/positions/open', { epic: neuralCurrentEpic, direction: direction, size: cortexPositionSize });
     if (result && result.ok && result.dealReference) {
       var dealId = (result.confirmation && result.confirmation.dealId) || result.dealReference;
-      addBrainLog('CORTEX', direction + ' order placed: ' + result.dealReference + ' dealId=' + dealId);
-      brainTradeLog.push({ timestamp: new Date().toISOString(), epic: neuralCurrentEpic, direction: direction, size: cortexPositionSize, dealRef: result.dealReference, dealId: dealId, price: neuralLastPrice, source: 'cortex-auto' });
+      var fillLevel = (result.confirmation && result.confirmation.level) ? parseFloat(result.confirmation.level) : null;
+      addBrainLog('CORTEX', direction + ' order placed: ' + result.dealReference + ' dealId=' + dealId + (fillLevel ? ' fill=' + fillLevel : ''));
+      brainTradeLog.push({ timestamp: new Date().toISOString(), epic: neuralCurrentEpic, direction: direction, size: cortexPositionSize, dealRef: result.dealReference, dealId: dealId, price: fillLevel || neuralLastPrice, source: 'cortex-auto' });
       if (trainingModeActive) brainFeedback('sugar');
-      return { ok: true, dealId: dealId, dealRef: result.dealReference };
+      return { ok: true, dealId: dealId, dealRef: result.dealReference, fillLevel: fillLevel };
     } else {
       addBrainLog('ERROR', 'Cortex ' + direction + ' failed: ' + ((result && result.error) || 'Order failed'));
       if (trainingModeActive) brainFeedback('pain');
@@ -3149,10 +3150,13 @@ async function cortexForceClosePosition() {
   try {
     var closeResult = await apiPost('/api/ig/positions/close', { dealId: cortexOpenPosition.dealId });
     if (closeResult && !closeResult._httpError && !closeResult.error) {
-      var fcCurrentMid = null;
-      if (typeof livePrices !== 'undefined' && livePrices[neuralCurrentEpic]) fcCurrentMid = livePrices[neuralCurrentEpic].mid;
-      if (!fcCurrentMid && neuralLastPrice) fcCurrentMid = neuralLastPrice;
-      var fcPnlPts = fcCurrentMid ? (cortexOpenPosition.direction === 'BUY' ? (fcCurrentMid - (cortexOpenPosition.entry || 0)) : ((cortexOpenPosition.entry || 0) - fcCurrentMid)) : 0;
+      var fcCurrentPrice = null;
+      var fcLive = (typeof livePrices !== 'undefined' && livePrices[neuralCurrentEpic]) ? livePrices[neuralCurrentEpic] : null;
+      if (fcLive) {
+        fcCurrentPrice = cortexOpenPosition.direction === 'BUY' ? (fcLive.bid || fcLive.mid) : (fcLive.offer || fcLive.mid);
+      }
+      if (!fcCurrentPrice && neuralLastPrice) fcCurrentPrice = neuralLastPrice;
+      var fcPnlPts = fcCurrentPrice ? (cortexOpenPosition.direction === 'BUY' ? (fcCurrentPrice - (cortexOpenPosition.entry || 0)) : ((cortexOpenPosition.entry || 0) - fcCurrentPrice)) : 0;
       var fcSize = cortexOpenPosition.size || cortexPositionSize || 1;
       var fcPlm = cortexOpenPosition.plMultiplier || 1;
       var fcPnl = fcPnlPts * fcSize * fcPlm;
@@ -3415,11 +3419,12 @@ async function _cortexAutoTradeCheckInner() {
         cortexLastTradeTs = Date.now();
         if (bResult && bResult.ok) {
           var bPlm = await fetchPlMultiplier(neuralCurrentEpic);
-          cortexAddDecision({ time: timeStr, action: 'BREAKOUT ' + breakDir, detail: breakoutAction.reason + ' dealId=' + bResult.dealId });
-          cortexOpenPosition = { direction: breakDir, entry: closePrice, candlesHeld: 0, dealId: bResult.dealId, size: tradeSize, plMultiplier: bPlm };
+          var bActualEntry = bResult.fillLevel || closePrice;
+          cortexAddDecision({ time: timeStr, action: 'BREAKOUT ' + breakDir, detail: breakoutAction.reason + ' dealId=' + bResult.dealId + ' fill=' + bActualEntry.toFixed(2) });
+          cortexOpenPosition = { direction: breakDir, entry: bActualEntry, candlesHeld: 0, dealId: bResult.dealId, size: tradeSize, plMultiplier: bPlm };
           cortexExitConsecutiveCount = 0;
           cortexConsecutiveCount = 0;
-          cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'BREAKOUT ' + breakDir, buy: buy, sell: sell, price: closePrice, size: tradeSize, tf: tfLabel, dealId: bResult.dealId, plMultiplier: bPlm });
+          cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'BREAKOUT ' + breakDir, buy: buy, sell: sell, price: bActualEntry, size: tradeSize, tf: tfLabel, dealId: bResult.dealId, plMultiplier: bPlm });
           renderCortexTradeLog();
           cortexSaveState();
         } else {
@@ -3592,11 +3597,12 @@ async function _cortexAutoTradeCheckInner() {
       cortexLastTradeTs = Date.now();
       if (orderResult && orderResult.ok) {
         var entryPlm = await fetchPlMultiplier(neuralCurrentEpic);
-        cortexAddDecision({ time: timeStr, action: 'OPENED ' + rawSignal, detail: closePrice.toFixed(2) + ' sz=' + sizeLabel + ' confirmed=' + cortexConsecutiveCount + 'x | dealId=' + orderResult.dealId });
-        cortexOpenPosition = { direction: rawSignal, entry: closePrice, candlesHeld: 0, dealId: orderResult.dealId, size: tradeSize, plMultiplier: entryPlm };
+        var actualEntry = orderResult.fillLevel || closePrice;
+        cortexAddDecision({ time: timeStr, action: 'OPENED ' + rawSignal, detail: actualEntry.toFixed(2) + ' sz=' + sizeLabel + ' confirmed=' + cortexConsecutiveCount + 'x | dealId=' + orderResult.dealId + (orderResult.fillLevel ? ' (fill)' : ' (candle)') });
+        cortexOpenPosition = { direction: rawSignal, entry: actualEntry, candlesHeld: 0, dealId: orderResult.dealId, size: tradeSize, plMultiplier: entryPlm };
         cortexExitConsecutiveCount = 0;
         cortexConsecutiveCount = 0;
-        cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: rawSignal, buy: buy, sell: sell, price: closePrice, size: tradeSize, tf: tfLabel, dealId: orderResult.dealId, plMultiplier: entryPlm });
+        cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: rawSignal, buy: buy, sell: sell, price: actualEntry, size: tradeSize, tf: tfLabel, dealId: orderResult.dealId, plMultiplier: entryPlm });
         renderCortexTradeLog();
         cortexSaveState();
       } else {
@@ -3716,7 +3722,15 @@ async function cortexLoadState() {
             if (pDealId === savedPos.dealId) {
               verified = true;
               var mkt = p.market || {};
-              savedPos.currentPrice = mkt.bid || mkt.offer || savedPos.entry;
+              var igPos = p.position || {};
+              var igLevel = parseFloat(igPos.level || igPos.openLevel) || 0;
+              if (igLevel > 0 && igLevel !== savedPos.entry) {
+                addBrainLog('CORTEX', 'Syncing entry from IG: ' + savedPos.entry + ' → ' + igLevel + ' (IG fill level)');
+                savedPos.entry = igLevel;
+              }
+              var igSize = parseFloat(igPos.size || igPos.dealSize) || 0;
+              if (igSize > 0) savedPos.size = igSize;
+              if (mkt.plMultiplier) savedPos.plMultiplier = parseFloat(mkt.plMultiplier);
               break;
             }
           }
@@ -3882,29 +3896,30 @@ function renderCortexTradeLog(skipSave) {
 
   if (cortexOpenPosition) {
     var pos = cortexOpenPosition;
-    var currentMid = null;
-    if (typeof livePrices !== 'undefined' && livePrices[neuralCurrentEpic]) {
-      currentMid = livePrices[neuralCurrentEpic].mid;
+    var currentPrice = null;
+    var liveData = (typeof livePrices !== 'undefined' && livePrices[neuralCurrentEpic]) ? livePrices[neuralCurrentEpic] : null;
+    if (liveData) {
+      currentPrice = pos.direction === 'BUY' ? (liveData.bid || liveData.mid) : (liveData.offer || liveData.mid);
     }
-    if (!currentMid && neuralLastPrice) currentMid = neuralLastPrice;
+    if (!currentPrice && neuralLastPrice) currentPrice = neuralLastPrice;
     var livePnl = '';
     var livePnlColor = '#8b949e';
-    if (currentMid && pos.entry) {
-      var dir = pos.direction === 'BUY' ? 1 : -1;
-      var pnlPts = (currentMid - pos.entry) * dir;
+    if (currentPrice && pos.entry) {
+      var pnlPts = pos.direction === 'BUY' ? (currentPrice - pos.entry) : (pos.entry - currentPrice);
       var posSize = pos.size || cortexPositionSize || 1;
       var posPlm = pos.plMultiplier || 1;
       var pnlVal = pnlPts * posSize * posPlm;
       livePnl = (pnlVal >= 0 ? '+$' : '-$') + Math.abs(pnlVal).toFixed(2);
       livePnlColor = pnlVal >= 0 ? '#2dc653' : '#f85149';
     }
+    var priceLabel = pos.direction === 'BUY' ? 'Bid' : 'Offer';
     html += '<div style="padding:6px 8px;margin-bottom:4px;background:#1b4332;border:1px solid #2dc653;border-radius:6px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
       '<span style="font-weight:700;color:' + (pos.direction === 'BUY' ? '#2dc653' : '#f85149') + ';font-size:12px">OPEN: ' + pos.direction + ' @ ' + (pos.entry || 0).toFixed(2) + '</span>' +
       '<span style="font-weight:700;color:' + livePnlColor + ';font-size:13px">' + (livePnl || 'awaiting price') + '</span>' +
       '</div>' +
       '<div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#8b949e">' +
-      '<span>Now: ' + (currentMid ? currentMid.toFixed(2) : '--') + ' | DealId: ' + (pos.dealId || '?').substring(0, 15) + '</span>' +
+      '<span>' + priceLabel + ': ' + (currentPrice ? currentPrice.toFixed(2) : '--') + ' | sz=' + (pos.size || '?') + ' plm=' + (pos.plMultiplier || 1) + ' | ' + (pos.dealId || '?').substring(0, 12) + '</span>' +
       '<button onclick="cortexForceClosePosition()" style="background:#3d1a1a;color:#f85149;border:1px solid #f85149;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:600;cursor:pointer">FORCE CLOSE</button>' +
       '</div></div>';
   }
