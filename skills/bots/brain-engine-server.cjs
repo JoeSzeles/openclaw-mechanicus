@@ -9,9 +9,9 @@ const BRAIN_STATE_FILE = path.join(DATA_DIR, 'brain-state.json');
 
 try { fs.mkdirSync(PATTERNS_DIR, { recursive: true }); } catch (_) {}
 
-let N_SENSORY = 100;
-let N_INTER = 200;
-let N_MOTOR = 50;
+let N_SENSORY = 600;
+let N_INTER = 3600;
+let N_MOTOR = 800;
 let N_TOTAL = N_SENSORY + N_INTER + N_MOTOR;
 const DT = 1.0;
 const V_REST = -52.0;

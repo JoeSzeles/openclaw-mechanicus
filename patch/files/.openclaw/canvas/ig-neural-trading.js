@@ -3753,6 +3753,7 @@ function initNeuralTradingTab() {
       if (r) {
         addBrainLog('INFO', 'Brain auto-booted on tab init');
       }
+      loadArchitecture();
       cortexLoadState();
     });
     checkBrainProcessStatus();

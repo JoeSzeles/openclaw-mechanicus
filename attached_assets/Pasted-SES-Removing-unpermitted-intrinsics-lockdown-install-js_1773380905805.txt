@@ -1,0 +1,606 @@
+SES Removing unpermitted intrinsics lockdown-install.js:1:203117
+  Removing intrinsics.%MapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%MapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%DatePrototype%.toTemporalInstant lockdown-install.js:1:202962
+Uncaught (in promise) Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2039
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lightweight-charts.js:7:147432
+Uncaught (in promise) Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lightweight-charts.js:7:147432
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2039
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+Uncaught (in promise) Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+2 lightweight-charts.js:7:147432
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+Uncaught (in promise) Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+2 lightweight-charts.js:7:147432
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+Uncaught (in promise) Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+13 lightweight-charts.js:7:147432
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+Uncaught (in promise) Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+21 lightweight-charts.js:7:147432
+Uncaught (in promise) Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+    async* https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:5118
+4 lightweight-charts.js:7:147432
+Uncaught (in promise) Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lightweight-charts.js:7:147432
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+    async* https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:5118
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+    async* https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:5118
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+    async* https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:5118
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+    async* https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:5118
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+Uncaught (in promise) Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+7 lightweight-charts.js:7:147432
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+Uncaught (in promise) Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+22 lightweight-charts.js:7:147432
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+SES_UNHANDLED_REJECTION: Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+lockdown-install.js:1:145776
+Uncaught (in promise) Error: Cannot update oldest data, last time=[object Object], new time=[object Object]
+    Lb https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    tw https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    update https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/lightweight-charts.js:7
+    feedLiveTick https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-dashboard.html:2035
+    updateLivePrices https://be1a940b-924a-449d-ae02-954c66974b04-00-39aqxi9w7wyw6.picard.replit.dev/__openclaw__/canvas/ig-live-prices.js:36
+3 lightweight-charts.js:7:147432
