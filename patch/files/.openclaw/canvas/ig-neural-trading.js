@@ -1035,16 +1035,93 @@ var calibAutoPassTimer = null;
 var CALIB_ALL_TIMEFRAMES = ['SECOND','SECOND_2','SECOND_5','SECOND_10','SECOND_30','MINUTE','MINUTE_2','MINUTE_3','MINUTE_5','MINUTE_15','MINUTE_30','HOUR','HOUR_4','DAY'];
 var CALIB_TF_LABELS = {SECOND:'1s',SECOND_2:'2s',SECOND_5:'5s',SECOND_10:'10s',SECOND_30:'30s',MINUTE:'1m',MINUTE_2:'2m',MINUTE_3:'3m',MINUTE_5:'5m',MINUTE_15:'15m',MINUTE_30:'30m',HOUR:'1h',HOUR_4:'4h',DAY:'D1'};
 
+function calibAggregateCandles(baseCandles, baseSec, targetSec) {
+  if (targetSec <= baseSec) return baseCandles;
+  var result = [];
+  var current = null;
+  for (var i = 0; i < baseCandles.length; i++) {
+    var c = baseCandles[i];
+    var rawTs = c.snapshotTime || c.snapshotTimeUTC || '';
+    var ts = new Date(rawTs.replace(/\//g, '-').replace(' ', 'T')).getTime();
+    if (!ts || isNaN(ts)) continue;
+    var tsSec = Math.floor(ts / 1000);
+    var bucket = Math.floor(tsSec / targetSec) * targetSec;
+    var cClose = cortexExtractPrice(c, 'close') || 0;
+    var cOpen = cortexExtractPrice(c, 'open') || cClose;
+    var cHigh = cortexExtractPrice(c, 'high') || cClose;
+    var cLow = cortexExtractPrice(c, 'low') || cClose;
+    if (!cClose) continue;
+    if (current && current._bucket === bucket) {
+      if (cHigh > current._high) current._high = cHigh;
+      if (cLow < current._low) current._low = cLow;
+      current._close = cClose;
+    } else {
+      if (current) result.push(calibBuildCandle(current));
+      current = { _bucket: bucket, _open: cOpen, _high: cHigh, _low: cLow, _close: cClose, _ts: new Date(bucket * 1000).toISOString() };
+    }
+  }
+  if (current) result.push(calibBuildCandle(current));
+  return result;
+}
+
+function calibBuildCandle(agg) {
+  return {
+    snapshotTimeUTC: agg._ts,
+    snapshotTime: agg._ts,
+    openPrice: { bid: agg._open, ask: agg._open, mid: agg._open },
+    highPrice: { bid: agg._high, ask: agg._high, mid: agg._high },
+    lowPrice: { bid: agg._low, ask: agg._low, mid: agg._low },
+    closePrice: { bid: agg._close, ask: agg._close, mid: agg._close },
+    open: agg._open, high: agg._high, low: agg._low, close: agg._close,
+  };
+}
+
+var calibBaseCandleCache = {};
+
+async function calibFetchBaseCandles(epic, maxCandles) {
+  var cacheKey = epic + ':' + maxCandles;
+  if (calibBaseCandleCache[cacheKey]) return calibBaseCandleCache[cacheKey];
+  var baseTfs = ['MINUTE', 'SECOND_30', 'SECOND_10', 'SECOND_5', 'SECOND'];
+  var candles = [];
+  var baseSec = 60;
+  for (var i = 0; i < baseTfs.length; i++) {
+    var btf = baseTfs[i];
+    var url = '/api/ig/scalper/candles?epic=' + encodeURIComponent(epic) + '&resolution=' + btf + '&max=' + maxCandles;
+    var data = await apiFetch(url);
+    candles = (data && data.prices) || [];
+    if (candles.length >= 20) {
+      baseSec = cortexTimeframeSec[btf] || 60;
+      break;
+    }
+  }
+  if (candles.length < 20) {
+    var igData = await apiFetch('/api/ig/prices/' + encodeURIComponent(epic) + '?resolution=MINUTE&max=' + maxCandles);
+    candles = (igData && igData.prices) || [];
+    baseSec = 60;
+  }
+  var result = { candles: candles, baseSec: baseSec };
+  calibBaseCandleCache[cacheKey] = result;
+  return result;
+}
+
 async function calibFetchCandles(epic, tf, maxCandles) {
+  var targetSec = cortexTimeframeSec[tf] || 60;
   var url = '/api/ig/scalper/candles?epic=' + encodeURIComponent(epic) + '&resolution=' + tf + '&max=' + maxCandles;
   var data = await apiFetch(url);
   var candles = (data && data.prices) || [];
-  if (candles.length < 20) {
-    var igUrl = '/api/ig/prices/' + encodeURIComponent(epic) + '?resolution=' + tf + '&max=' + maxCandles;
-    var igData = await apiFetch(igUrl);
-    candles = (igData && igData.prices) || [];
+  if (candles.length >= 20) return candles;
+  var igUrl = '/api/ig/prices/' + encodeURIComponent(epic) + '?resolution=' + tf + '&max=' + maxCandles;
+  var igData = await apiFetch(igUrl);
+  candles = (igData && igData.prices) || [];
+  if (candles.length >= 20) return candles;
+  var base = await calibFetchBaseCandles(epic, maxCandles);
+  if (base.candles.length < 20) return [];
+  if (targetSec <= base.baseSec) return base.candles;
+  var agg = calibAggregateCandles(base.candles, base.baseSec, targetSec);
+  if (agg.length >= 20) {
+    addBrainLog('INFO', 'Aggregated ' + base.candles.length + ' base candles -> ' + agg.length + ' ' + (CALIB_TF_LABELS[tf]||tf) + ' candles');
   }
-  return candles;
+  return agg;
 }
 
 async function calibRunThresholdScan(candles, epic, tf, thresholds) {
@@ -1079,6 +1156,7 @@ async function startCalibration() {
   if (calibrationRunning) return;
   calibrationRunning = true;
   calibLastResults = null;
+  calibBaseCandleCache = {};
   var epic = neuralCurrentEpic;
   if (!epic) {
     addBrainLog('ERROR', 'Select an instrument before calibrating');
@@ -1376,6 +1454,7 @@ async function runAutoPassCalibration() {
   if (!epic) { addBrainLog('WARN', 'Auto-pass: no instrument selected'); return; }
   calibrationRunning = true;
   calibLastResults = null;
+  calibBaseCandleCache = {};
   var maxCandlesRaw = parseInt((document.getElementById('neural-calib-candles') || {}).value);
   var maxCandles = (maxCandlesRaw > 0) ? maxCandlesRaw : 999999;
   var tf = (document.getElementById('neural-calib-tf') || {}).value || 'MINUTE';
