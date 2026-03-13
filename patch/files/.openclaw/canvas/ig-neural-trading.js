@@ -1042,7 +1042,9 @@ async function startCalibration() {
     calibrationRunning = false;
     return;
   }
-  var maxCandles = parseInt((document.getElementById('neural-calib-candles') || {}).value) || 500;
+  var maxCandlesRaw = parseInt((document.getElementById('neural-calib-candles') || {}).value);
+  var maxCandles = (maxCandlesRaw > 0) ? maxCandlesRaw : 999999;
+  var maxLabel = (maxCandlesRaw > 0) ? String(maxCandlesRaw) : 'ALL';
   var tf = (document.getElementById('neural-calib-tf') || {}).value || 'MINUTE';
   var rangeMode = (document.getElementById('neural-calib-range') || {}).value || 'normal';
   var statusEl = document.getElementById('neural-calibration-status');
@@ -1060,7 +1062,7 @@ async function startCalibration() {
   if (pctEl) pctEl.textContent = 'Fetching candles...';
   if (statusEl) statusEl.textContent = 'Fetching...';
   cortexReadParams();
-  addBrainLog('INFO', 'Auto-calibration: ' + epic + ' tf=' + tf + ' candles=' + maxCandles + ' range=' + rangeMode);
+  addBrainLog('INFO', 'Auto-calibration: ' + epic + ' tf=' + tf + ' candles=' + maxLabel + ' range=' + rangeMode);
 
   var thresholds;
   if (rangeMode === 'narrow') thresholds = [3, 5, 7, 9, 12, 15];
@@ -1308,7 +1310,8 @@ async function runAutoPassCalibration() {
   if (!epic) { addBrainLog('WARN', 'Auto-pass: no instrument selected'); return; }
   calibrationRunning = true;
   calibLastResults = null;
-  var maxCandles = parseInt((document.getElementById('neural-calib-candles') || {}).value) || 500;
+  var maxCandlesRaw = parseInt((document.getElementById('neural-calib-candles') || {}).value);
+  var maxCandles = (maxCandlesRaw > 0) ? maxCandlesRaw : 999999;
   var tf = (document.getElementById('neural-calib-tf') || {}).value || 'MINUTE';
   var rangeMode = (document.getElementById('neural-calib-range') || {}).value || 'normal';
   cortexReadParams();
