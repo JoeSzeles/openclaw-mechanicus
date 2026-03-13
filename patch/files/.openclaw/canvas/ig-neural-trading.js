@@ -3144,12 +3144,21 @@ async function cortexForceClosePosition() {
     showToast('No tracked position to close', false);
     return;
   }
-  if (!confirm('Close ' + cortexOpenPosition.direction + ' position on IG?\n\nEntry: ' + (cortexOpenPosition.entry || 0).toFixed(2) + '\nDealId: ' + cortexOpenPosition.dealId)) return;
+  var wasAutoTrading = cortexAutoTradeEnabled;
+  if (!confirm('Close ' + cortexOpenPosition.direction + ' position on IG?\n\nEntry: ' + (cortexOpenPosition.entry || 0).toFixed(2) + '\nDealId: ' + cortexOpenPosition.dealId + (wasAutoTrading ? '\n\nAuto-trade will be PAUSED after close.' : ''))) return;
+
+  if (wasAutoTrading) {
+    cortexAutoTradeEnabled = false;
+    if (cortexAutoTradeInterval) { clearInterval(cortexAutoTradeInterval); cortexAutoTradeInterval = null; }
+    var btn = document.getElementById('cortex-auto-trade-btn');
+    if (btn) { btn.textContent = 'AUTO-TRADE PAUSED'; btn.style.background = '#3d2a00'; btn.style.color = '#d29922'; btn.style.borderColor = '#d29922'; }
+    addBrainLog('CORTEX', 'Auto-trade PAUSED for force-close');
+  }
 
   addBrainLog('CORTEX', 'Force-closing position dealId=' + cortexOpenPosition.dealId + '...');
   try {
     var closeResult = await apiPost('/api/ig/positions/close', { dealId: cortexOpenPosition.dealId });
-    if (closeResult && !closeResult._httpError && !closeResult.error) {
+    if (closeResult && closeResult.ok) {
       var fcCurrentPrice = null;
       var fcLive = (typeof livePrices !== 'undefined' && livePrices[neuralCurrentEpic]) ? livePrices[neuralCurrentEpic] : null;
       if (fcLive) {
@@ -3163,22 +3172,34 @@ async function cortexForceClosePosition() {
       addBrainLog('CORTEX', 'Position force-closed on IG — P&L: $' + fcPnl.toFixed(2));
       showToast('Position closed ($' + fcPnl.toFixed(2) + ')', true);
       cortexTradeLog.push({
-        ts: Date.now(), dir: 'FORCE-CLOSE', price: fcCurrentMid || cortexOpenPosition.entry,
+        ts: Date.now(), dir: 'FORCE-CLOSE', price: fcCurrentPrice || cortexOpenPosition.entry,
         tf: cortexTimeframe, buy: 0, sell: 0, dealId: cortexOpenPosition.dealId,
-        pnl: fcPnl, plMultiplier: fcPlm, size: fcSize
+        epic: neuralCurrentEpic, pnl: fcPnl, plMultiplier: fcPlm, size: fcSize
       });
       cortexOpenPosition = null;
       renderCortexTradeLog();
       cortexUpdatePositionBadge();
       cortexSaveState();
+      if (wasAutoTrading) {
+        var statusEl = document.getElementById('cortex-auto-status');
+        if (statusEl) { statusEl.textContent = 'PAUSED after force-close — click AUTO-TRADE to resume'; statusEl.style.color = '#d29922'; }
+      }
     } else {
-      var msg = (closeResult && (closeResult.reason || closeResult.error)) || 'unknown error';
+      var msg = (closeResult && (closeResult.reason || closeResult.error || closeResult.errorCode)) || 'unknown error';
       addBrainLog('ERROR', 'Force-close failed: ' + msg);
       showToast('Close failed: ' + msg, false);
+      if (wasAutoTrading) {
+        cortexAutoTradeEnabled = true;
+        addBrainLog('CORTEX', 'Re-enabling auto-trade after failed close');
+      }
     }
   } catch (e) {
     addBrainLog('ERROR', 'Force-close error: ' + e.message);
     showToast('Close error: ' + e.message, false);
+    if (wasAutoTrading) {
+      cortexAutoTradeEnabled = true;
+      addBrainLog('CORTEX', 'Re-enabling auto-trade after close error');
+    }
   }
 }
 
