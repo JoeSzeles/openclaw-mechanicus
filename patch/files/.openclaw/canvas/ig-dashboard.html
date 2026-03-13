@@ -2028,17 +2028,20 @@ function feedLiveTick(epic, mid) {
   if (!liveTickCandles[key]) liveTickCandles[key] = [];
   var candles = liveTickCandles[key];
   var last = candles.length > 0 ? candles[candles.length - 1] : null;
-  if (last && last.time === candleTs) {
-    last.high = Math.max(last.high, mid);
-    last.low = Math.min(last.low, mid);
-    last.close = mid;
-    candleSeries.update(last);
-  } else {
-    var newCandle = { time: candleTs, open: mid, high: mid, low: mid, close: mid };
-    candles.push(newCandle);
-    candleSeries.update(newCandle);
-    if (candles.length > 5000) candles.splice(0, candles.length - 5000);
-  }
+  if (last && candleTs < last.time) return;
+  try {
+    if (last && last.time === candleTs) {
+      last.high = Math.max(last.high, mid);
+      last.low = Math.min(last.low, mid);
+      last.close = mid;
+      candleSeries.update(last);
+    } else {
+      var newCandle = { time: candleTs, open: mid, high: mid, low: mid, close: mid };
+      candles.push(newCandle);
+      candleSeries.update(newCandle);
+      if (candles.length > 5000) candles.splice(0, candles.length - 5000);
+    }
+  } catch (_) {}
   currentCandleData = candles;
 }
 
