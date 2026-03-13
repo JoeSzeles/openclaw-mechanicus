@@ -1490,6 +1490,47 @@ async function handleRequest(req, res) {
     }
   }
 
+  if (m === 'GET' && p === '/cortex-params') {
+    try {
+      if (fs.existsSync(CORTEX_STATE_FILE)) {
+        const raw = JSON.parse(fs.readFileSync(CORTEX_STATE_FILE, 'utf-8'));
+        return respond(res, 200, {
+          params: raw.params || {},
+          autoTradeState: raw.autoTradeState || {},
+          calibAutoPass: raw.calibAutoPass || false,
+          calibAutoPassInterval: raw.calibAutoPassInterval || 30,
+          savedAt: raw.savedAt || null,
+          hasOpenPosition: !!(raw.openPosition && raw.openPosition.dealId),
+        });
+      }
+      return respond(res, 200, { params: {}, autoTradeState: {}, calibAutoPass: false, calibAutoPassInterval: 30 });
+    } catch (e) {
+      return respond(res, 500, { error: e.message });
+    }
+  }
+
+  if (m === 'POST' && p === '/cortex-params') {
+    const newParams = await parseBody(req);
+    try {
+      let state = {};
+      if (fs.existsSync(CORTEX_STATE_FILE)) {
+        state = JSON.parse(fs.readFileSync(CORTEX_STATE_FILE, 'utf-8'));
+      }
+      if (!state.params) state.params = {};
+      Object.assign(state.params, newParams.params || {});
+      if (newParams.calibAutoPass !== undefined) state.calibAutoPass = newParams.calibAutoPass;
+      if (newParams.calibAutoPassInterval !== undefined) state.calibAutoPassInterval = newParams.calibAutoPassInterval;
+      state.savedAt = new Date().toISOString();
+      state.lastModifiedBy = newParams._source || 'agent';
+      const tmp = CORTEX_STATE_FILE + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(state));
+      fs.renameSync(tmp, CORTEX_STATE_FILE);
+      return respond(res, 200, { ok: true, savedAt: state.savedAt, paramsUpdated: Object.keys(newParams.params || {}) });
+    } catch (e) {
+      return respond(res, 500, { error: e.message });
+    }
+  }
+
   if (m === 'DELETE' && p === '/cortex-state') {
     try {
       if (fs.existsSync(CORTEX_STATE_FILE)) fs.unlinkSync(CORTEX_STATE_FILE);

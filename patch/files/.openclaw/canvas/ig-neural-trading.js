@@ -1028,6 +1028,9 @@ function stopObserverMode() {
 }
 
 var calibLastResults = null;
+var calibAutoPassEnabled = false;
+var calibAutoPassInterval = 30;
+var calibAutoPassTimer = null;
 
 async function startCalibration() {
   if (calibrationRunning) return;
@@ -1238,6 +1241,154 @@ function stopCalibration() {
   if (startBtn) startBtn.style.display = 'inline-block';
   if (stopBtn) stopBtn.style.display = 'none';
   addBrainLog('INFO', 'Calibration stopped');
+}
+
+function toggleCalibAutoPass() {
+  var cb = document.getElementById('calib-auto-pass');
+  calibAutoPassEnabled = cb ? cb.checked : false;
+  var intEl = document.getElementById('calib-auto-pass-interval');
+  if (intEl) calibAutoPassInterval = Math.max(1, parseInt(intEl.value) || 30);
+  if (calibAutoPassEnabled) {
+    startCalibAutoPassTimer();
+    addBrainLog('CORTEX', 'Auto-pass ENABLED: re-calibrate every ' + calibAutoPassInterval + ' min, auto-apply thresholds');
+  } else {
+    stopCalibAutoPassTimer();
+    addBrainLog('CORTEX', 'Auto-pass DISABLED');
+  }
+  cortexSaveState();
+  updateCalibAutoPassUI();
+}
+
+function updateCalibAutoPassInterval() {
+  var intEl = document.getElementById('calib-auto-pass-interval');
+  calibAutoPassInterval = Math.max(1, parseInt((intEl || {}).value) || 30);
+  if (calibAutoPassEnabled) {
+    stopCalibAutoPassTimer();
+    startCalibAutoPassTimer();
+    addBrainLog('CORTEX', 'Auto-pass interval changed to ' + calibAutoPassInterval + ' min');
+  }
+  cortexSaveState();
+}
+
+function startCalibAutoPassTimer() {
+  stopCalibAutoPassTimer();
+  var ms = calibAutoPassInterval * 60 * 1000;
+  calibAutoPassTimer = setInterval(function() {
+    if (!calibAutoPassEnabled) { stopCalibAutoPassTimer(); return; }
+    if (calibrationRunning) return;
+    addBrainLog('CORTEX', 'Auto-pass: starting scheduled calibration...');
+    runAutoPassCalibration();
+  }, ms);
+  updateCalibAutoPassUI();
+}
+
+function stopCalibAutoPassTimer() {
+  if (calibAutoPassTimer) { clearInterval(calibAutoPassTimer); calibAutoPassTimer = null; }
+  updateCalibAutoPassUI();
+}
+
+function updateCalibAutoPassUI() {
+  var statusEl = document.getElementById('calib-auto-pass-status');
+  if (!statusEl) return;
+  if (calibAutoPassEnabled && calibAutoPassTimer) {
+    statusEl.textContent = 'ON — every ' + calibAutoPassInterval + 'min';
+    statusEl.style.color = '#2dc653';
+  } else if (calibAutoPassEnabled) {
+    statusEl.textContent = 'Enabled (starting...)';
+    statusEl.style.color = '#d29922';
+  } else {
+    statusEl.textContent = 'OFF';
+    statusEl.style.color = '#8b949e';
+  }
+}
+
+async function runAutoPassCalibration() {
+  if (calibrationRunning) return;
+  var epic = neuralCurrentEpic;
+  if (!epic) { addBrainLog('WARN', 'Auto-pass: no instrument selected'); return; }
+  calibrationRunning = true;
+  calibLastResults = null;
+  var maxCandles = parseInt((document.getElementById('neural-calib-candles') || {}).value) || 500;
+  var tf = (document.getElementById('neural-calib-tf') || {}).value || 'MINUTE';
+  var rangeMode = (document.getElementById('neural-calib-range') || {}).value || 'normal';
+  cortexReadParams();
+
+  var thresholds;
+  if (rangeMode === 'narrow') thresholds = [3, 5, 7, 9, 12, 15];
+  else if (rangeMode === 'wide') thresholds = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40];
+  else thresholds = [2, 3, 5, 7, 10, 13, 16, 20, 25];
+
+  var statusEl = document.getElementById('neural-calibration-status');
+  if (statusEl) statusEl.textContent = 'Auto-pass running...';
+
+  try {
+    var url = '/api/ig/scalper/candles?epic=' + encodeURIComponent(epic) + '&resolution=' + tf + '&max=' + maxCandles;
+    var data = await apiFetch(url);
+    var candles = (data && data.prices) || [];
+    if (candles.length < 20) {
+      var igData = await apiFetch('/api/ig/prices/' + encodeURIComponent(epic) + '?resolution=' + tf + '&max=' + maxCandles);
+      candles = (igData && igData.prices) || [];
+    }
+    if (candles.length < 20) {
+      addBrainLog('WARN', 'Auto-pass: insufficient candle data (' + candles.length + ')');
+      calibrationRunning = false;
+      if (statusEl) statusEl.textContent = 'Auto-pass: no data';
+      return;
+    }
+    var results = [];
+    for (var ti = 0; ti < thresholds.length; ti++) {
+      if (!calibAutoPassEnabled) break;
+      var thresh = thresholds[ti];
+      var btResult = await brainFetch('/backtest-train', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          candles: candles, epic: epic, stopLossPips: cortexStopLossPips, takeProfitPips: cortexTakeProfitPips,
+          size: cortexMinPositionSize, plMultiplier: 1, minHoldCandles: cortexMinHoldCandles,
+          signalThreshold: thresh, confirmCandles: cortexConfirmCandles, antennaEnabled: true, timeframe: tf, dryRun: true,
+        })
+      });
+      if (btResult) {
+        results.push({ threshold: thresh, trades: btResult.trades ? btResult.trades.length : 0, pnl: btResult.total_pnl || 0, winRate: btResult.win_rate || 0 });
+      }
+    }
+    calibLastResults = results;
+    var withTrades = results.filter(function(r) { return r.trades > 0; });
+    if (withTrades.length === 0) {
+      addBrainLog('WARN', 'Auto-pass: no threshold produced trades');
+      if (statusEl) statusEl.textContent = 'Auto-pass: no trades';
+      calibrationRunning = false;
+      return;
+    }
+    if (!calibAutoPassEnabled) {
+      addBrainLog('CORTEX', 'Auto-pass disabled during scan — discarding results');
+      if (statusEl) statusEl.textContent = 'Aborted (disabled)';
+      calibrationRunning = false;
+      return;
+    }
+    var best = withTrades.reduce(function(a, b) { return (b.winRate > a.winRate || (b.winRate === a.winRate && b.pnl > a.pnl)) ? b : a; }, withTrades[0]);
+    var bestPnl = withTrades.reduce(function(a, b) { return b.pnl > a.pnl ? b : a; }, withTrades[0]);
+    var pick = best;
+    if (bestPnl.pnl > 0 && bestPnl.pnl > pick.pnl * 1.5 && bestPnl.winRate >= 40) pick = bestPnl;
+
+    var oldBuy = cortexBuyThreshold;
+    var oldSell = cortexSellThreshold;
+    cortexBuyThreshold = pick.threshold;
+    cortexSellThreshold = pick.threshold;
+    var buyEl = document.getElementById('cortex-buy-thresh');
+    var sellEl = document.getElementById('cortex-sell-thresh');
+    if (buyEl) buyEl.value = pick.threshold;
+    if (sellEl) sellEl.value = pick.threshold;
+
+    addBrainLog('CORTEX', 'Auto-pass applied: threshold ' + oldBuy + '/' + oldSell + ' -> ' + pick.threshold + '/' + pick.threshold + ' (Win=' + pick.winRate + '% P&L=' + pick.pnl.toFixed(2) + ' from ' + candles.length + ' ' + tf + ' candles)');
+    if (statusEl) statusEl.textContent = 'Applied: ' + pick.threshold + ' (Win=' + pick.winRate + '%)';
+    calibShowResults(results, candles.length, tf, epic);
+    cortexSaveState();
+  } catch (e) {
+    addBrainLog('ERROR', 'Auto-pass error: ' + e.message);
+    if (statusEl) statusEl.textContent = 'Error';
+  }
+  calibrationRunning = false;
 }
 
 function exportBrainTradeCSV() {
@@ -3144,18 +3295,37 @@ async function cortexSaveState() {
     var saveData = {
       tradeLog: cortexTradeLog,
       openPosition: cortexOpenPosition,
-      decisionLog: cortexDecisionLog,
+      decisionLog: cortexDecisionLog.slice(-200),
+      params: {
+        buyThreshold: cortexBuyThreshold,
+        sellThreshold: cortexSellThreshold,
+        holdZone: cortexHoldZone,
+        stopLossPips: cortexStopLossPips,
+        takeProfitPips: cortexTakeProfitPips,
+        cooldownMs: cortexCooldownMs,
+        minPositionSize: cortexMinPositionSize,
+        maxPositionSize: cortexMaxPositionSize,
+        positionSize: cortexPositionSize,
+        autoSize: cortexAutoSize,
+        minHoldCandles: cortexMinHoldCandles,
+        confirmCandles: cortexConfirmCandles,
+        exitConfirmCandles: cortexExitConfirmCandles,
+        priceExitsEnabled: cortexPriceExitsEnabled,
+        autoLearn: cortexAutoLearn,
+        maxOpenPositions: cortexMaxOpenPositions,
+        antennaFlashThreshold: antenna.flashThreshold,
+        antennaDeadCatSensitivity: antenna.deadCatSensitivity,
+        antennaEmergencyExit: antenna.emergencyExitEnabled,
+        antennaBreakoutRider: antenna.breakoutRiderEnabled,
+        antennaFallingKnife: antenna.fallingKnifeBlock,
+      },
       autoTradeState: {
         enabled: cortexAutoTradeEnabled,
         epic: neuralCurrentEpic,
         timeframe: cortexTimeframe,
-        buyThreshold: cortexBuyThreshold,
-        sellThreshold: cortexSellThreshold,
-        holdZone: cortexHoldZone,
-        positionSize: cortexPositionSize,
-        minSize: cortexMinPositionSize,
-        maxSize: cortexMaxPositionSize
-      }
+      },
+      calibAutoPass: calibAutoPassEnabled,
+      calibAutoPassInterval: calibAutoPassInterval,
     };
     await brainFetch('/cortex-state', {
       method: 'POST',
@@ -3205,6 +3375,47 @@ async function cortexLoadState() {
         cortexOpenPosition = null;
         cortexSaveState();
       }
+    }
+    if (state && state.params) {
+      var p = state.params;
+      function setIfExists(id, val) { var el = document.getElementById(id); if (el && val !== undefined && val !== null) { if (el.type === 'checkbox') el.checked = !!val; else el.value = val; } }
+      if (p.buyThreshold !== undefined) { cortexBuyThreshold = p.buyThreshold; setIfExists('cortex-buy-thresh', p.buyThreshold); }
+      if (p.sellThreshold !== undefined) { cortexSellThreshold = p.sellThreshold; setIfExists('cortex-sell-thresh', p.sellThreshold); }
+      if (p.holdZone !== undefined) { cortexHoldZone = p.holdZone; setIfExists('cortex-hold-zone', p.holdZone); }
+      if (p.stopLossPips !== undefined) { cortexStopLossPips = p.stopLossPips; setIfExists('cortex-sl', p.stopLossPips); }
+      if (p.takeProfitPips !== undefined) { cortexTakeProfitPips = p.takeProfitPips; setIfExists('cortex-tp', p.takeProfitPips); }
+      if (p.cooldownMs !== undefined) { cortexCooldownMs = p.cooldownMs; setIfExists('cortex-cooldown', p.cooldownMs / 1000); }
+      if (p.minPositionSize !== undefined) { cortexMinPositionSize = p.minPositionSize; setIfExists('cortex-min-size', p.minPositionSize); }
+      if (p.maxPositionSize !== undefined) { cortexMaxPositionSize = p.maxPositionSize; setIfExists('cortex-max-size', p.maxPositionSize); }
+      if (p.autoSize !== undefined) { cortexAutoSize = p.autoSize; setIfExists('cortex-auto-size', p.autoSize); }
+      if (p.minHoldCandles !== undefined) { cortexMinHoldCandles = p.minHoldCandles; setIfExists('cortex-min-hold', p.minHoldCandles); }
+      if (p.confirmCandles !== undefined) { cortexConfirmCandles = p.confirmCandles; setIfExists('cortex-confirm', p.confirmCandles); }
+      if (p.exitConfirmCandles !== undefined) { cortexExitConfirmCandles = p.exitConfirmCandles; setIfExists('cortex-exit-confirm', p.exitConfirmCandles); }
+      if (p.priceExitsEnabled !== undefined) { cortexPriceExitsEnabled = p.priceExitsEnabled; setIfExists('cortex-price-exits', p.priceExitsEnabled); }
+      if (p.autoLearn !== undefined) { cortexAutoLearn = p.autoLearn; setIfExists('cortex-auto-learn', p.autoLearn); }
+      if (p.positionSize !== undefined) { cortexPositionSize = p.positionSize; setIfExists('cortex-pos-size', p.positionSize); }
+      if (p.maxOpenPositions !== undefined) { cortexMaxOpenPositions = p.maxOpenPositions; setIfExists('cortex-max-pos', p.maxOpenPositions); }
+      if (p.antennaFlashThreshold !== undefined) { antenna.flashThreshold = p.antennaFlashThreshold; setIfExists('antenna-flash-thresh', p.antennaFlashThreshold); }
+      if (p.antennaDeadCatSensitivity !== undefined) { antenna.deadCatSensitivity = p.antennaDeadCatSensitivity; setIfExists('antenna-deadcat-sens', p.antennaDeadCatSensitivity); }
+      if (p.antennaEmergencyExit !== undefined) { antenna.emergencyExitEnabled = p.antennaEmergencyExit; setIfExists('antenna-emergency', p.antennaEmergencyExit); }
+      if (p.antennaBreakoutRider !== undefined) { antenna.breakoutRiderEnabled = p.antennaBreakoutRider; setIfExists('antenna-breakout', p.antennaBreakoutRider); }
+      if (p.antennaFallingKnife !== undefined) { antenna.fallingKnifeBlock = p.antennaFallingKnife; setIfExists('antenna-knife', p.antennaFallingKnife); }
+      addBrainLog('CORTEX', 'Restored params: buy=' + cortexBuyThreshold + ' sell=' + cortexSellThreshold + ' SL=' + cortexStopLossPips + ' TP=' + cortexTakeProfitPips + ' hold=' + cortexMinHoldCandles);
+    }
+    if (state && state.calibAutoPass !== undefined) {
+      calibAutoPassEnabled = !!state.calibAutoPass;
+      calibAutoPassInterval = state.calibAutoPassInterval || 30;
+      var apCb = document.getElementById('calib-auto-pass');
+      var apInt = document.getElementById('calib-auto-pass-interval');
+      if (apCb) apCb.checked = calibAutoPassEnabled;
+      if (apInt) apInt.value = calibAutoPassInterval;
+      if (calibAutoPassEnabled) {
+        startCalibAutoPassTimer();
+        addBrainLog('CORTEX', 'Restored auto-pass: ON, every ' + calibAutoPassInterval + 'min');
+      } else {
+        stopCalibAutoPassTimer();
+      }
+      updateCalibAutoPassUI();
     }
     if (state && state.autoTradeState && !cortexAutoTradeEnabled) {
       var ats = state.autoTradeState;

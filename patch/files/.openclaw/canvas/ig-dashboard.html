@@ -1075,9 +1075,19 @@ tr:hover { background: rgba(88,166,255,0.04); }
             <button class="btn-sm" onclick="calibApplyBestPnl()" style="background:#1a1028;color:#bc8cff;border-color:#bc8cff;padding:4px 12px;font-weight:600">Apply Best P&L</button>
           </div>
         </div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
           <button class="btn-sm" id="neural-calibration-start" onclick="startCalibration()" style="background:#1a1028;color:#bc8cff;border-color:#bc8cff;padding:6px 16px;font-weight:600">Start Auto-Calibration</button>
           <button class="btn-sm" id="neural-calibration-stop" onclick="stopCalibration()" style="display:none;background:#3d1a1a;color:#f85149;border-color:#f85149;padding:6px 16px;font-weight:600">Stop</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px;background:#161b22;border:1px solid #30363d;border-radius:6px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#c9d1d9;white-space:nowrap">
+            <input type="checkbox" id="calib-auto-pass" onchange="toggleCalibAutoPass()" style="accent-color:#bc8cff">
+            Auto-Pass to Cortex
+          </label>
+          <span style="font-size:11px;color:#8b949e">every</span>
+          <input type="number" id="calib-auto-pass-interval" value="30" min="1" max="1440" onchange="updateCalibAutoPassInterval()" style="width:50px;padding:3px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:12px;text-align:center">
+          <span style="font-size:11px;color:#8b949e">min</span>
+          <span id="calib-auto-pass-status" style="font-size:11px;color:#8b949e;margin-left:auto">OFF</span>
         </div>
       </div>
 
