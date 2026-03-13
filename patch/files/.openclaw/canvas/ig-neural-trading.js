@@ -1042,6 +1042,9 @@ var calibLastResults = null;
 var calibAutoPassEnabled = false;
 var calibAutoPassInterval = 30;
 var calibAutoPassTimer = null;
+var calibAutoPassLastRun = null;
+var calibAutoPassNextRun = null;
+var calibAutoPassCountdownTimer = null;
 
 var CALIB_ALL_TIMEFRAMES = ['SECOND','SECOND_2','SECOND_5','SECOND_10','SECOND_30','MINUTE','MINUTE_2','MINUTE_3','MINUTE_5','MINUTE_15','MINUTE_30','HOUR','HOUR_4','DAY'];
 var CALIB_TF_LABELS = {SECOND:'1s',SECOND_2:'2s',SECOND_5:'5s',SECOND_10:'10s',SECOND_30:'30s',MINUTE:'1m',MINUTE_2:'2m',MINUTE_3:'3m',MINUTE_5:'5m',MINUTE_15:'15m',MINUTE_30:'30m',HOUR:'1h',HOUR_4:'4h',DAY:'D1'};
@@ -1430,31 +1433,62 @@ function updateCalibAutoPassInterval() {
 function startCalibAutoPassTimer() {
   stopCalibAutoPassTimer();
   var ms = calibAutoPassInterval * 60 * 1000;
+  calibAutoPassNextRun = Date.now() + ms;
   calibAutoPassTimer = setInterval(function() {
     if (!calibAutoPassEnabled) { stopCalibAutoPassTimer(); return; }
     if (calibrationRunning) return;
     addBrainLog('CORTEX', 'Auto-pass: starting scheduled calibration...');
+    calibAutoPassNextRun = Date.now() + ms;
     runAutoPassCalibration();
   }, ms);
+  startCalibCountdown();
   updateCalibAutoPassUI();
 }
 
 function stopCalibAutoPassTimer() {
   if (calibAutoPassTimer) { clearInterval(calibAutoPassTimer); calibAutoPassTimer = null; }
+  if (calibAutoPassCountdownTimer) { clearInterval(calibAutoPassCountdownTimer); calibAutoPassCountdownTimer = null; }
+  calibAutoPassNextRun = null;
   updateCalibAutoPassUI();
+}
+
+function startCalibCountdown() {
+  if (calibAutoPassCountdownTimer) clearInterval(calibAutoPassCountdownTimer);
+  calibAutoPassCountdownTimer = setInterval(function() {
+    updateCalibAutoPassUI();
+  }, 10000);
+}
+
+function formatCalibTime(ts) {
+  if (!ts) return '—';
+  var d = new Date(ts);
+  var h = d.getHours(); var m = d.getMinutes();
+  return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
 }
 
 function updateCalibAutoPassUI() {
   var statusEl = document.getElementById('calib-auto-pass-status');
   if (!statusEl) return;
   if (calibAutoPassEnabled && calibAutoPassTimer) {
-    statusEl.textContent = 'ON — every ' + calibAutoPassInterval + 'min';
+    var parts = ['ON — every ' + calibAutoPassInterval + 'min'];
+    if (calibAutoPassLastRun) {
+      parts.push('Last: ' + formatCalibTime(calibAutoPassLastRun));
+    }
+    if (calibAutoPassNextRun) {
+      var secsLeft = Math.max(0, Math.round((calibAutoPassNextRun - Date.now()) / 1000));
+      var mLeft = Math.floor(secsLeft / 60);
+      var sLeft = secsLeft % 60;
+      parts.push('Next: ' + mLeft + ':' + (sLeft < 10 ? '0' : '') + sLeft);
+    }
+    statusEl.textContent = parts.join('  ·  ');
     statusEl.style.color = '#2dc653';
   } else if (calibAutoPassEnabled) {
     statusEl.textContent = 'Enabled (starting...)';
     statusEl.style.color = '#d29922';
   } else {
-    statusEl.textContent = 'OFF';
+    var txt = 'OFF';
+    if (calibAutoPassLastRun) txt += '  ·  Last: ' + formatCalibTime(calibAutoPassLastRun);
+    statusEl.textContent = txt;
     statusEl.style.color = '#8b949e';
   }
 }
@@ -1520,6 +1554,8 @@ async function runAutoPassCalibration() {
     if (withTrades.length === 0) {
       addBrainLog('WARN', 'Auto-pass: no threshold produced trades');
       if (statusEl) statusEl.textContent = 'Auto-pass: no trades';
+      calibAutoPassLastRun = Date.now();
+      updateCalibAutoPassUI();
       calibrationRunning = false;
       return;
     }
@@ -1582,9 +1618,13 @@ async function runAutoPassCalibration() {
       addBrainLog('WARN', 'Auto-pass training error: ' + te.message);
     }
     if (statusEl) statusEl.textContent = 'Applied: ' + pick.threshold + tfNote + ' (trained)';
+    calibAutoPassLastRun = Date.now();
+    updateCalibAutoPassUI();
   } catch (e) {
     addBrainLog('ERROR', 'Auto-pass error: ' + e.message);
     if (statusEl) statusEl.textContent = 'Error';
+    calibAutoPassLastRun = Date.now();
+    updateCalibAutoPassUI();
   }
   calibrationRunning = false;
 }
@@ -3712,6 +3752,7 @@ async function cortexSaveState() {
       },
       calibAutoPass: calibAutoPassEnabled,
       calibAutoPassInterval: calibAutoPassInterval,
+      calibAutoPassLastRun: calibAutoPassLastRun,
     };
     await brainFetch('/cortex-state', {
       method: 'POST',
@@ -3805,13 +3846,14 @@ async function cortexLoadState() {
     if (state && state.calibAutoPass !== undefined) {
       calibAutoPassEnabled = !!state.calibAutoPass;
       calibAutoPassInterval = state.calibAutoPassInterval || 30;
+      if (state.calibAutoPassLastRun) calibAutoPassLastRun = state.calibAutoPassLastRun;
       var apCb = document.getElementById('calib-auto-pass');
       var apInt = document.getElementById('calib-auto-pass-interval');
       if (apCb) apCb.checked = calibAutoPassEnabled;
       if (apInt) apInt.value = calibAutoPassInterval;
       if (calibAutoPassEnabled) {
         startCalibAutoPassTimer();
-        addBrainLog('CORTEX', 'Restored auto-pass: ON, every ' + calibAutoPassInterval + 'min');
+        addBrainLog('CORTEX', 'Restored auto-pass: ON, every ' + calibAutoPassInterval + 'min' + (calibAutoPassLastRun ? ' (last run ' + formatCalibTime(calibAutoPassLastRun) + ')' : ''));
       } else {
         stopCalibAutoPassTimer();
       }
