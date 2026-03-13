@@ -264,6 +264,8 @@ function stimulateFromPrice(priceData) {
   const inputs = [];
   const { price, prevPrice, volume, spread, epic } = priceData;
   const pressure = priceData.pressure || {};
+  const boost = priceData.boost || 1;
+  const stepsOverride = priceData.steps || 10;
   const pu = sensoryAssignments.price_up;
   const pd = sensoryAssignments.price_down;
   const vol = sensoryAssignments.volume;
@@ -274,27 +276,29 @@ function stimulateFromPrice(priceData) {
   if (price && prevPrice) {
     const delta = price - prevPrice;
     const pctChange = Math.abs(delta / prevPrice) * 10000;
+    const boostedPct = pctChange * boost;
     for (let i = pu.start; i < pu.start + pu.count; i++) {
-      inputs.push([i, pctChange * (delta > 0 ? 1.5 : 0.5)]);
+      inputs.push([i, boostedPct * (delta > 0 ? 1.5 : 0.5)]);
     }
     for (let i = pd.start; i < pd.start + pd.count; i++) {
-      inputs.push([i, pctChange * (delta < 0 ? 1.5 : 0.5)]);
+      inputs.push([i, boostedPct * (delta < 0 ? 1.5 : 0.5)]);
     }
-    const acceleration = Math.abs(pctChange) > 50 ? pctChange * 2 : pctChange;
+    const acceleration = Math.abs(boostedPct) > 50 ? boostedPct * 2 : boostedPct;
     for (let i = mom.start; i < mom.start + mom.count; i++) {
       inputs.push([i, acceleration]);
     }
   }
 
   if (volume) {
-    const volIntensity = Math.min(volume / 100, 200);
+    const volIntensity = Math.min(volume / 100, 200) * boost;
     for (let i = vol.start; i < vol.start + vol.count; i++) {
       inputs.push([i, volIntensity]);
     }
   }
 
-  if (spread) {
-    const spreadIntensity = spread * 1000;
+  const effectiveSpread = spread || (price && prevPrice ? Math.abs(price - prevPrice) : 0);
+  if (effectiveSpread) {
+    const spreadIntensity = effectiveSpread * 1000 * boost;
     for (let i = spr.start; i < spr.start + spr.count; i++) {
       inputs.push([i, spreadIntensity]);
     }
@@ -302,8 +306,7 @@ function stimulateFromPrice(priceData) {
 
   encodeAntennaPressure(inputs, ant, pressure, volume);
 
-  const stepsToRun = 10;
-  for (let s = 0; s < stepsToRun; s++) {
+  for (let s = 0; s < stepsOverride; s++) {
     step(inputs);
   }
   const rates = getMotorRates();
@@ -530,6 +533,10 @@ function getArchitecture() {
 
 const MAX_BACKUPS = 5;
 const BACKUP_INTERVAL_MS = 5 * 60 * 1000;
+const MAX_DAILY_BACKUPS = 30;
+const DAILY_BACKUP_DIR = path.join(DATA_DIR, 'daily-backups');
+let lastDailyBackupDate = '';
+try { fs.mkdirSync(DAILY_BACKUP_DIR, { recursive: true }); } catch (_) {}
 let lastBackupTime = 0;
 
 function sanitizeEpic(epic) {
@@ -632,6 +639,39 @@ function rotateStateBackups() {
   } catch (_) {}
 }
 
+function dailyBackup() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today === lastDailyBackupDate) return;
+  lastDailyBackupDate = today;
+  try {
+    const dayDir = path.join(DAILY_BACKUP_DIR, today);
+    fs.mkdirSync(dayDir, { recursive: true });
+    if (fs.existsSync(BRAIN_STATE_FILE)) {
+      fs.copyFileSync(BRAIN_STATE_FILE, path.join(dayDir, 'brain-state.json'));
+    }
+    const wpath = path.join(DATA_DIR, 'brain-weights.json');
+    if (fs.existsSync(wpath)) {
+      fs.copyFileSync(wpath, path.join(dayDir, 'brain-weights.json'));
+    }
+    for (const epic of Object.keys(patternMemory)) {
+      const fname = sanitizeEpic(epic) + '.json';
+      const src = path.join(PATTERNS_DIR, fname);
+      if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dayDir, fname));
+    }
+    const cortexPath = path.join(DATA_DIR, 'cortex-state.json');
+    if (fs.existsSync(cortexPath)) {
+      fs.copyFileSync(cortexPath, path.join(dayDir, 'cortex-state.json'));
+    }
+    const days = fs.readdirSync(DAILY_BACKUP_DIR).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    while (days.length > MAX_DAILY_BACKUPS) {
+      const old = days.shift();
+      const oldDir = path.join(DAILY_BACKUP_DIR, old);
+      try { fs.rmSync(oldDir, { recursive: true, force: true }); } catch (_) {}
+    }
+    console.log('[brain-engine] Daily backup created: ' + today + ' (' + Object.keys(patternMemory).length + ' instruments, weights, state, cortex)');
+  } catch (e) { console.error('[brain-engine] Daily backup error:', e.message); }
+}
+
 function saveSynapseWeights() {
   try {
     if (!synapses || !synapses.length) return;
@@ -695,6 +735,7 @@ function saveState() {
       saveInstrumentPatterns(epic);
     }
     backupInstrumentPatterns();
+    dailyBackup();
   } catch (_) {}
 }
 
@@ -1087,15 +1128,20 @@ async function handleRequest(req, res) {
       }
       prevVol = vol;
 
+      const candleRange = highPrice - lowPrice;
+      const syntheticSpread = c.spread || candleRange || Math.abs(closePrice - (prevPrice || closePrice));
+      const syntheticVolume = vol || Math.max(1, Math.round(candleRange * 10));
       const rates = stimulateFromPrice({
         price: closePrice,
         prevPrice: prevPrice || closePrice,
-        volume: vol,
-        spread: c.spread || 0,
+        volume: syntheticVolume,
+        spread: syntheticSpread,
         epic: epic,
         pressure: pressure,
+        boost: 25,
+        steps: 50,
       });
-      results.steps_run += 10;
+      results.steps_run += 50;
 
       const signal = rates.buy_signal > rates.sell_signal && rates.buy_signal > rates.hold_signal
         ? 'BUY' : rates.sell_signal > rates.buy_signal && rates.sell_signal > rates.hold_signal
@@ -1221,14 +1267,19 @@ async function handleRequest(req, res) {
     const prevPrice = candle.prevClose || closePrice;
 
     const pressure = body.pressure || {};
+    const candleRange = highPrice - lowPrice;
+    const syntheticSpread = candle.spread || candleRange || Math.abs(closePrice - prevPrice);
+    const syntheticVolume = vol || Math.max(1, Math.round(candleRange * 10));
 
     const rates = stimulateFromPrice({
       price: closePrice,
       prevPrice: prevPrice,
-      volume: vol,
-      spread: candle.spread || 0,
+      volume: syntheticVolume,
+      spread: syntheticSpread,
       epic: epic,
       pressure: pressure,
+      boost: 25,
+      steps: 50,
     });
 
     const signal = rates.buy_signal > rates.sell_signal && rates.buy_signal > rates.hold_signal

@@ -1556,6 +1556,32 @@ async function runAutoPassCalibration() {
     var displayTf = isAllTf ? 'ALL TFs' : tf;
     calibShowResults(allResults, pick.candles || 0, displayTf, epic);
     cortexSaveState();
+
+    var trainTf = pick.tf || tf;
+    addBrainLog('CORTEX', 'Auto-pass: running training pass with winning threshold ' + pick.threshold + ' on ' + (CALIB_TF_LABELS[trainTf] || trainTf) + '...');
+    if (statusEl) statusEl.textContent = 'Training with best threshold...';
+    try {
+      var trainCandles = await calibFetchCandles(epic, trainTf, maxCandles);
+      if (trainCandles.length >= 20) {
+        var trainResult = await brainFetch('/backtest-train', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            candles: trainCandles, epic: epic, stopLossPips: cortexStopLossPips, takeProfitPips: cortexTakeProfitPips,
+            size: cortexMinPositionSize, plMultiplier: 1, minHoldCandles: cortexMinHoldCandles,
+            signalThreshold: pick.threshold, confirmCandles: cortexConfirmCandles, antennaEnabled: true,
+            timeframe: trainTf, dryRun: false,
+          })
+        });
+        if (trainResult) {
+          addBrainLog('CORTEX', 'Auto-pass training: ' + trainResult.trades.length + ' trades, P&L=' + (trainResult.total_pnl || 0).toFixed(2) + ', Sugar=' + trainResult.sugar_count + ' Pain=' + trainResult.pain_count + ' (' + trainResult.steps_run + ' steps)');
+          showTrainResults(trainResult);
+        }
+      }
+    } catch (te) {
+      addBrainLog('WARN', 'Auto-pass training error: ' + te.message);
+    }
+    if (statusEl) statusEl.textContent = 'Applied: ' + pick.threshold + tfNote + ' (trained)';
   } catch (e) {
     addBrainLog('ERROR', 'Auto-pass error: ' + e.message);
     if (statusEl) statusEl.textContent = 'Error';
