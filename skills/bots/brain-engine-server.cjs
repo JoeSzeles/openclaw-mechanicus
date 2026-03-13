@@ -960,14 +960,18 @@ async function handleRequest(req, res) {
     if (!isBooted) return respond(res, 400, { error: 'Brain not booted' });
     const body = await parseBody(req);
     const candles = (body.candles || []).slice(0, 10000);
-    const stopLossPct = body.stopLossPct || 1.0;
-    const takeProfitPct = body.takeProfitPct || 2.0;
+    const stopLossPips = body.stopLossPips || 0;
+    const takeProfitPips = body.takeProfitPips || 0;
+    const stopLossPct = stopLossPips ? 0 : (body.stopLossPct || 1.0);
+    const takeProfitPct = takeProfitPips ? 0 : (body.takeProfitPct || 2.0);
+    const usePips = stopLossPips > 0 || takeProfitPips > 0;
     const plMultiplier = body.plMultiplier || 1;
     const size = body.size || 1;
     const epic = body.epic || 'BACKTEST';
     const minHoldCandles = Math.max(0, parseInt(body.minHoldCandles) || 0);
     const signalThreshold = Math.max(0, parseFloat(body.signalThreshold) || 5);
     const confirmCandles = Math.max(1, parseInt(body.confirmCandles) || 1);
+    const timeframe = body.timeframe || '';
 
     if (!candles.length) return respond(res, 400, { error: 'No candles provided' });
 
@@ -1083,8 +1087,8 @@ async function handleRequest(req, res) {
       if (openTrade) {
         openTrade.candlesHeld = (openTrade.candlesHeld || 0) + 1;
         const dir = openTrade.direction === 'BUY' ? 1 : -1;
-        const slPrice = openTrade.entry - dir * openTrade.entry * stopLossPct / 100;
-        const tpPrice = openTrade.entry + dir * openTrade.entry * takeProfitPct / 100;
+        const slPrice = usePips ? (openTrade.entry - dir * stopLossPips) : (openTrade.entry - dir * openTrade.entry * stopLossPct / 100);
+        const tpPrice = usePips ? (openTrade.entry + dir * takeProfitPips) : (openTrade.entry + dir * openTrade.entry * takeProfitPct / 100);
 
         let exitPrice = null;
         let exitReason = null;
@@ -1168,13 +1172,17 @@ async function handleRequest(req, res) {
     const body = await parseBody(req);
     const candle = body.candle;
     const epic = body.epic || 'LIVE';
-    const stopLossPct = body.stopLossPct || 1.0;
-    const takeProfitPct = body.takeProfitPct || 2.0;
+    const stopLossPips = body.stopLossPips || 0;
+    const takeProfitPips = body.takeProfitPips || 0;
+    const stopLossPct = stopLossPips ? 0 : (body.stopLossPct || 1.0);
+    const takeProfitPct = takeProfitPips ? 0 : (body.takeProfitPct || 2.0);
+    const usePips = stopLossPips > 0 || takeProfitPips > 0;
     const plMultiplier = body.plMultiplier || 1;
     const size = body.size || 1;
     const minHoldCandles = Math.max(0, parseInt(body.minHoldCandles) || 0);
     const signalThreshold = Math.max(0, parseFloat(body.signalThreshold) || 5);
     const confirmCandles = Math.max(1, parseInt(body.confirmCandles) || 1);
+    const timeframe = body.timeframe || '';
 
     if (!candle || !candle.close) return respond(res, 400, { error: 'Candle with close price required' });
 
@@ -1214,8 +1222,8 @@ async function handleRequest(req, res) {
       const ot = body.openTrade;
       const candlesHeld = (ot.candlesHeld || 0) + 1;
       const dir = ot.direction === 'BUY' ? 1 : -1;
-      const slPrice = ot.entry - dir * ot.entry * stopLossPct / 100;
-      const tpPrice = ot.entry + dir * ot.entry * takeProfitPct / 100;
+      const slPrice = usePips ? (ot.entry - dir * stopLossPips) : (ot.entry - dir * ot.entry * stopLossPct / 100);
+      const tpPrice = usePips ? (ot.entry + dir * takeProfitPips) : (ot.entry + dir * ot.entry * takeProfitPct / 100);
       let exitPrice = null;
       let exitReason = null;
 

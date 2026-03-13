@@ -990,19 +990,33 @@ tr:hover { background: rgba(88,166,255,0.04); }
         </div>
       </div>
 
-      <div class="grid">
-        <div class="card">
-          <h2>Training Controls</h2>
-          <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-            <button class="btn-sm" id="neural-training-toggle" onclick="toggleTrainingMode()" style="background:#3d1a1a;color:#f85149;border-color:#f85149;padding:8px 16px;font-weight:700">Training OFF</button>
-            <span style="font-size:11px;color:#8b949e" id="neural-training-status">Inactive</span>
+      <div class="card full" style="margin-bottom:16px">
+        <h2 style="display:flex;align-items:center;gap:8px">Decision Review <span style="font-size:10px;padding:2px 8px;background:#1a1028;color:#bc8cff;border-radius:8px">Approve/Reject Cortex Decisions</span></h2>
+        <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+          <button class="btn-sm" id="neural-training-toggle" onclick="toggleTrainingMode()" style="background:#3d1a1a;color:#f85149;border-color:#f85149;padding:8px 16px;font-weight:700">Training OFF</button>
+          <span style="font-size:11px;color:#8b949e" id="neural-training-status">Inactive</span>
+          <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+            <label style="font-size:10px;color:#8b949e;cursor:pointer"><input type="checkbox" id="dr-auto-review" onchange="toggleAutoReview(this.checked)" style="margin-right:3px">Auto-review</label>
+            <span id="dr-auto-status" style="font-size:9px;color:#484f58"></span>
           </div>
-          <div style="display:flex;gap:8px;margin-bottom:8px">
-            <button class="btn-sm" onclick="sendTrainingFeedback('sugar')" style="flex:1;background:#1b4332;color:#2dc653;border-color:#2dc653;padding:10px;font-weight:700;font-size:13px">SUGAR</button>
-            <button class="btn-sm" onclick="sendTrainingFeedback('pain')" style="flex:1;background:#3d1a1a;color:#f85149;border-color:#f85149;padding:10px;font-weight:700;font-size:13px">PAIN</button>
-          </div>
-          <div style="font-size:10px;color:#8b949e;padding:4px;background:#0d1117;border-radius:3px">Sugar = reinforce current behavior. Pain = suppress current behavior.</div>
         </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="btn-sm" onclick="sendTrainingFeedback('sugar')" style="flex:1;background:#1b4332;color:#2dc653;border-color:#2dc653;padding:10px;font-weight:700;font-size:13px">SUGAR (Approve All)</button>
+          <button class="btn-sm" onclick="sendTrainingFeedback('pain')" style="flex:1;background:#3d1a1a;color:#f85149;border-color:#f85149;padding:10px;font-weight:700;font-size:13px">PAIN (Reject All)</button>
+        </div>
+        <div id="dr-entries" style="max-height:300px;overflow-y:auto;background:#0d1117;border:1px solid #21262d;border-radius:4px;padding:6px;font-size:11px;font-family:monospace">
+          <div style="display:grid;grid-template-columns:60px 50px 80px 80px 60px 60px 1fr;gap:4px;padding-bottom:4px;border-bottom:1px solid #21262d;font-weight:600;color:#8b949e;font-size:9px"><span>Time</span><span>Dir</span><span>Entry</span><span>Exit</span><span>P&L</span><span>Signal</span><span>Action</span></div>
+          <div id="dr-rows" style="color:#c9d1d9"></div>
+          <div id="dr-empty" style="color:#484f58;text-align:center;padding:16px">No decisions to review yet. Enable Cortex or run training to generate entries.</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
+          <button class="btn-sm" onclick="drBatchApprove()" style="background:#1b4332;color:#2dc653;border-color:#2dc653;padding:4px 12px;font-size:10px">Approve Pending</button>
+          <button class="btn-sm" onclick="drBatchReject()" style="background:#3d1a1a;color:#f85149;border-color:#f85149;padding:4px 12px;font-size:10px">Reject Pending</button>
+          <button class="btn-sm" onclick="drClearAll()" style="padding:4px 12px;font-size:10px">Clear</button>
+        </div>
+      </div>
+
+      <div class="grid">
         <div class="card">
           <h2>Calibration</h2>
           <div style="font-size:12px;margin-bottom:6px"><label style="color:#8b949e">Synaptic Weight: <span id="neural-wsyn-val">12.0</span>x</label><br><input type="range" id="neural-cal-wsyn" min="0.5" max="25.0" value="12.0" step="0.5" style="width:100%" oninput="document.getElementById('neural-wsyn-val').textContent=parseFloat(this.value).toFixed(1)"></div>
@@ -1047,6 +1061,41 @@ tr:hover { background: rgba(88,166,255,0.04); }
         <div style="display:flex;gap:8px">
           <button class="btn-sm" id="neural-calibration-start" onclick="startCalibration()" style="background:#1a1028;color:#bc8cff;border-color:#bc8cff;padding:6px 16px;font-weight:600">Start Auto-Calibration</button>
           <button class="btn-sm" id="neural-calibration-stop" onclick="stopCalibration()" style="display:none;background:#3d1a1a;color:#f85149;border-color:#f85149;padding:6px 16px;font-weight:600">Stop</button>
+        </div>
+      </div>
+
+      <div class="card full" style="margin-bottom:16px">
+        <h2 style="display:flex;align-items:center;gap:8px">Channel Advisory <span style="font-size:10px;padding:2px 8px;background:#0d2137;color:#58a6ff;border-radius:8px">Price Channel Analysis</span></h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div>
+            <div style="font-size:10px;color:#8b949e;margin-bottom:4px">Short-Term Channel (5min rolling)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+              <div style="padding:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px;text-align:center"><div style="font-size:9px;color:#484f58">Ceiling</div><div id="ch-st-high" style="font-size:12px;color:#f85149;font-weight:600">--</div></div>
+              <div style="padding:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px;text-align:center"><div style="font-size:9px;color:#484f58">Mid</div><div id="ch-st-mid" style="font-size:12px;color:#d29922;font-weight:600">--</div></div>
+              <div style="padding:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px;text-align:center"><div style="font-size:9px;color:#484f58">Floor</div><div id="ch-st-low" style="font-size:12px;color:#2dc653;font-weight:600">--</div></div>
+            </div>
+            <div style="font-size:9px;color:#484f58;margin-top:3px">Width: <span id="ch-st-width">--</span> | Ticks: <span id="ch-st-ticks">0</span></div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:#8b949e;margin-bottom:4px">Long-Term Channel (DB candles)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+              <div style="padding:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px;text-align:center"><div style="font-size:9px;color:#484f58">Ceiling</div><div id="ch-lt-high" style="font-size:12px;color:#f85149;font-weight:600">--</div></div>
+              <div style="padding:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px;text-align:center"><div style="font-size:9px;color:#484f58">Mid</div><div id="ch-lt-mid" style="font-size:12px;color:#d29922;font-weight:600">--</div></div>
+              <div style="padding:4px;background:#0d1117;border:1px solid #21262d;border-radius:4px;text-align:center"><div style="font-size:9px;color:#484f58">Floor</div><div id="ch-lt-low" style="font-size:12px;color:#2dc653;font-weight:600">--</div></div>
+            </div>
+            <div style="font-size:9px;color:#484f58;margin-top:3px">Width: <span id="ch-lt-width">--</span> | TF: <span id="ch-lt-tf">--</span></div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+          <div style="padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;text-align:center"><div style="font-size:9px;color:#484f58">Pattern</div><div id="ch-pattern" style="font-size:11px;color:#bc8cff;font-weight:600">--</div></div>
+          <div style="padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;text-align:center"><div style="font-size:9px;color:#484f58">Position</div><div id="ch-position" style="font-size:11px;color:#58a6ff;font-weight:600">--</div></div>
+          <div style="padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;text-align:center"><div style="font-size:9px;color:#484f58">Advisory</div><div id="ch-advisory" style="font-size:11px;font-weight:600;color:#d29922">--</div></div>
+          <div style="padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;text-align:center"><div style="font-size:9px;color:#484f58">Confidence</div><div id="ch-confidence" style="font-size:11px;color:#8b949e;font-weight:600">--</div></div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <label style="font-size:10px;color:#8b949e;cursor:pointer"><input type="checkbox" id="ch-cortex-enable" checked onchange="channelCortexEnabled=this.checked" style="margin-right:3px">Feed to Cortex</label>
+          <button class="btn-sm" onclick="channelRefreshLongTerm()" style="padding:3px 10px;font-size:10px">Refresh LT Channel</button>
+          <span id="ch-last-update" style="font-size:9px;color:#484f58;margin-left:auto"></span>
         </div>
       </div>
 
@@ -1255,7 +1304,7 @@ tr:hover { background: rgba(88,166,255,0.04); }
         </div>
 
         <div id="nt-backtest-panel">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px">
             <div>
               <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Instrument</div>
               <div style="font-size:12px;color:#58a6ff;font-weight:600" id="bt-train-epic">--</div>
@@ -1270,6 +1319,14 @@ tr:hover { background: rgba(88,166,255,0.04); }
             <div>
               <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Candles</div>
               <input id="bt-train-candles" type="number" min="50" max="5000" value="500" style="width:100%;padding:4px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:12px;text-align:center">
+            </div>
+            <div>
+              <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Data Source</div>
+              <select id="bt-train-source" style="width:100%;padding:4px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:12px" onchange="updateBtSourceInfo()">
+                <option value="ig" selected>IG API</option>
+                <option value="localdb">Local DB</option>
+              </select>
+              <div id="bt-source-info" style="font-size:9px;color:#484f58;margin-top:2px"></div>
             </div>
           </div>
         </div>
@@ -1327,37 +1384,9 @@ tr:hover { background: rgba(88,166,255,0.04); }
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:8px">
-          <div>
-            <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Stop Loss %</div>
-            <input id="bt-train-sl" type="number" min="0.1" max="10" step="0.1" value="1.0" style="width:100%;padding:4px;background:#0d1117;border:1px solid #f85149;border-radius:4px;color:#c9d1d9;font-size:12px;text-align:center">
-          </div>
-          <div>
-            <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Take Profit %</div>
-            <input id="bt-train-tp" type="number" min="0.1" max="20" step="0.1" value="2.0" style="width:100%;padding:4px;background:#0d1117;border:1px solid #2dc653;border-radius:4px;color:#c9d1d9;font-size:12px;text-align:center">
-          </div>
-          <div>
-            <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Trade Size</div>
-            <input id="bt-train-size" type="number" min="0.1" max="100" step="0.1" value="1" style="width:100%;padding:4px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:12px;text-align:center">
-          </div>
-          <div>
-            <div style="font-size:10px;color:#8b949e;margin-bottom:2px">P&L Multiplier</div>
-            <input id="bt-train-plm" type="number" min="0.01" max="100000" step="0.01" value="1" style="width:100%;padding:4px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:12px;text-align:center">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
-          <div>
-            <div style="font-size:10px;color:#d29922;margin-bottom:2px">Min Hold (candles)</div>
-            <input id="bt-train-hold" type="number" min="0" max="500" step="1" value="5" style="width:100%;padding:4px;background:#0d1117;border:1px solid #d29922;border-radius:4px;color:#c9d1d9;font-size:12px;text-align:center" title="Minimum candles to hold before a signal can close the trade. SL/TP still fire immediately.">
-          </div>
-          <div>
-            <div style="font-size:10px;color:#d29922;margin-bottom:2px">Signal Threshold</div>
-            <input id="bt-train-thresh" type="number" min="1" max="100" step="1" value="10" style="width:100%;padding:4px;background:#0d1117;border:1px solid #d29922;border-radius:4px;color:#c9d1d9;font-size:12px;text-align:center" title="Minimum signal strength needed to open a trade (higher = fewer trades, more selective)">
-          </div>
-          <div>
-            <div style="font-size:10px;color:#d29922;margin-bottom:2px">Confirm (candles)</div>
-            <input id="bt-train-confirm" type="number" min="1" max="50" step="1" value="3" style="width:100%;padding:4px;background:#0d1117;border:1px solid #d29922;border-radius:4px;color:#c9d1d9;font-size:12px;text-align:center" title="Consecutive candles with the same signal required before entering a trade">
-          </div>
+        <div style="padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;margin-bottom:12px;font-size:10px;color:#8b949e">
+          Training uses Cortex settings: SL=<span id="bt-cortex-sl" style="color:#f85149">--</span>pips TP=<span id="bt-cortex-tp" style="color:#2dc653">--</span>pips Hold=<span id="bt-cortex-hold" style="color:#d29922">--</span> Thresh=<span id="bt-cortex-thresh" style="color:#d29922">--</span> Confirm=<span id="bt-cortex-confirm" style="color:#d29922">--</span> Size=<span id="bt-cortex-size" style="color:#58a6ff">--</span>
+          <span style="color:#484f58">(edit in Cortex Auto-Trade section)</span>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <button class="btn-sm" id="bt-train-start" onclick="startTraining()" style="background:#1b4332;color:#2dc653;border-color:#2dc653;padding:6px 16px">Start Training</button>

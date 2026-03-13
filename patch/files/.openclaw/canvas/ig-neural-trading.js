@@ -747,6 +747,7 @@ function neuralProcessTick(tick) {
   var volume = parseInt(tick.volume) || 0;
   if (price > 0) neuralLastPrice = price;
   if (price > 0) antennaPushTick(price, bid, ask, volume);
+  if (price > 0) channelAddTick(price);
   var now = new Date();
   var timeStr = now.toLocaleTimeString();
   var el2 = document.getElementById('neural-last-tick');
@@ -1071,13 +1072,17 @@ async function startCalibration() {
 
 async function startCalibrationTrading() {
   var maxTrades = 20;
+  var calibSimOpenTrade = null;
+  var calibSimPnl = 0;
+  var calibSimConsecutiveSignal = null;
+  var calibSimConsecutiveCount = 0;
   var tradeInterval = setInterval(async function() {
     if (!calibrationRunning || calibrationData.trades_executed >= maxTrades) {
       clearInterval(tradeInterval);
       calibrationRunning = false;
       var statusEl = document.getElementById('neural-calibration-status');
-      if (statusEl) statusEl.textContent = 'Calibration complete! Trades: ' + calibrationData.trades_executed;
-      addBrainLog('INFO', 'Calibration complete: ' + calibrationData.trades_executed + ' trades');
+      if (statusEl) statusEl.textContent = 'Calibration complete! ' + calibrationData.trades_executed + ' simulated trades, P&L=' + calibSimPnl.toFixed(2);
+      addBrainLog('INFO', 'Calibration complete: ' + calibrationData.trades_executed + ' simulated trades, total P&L=' + calibSimPnl.toFixed(2));
       var startBtn = document.getElementById('neural-calibration-start');
       var stopBtn = document.getElementById('neural-calibration-stop');
       if (startBtn) startBtn.style.display = 'inline-block';
@@ -1088,13 +1093,50 @@ async function startCalibrationTrading() {
     if (!res) return;
     updateBrainSignals(res);
     var motorRate = res.avg_rate || 0;
-    if (motorRate > calibrationData.threshold && igConnectedForNeural) {
-      var direction = (res.buy_signal || 0) > (res.sell_signal || 0) ? 'BUY' : 'SELL';
-      addBrainLog('INFO', 'Calibration trade: ' + direction + ' (motor=' + motorRate.toFixed(2) + ' > threshold=' + calibrationData.threshold.toFixed(2) + ')');
-      await neuralPlaceOrder(direction);
-      calibrationData.trades_executed++;
-      var tEl = document.getElementById('neural-calib-trades');
-      if (tEl) tEl.textContent = calibrationData.trades_executed;
+    if (motorRate > calibrationData.threshold) {
+      var price = neuralLastPrice || 0;
+      if (!price) return;
+      var candle = { close: price, high: price, low: price, open: price, prevClose: price, spread: 0, volume: 0 };
+      var pressure = antennaComputePressure();
+      cortexReadParams();
+      var result = await brainFetch('/live-train', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          candle: candle,
+          epic: neuralCurrentEpic || 'CALIBRATION',
+          stopLossPips: cortexStopLossPips,
+          takeProfitPips: cortexTakeProfitPips,
+          size: cortexMinPositionSize,
+          plMultiplier: 1,
+          openTrade: calibSimOpenTrade,
+          minHoldCandles: cortexMinHoldCandles,
+          signalThreshold: cortexBuyThreshold,
+          confirmCandles: cortexConfirmCandles,
+          consecutiveSignal: calibSimConsecutiveSignal,
+          consecutiveCount: calibSimConsecutiveCount,
+          pressure: pressure,
+        })
+      });
+      if (result) {
+        if (result.consecutiveSignal !== undefined) calibSimConsecutiveSignal = result.consecutiveSignal;
+        if (result.consecutiveCount !== undefined) calibSimConsecutiveCount = result.consecutiveCount;
+        if (result.trade_closed) {
+          calibrationData.trades_executed++;
+          calibSimPnl += result.trade_closed.pnl;
+          calibSimOpenTrade = null;
+          addBrainLog('INFO', 'Calibration SIM close: ' + result.trade_closed.direction + ' P&L=' + result.trade_closed.pnl.toFixed(2) + ' (' + result.trade_closed.reason + ') [' + result.feedback + ']');
+        }
+        if (result.held_trade) calibSimOpenTrade = result.held_trade;
+        if (result.open_trade) {
+          calibSimOpenTrade = result.open_trade;
+          addBrainLog('INFO', 'Calibration SIM open: ' + result.open_trade.direction + ' @ ' + result.open_trade.entry.toFixed(2));
+        }
+        var tEl = document.getElementById('neural-calib-trades');
+        if (tEl) tEl.textContent = calibrationData.trades_executed + ' (sim P&L=' + calibSimPnl.toFixed(2) + ')';
+        var statusEl = document.getElementById('neural-calibration-status');
+        if (statusEl) statusEl.textContent = 'Trading... ' + calibrationData.trades_executed + '/' + maxTrades + ' sim P&L=' + calibSimPnl.toFixed(2);
+      }
     }
   }, 5000);
 }
@@ -1651,10 +1693,7 @@ async function startBacktestTraining() {
   if (!epic) { showToast('Select an instrument first', false); return; }
   var tf = (document.getElementById('bt-train-tf') || {}).value || 'MINUTE';
   var maxCandles = parseInt((document.getElementById('bt-train-candles') || {}).value) || 500;
-  var sl = parseFloat((document.getElementById('bt-train-sl') || {}).value) || 1.0;
-  var tp = parseFloat((document.getElementById('bt-train-tp') || {}).value) || 2.0;
-  var size = parseFloat((document.getElementById('bt-train-size') || {}).value) || 1;
-  var plm = parseFloat((document.getElementById('bt-train-plm') || {}).value) || 1;
+  cortexReadParams();
 
   btTrainAbort = false;
   var startBtn = document.getElementById('bt-train-start');
@@ -1668,16 +1707,23 @@ async function startBacktestTraining() {
   if (resultDiv) { resultDiv.style.display = 'none'; resultDiv.innerHTML = ''; }
   if (epicLabel) epicLabel.textContent = epic;
 
-  addBrainLog('INFO', 'Backtest training: ' + epic + ' tf=' + tf + ' candles=' + maxCandles + ' SL=' + sl + '% TP=' + tp + '%');
+  addBrainLog('INFO', 'Backtest training: ' + epic + ' tf=' + tf + ' candles=' + maxCandles + ' SL=' + cortexStopLossPips + 'pips TP=' + cortexTakeProfitPips + 'pips');
 
   var pctEl = document.getElementById('bt-train-pct');
   var barEl = document.getElementById('bt-train-bar');
   if (pctEl) pctEl.textContent = 'Fetching candles...';
 
   try {
-    var url = '/api/ig/prices/' + encodeURIComponent(epic) + '?resolution=' + tf + '&max=' + maxCandles;
+    var btSource = ((document.getElementById('bt-train-source') || {}).value) || 'ig';
+    var url;
+    if (btSource === 'localdb') {
+      url = '/api/ig/scalper/candles?epic=' + encodeURIComponent(epic) + '&resolution=' + tf + '&max=' + maxCandles;
+    } else {
+      url = '/api/ig/prices/' + encodeURIComponent(epic) + '?resolution=' + tf + '&max=' + maxCandles;
+    }
     var data = await apiFetch(url);
     var candles = (data && data.prices) || [];
+    if (data && data.source) addBrainLog('INFO', 'Data source: ' + data.source + ' (' + (data.count || candles.length) + '/' + (data.total_available || '?') + ' candles)');
     if (candles.length === 0) {
       addBrainLog('WARN', 'No candles returned for backtest');
       showToast('No historical data available', false);
@@ -1691,9 +1737,6 @@ async function startBacktestTraining() {
     if (pctEl) pctEl.textContent = 'Training on ' + candles.length + ' candles...';
     if (barEl) { barEl.style.width = '10%'; }
 
-    var minHold = parseInt((document.getElementById('bt-train-hold') || {}).value) || 5;
-    var signalThresh = parseFloat((document.getElementById('bt-train-thresh') || {}).value) || 10;
-    var confirmC = parseInt((document.getElementById('bt-train-confirm') || {}).value) || 3;
     var pressure = antennaComputePressure();
     var result = await brainFetch('/backtest-train', {
       method: 'POST',
@@ -1701,14 +1744,15 @@ async function startBacktestTraining() {
       body: JSON.stringify({
         candles: candles,
         epic: epic,
-        stopLossPct: sl,
-        takeProfitPct: tp,
-        size: size,
-        plMultiplier: plm,
-        minHoldCandles: minHold,
-        signalThreshold: signalThresh,
-        confirmCandles: confirmC,
+        stopLossPips: cortexStopLossPips,
+        takeProfitPips: cortexTakeProfitPips,
+        size: cortexMinPositionSize,
+        plMultiplier: 1,
+        minHoldCandles: cortexMinHoldCandles,
+        signalThreshold: cortexBuyThreshold,
+        confirmCandles: cortexConfirmCandles,
         antennaEnabled: true,
+        timeframe: tf,
       })
     });
 
@@ -1800,23 +1844,25 @@ async function feedLiveTrainingTick(price, volume, spread) {
 
       var epic = neuralCurrentEpic;
       var pressure = antennaComputePressure();
+      cortexReadParams();
       var result = await brainFetch('/live-train', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           candle: candle,
           epic: epic,
-          stopLossPct: liveTrainParams.sl,
-          takeProfitPct: liveTrainParams.tp,
-          size: liveTrainParams.size,
-          plMultiplier: liveTrainParams.plm,
+          stopLossPips: cortexStopLossPips,
+          takeProfitPips: cortexTakeProfitPips,
+          size: cortexMinPositionSize,
+          plMultiplier: 1,
           openTrade: liveTrainOpenTrade,
-          minHoldCandles: liveTrainParams.minHold,
-          signalThreshold: liveTrainParams.signalThresh,
-          confirmCandles: liveTrainParams.confirmCandles,
+          minHoldCandles: cortexMinHoldCandles,
+          signalThreshold: cortexBuyThreshold,
+          confirmCandles: cortexConfirmCandles,
           consecutiveSignal: liveTrainConsecutiveSignal,
           consecutiveCount: liveTrainConsecutiveCount,
           pressure: pressure,
+          timeframe: (liveTrainTfSeconds >= 60 ? 'MINUTE' : 'SECOND') + (liveTrainTfSeconds >= 120 ? '_' + Math.floor(liveTrainTfSeconds/60) : ''),
         })
       });
 
@@ -1842,7 +1888,7 @@ async function feedLiveTrainingTick(price, volume, spread) {
           addBrainLog('TRADE', 'Live: ' + result.open_trade.direction + ' opened @ ' + result.open_trade.entry.toFixed(2));
         }
         if (result.signal !== 'HOLD') {
-          addBrainLog('INFO', 'Live signal: ' + result.signal + ' buy=' + result.buy_signal.toFixed(1) + ' sell=' + result.sell_signal.toFixed(1) + (liveTrainOpenTrade ? ' (holding ' + (liveTrainOpenTrade.candlesHeld || 0) + '/' + liveTrainParams.minHold + ')' : ''));
+          addBrainLog('INFO', 'Live signal: ' + result.signal + ' buy=' + result.buy_signal.toFixed(1) + ' sell=' + result.sell_signal.toFixed(1) + (liveTrainOpenTrade ? ' (holding ' + (liveTrainOpenTrade.candlesHeld || 0) + '/' + cortexMinHoldCandles + ')' : ''));
         }
       }
 
@@ -1914,13 +1960,7 @@ function startLiveTraining() {
   if (ltRowsEl) ltRowsEl.innerHTML = '';
 
   liveTrainTfSeconds = parseInt((document.getElementById('lt-train-tf') || {}).value) || 1;
-  liveTrainParams.sl = parseFloat((document.getElementById('bt-train-sl') || {}).value) || 1.0;
-  liveTrainParams.tp = parseFloat((document.getElementById('bt-train-tp') || {}).value) || 2.0;
-  liveTrainParams.size = parseFloat((document.getElementById('bt-train-size') || {}).value) || 1;
-  liveTrainParams.plm = parseFloat((document.getElementById('bt-train-plm') || {}).value) || 1;
-  liveTrainParams.minHold = parseInt((document.getElementById('bt-train-hold') || {}).value) || 5;
-  liveTrainParams.signalThresh = parseFloat((document.getElementById('bt-train-thresh') || {}).value) || 10;
-  liveTrainParams.confirmCandles = parseInt((document.getElementById('bt-train-confirm') || {}).value) || 3;
+  cortexReadParams();
   liveTrainConsecutiveSignal = null;
   liveTrainConsecutiveCount = 0;
 
@@ -1935,7 +1975,7 @@ function startLiveTraining() {
   if (srcEl) { srcEl.textContent = 'Dashboard Feed'; srcEl.style.color = '#2dc653'; }
 
   liveTrainCandleStart = Date.now();
-  addBrainLog('INFO', 'Live training started: ' + epic + ' tf=' + liveTrainTfSeconds + 's SL=' + liveTrainParams.sl + '% TP=' + liveTrainParams.tp + '% hold=' + liveTrainParams.minHold + ' thresh=' + liveTrainParams.signalThresh + ' confirm=' + liveTrainParams.confirmCandles);
+  addBrainLog('INFO', 'Live training started: ' + epic + ' tf=' + liveTrainTfSeconds + 's SL=' + cortexStopLossPips + 'pips TP=' + cortexTakeProfitPips + 'pips hold=' + cortexMinHoldCandles + ' thresh=' + cortexBuyThreshold + ' confirm=' + cortexConfirmCandles);
   addBrainLog('INFO', 'Tick source: dashboard polling (3s interval, multi-fallback)');
 }
 
@@ -1972,10 +2012,7 @@ async function startAutoTest() {
   var candlesPerCycle = parseInt((document.getElementById('at-candles') || {}).value) || 250;
   var tuneInterval = parseInt((document.getElementById('at-tune-interval') || {}).value) || 2;
   var targetWR = parseFloat((document.getElementById('at-target-wr') || {}).value) || 55;
-  var sl = parseFloat((document.getElementById('bt-train-sl') || {}).value) || 1.0;
-  var tp = parseFloat((document.getElementById('bt-train-tp') || {}).value) || 2.0;
-  var size = parseFloat((document.getElementById('bt-train-size') || {}).value) || 1;
-  var plm = parseFloat((document.getElementById('bt-train-plm') || {}).value) || 1;
+  cortexReadParams();
   var tf = (document.getElementById('bt-train-tf') || {}).value || 'MINUTE';
 
   var startBtn = document.getElementById('bt-train-start');
@@ -2019,10 +2056,11 @@ async function startAutoTest() {
         continue;
       }
 
+      cortexReadParams();
       var result = await brainFetch('/backtest-train', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candles: candles, epic: epic, stopLossPct: sl, takeProfitPct: tp, size: size, plMultiplier: plm, minHoldCandles: parseInt((document.getElementById('bt-train-hold') || {}).value) || 5, signalThreshold: parseFloat((document.getElementById('bt-train-thresh') || {}).value) || 10, confirmCandles: parseInt((document.getElementById('bt-train-confirm') || {}).value) || 3, antennaEnabled: true })
+        body: JSON.stringify({ candles: candles, epic: epic, stopLossPips: cortexStopLossPips, takeProfitPips: cortexTakeProfitPips, size: cortexMinPositionSize, plMultiplier: 1, minHoldCandles: cortexMinHoldCandles, signalThreshold: cortexBuyThreshold, confirmCandles: cortexConfirmCandles, antennaEnabled: true, timeframe: tf })
       });
 
       if (result) {
@@ -2455,6 +2493,41 @@ function cortexAddDecision(entry, skipPush) {
   if (countEl) countEl.textContent = cortexDecisionLog.length + ' decisions';
 }
 
+function cortexReadParams() {
+  var changed = [];
+  function readF(id, def) { return parseFloat((document.getElementById(id) || {}).value) || def; }
+  function readI(id, def) { return parseInt((document.getElementById(id) || {}).value) || def; }
+  function readC(id, def) { var el = document.getElementById(id); return el ? el.checked : def; }
+  function track(name, oldVal, newVal) { if (oldVal !== newVal) changed.push(name + ':' + oldVal + '→' + newVal); return newVal; }
+
+  cortexBuyThreshold = track('buyThresh', cortexBuyThreshold, readF('cortex-buy-thresh', 10));
+  cortexSellThreshold = track('sellThresh', cortexSellThreshold, readF('cortex-sell-thresh', 10));
+  cortexCooldownMs = track('cooldown', cortexCooldownMs, readF('cortex-cooldown', 60) * 1000);
+  cortexMaxOpenPositions = track('maxPos', cortexMaxOpenPositions, readI('cortex-max-pos', 3));
+  cortexMinPositionSize = track('minSize', cortexMinPositionSize, readF('cortex-min-size', 0.5));
+  cortexMaxPositionSize = track('maxSize', cortexMaxPositionSize, readF('cortex-max-size', 2.0));
+  cortexAutoSize = track('autoSize', cortexAutoSize, readC('cortex-auto-size', true));
+  cortexStopLossPips = track('SL', cortexStopLossPips, readF('cortex-sl', 50));
+  cortexTakeProfitPips = track('TP', cortexTakeProfitPips, readF('cortex-tp', 100));
+  cortexPriceExitsEnabled = track('priceExits', cortexPriceExitsEnabled, readC('cortex-price-exits', false));
+  cortexAutoLearn = track('autoLearn', cortexAutoLearn, readC('cortex-auto-learn', true));
+  cortexHoldZone = track('holdZone', cortexHoldZone, readF('cortex-hold-zone', 2));
+  cortexMinHoldCandles = track('minHold', cortexMinHoldCandles, readI('cortex-min-hold', 5));
+  cortexConfirmCandles = track('confirm', cortexConfirmCandles, readI('cortex-confirm', 1));
+  cortexExitConfirmCandles = track('exitConfirm', cortexExitConfirmCandles, readI('cortex-exit-confirm', 2));
+  antenna.flashThreshold = track('flash', antenna.flashThreshold, readF('antenna-flash-thresh', 3.0));
+  antenna.deadCatSensitivity = track('deadCat', antenna.deadCatSensitivity, readF('antenna-deadcat-sens', 0.5));
+  antenna.emergencyExitEnabled = track('emergency', antenna.emergencyExitEnabled, readC('antenna-emergency', true));
+  antenna.breakoutRiderEnabled = track('breakout', antenna.breakoutRiderEnabled, readC('antenna-breakout', true));
+  antenna.fallingKnifeBlock = track('knife', antenna.fallingKnifeBlock, readC('antenna-knife', true));
+
+  if (changed.length > 0) {
+    cortexAddDecision({ time: new Date().toLocaleTimeString(), action: 'PARAMS', detail: changed.join(' | ') });
+    cortexSaveState();
+  }
+  return changed;
+}
+
 function toggleCortexAutoTrade() {
   cortexAutoTradeEnabled = !cortexAutoTradeEnabled;
   var btn = document.getElementById('cortex-auto-trade-btn');
@@ -2465,27 +2538,7 @@ function toggleCortexAutoTrade() {
       cortexAutoTradeEnabled = false;
       return;
     }
-    cortexBuyThreshold = parseFloat((document.getElementById('cortex-buy-thresh') || {}).value) || 10;
-    cortexSellThreshold = parseFloat((document.getElementById('cortex-sell-thresh') || {}).value) || 10;
-    cortexCooldownMs = (parseFloat((document.getElementById('cortex-cooldown') || {}).value) || 60) * 1000;
-    cortexMaxOpenPositions = parseInt((document.getElementById('cortex-max-pos') || {}).value) || 3;
-    cortexMinPositionSize = parseFloat((document.getElementById('cortex-min-size') || {}).value) || 0.5;
-    cortexMaxPositionSize = parseFloat((document.getElementById('cortex-max-size') || {}).value) || 2.0;
-    cortexAutoSize = (document.getElementById('cortex-auto-size') || {}).checked !== false;
-    cortexPositionSize = cortexMinPositionSize;
-    cortexStopLossPips = parseFloat((document.getElementById('cortex-sl') || {}).value) || 50;
-    cortexTakeProfitPips = parseFloat((document.getElementById('cortex-tp') || {}).value) || 100;
-    cortexPriceExitsEnabled = (document.getElementById('cortex-price-exits') || {}).checked === true;
-    cortexAutoLearn = (document.getElementById('cortex-auto-learn') || {}).checked !== false;
-    cortexHoldZone = parseFloat((document.getElementById('cortex-hold-zone') || {}).value) || 2;
-    cortexMinHoldCandles = parseInt((document.getElementById('cortex-min-hold') || {}).value) || 5;
-    cortexConfirmCandles = parseInt((document.getElementById('cortex-confirm') || {}).value) || 1;
-    cortexExitConfirmCandles = parseInt((document.getElementById('cortex-exit-confirm') || {}).value) || 2;
-    antenna.flashThreshold = parseFloat((document.getElementById('antenna-flash-thresh') || {}).value) || 3.0;
-    antenna.deadCatSensitivity = parseFloat((document.getElementById('antenna-deadcat-sens') || {}).value) || 0.5;
-    antenna.emergencyExitEnabled = (document.getElementById('antenna-emergency') || {}).checked !== false;
-    antenna.breakoutRiderEnabled = (document.getElementById('antenna-breakout') || {}).checked !== false;
-    antenna.fallingKnifeBlock = (document.getElementById('antenna-knife') || {}).checked !== false;
+    cortexReadParams();
     antenna.ticks = [];
     antenna.recentHigh = 0;
     antenna.recentLow = Infinity;
@@ -2566,6 +2619,7 @@ function cortexExtractPrice(candle, field) {
 }
 
 async function _cortexAutoTradeCheckInner() {
+  cortexReadParams();
   var now = Date.now();
   var statusEl = document.getElementById('cortex-auto-status');
   var effectiveTf = cortexTimeframe === 'AUTO' ? (cortexAutoTimeframeSelected || 'MINUTE_5') : cortexTimeframe;
@@ -2806,6 +2860,7 @@ async function _cortexAutoTradeCheckInner() {
           cortexAddDecision({ time: timeStr, action: 'TP CLOSE', detail: cortexOpenPosition.direction + ' +' + pnlPips.toFixed(1) + ' pips (TP=' + cortexTakeProfitPips + ') @ ' + closePrice.toFixed(2) + (tpClosed ? ' OK' : ' FAILED — keeping position') });
           if (tpClosed) {
             cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'TP CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: cortexOpenPosition.size || cortexPositionSize, tf: tfLabel, pnl: pnlPips });
+            drAddEntry(cortexOpenPosition.direction, cortexOpenPosition.entry, closePrice, pnlPips, 'TP', 'Take Profit');
             renderCortexTradeLog();
             if (cortexAutoLearn) { brainFeedback('sugar'); addBrainLog('BRAIN', 'Auto-learn: SUGAR for profitable TP close (+' + pnlPips.toFixed(1) + ' pips)'); }
             cortexOpenPosition = null;
@@ -2824,6 +2879,7 @@ async function _cortexAutoTradeCheckInner() {
           cortexAddDecision({ time: timeStr, action: 'SL CLOSE', detail: cortexOpenPosition.direction + ' ' + pnlPips.toFixed(1) + ' pips (SL=' + cortexStopLossPips + ') @ ' + closePrice.toFixed(2) + (slClosed ? ' OK' : ' FAILED — keeping position') });
           if (slClosed) {
             cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'SL CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: cortexOpenPosition.size || cortexPositionSize, tf: tfLabel, pnl: pnlPips });
+            drAddEntry(cortexOpenPosition.direction, cortexOpenPosition.entry, closePrice, pnlPips, 'SL', 'Stop Loss');
             renderCortexTradeLog();
             if (cortexAutoLearn) { brainFeedback('pain'); addBrainLog('BRAIN', 'Auto-learn: PAIN for stop loss (' + pnlPips.toFixed(1) + ' pips)'); }
             cortexOpenPosition = null;
@@ -2851,6 +2907,7 @@ async function _cortexAutoTradeCheckInner() {
         cortexAddDecision({ time: timeStr, action: 'CLOSED', detail: cortexOpenPosition.direction + ' after ' + cortexOpenPosition.candlesHeld + ' candles, exit=' + cortexExitConsecutiveCount + 'x ' + oppSignal + ' pnl=' + pnlPips.toFixed(1) + ' @ ' + closePrice.toFixed(2) + (closedOk ? ' OK' : ' FAILED — keeping position') });
         if (closedOk) {
           cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: cortexOpenPosition.size || cortexPositionSize, tf: tfLabel, pnl: pnlPips });
+          drAddEntry(cortexOpenPosition.direction, cortexOpenPosition.entry, closePrice, pnlPips, oppSignal, 'Signal');
           renderCortexTradeLog();
           if (cortexAutoLearn) {
             if (pnlPips > 0) { brainFeedback('sugar'); addBrainLog('BRAIN', 'Auto-learn: SUGAR for profitable signal close (+' + pnlPips.toFixed(1) + ' pips)'); }
@@ -2909,7 +2966,22 @@ async function _cortexAutoTradeCheckInner() {
         cortexConsecutiveCount = 0;
         return;
       }
-      addBrainLog('CORTEX', 'AUTO ' + rawSignal + ' [' + tfLabel + '] ' + closePrice.toFixed(2) + ' sz=' + sizeLabel + ' | Buy=' + buy.toFixed(1) + ' Sell=' + sell.toFixed(1) + ' confirmed=' + cortexConsecutiveCount);
+      var chAdvisory = channelGetAdvisory();
+      var chNote = '';
+      if (chAdvisory) {
+        var chSignalDir = chAdvisory.advisory.indexOf('BUY') >= 0 ? 'BUY' : (chAdvisory.advisory.indexOf('SELL') >= 0 ? 'SELL' : 'HOLD');
+        chNote = ' | CH:' + chAdvisory.pattern + '/' + chAdvisory.advisory + '(' + chAdvisory.confidence + '%)';
+        if (chSignalDir !== 'HOLD' && chSignalDir !== rawSignal && chAdvisory.confidence >= 70) {
+          addBrainLog('CHANNEL', 'VETOED ' + rawSignal + ': CH advisory ' + chAdvisory.advisory + ' (' + chAdvisory.confidence + '% conf) strongly conflicts');
+          cortexAddDecision({ time: timeStr, action: 'CH_VETO', detail: rawSignal + ' vetoed by channel: ' + chAdvisory.pattern + '/' + chAdvisory.advisory + ' (' + chAdvisory.confidence + '%)' });
+          if (statusEl) { statusEl.textContent = 'CH VETO: ' + chAdvisory.advisory + ' vs ' + rawSignal; statusEl.style.color = '#d29922'; }
+          cortexConsecutiveCount = 0;
+          return;
+        } else if (chSignalDir !== 'HOLD' && chSignalDir !== rawSignal && chAdvisory.confidence >= 50) {
+          addBrainLog('CHANNEL', 'Advisory CONFLICTS with signal: ' + rawSignal + ' vs CH:' + chAdvisory.advisory + ' (' + chAdvisory.confidence + '% conf) — proceeding with caution');
+        }
+      }
+      addBrainLog('CORTEX', 'AUTO ' + rawSignal + ' [' + tfLabel + '] ' + closePrice.toFixed(2) + ' sz=' + sizeLabel + ' | Buy=' + buy.toFixed(1) + ' Sell=' + sell.toFixed(1) + ' confirmed=' + cortexConsecutiveCount + chNote);
       if (statusEl) { statusEl.textContent = 'EXECUTING ' + rawSignal + ' [' + tfLabel + '] sz=' + sizeLabel + ' | ' + currentSig; statusEl.style.color = rawSignal === 'BUY' ? '#2dc653' : '#f85149'; }
       var orderResult = await cortexPlaceOrder(rawSignal);
       cortexLastTradeTs = Date.now();
@@ -3181,6 +3253,294 @@ function initNeuralTradingTab() {
   });
 }
 
+function updateBtSourceInfo() {
+  var src = ((document.getElementById('bt-train-source') || {}).value) || 'ig';
+  var infoEl = document.getElementById('bt-source-info');
+  if (src === 'localdb') {
+    var epic = neuralCurrentEpic;
+    var tf = ((document.getElementById('bt-train-tf') || {}).value) || 'MINUTE';
+    if (!epic) { if (infoEl) infoEl.textContent = 'Select instrument first'; return; }
+    if (infoEl) infoEl.textContent = 'Checking...';
+    apiFetch('/api/ig/scalper/candle-count?epic=' + encodeURIComponent(epic) + '&resolution=' + tf).then(function(d) {
+      if (infoEl) infoEl.textContent = (d && d.count ? d.count + ' candles stored' : 'No data in DB');
+      if (infoEl) infoEl.style.color = (d && d.count > 0) ? '#2dc653' : '#f85149';
+    }).catch(function() { if (infoEl) infoEl.textContent = 'DB unavailable'; });
+  } else {
+    if (infoEl) { infoEl.textContent = ''; infoEl.style.color = '#484f58'; }
+  }
+}
+
+function updateBtCortexDisplay() {
+  cortexReadParams();
+  var els = {
+    'bt-cortex-sl': cortexStopLossPips,
+    'bt-cortex-tp': cortexTakeProfitPips,
+    'bt-cortex-hold': cortexMinHoldCandles,
+    'bt-cortex-thresh': cortexBuyThreshold,
+    'bt-cortex-confirm': cortexConfirmCandles,
+    'bt-cortex-size': cortexMinPositionSize,
+  };
+  for (var id in els) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = els[id];
+  }
+}
+
+var channelTickWindow = [];
+var channelWindowMs = 5 * 60 * 1000;
+var channelShortTerm = { high: 0, low: 0, mid: 0 };
+var channelLongTerm = { high: 0, low: 0, mid: 0, tf: '' };
+var channelCortexEnabled = true;
+var channelLastPattern = '--';
+var channelLastAdvisory = '--';
+var channelLastPosition = '--';
+var channelLastConfidence = 0;
+
+function channelAddTick(price) {
+  if (!price || price <= 0) return;
+  var now = Date.now();
+  channelTickWindow.push({ ts: now, price: price });
+  var cutoff = now - channelWindowMs;
+  while (channelTickWindow.length > 0 && channelTickWindow[0].ts < cutoff) channelTickWindow.shift();
+  channelUpdateShortTerm();
+}
+
+function channelUpdateShortTerm() {
+  if (channelTickWindow.length < 2) return;
+  var high = -Infinity, low = Infinity;
+  for (var i = 0; i < channelTickWindow.length; i++) {
+    var p = channelTickWindow[i].price;
+    if (p > high) high = p;
+    if (p < low) low = p;
+  }
+  channelShortTerm = { high: high, low: low, mid: (high + low) / 2 };
+  var price = channelTickWindow[channelTickWindow.length - 1].price;
+  channelDetectPattern(price);
+  channelUpdateUI();
+}
+
+function channelDetectPattern(price) {
+  if (!channelShortTerm.high || !channelShortTerm.low) return;
+  var range = channelShortTerm.high - channelShortTerm.low;
+  if (range <= 0) return;
+  var pos = (price - channelShortTerm.low) / range;
+  var ticks = channelTickWindow;
+  var len = ticks.length;
+
+  if (pos > 0.85) channelLastPosition = 'Near Ceiling';
+  else if (pos < 0.15) channelLastPosition = 'Near Floor';
+  else if (pos > 0.45 && pos < 0.55) channelLastPosition = 'Mid Channel';
+  else if (pos > 0.55) channelLastPosition = 'Upper Half';
+  else channelLastPosition = 'Lower Half';
+
+  var recentLen = Math.min(20, len);
+  var recentTicks = ticks.slice(-recentLen);
+  var rising = 0, falling = 0;
+  for (var i = 1; i < recentTicks.length; i++) {
+    if (recentTicks[i].price > recentTicks[i - 1].price) rising++;
+    else if (recentTicks[i].price < recentTicks[i - 1].price) falling++;
+  }
+
+  var ltRange = channelLongTerm.high - channelLongTerm.low;
+  var narrowing = ltRange > 0 && range < ltRange * 0.3;
+  var expanding = ltRange > 0 && range > ltRange * 0.8;
+
+  if (narrowing && pos > 0.5 && rising > falling) {
+    channelLastPattern = 'Bull Flag';
+    channelLastAdvisory = 'BUY Breakout';
+    channelLastConfidence = Math.min(90, 50 + (rising - falling) * 5);
+  } else if (narrowing && pos < 0.5 && falling > rising) {
+    channelLastPattern = 'Bear Flag';
+    channelLastAdvisory = 'SELL Breakdown';
+    channelLastConfidence = Math.min(90, 50 + (falling - rising) * 5);
+  } else if (expanding && pos > 0.8) {
+    channelLastPattern = 'Breakout Up';
+    channelLastAdvisory = 'BUY Momentum';
+    channelLastConfidence = Math.min(85, 40 + rising * 3);
+  } else if (expanding && pos < 0.2) {
+    channelLastPattern = 'Breakout Down';
+    channelLastAdvisory = 'SELL Momentum';
+    channelLastConfidence = Math.min(85, 40 + falling * 3);
+  } else if (pos < 0.15 && rising > falling) {
+    channelLastPattern = 'Bear Trap';
+    channelLastAdvisory = 'BUY Reversal';
+    channelLastConfidence = Math.min(70, 30 + (rising - falling) * 5);
+  } else if (pos > 0.85 && falling > rising) {
+    channelLastPattern = 'Bull Trap';
+    channelLastAdvisory = 'SELL Reversal';
+    channelLastConfidence = Math.min(70, 30 + (falling - rising) * 5);
+  } else if (narrowing) {
+    channelLastPattern = 'Consolidation';
+    channelLastAdvisory = 'HOLD';
+    channelLastConfidence = Math.min(60, 30 + Math.abs(rising - falling) * 2);
+  } else {
+    channelLastPattern = 'Ranging';
+    channelLastAdvisory = pos > 0.7 ? 'Caution High' : (pos < 0.3 ? 'Caution Low' : 'HOLD');
+    channelLastConfidence = 20;
+  }
+}
+
+function channelUpdateUI() {
+  var set = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
+  set('ch-st-high', channelShortTerm.high ? channelShortTerm.high.toFixed(2) : '--');
+  set('ch-st-mid', channelShortTerm.mid ? channelShortTerm.mid.toFixed(2) : '--');
+  set('ch-st-low', channelShortTerm.low ? channelShortTerm.low.toFixed(2) : '--');
+  set('ch-st-width', channelShortTerm.high ? (channelShortTerm.high - channelShortTerm.low).toFixed(2) : '--');
+  set('ch-st-ticks', channelTickWindow.length);
+  set('ch-lt-high', channelLongTerm.high ? channelLongTerm.high.toFixed(2) : '--');
+  set('ch-lt-mid', channelLongTerm.mid ? channelLongTerm.mid.toFixed(2) : '--');
+  set('ch-lt-low', channelLongTerm.low ? channelLongTerm.low.toFixed(2) : '--');
+  set('ch-lt-width', channelLongTerm.high ? (channelLongTerm.high - channelLongTerm.low).toFixed(2) : '--');
+  set('ch-lt-tf', channelLongTerm.tf || '--');
+  set('ch-pattern', channelLastPattern);
+  set('ch-position', channelLastPosition);
+  set('ch-advisory', channelLastAdvisory);
+  set('ch-confidence', channelLastConfidence + '%');
+  var advEl = document.getElementById('ch-advisory');
+  if (advEl) {
+    if (channelLastAdvisory.indexOf('BUY') >= 0) advEl.style.color = '#2dc653';
+    else if (channelLastAdvisory.indexOf('SELL') >= 0) advEl.style.color = '#f85149';
+    else advEl.style.color = '#d29922';
+  }
+  set('ch-last-update', new Date().toLocaleTimeString());
+}
+
+function channelRefreshLongTerm() {
+  var epic = neuralCurrentEpic;
+  if (!epic) { showToast('Select instrument first', false); return; }
+  var tf = 'HOUR';
+  apiFetch('/api/ig/scalper/candles?epic=' + encodeURIComponent(epic) + '&resolution=' + tf + '&max=100').then(function(d) {
+    var candles = (d && d.prices) || [];
+    if (candles.length < 2) {
+      apiFetch('/api/ig/prices/' + encodeURIComponent(epic) + '?resolution=' + tf + '&max=100').then(function(d2) {
+        var c2 = (d2 && d2.prices) || [];
+        if (c2.length > 1) channelSetLongTerm(c2, tf);
+        else addBrainLog('WARN', 'No LT channel data available');
+      }).catch(function() {});
+      return;
+    }
+    channelSetLongTerm(candles, tf);
+  }).catch(function() {
+    addBrainLog('WARN', 'LT channel fetch failed, trying IG API...');
+    apiFetch('/api/ig/prices/' + encodeURIComponent(epic) + '?resolution=' + tf + '&max=100').then(function(d2) {
+      var c2 = (d2 && d2.prices) || [];
+      if (c2.length > 1) channelSetLongTerm(c2, tf);
+    }).catch(function() {});
+  });
+}
+
+function channelSetLongTerm(candles, tf) {
+  var high = -Infinity, low = Infinity;
+  for (var i = 0; i < candles.length; i++) {
+    if (candles[i].high > high) high = candles[i].high;
+    if (candles[i].low < low) low = candles[i].low;
+  }
+  channelLongTerm = { high: high, low: low, mid: (high + low) / 2, tf: tf };
+  channelUpdateUI();
+  addBrainLog('INFO', 'LT channel: ' + low.toFixed(2) + ' - ' + high.toFixed(2) + ' (' + candles.length + ' candles, ' + tf + ')');
+}
+
+function channelGetAdvisory() {
+  if (!channelCortexEnabled) return null;
+  if (channelLastConfidence < 30) return null;
+  return { pattern: channelLastPattern, advisory: channelLastAdvisory, position: channelLastPosition, confidence: channelLastConfidence };
+}
+
+var drEntries = [];
+var drAutoReview = false;
+var drNextId = 1;
+
+function drAddEntry(direction, entry, exit, pnl, signal, reason) {
+  var id = drNextId++;
+  var item = { id: id, time: new Date(), direction: direction, entry: entry, exit: exit, pnl: pnl, signal: signal, reason: reason || '', status: 'pending' };
+  drEntries.unshift(item);
+  if (drEntries.length > 100) drEntries.pop();
+  if (drAutoReview) {
+    item.status = pnl >= 0 ? 'approved' : 'rejected';
+    sendTrainingFeedback(pnl >= 0 ? 'sugar' : 'pain');
+  }
+  drRenderEntries();
+  return item;
+}
+
+function drRenderEntries() {
+  var rowsEl = document.getElementById('dr-rows');
+  var emptyEl = document.getElementById('dr-empty');
+  if (!rowsEl) return;
+  if (drEntries.length === 0) { rowsEl.innerHTML = ''; if (emptyEl) emptyEl.style.display = 'block'; return; }
+  if (emptyEl) emptyEl.style.display = 'none';
+  var html = '';
+  for (var i = 0; i < Math.min(drEntries.length, 50); i++) {
+    var e = drEntries[i];
+    var timeStr = e.time.toLocaleTimeString().substring(0, 8);
+    var pnlColor = e.pnl >= 0 ? '#2dc653' : '#f85149';
+    var dirColor = e.direction === 'BUY' ? '#2dc653' : '#f85149';
+    var statusHtml;
+    if (e.status === 'pending') {
+      statusHtml = '<button onclick="drApprove(' + e.id + ')" style="background:#1b4332;color:#2dc653;border:1px solid #2dc653;border-radius:3px;padding:1px 6px;font-size:9px;cursor:pointer;margin-right:2px">✓</button>' +
+                   '<button onclick="drReject(' + e.id + ')" style="background:#3d1a1a;color:#f85149;border:1px solid #f85149;border-radius:3px;padding:1px 6px;font-size:9px;cursor:pointer">✗</button>';
+    } else if (e.status === 'approved') {
+      statusHtml = '<span style="color:#2dc653;font-size:10px">Approved</span>';
+    } else {
+      statusHtml = '<span style="color:#f85149;font-size:10px">Rejected</span>';
+    }
+    html += '<div style="display:grid;grid-template-columns:60px 50px 80px 80px 60px 60px 1fr;gap:4px;padding:3px 0;border-bottom:1px solid #161b22;font-size:10px">' +
+      '<span>' + timeStr + '</span>' +
+      '<span style="color:' + dirColor + '">' + e.direction + '</span>' +
+      '<span>' + (e.entry ? e.entry.toFixed(2) : '--') + '</span>' +
+      '<span>' + (e.exit ? e.exit.toFixed(2) : '--') + '</span>' +
+      '<span style="color:' + pnlColor + '">' + (e.pnl !== null ? e.pnl.toFixed(2) : '--') + '</span>' +
+      '<span>' + (e.signal || '--') + '</span>' +
+      '<span>' + statusHtml + '</span>' +
+      '</div>';
+  }
+  rowsEl.innerHTML = html;
+}
+
+function drApprove(id) {
+  for (var i = 0; i < drEntries.length; i++) {
+    if (drEntries[i].id === id) { drEntries[i].status = 'approved'; sendTrainingFeedback('sugar'); break; }
+  }
+  drRenderEntries();
+}
+
+function drReject(id) {
+  for (var i = 0; i < drEntries.length; i++) {
+    if (drEntries[i].id === id) { drEntries[i].status = 'rejected'; sendTrainingFeedback('pain'); break; }
+  }
+  drRenderEntries();
+}
+
+function drBatchApprove() {
+  var count = 0;
+  for (var i = 0; i < drEntries.length; i++) {
+    if (drEntries[i].status === 'pending') { drEntries[i].status = 'approved'; count++; }
+  }
+  if (count > 0) { sendTrainingFeedback('sugar'); addBrainLog('INFO', 'Batch approved ' + count + ' decisions'); }
+  drRenderEntries();
+}
+
+function drBatchReject() {
+  var count = 0;
+  for (var i = 0; i < drEntries.length; i++) {
+    if (drEntries[i].status === 'pending') { drEntries[i].status = 'rejected'; count++; }
+  }
+  if (count > 0) { sendTrainingFeedback('pain'); addBrainLog('INFO', 'Batch rejected ' + count + ' decisions'); }
+  drRenderEntries();
+}
+
+function drClearAll() {
+  drEntries = [];
+  drRenderEntries();
+}
+
+function toggleAutoReview(enabled) {
+  drAutoReview = enabled;
+  var statusEl = document.getElementById('dr-auto-status');
+  if (statusEl) statusEl.textContent = enabled ? 'Auto: sugar if P&L≥0, pain if <0' : '';
+  addBrainLog('INFO', 'Auto-review ' + (enabled ? 'enabled' : 'disabled'));
+}
+
 function switchNeuralSubTab(tab) {
   document.querySelectorAll('.neural-sub-tab').forEach(function(b) {
     b.classList.remove('active');
@@ -3197,7 +3557,7 @@ function switchNeuralSubTab(tab) {
   if (content) { content.classList.add('active'); content.style.display = 'block'; }
   startNeuralTickPolling();
   if (tab === 'dashboard') { initNeuralCharts(); loadAccountInfo(); }
-  else if (tab === 'brain') { refreshCortex(); checkBrainProcessStatus(); var ae = document.getElementById('cortex-active-epic'); if (ae) ae.textContent = neuralCurrentEpic ? neuralCurrentEpic.replace(/^CS\.D\./,'').replace(/\.CFA\.IP$/,'').replace(/\.CFD\.IP$/,'').replace(/\.CFM\.IP$/,'').replace(/\.CAF\.IP$/,'') : '--'; }
+  else if (tab === 'brain') { refreshCortex(); checkBrainProcessStatus(); updateBtCortexDisplay(); channelRefreshLongTerm(); var ae = document.getElementById('cortex-active-epic'); if (ae) ae.textContent = neuralCurrentEpic ? neuralCurrentEpic.replace(/^CS\.D\./,'').replace(/\.CFA\.IP$/,'').replace(/\.CFD\.IP$/,'').replace(/\.CFM\.IP$/,'').replace(/\.CAF\.IP$/,'') : '--'; }
   else if (tab === 'config') { checkBrainProcessStatus(); loadArchitecture(); }
   else if (tab === 'console') { /* dev console auto-scrolls */ }
 }
