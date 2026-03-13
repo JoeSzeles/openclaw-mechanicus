@@ -49,6 +49,8 @@ var cortexTakeProfitPips = 100;
 var cortexPriceExitsEnabled = false;
 var cortexAutoLearn = true;
 var cortexCheckRunning = false;
+var cortexVerifyTickCount = 0;
+var cortexLastVerifyTs = 0;
 var cortexTimeframe = 'MINUTE_5';
 var cortexMinHoldCandles = 5;
 var cortexConfirmCandles = 1;
@@ -2339,9 +2341,35 @@ async function cortexPlaceOrder(direction) {
   }
 }
 
+async function cortexVerifyPositionExists(dealId) {
+  try {
+    var posData = await apiFetch('/api/ig/positions');
+    if (posData && posData.positions) {
+      for (var i = 0; i < posData.positions.length; i++) {
+        var p = posData.positions[i];
+        var pDealId = (p.position && p.position.dealId) || p.dealId || '';
+        if (pDealId === dealId) return true;
+      }
+    }
+    return false;
+  } catch (e) {
+    addBrainLog('WARN', 'Position verify API error: ' + e.message);
+    return 'error';
+  }
+}
+
 async function cortexClosePosition(pos) {
   if (!pos || !pos.dealId) {
     addBrainLog('WARN', 'No dealId to close, skipping');
+    return false;
+  }
+  var exists = await cortexVerifyPositionExists(pos.dealId);
+  if (exists === false) {
+    addBrainLog('CORTEX', 'Position dealId=' + pos.dealId + ' no longer exists on IG — was closed externally');
+    return 'gone';
+  }
+  if (exists === 'error') {
+    addBrainLog('WARN', 'Cannot verify position on IG — skipping close attempt to avoid confusion');
     return false;
   }
   addBrainLog('CORTEX', 'Closing ' + pos.direction + ' position dealId=' + pos.dealId);
@@ -2353,19 +2381,48 @@ async function cortexClosePosition(pos) {
       var dealStatus = conf.dealStatus || '';
       var rejectReason = conf.reason || '';
       if (dealStatus === 'REJECTED') {
+        var rejLower = (rejectReason || '').toLowerCase();
+        if (rejLower.indexOf('unknown position') >= 0 || rejLower.indexOf('invalid dealid') >= 0 || rejLower.indexOf('position already closed') >= 0) {
+          addBrainLog('CORTEX', 'Close REJECTED (position gone): ' + rejectReason + ' (dealId=' + pos.dealId + ')');
+          return 'gone';
+        }
         addBrainLog('ERROR', 'Close REJECTED by IG: ' + rejectReason + ' (dealId=' + pos.dealId + ')');
         return false;
       }
       addBrainLog('CORTEX', 'Position closed: ' + pos.dealId + (dealStatus ? ' status=' + dealStatus : ''));
       return true;
     } else {
-      addBrainLog('ERROR', 'Close failed: ' + ((result && result.error) || 'unknown'));
+      var errMsg = (result && result.error) || 'unknown';
+      var errLower = errMsg.toLowerCase();
+      if (errLower.indexOf('could not determine direction') >= 0 || errLower.indexOf('missing size') >= 0) {
+        addBrainLog('CORTEX', 'Close failed (position likely gone): ' + errMsg + ' — verifying...');
+        var recheck = await cortexVerifyPositionExists(pos.dealId);
+        if (recheck === false) {
+          addBrainLog('CORTEX', 'Confirmed: position dealId=' + pos.dealId + ' no longer on IG');
+          return 'gone';
+        }
+      }
+      addBrainLog('ERROR', 'Close failed: ' + errMsg);
       return false;
     }
   } catch (e) {
     addBrainLog('ERROR', 'Close error: ' + e.message);
     return false;
   }
+}
+
+function cortexHandleExternalClose(timeStr, closePrice, buy, sell, tfLabel) {
+  var dir = cortexOpenPosition ? cortexOpenPosition.direction : '?';
+  var dealId = cortexOpenPosition ? cortexOpenPosition.dealId : '?';
+  var entry = cortexOpenPosition ? (cortexOpenPosition.entry || 0) : 0;
+  var pnl = dir === 'BUY' ? (closePrice - entry) : (entry - closePrice);
+  addBrainLog('CORTEX', 'Position was closed externally (dealId=' + dealId + ') — clearing and resuming');
+  cortexAddDecision({ time: timeStr, action: 'EXT CLOSE', detail: dir + ' dealId=' + dealId + ' closed outside bot, pnl~' + pnl.toFixed(1) + ' pips @ ' + closePrice.toFixed(2) });
+  cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'EXT CLOSE ' + dir, buy: buy || 0, sell: sell || 0, price: closePrice, size: (cortexOpenPosition && cortexOpenPosition.size) || cortexPositionSize, tf: tfLabel, pnl: pnl, dealId: dealId });
+  renderCortexTradeLog();
+  cortexOpenPosition = null;
+  cortexExitConsecutiveCount = 0;
+  cortexSaveState();
 }
 
 function cortexAddDecision(entry, skipPush) {
@@ -2462,6 +2519,13 @@ function toggleCortexAutoTrade() {
     cortexAutoTradeCheck();
   } else {
     if (cortexAutoTradeInterval) { clearInterval(cortexAutoTradeInterval); cortexAutoTradeInterval = null; }
+    if (cortexOpenPosition) {
+      addBrainLog('CORTEX', 'Auto-trade OFF — clearing tracked position dealId=' + cortexOpenPosition.dealId + ' (position may still be open on IG, manage manually)');
+      cortexOpenPosition = null;
+      cortexExitConsecutiveCount = 0;
+    }
+    cortexVerifyTickCount = 0;
+    cortexLastVerifyTs = 0;
     if (btn) { btn.textContent = 'AUTO-TRADE OFF'; btn.style.background = '#3d1a1a'; btn.style.color = '#f85149'; btn.style.borderColor = '#f85149'; }
     if (statusEl) { statusEl.textContent = 'Disabled'; statusEl.style.color = '#f85149'; }
     addBrainLog('CORTEX', 'Auto-trade DISABLED');
@@ -2614,30 +2678,39 @@ async function _cortexAutoTradeCheckInner() {
     var sizePreview = document.getElementById('cortex-size-preview');
     if (sizePreview) sizePreview.textContent = (cortexAutoSize ? 'Auto' : 'Fixed') + ': ' + tradeSize.toFixed(1) + ' (signal spread=' + spread.toFixed(1) + ', range ' + cortexMinPositionSize + '-' + cortexMaxPositionSize + ')';
 
-    if (cortexOpenPosition && cortexOpenPosition._unverified) {
-      try {
-        var verifyData = await apiFetch('/api/ig/positions');
-        var found = false;
-        if (verifyData && verifyData.positions) {
-          for (var vi = 0; vi < verifyData.positions.length; vi++) {
-            var vp = verifyData.positions[vi];
-            var vpId = (vp.position && vp.position.dealId) || vp.dealId || '';
-            if (vpId === cortexOpenPosition.dealId) { found = true; break; }
+    if (cortexOpenPosition) {
+      cortexVerifyTickCount++;
+      var needsVerify = cortexOpenPosition._unverified || (cortexVerifyTickCount >= 5 && (now - cortexLastVerifyTs) >= 30000);
+      if (needsVerify) {
+        cortexVerifyTickCount = 0;
+        cortexLastVerifyTs = now;
+        try {
+          var verifyData = await apiFetch('/api/ig/positions');
+          var found = false;
+          if (verifyData && verifyData.positions) {
+            for (var vi = 0; vi < verifyData.positions.length; vi++) {
+              var vp = verifyData.positions[vi];
+              var vpId = (vp.position && vp.position.dealId) || vp.dealId || '';
+              if (vpId === cortexOpenPosition.dealId) { found = true; break; }
+            }
+          }
+          if (found) {
+            if (cortexOpenPosition._unverified) {
+              delete cortexOpenPosition._unverified;
+              addBrainLog('CORTEX', 'Position dealId=' + cortexOpenPosition.dealId + ' re-verified on IG');
+              cortexSaveState();
+            }
+          } else {
+            addBrainLog('CORTEX', 'Position dealId=' + cortexOpenPosition.dealId + ' no longer on IG — externally closed');
+            cortexHandleExternalClose(timeStr, closePrice, buy, sell, tfLabel);
+            return;
+          }
+        } catch (reVerifyErr) {
+          if (cortexOpenPosition._unverified) {
+            addBrainLog('WARN', 'Re-verify failed: ' + reVerifyErr.message + ' — skipping trade check');
+            return;
           }
         }
-        if (found) {
-          delete cortexOpenPosition._unverified;
-          addBrainLog('CORTEX', 'Position dealId=' + cortexOpenPosition.dealId + ' re-verified on IG');
-          cortexSaveState();
-        } else {
-          addBrainLog('CORTEX', 'Stale position dealId=' + cortexOpenPosition.dealId + ' not found on IG — clearing');
-          cortexOpenPosition = null;
-          cortexSaveState();
-          return;
-        }
-      } catch (reVerifyErr) {
-        addBrainLog('WARN', 'Re-verify failed: ' + reVerifyErr.message + ' — skipping trade check');
-        return;
       }
     }
     if (cortexOpenPosition) {
@@ -2645,6 +2718,7 @@ async function _cortexAutoTradeCheckInner() {
       if (emergencyAction) {
         addBrainLog('ANTENNA', emergencyAction.reason);
         var emergClosed = await cortexClosePosition(cortexOpenPosition);
+        if (emergClosed === 'gone') { cortexHandleExternalClose(timeStr, closePrice, buy, sell, tfLabel); return; }
         cortexAddDecision({ time: timeStr, action: 'EMERGENCY', detail: emergencyAction.reason + (emergClosed ? ' CLOSED OK' : ' CLOSE FAILED — keeping position') });
         if (emergClosed) {
           var emergPnl = cortexOpenPosition.direction === 'BUY' ? (closePrice - (cortexOpenPosition.entry || 0)) : ((cortexOpenPosition.entry || 0) - closePrice);
@@ -2726,6 +2800,7 @@ async function _cortexAutoTradeCheckInner() {
         if (pnlPips >= cortexTakeProfitPips) {
           addBrainLog('CORTEX', 'TAKE PROFIT hit: ' + pnlPips.toFixed(1) + ' pips >= ' + cortexTakeProfitPips + ' | ' + currentSig);
           var tpClosed = await cortexClosePosition(cortexOpenPosition);
+          if (tpClosed === 'gone') { cortexHandleExternalClose(timeStr, closePrice, buy, sell, tfLabel); return; }
           cortexAddDecision({ time: timeStr, action: 'TP CLOSE', detail: cortexOpenPosition.direction + ' +' + pnlPips.toFixed(1) + ' pips (TP=' + cortexTakeProfitPips + ') @ ' + closePrice.toFixed(2) + (tpClosed ? ' OK' : ' FAILED — keeping position') });
           if (tpClosed) {
             cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'TP CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: cortexOpenPosition.size || cortexPositionSize, tf: tfLabel, pnl: pnlPips });
@@ -2743,6 +2818,7 @@ async function _cortexAutoTradeCheckInner() {
         if (pnlPips <= -cortexStopLossPips) {
           addBrainLog('CORTEX', 'STOP LOSS hit: ' + pnlPips.toFixed(1) + ' pips <= -' + cortexStopLossPips + ' | ' + currentSig);
           var slClosed = await cortexClosePosition(cortexOpenPosition);
+          if (slClosed === 'gone') { cortexHandleExternalClose(timeStr, closePrice, buy, sell, tfLabel); return; }
           cortexAddDecision({ time: timeStr, action: 'SL CLOSE', detail: cortexOpenPosition.direction + ' ' + pnlPips.toFixed(1) + ' pips (SL=' + cortexStopLossPips + ') @ ' + closePrice.toFixed(2) + (slClosed ? ' OK' : ' FAILED — keeping position') });
           if (slClosed) {
             cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'SL CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: cortexOpenPosition.size || cortexPositionSize, tf: tfLabel, pnl: pnlPips });
@@ -2769,6 +2845,7 @@ async function _cortexAutoTradeCheckInner() {
       if (canExitBySignal) {
         addBrainLog('CORTEX', 'CLOSING ' + cortexOpenPosition.direction + ' (signal reversal after ' + cortexOpenPosition.candlesHeld + ' candles) | ' + currentSig);
         var closedOk = await cortexClosePosition(cortexOpenPosition);
+        if (closedOk === 'gone') { cortexHandleExternalClose(timeStr, closePrice, buy, sell, tfLabel); return; }
         cortexAddDecision({ time: timeStr, action: 'CLOSED', detail: cortexOpenPosition.direction + ' after ' + cortexOpenPosition.candlesHeld + ' candles, exit=' + cortexExitConsecutiveCount + 'x ' + oppSignal + ' pnl=' + pnlPips.toFixed(1) + ' @ ' + closePrice.toFixed(2) + (closedOk ? ' OK' : ' FAILED — keeping position') });
         if (closedOk) {
           cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: cortexOpenPosition.size || cortexPositionSize, tf: tfLabel, pnl: pnlPips });
