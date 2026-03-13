@@ -2492,6 +2492,8 @@ function toggleCortexAutoTrade() {
     cortexConsecutiveSignal = null;
     cortexConsecutiveCount = 0;
     cortexExitConsecutiveCount = 0;
+    cortexVerifyTickCount = 4;
+    cortexLastVerifyTs = 0;
     if (!cortexOpenPosition) cortexDecisionLog = [];
     var monEl = document.getElementById('cortex-decision-monitor');
     if (monEl) monEl.innerHTML = '';
