@@ -1,0 +1,28 @@
+#10 - Fix Auto-Trade P&L Calculation
+What & Why
+The Cortex auto-trade open position panel shows P&L as raw price-point difference, but IG calculates real P&L using (priceDiff) × size × plMultiplier where plMultiplier = valueOfOnePip × scalingFactor. This causes the displayed P&L to be ~$8-10 off from what IG shows. The IG dashboard already does this correctly — the auto-trade panel needs the same formula.
+
+Done looks like
+When a position opens, plMultiplier is fetched from /api/ig/markets/{epic} (already exists, cached) and stored on cortexOpenPosition
+The open-position panel in the trade log uses (priceDiff) × size × plMultiplier for live P&L, matching IG exactly
+Trade log close entries also record the correct dollar P&L
+The plMultiplier persists through page refresh (saved in cortex state)
+Fallback: if market data fetch fails, plMultiplier defaults to 1 with a warning log
+No changes to IG endpoints, proxy, or dashboard — only auto-trade code in ig-neural-trading.js
+Out of scope
+Changing the IG proxy or dashboard P&L logic (already correct)
+Changing trade execution, position sizing, or signal logic
+Adding currency symbols or account-currency conversion
+Tasks
+Fetch and store plMultiplier on position open — When cortexOpenPosition is created (both normal entry and breakout entry), call /api/ig/markets/{epic} to get instrument.valueOfOnePip and snapshot.scalingFactor, compute plMultiplier, and store it on the position object alongside size. Also store it in the trade log entry.
+
+Fix live P&L formula in renderCortexTradeLog — Replace (currentMid - pos.entry) * dir with (priceDiff) * (pos.size || 1) * (pos.plMultiplier || 1). Show the result as currency value (e.g. "$12.50") not points.
+
+Fix P&L on position close entries — When a position closes (TP, SL, signal reversal, emergency, force-close), compute final P&L using the same formula and record it in the trade log.
+
+Persist plMultiplier through refresh — Ensure cortexOpenPosition.plMultiplier and cortexOpenPosition.size are included in cortexSaveState and restored in cortexLoadState.
+
+Relevant files
+.openclaw/canvas/ig-neural-trading.js:3111-3145,3385-3390,3550-3558,3812-3870
+.openclaw/canvas/ig-dashboard.html:2730-2734
+patch/files/.openclaw/canvas/ig-neural-trading.js

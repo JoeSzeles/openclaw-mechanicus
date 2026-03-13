@@ -2813,6 +2813,26 @@ async function cortexManualTrade(epic, direction) {
   setTimeout(refreshCortex, 2000);
 }
 
+var _plMultiplierCache = {};
+async function fetchPlMultiplier(epic) {
+  if (_plMultiplierCache[epic]) return _plMultiplierCache[epic];
+  try {
+    var data = await apiFetch('/api/ig/markets/' + epic);
+    if (data && data.instrument) {
+      var vop = parseFloat(data.instrument.valueOfOnePip) || 1;
+      var rawSf = (data.snapshot && data.snapshot.scalingFactor !== undefined) ? data.snapshot.scalingFactor : data.instrument.scalingFactor;
+      var sf = parseFloat(rawSf) || 1;
+      var plm = vop * sf;
+      _plMultiplierCache[epic] = plm;
+      addBrainLog('INFO', 'plMultiplier for ' + epic + ': ' + plm + ' (vop=' + vop + ' sf=' + sf + ')');
+      return plm;
+    }
+  } catch (e) {
+    addBrainLog('WARN', 'Failed to fetch plMultiplier for ' + epic + ': ' + e.message + ' — using 1');
+  }
+  return 1;
+}
+
 async function cortexPlaceOrder(direction) {
   if (!neuralCurrentEpic) { addBrainLog('ERROR', 'No instrument selected'); return null; }
   addBrainLog('CORTEX', 'Cortex placing ' + direction + ' order: ' + neuralCurrentEpic + ' x' + cortexPositionSize);
@@ -2909,10 +2929,13 @@ function cortexHandleExternalClose(timeStr, closePrice, buy, sell, tfLabel) {
   var dir = cortexOpenPosition ? cortexOpenPosition.direction : '?';
   var dealId = cortexOpenPosition ? cortexOpenPosition.dealId : '?';
   var entry = cortexOpenPosition ? (cortexOpenPosition.entry || 0) : 0;
-  var pnl = dir === 'BUY' ? (closePrice - entry) : (entry - closePrice);
-  addBrainLog('CORTEX', 'Position was closed externally (dealId=' + dealId + ') — clearing and resuming');
-  cortexAddDecision({ time: timeStr, action: 'EXT CLOSE', detail: dir + ' dealId=' + dealId + ' closed outside bot, pnl~' + pnl.toFixed(1) + ' pips @ ' + closePrice.toFixed(2) });
-  cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'EXT CLOSE ' + dir, buy: buy || 0, sell: sell || 0, price: closePrice, size: (cortexOpenPosition && cortexOpenPosition.size) || cortexPositionSize, tf: tfLabel, pnl: pnl, dealId: dealId });
+  var extPnlPts = dir === 'BUY' ? (closePrice - entry) : (entry - closePrice);
+  var extSize = (cortexOpenPosition && cortexOpenPosition.size) || cortexPositionSize;
+  var extPlm = (cortexOpenPosition && cortexOpenPosition.plMultiplier) || 1;
+  var extPnl = extPnlPts * extSize * extPlm;
+  addBrainLog('CORTEX', 'Position was closed externally (dealId=' + dealId + ') — P&L: $' + extPnl.toFixed(2));
+  cortexAddDecision({ time: timeStr, action: 'EXT CLOSE', detail: dir + ' dealId=' + dealId + ' closed outside bot, P&L=$' + extPnl.toFixed(2) + ' @ ' + closePrice.toFixed(2) });
+  cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'EXT CLOSE ' + dir, buy: buy || 0, sell: sell || 0, price: closePrice, size: extSize, tf: tfLabel, pnl: extPnl, plMultiplier: extPlm, dealId: dealId });
   renderCortexTradeLog();
   cortexOpenPosition = null;
   cortexExitConsecutiveCount = 0;
@@ -3126,12 +3149,19 @@ async function cortexForceClosePosition() {
   try {
     var closeResult = await apiPost('/api/ig/positions/close', { dealId: cortexOpenPosition.dealId });
     if (closeResult && !closeResult._httpError && !closeResult.error) {
-      addBrainLog('CORTEX', 'Position force-closed on IG');
-      showToast('Position closed', true);
+      var fcCurrentMid = null;
+      if (typeof livePrices !== 'undefined' && livePrices[neuralCurrentEpic]) fcCurrentMid = livePrices[neuralCurrentEpic].mid;
+      if (!fcCurrentMid && neuralLastPrice) fcCurrentMid = neuralLastPrice;
+      var fcPnlPts = fcCurrentMid ? (cortexOpenPosition.direction === 'BUY' ? (fcCurrentMid - (cortexOpenPosition.entry || 0)) : ((cortexOpenPosition.entry || 0) - fcCurrentMid)) : 0;
+      var fcSize = cortexOpenPosition.size || cortexPositionSize || 1;
+      var fcPlm = cortexOpenPosition.plMultiplier || 1;
+      var fcPnl = fcPnlPts * fcSize * fcPlm;
+      addBrainLog('CORTEX', 'Position force-closed on IG — P&L: $' + fcPnl.toFixed(2));
+      showToast('Position closed ($' + fcPnl.toFixed(2) + ')', true);
       cortexTradeLog.push({
-        ts: Date.now(), dir: 'FORCE-CLOSE', price: cortexOpenPosition.entry,
+        ts: Date.now(), dir: 'FORCE-CLOSE', price: fcCurrentMid || cortexOpenPosition.entry,
         tf: cortexTimeframe, buy: 0, sell: 0, dealId: cortexOpenPosition.dealId,
-        pnl: ''
+        pnl: fcPnl, plMultiplier: fcPlm, size: fcSize
       });
       cortexOpenPosition = null;
       renderCortexTradeLog();
@@ -3338,10 +3368,13 @@ async function _cortexAutoTradeCheckInner() {
         if (emergClosed === 'gone') { cortexHandleExternalClose(timeStr, closePrice, buy, sell, tfLabel); return; }
         cortexAddDecision({ time: timeStr, action: 'EMERGENCY', detail: emergencyAction.reason + (emergClosed ? ' CLOSED OK' : ' CLOSE FAILED — keeping position') });
         if (emergClosed) {
-          var emergPnl = cortexOpenPosition.direction === 'BUY' ? (closePrice - (cortexOpenPosition.entry || 0)) : ((cortexOpenPosition.entry || 0) - closePrice);
-          cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'EMRG CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: cortexOpenPosition.size || cortexPositionSize, tf: tfLabel, pnl: emergPnl });
+          var emergPnlPts = cortexOpenPosition.direction === 'BUY' ? (closePrice - (cortexOpenPosition.entry || 0)) : ((cortexOpenPosition.entry || 0) - closePrice);
+          var emergSize = cortexOpenPosition.size || cortexPositionSize;
+          var emergPlm = cortexOpenPosition.plMultiplier || 1;
+          var emergPnl = emergPnlPts * emergSize * emergPlm;
+          cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'EMRG CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: emergSize, tf: tfLabel, pnl: emergPnl, plMultiplier: emergPlm });
           renderCortexTradeLog();
-          if (cortexAutoLearn) { brainFeedback('pain'); addBrainLog('BRAIN', 'Auto-learn: PAIN for emergency close (' + emergPnl.toFixed(1) + ' pips)'); }
+          if (cortexAutoLearn) { brainFeedback('pain'); addBrainLog('BRAIN', 'Auto-learn: PAIN for emergency close ($' + emergPnl.toFixed(2) + ')'); }
           cortexOpenPosition = null;
           cortexExitConsecutiveCount = 0;
         } else {
@@ -3381,11 +3414,12 @@ async function _cortexAutoTradeCheckInner() {
         var bResult = await cortexPlaceOrder(breakDir);
         cortexLastTradeTs = Date.now();
         if (bResult && bResult.ok) {
+          var bPlm = await fetchPlMultiplier(neuralCurrentEpic);
           cortexAddDecision({ time: timeStr, action: 'BREAKOUT ' + breakDir, detail: breakoutAction.reason + ' dealId=' + bResult.dealId });
-          cortexOpenPosition = { direction: breakDir, entry: closePrice, candlesHeld: 0, dealId: bResult.dealId, size: tradeSize };
+          cortexOpenPosition = { direction: breakDir, entry: closePrice, candlesHeld: 0, dealId: bResult.dealId, size: tradeSize, plMultiplier: bPlm };
           cortexExitConsecutiveCount = 0;
           cortexConsecutiveCount = 0;
-          cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'BREAKOUT ' + breakDir, buy: buy, sell: sell, price: closePrice, size: tradeSize, tf: tfLabel, dealId: bResult.dealId });
+          cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'BREAKOUT ' + breakDir, buy: buy, sell: sell, price: closePrice, size: tradeSize, tf: tfLabel, dealId: bResult.dealId, plMultiplier: bPlm });
           renderCortexTradeLog();
           cortexSaveState();
         } else {
@@ -3420,10 +3454,13 @@ async function _cortexAutoTradeCheckInner() {
           if (tpClosed === 'gone') { cortexHandleExternalClose(timeStr, closePrice, buy, sell, tfLabel); return; }
           cortexAddDecision({ time: timeStr, action: 'TP CLOSE', detail: cortexOpenPosition.direction + ' +' + pnlPips.toFixed(1) + ' pips (TP=' + cortexTakeProfitPips + ') @ ' + closePrice.toFixed(2) + (tpClosed ? ' OK' : ' FAILED — keeping position') });
           if (tpClosed) {
-            cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'TP CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: cortexOpenPosition.size || cortexPositionSize, tf: tfLabel, pnl: pnlPips });
-            drAddEntry(cortexOpenPosition.direction, cortexOpenPosition.entry, closePrice, pnlPips, 'TP', 'Take Profit');
+            var tpSize = cortexOpenPosition.size || cortexPositionSize;
+            var tpPlm = cortexOpenPosition.plMultiplier || 1;
+            var tpPnl = pnlPips * tpSize * tpPlm;
+            cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'TP CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: tpSize, tf: tfLabel, pnl: tpPnl, plMultiplier: tpPlm });
+            drAddEntry(cortexOpenPosition.direction, cortexOpenPosition.entry, closePrice, tpPnl, 'TP', 'Take Profit');
             renderCortexTradeLog();
-            if (cortexAutoLearn) { brainFeedback('sugar'); addBrainLog('BRAIN', 'Auto-learn: SUGAR for profitable TP close (+' + pnlPips.toFixed(1) + ' pips)'); }
+            if (cortexAutoLearn) { brainFeedback('sugar'); addBrainLog('BRAIN', 'Auto-learn: SUGAR for profitable TP close ($' + tpPnl.toFixed(2) + ')'); }
             cortexOpenPosition = null;
             cortexExitConsecutiveCount = 0;
           } else {
@@ -3439,10 +3476,13 @@ async function _cortexAutoTradeCheckInner() {
           if (slClosed === 'gone') { cortexHandleExternalClose(timeStr, closePrice, buy, sell, tfLabel); return; }
           cortexAddDecision({ time: timeStr, action: 'SL CLOSE', detail: cortexOpenPosition.direction + ' ' + pnlPips.toFixed(1) + ' pips (SL=' + cortexStopLossPips + ') @ ' + closePrice.toFixed(2) + (slClosed ? ' OK' : ' FAILED — keeping position') });
           if (slClosed) {
-            cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'SL CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: cortexOpenPosition.size || cortexPositionSize, tf: tfLabel, pnl: pnlPips });
-            drAddEntry(cortexOpenPosition.direction, cortexOpenPosition.entry, closePrice, pnlPips, 'SL', 'Stop Loss');
+            var slSize = cortexOpenPosition.size || cortexPositionSize;
+            var slPlm = cortexOpenPosition.plMultiplier || 1;
+            var slPnl = pnlPips * slSize * slPlm;
+            cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'SL CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: slSize, tf: tfLabel, pnl: slPnl, plMultiplier: slPlm });
+            drAddEntry(cortexOpenPosition.direction, cortexOpenPosition.entry, closePrice, slPnl, 'SL', 'Stop Loss');
             renderCortexTradeLog();
-            if (cortexAutoLearn) { brainFeedback('pain'); addBrainLog('BRAIN', 'Auto-learn: PAIN for stop loss (' + pnlPips.toFixed(1) + ' pips)'); }
+            if (cortexAutoLearn) { brainFeedback('pain'); addBrainLog('BRAIN', 'Auto-learn: PAIN for stop loss ($' + slPnl.toFixed(2) + ')'); }
             cortexOpenPosition = null;
             cortexExitConsecutiveCount = 0;
           } else {
@@ -3467,12 +3507,15 @@ async function _cortexAutoTradeCheckInner() {
         if (closedOk === 'gone') { cortexHandleExternalClose(timeStr, closePrice, buy, sell, tfLabel); return; }
         cortexAddDecision({ time: timeStr, action: 'CLOSED', detail: cortexOpenPosition.direction + ' after ' + cortexOpenPosition.candlesHeld + ' candles, exit=' + cortexExitConsecutiveCount + 'x ' + oppSignal + ' pnl=' + pnlPips.toFixed(1) + ' @ ' + closePrice.toFixed(2) + (closedOk ? ' OK' : ' FAILED — keeping position') });
         if (closedOk) {
-          cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: cortexOpenPosition.size || cortexPositionSize, tf: tfLabel, pnl: pnlPips });
-          drAddEntry(cortexOpenPosition.direction, cortexOpenPosition.entry, closePrice, pnlPips, oppSignal, 'Signal');
+          var sigSize = cortexOpenPosition.size || cortexPositionSize;
+          var sigPlm = cortexOpenPosition.plMultiplier || 1;
+          var sigPnl = pnlPips * sigSize * sigPlm;
+          cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: 'CLOSE ' + cortexOpenPosition.direction, buy: buy, sell: sell, price: closePrice, size: sigSize, tf: tfLabel, pnl: sigPnl, plMultiplier: sigPlm });
+          drAddEntry(cortexOpenPosition.direction, cortexOpenPosition.entry, closePrice, sigPnl, oppSignal, 'Signal');
           renderCortexTradeLog();
           if (cortexAutoLearn) {
-            if (pnlPips > 0) { brainFeedback('sugar'); addBrainLog('BRAIN', 'Auto-learn: SUGAR for profitable signal close (+' + pnlPips.toFixed(1) + ' pips)'); }
-            else { brainFeedback('pain'); addBrainLog('BRAIN', 'Auto-learn: PAIN for losing signal close (' + pnlPips.toFixed(1) + ' pips)'); }
+            if (sigPnl > 0) { brainFeedback('sugar'); addBrainLog('BRAIN', 'Auto-learn: SUGAR for profitable signal close ($' + sigPnl.toFixed(2) + ')'); }
+            else { brainFeedback('pain'); addBrainLog('BRAIN', 'Auto-learn: PAIN for losing signal close ($' + sigPnl.toFixed(2) + ')'); }
           }
           cortexOpenPosition = null;
           cortexExitConsecutiveCount = 0;
@@ -3548,11 +3591,12 @@ async function _cortexAutoTradeCheckInner() {
       var orderResult = await cortexPlaceOrder(rawSignal);
       cortexLastTradeTs = Date.now();
       if (orderResult && orderResult.ok) {
+        var entryPlm = await fetchPlMultiplier(neuralCurrentEpic);
         cortexAddDecision({ time: timeStr, action: 'OPENED ' + rawSignal, detail: closePrice.toFixed(2) + ' sz=' + sizeLabel + ' confirmed=' + cortexConsecutiveCount + 'x | dealId=' + orderResult.dealId });
-        cortexOpenPosition = { direction: rawSignal, entry: closePrice, candlesHeld: 0, dealId: orderResult.dealId, size: tradeSize };
+        cortexOpenPosition = { direction: rawSignal, entry: closePrice, candlesHeld: 0, dealId: orderResult.dealId, size: tradeSize, plMultiplier: entryPlm };
         cortexExitConsecutiveCount = 0;
         cortexConsecutiveCount = 0;
-        cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: rawSignal, buy: buy, sell: sell, price: closePrice, size: tradeSize, tf: tfLabel, dealId: orderResult.dealId });
+        cortexTradeLog.push({ ts: Date.now(), epic: neuralCurrentEpic, dir: rawSignal, buy: buy, sell: sell, price: closePrice, size: tradeSize, tf: tfLabel, dealId: orderResult.dealId, plMultiplier: entryPlm });
         renderCortexTradeLog();
         cortexSaveState();
       } else {
@@ -3684,7 +3728,13 @@ async function cortexLoadState() {
       }
       if (verified) {
         cortexOpenPosition = savedPos;
-        addBrainLog('CORTEX', 'Restored open position: ' + cortexOpenPosition.direction + ' @ ' + (cortexOpenPosition.entry || 0).toFixed(2) + ' dealId=' + (cortexOpenPosition.dealId || 'none') + ' [VERIFIED]');
+        if (!cortexOpenPosition.plMultiplier && neuralCurrentEpic) {
+          try {
+            cortexOpenPosition.plMultiplier = await fetchPlMultiplier(neuralCurrentEpic);
+            addBrainLog('INFO', 'Fetched plMultiplier for restored position: ' + cortexOpenPosition.plMultiplier);
+          } catch(_) { cortexOpenPosition.plMultiplier = 1; }
+        }
+        addBrainLog('CORTEX', 'Restored open position: ' + cortexOpenPosition.direction + ' @ ' + (cortexOpenPosition.entry || 0).toFixed(2) + ' dealId=' + (cortexOpenPosition.dealId || 'none') + ' plm=' + (cortexOpenPosition.plMultiplier || 1) + ' [VERIFIED]');
       } else {
         addBrainLog('CORTEX', 'Saved position dealId=' + savedPos.dealId + ' no longer found on IG — clearing stale position');
         cortexOpenPosition = null;
@@ -3841,8 +3891,11 @@ function renderCortexTradeLog(skipSave) {
     var livePnlColor = '#8b949e';
     if (currentMid && pos.entry) {
       var dir = pos.direction === 'BUY' ? 1 : -1;
-      var pnlVal = (currentMid - pos.entry) * dir;
-      livePnl = (pnlVal >= 0 ? '+' : '') + pnlVal.toFixed(1) + 'p';
+      var pnlPts = (currentMid - pos.entry) * dir;
+      var posSize = pos.size || cortexPositionSize || 1;
+      var posPlm = pos.plMultiplier || 1;
+      var pnlVal = pnlPts * posSize * posPlm;
+      livePnl = (pnlVal >= 0 ? '+$' : '-$') + Math.abs(pnlVal).toFixed(2);
       livePnlColor = pnlVal >= 0 ? '#2dc653' : '#f85149';
     }
     html += '<div style="padding:6px 8px;margin-bottom:4px;background:#1b4332;border:1px solid #2dc653;border-radius:6px">' +
@@ -3865,8 +3918,9 @@ function renderCortexTradeLog(skipSave) {
     if (t.dir && (t.dir.indexOf('TP') >= 0 || t.dir.indexOf('CLOSE') >= 0 || t.dir.indexOf('FORCE') >= 0)) color = '#bc8cff';
     if (t.dir && t.dir.indexOf('EMRG') >= 0) color = '#d29922';
     var time = new Date(t.ts).toLocaleTimeString();
-    var pnlStr = t.pnl !== undefined && t.pnl !== null && t.pnl !== '' ? (t.pnl >= 0 ? '+' : '') + parseFloat(t.pnl).toFixed(1) + 'p' : '';
-    var pnlColor = t.pnl >= 0 ? '#2dc653' : '#f85149';
+    var pnlNum = (t.pnl !== undefined && t.pnl !== null && t.pnl !== '') ? parseFloat(t.pnl) : null;
+    var pnlStr = pnlNum !== null ? (pnlNum >= 0 ? '+$' : '-$') + Math.abs(pnlNum).toFixed(2) : '';
+    var pnlColor = pnlNum >= 0 ? '#2dc653' : '#f85149';
     html += '<div style="display:flex;justify-content:space-between;padding:3px 6px;border-bottom:1px solid #161b22;font-size:10px">' +
       '<span style="color:#8b949e">' + time + '</span>' +
       '<span style="font-weight:700;color:' + color + '">' + t.dir + '</span>' +
