@@ -3461,11 +3461,30 @@ async function cortexClearHistory() {
 var cortexSaveTimer = null;
 var cortexTickSaveTimer = null;
 var cortexTickSaveInterval = 10000;
+var cortexLastSaveFingerprint = '';
+
+function cortexFingerprint() {
+  var pos = cortexOpenPosition;
+  return cortexBuyThreshold + '|' + cortexSellThreshold + '|' + cortexHoldZone + '|' +
+    cortexStopLossPips + '|' + cortexTakeProfitPips + '|' + cortexCooldownMs + '|' +
+    cortexMinPositionSize + '|' + cortexMaxPositionSize + '|' + cortexPositionSize + '|' +
+    (cortexAutoSize ? 1 : 0) + '|' + cortexMinHoldCandles + '|' + cortexConfirmCandles + '|' +
+    cortexExitConfirmCandles + '|' + (cortexPriceExitsEnabled ? 1 : 0) + '|' + (cortexAutoLearn ? 1 : 0) + '|' +
+    cortexMaxOpenPositions + '|' + cortexDecisionLog.length + '|' + cortexTradeLog.length + '|' +
+    (pos ? pos.dealId + ':' + (pos.candlesHeld || 0) : 'none') + '|' +
+    (calibAutoPassEnabled ? 1 : 0) + '|' + calibAutoPassInterval + '|' +
+    antenna.flashThreshold + '|' + antenna.deadCatSensitivity + '|' +
+    (antenna.emergencyExitEnabled ? 1 : 0) + '|' + (antenna.breakoutRiderEnabled ? 1 : 0) + '|' +
+    (antenna.fallingKnifeBlock ? 1 : 0);
+}
 
 function cortexTickSave() {
   if (cortexTickSaveTimer) return;
   cortexTickSaveTimer = setTimeout(function() {
     cortexTickSaveTimer = null;
+    var fp = cortexFingerprint();
+    if (fp === cortexLastSaveFingerprint) return;
+    cortexLastSaveFingerprint = fp;
     cortexSaveState();
   }, cortexTickSaveInterval);
 }
