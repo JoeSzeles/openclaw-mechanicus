@@ -2879,6 +2879,7 @@ async function _cortexAutoTradeCheckInner() {
     var remaining = Math.ceil((cortexCooldownMs - (now - cortexLastTradeTs)) / 1000);
     if (statusEl) { statusEl.textContent = 'Cooldown: ' + remaining + 's | TF=' + tfLabel + ' | ' + neuralCurrentEpic; statusEl.style.color = '#d29922'; }
     cortexAddDecision({ time: timeStr, action: 'COOLDOWN', detail: remaining + 's remaining' });
+    cortexTickSave();
     return;
   }
   try {
@@ -3175,6 +3176,7 @@ async function _cortexAutoTradeCheckInner() {
         var pnlLabel = entryPrice > 0 ? ' pnl=' + pnlPips.toFixed(1) : '';
         if (statusEl) { statusEl.textContent = 'HOLDING ' + cortexOpenPosition.direction + ' (' + holdReason + pnlLabel + ') | ' + currentSig; statusEl.style.color = '#d29922'; }
         cortexAddDecision({ time: timeStr, action: 'HOLDING', detail: cortexOpenPosition.direction + ' ' + holdReason + pnlLabel + ' | B=' + buy.toFixed(0) + ' S=' + sell.toFixed(0) + ' raw=' + rawSignal + ' @ ' + closePrice.toFixed(2) });
+        cortexTickSave();
         return;
       }
     }
@@ -3251,6 +3253,7 @@ async function _cortexAutoTradeCheckInner() {
       if (statusEl) { statusEl.textContent = 'Monitoring: ' + currentSig + ' | No signal'; statusEl.style.color = '#8b949e'; }
       cortexAddDecision({ time: timeStr, action: 'HOLD', detail: 'B=' + buy.toFixed(0) + ' S=' + sell.toFixed(0) + ' sprd=' + spread.toFixed(1) + ' need>' + cortexHoldZone + ' @ ' + closePrice.toFixed(2) });
     }
+    cortexTickSave();
   } catch (e) {
     addBrainLog('ERROR', 'Auto-trade check failed: ' + e.message);
     cortexAddDecision({ time: timeStr, action: 'ERROR', detail: e.message });
@@ -3456,6 +3459,17 @@ async function cortexClearHistory() {
 }
 
 var cortexSaveTimer = null;
+var cortexTickSaveTimer = null;
+var cortexTickSaveInterval = 10000;
+
+function cortexTickSave() {
+  if (cortexTickSaveTimer) return;
+  cortexTickSaveTimer = setTimeout(function() {
+    cortexTickSaveTimer = null;
+    cortexSaveState();
+  }, cortexTickSaveInterval);
+}
+
 function renderCortexTradeLog(skipSave) {
   var logEl = document.getElementById('cortex-trade-log');
   if (!logEl) return;
