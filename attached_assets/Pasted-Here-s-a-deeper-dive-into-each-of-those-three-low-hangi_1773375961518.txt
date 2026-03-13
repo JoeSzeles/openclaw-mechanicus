@@ -1,0 +1,149 @@
+Here’s a deeper dive into each of those three low-hanging fruit suggestions — why they matter, how they fit into your current BrainJar / Volume Antenna / Cortex architecture, and concrete ways to implement them with minimal code changes. All three are quick wins that should improve robustness, especially on IG CFDs where volume is often missing and spread becomes your main liquidity/volatility signal.
+
+### 1. Add a simple spread-velocity term to the antenna  
+**Why it’s valuable**  
+Your antenna already has solid spread-based logic in spread mode (`spreadAccel`, `spreadSpikeRatio`, absorption via wide spread + small price move).  
+But **spread-velocity** (how fast spread is changing) adds a new dimension:  
+- Sudden widening = liquidity evaporating fast → potential flash-crash / absorption / hidden selling pressure.  
+- Rapid tightening = liquidity flooding back → confirmation of momentum or breakout.  
+This is especially useful during news events or thin hours when spread jumps from 1.5 → 8 in seconds — your current `spreadAccel` catches the delta, but velocity gives acceleration context (second derivative feel).
+
+**How it fits**  
+Add it as an 8th sub-group in the antenna (or merge into existing absorption/flash-crash scores).  
+It complements your existing absorption logic:  
+- Wide spread + **slow** widening → classic absorption (big players defending).  
+- Wide spread + **fast** widening → panic / liquidity hole → stronger emergency exit signal.
+
+**Implementation sketch** (add to antenna pressure computation)
+
+```js
+// In antenna update (per tick or per candle)
+let prevSpread = this.lastSpread || currentSpread;
+let prevSpreadDelta = this.lastSpreadDelta || 0;
+
+const spreadDelta = currentSpread - prevSpread;          // first derivative
+const spreadVelocity = spreadDelta - prevSpreadDelta;    // second derivative ≈ acceleration of spread change
+
+// Normalize (scale relative to baseline)
+const normVelocity = spreadVelocity / (this.baselineSpread * 0.1); // e.g. 10% of baseline per tick
+
+// New pressure score
+let spreadVelocityScore = 0;
+if (normVelocity > 1.5) {          // fast widening
+  spreadVelocityScore = Math.min(normVelocity * 2, 5.0);
+  // → excite "stress / flash" neurons or boost flashCrashScore
+  this.injectToGroup('flash', spreadVelocityScore);
+} else if (normVelocity < -1.5) {  // fast tightening
+  spreadVelocityScore = Math.min(Math.abs(normVelocity) * 1.8, 4.0);
+  // → boost confirmation / momentum neurons
+  this.injectToGroup('confirmation', spreadVelocityScore);
+}
+
+// Store for next tick
+this.lastSpread = currentSpread;
+this.lastSpreadDelta = spreadDelta;
+
+// Optional: log for tuning
+console.log(`Spread vel: ${spreadVelocity.toFixed(3)}, score: ${spreadVelocityScore.toFixed(2)}`);
+```
+
+**Tuning tip**  
+Start with thresholds 1.5 / -1.5. Watch logs during volatile periods (news, open/close) — adjust so fast widening reliably triggers emergency blocks without false positives in normal ranging.
+
+### 2. Log antenna pressure JSON alongside ticks for post-analysis  
+**Why it’s valuable**  
+Right now you have firing rates, trade logs, and pattern memory — but antenna pressure scores (flashCrashScore, absorptionScore, divergenceScore, etc.) are transient.  
+Logging them per tick/candle gives you:
+- Post-mortem analysis: Did high absorption precede good entries? Did divergence correctly block bad trades?
+- Threshold tuning: Plot scores vs realized P&L → find optimal cutoffs via simple script.
+- Debugging: See if spread mode behaves as expected when vol=0.
+- Calibration input: Feed historical pressure logs back into auto-test or proof-test.
+
+**How to implement** (minimal change)
+
+Create a rolling JSON log file (append-only, rotate daily):
+
+```js
+// In tick handler or after antenna computation
+const pressureLog = {
+  timestamp: Date.now(),
+  epic: this.currentEpic,
+  midPrice: currentMid,
+  spread: currentSpread,
+  spreadDelta: spreadDelta,
+  spreadVelocity: spreadVelocity,
+  // All 7 antenna scores
+  tickVelocity: tickVelocityScore,
+  volumeAccel: volumeAccelScore,        // or spreadAccelScore in spread mode
+  buySellPressure: buySellPressureScore,
+  absorption: absorptionScore,
+  flashCrash: flashCrashScore,
+  deadCat: deadCatScore,
+  divergence: divergenceScore,
+  // Optional: motor rates at this tick
+  buyHz: buy_signal,
+  sellHz: sell_signal
+};
+
+// Append to file (atomic append)
+const logPath = path.join(os.homedir(), '.openclaw', 'brain-logs', `${this.currentEpic}-${today}.jsonl`);
+fs.appendFileSync(logPath, JSON.stringify(pressureLog) + '\n');
+```
+
+**Post-analysis quick script** (run locally or in Replit)
+```python
+import json
+import pandas as pd
+
+df = pd.read_json('brain-logs/CS.D.CFAGOLD.CFA.IP-2026-03-13.jsonl', lines=True)
+df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+
+# Example: absorption before good trades
+print(df[df['absorption'] > 2.0][['timestamp', 'absorption', 'buyHz', 'sellHz']])
+```
+
+This turns your live run into analyzable data — huge for tuning antenna sensitivity.
+
+### 3. Spread penalty multiplier on position size in Cortex  
+**Why it’s valuable**  
+Your current auto-sizing is signal-strength based (`ratio = strength / maxStrength`).  
+But when spread is 2–3× baseline, you pay much higher entry/exit cost → even strong signals can become unprofitable.  
+A spread penalty reduces size (or blocks) in thin/expensive markets — classic risk management missing from many retail bots.
+
+**How it fits**  
+Add right before final size calculation in Cortex position sizing:
+
+```js
+// In Cortex sizing logic
+let spreadPenalty = 1.0;
+
+if (currentSpread > this.baselineSpread * 2.0) {
+  // Linear penalty: 2× spread → 50% size, 3× → 25%, etc.
+  const excess = (currentSpread / this.baselineSpread) - 1;
+  spreadPenalty = Math.max(0.1, 1 - excess * 0.4); // tune 0.4
+  // Or exponential: spreadPenalty = Math.pow(0.8, excess);
+}
+
+// Apply after ratio
+size = (minSize + ratio * (maxSize - minSize)) * spreadPenalty;
+size = Math.round(size * 10) / 10; // keep 0.1 precision
+```
+
+**Bonus rules**  
+- If spread > 3.5× baseline → force size=0 (block entry).  
+- Log: `console.log(`Spread penalty: ${spreadPenalty.toFixed(2)} (spread=${currentSpread}, baseline=${baselineSpread})`);`
+
+**Tuning tip**  
+Start with 2× → 50% size. Backtest on gold during Asian session (when spread often widens) → see if penalized sizing reduces drawdown without killing too many winners.
+
+### Summary — Effort vs Impact
+| Idea                        | Code Lines | Impact | Difficulty |
+|-----------------------------|------------|--------|------------|
+| Spread-velocity term        | ~15–25     | High   | Low        |
+| Antenna pressure JSON logs  | ~10–15     | Very High (tuning goldmine) | Very Low   |
+| Spread penalty on size      | ~8–12      | High   | Very Low   |
+
+All three are <50 lines combined, use existing variables (spread, baselineSpread, etc.), and directly address your vol=0 reality.
+
+Which one do you want to implement first?  
+I can give you the exact diff/patch for any of them — just say the word.

@@ -5076,6 +5076,7 @@ async function handleApi(req, res) {
         let data = "";
         proxyRes.on("data", (chunk) => (data += chunk));
         proxyRes.on("end", () => {
+          if (res.headersSent) return resolve(true);
           const ct = proxyRes.headers["content-type"] || "application/json";
           res.writeHead(proxyRes.statusCode || 200, { "Content-Type": ct, "Access-Control-Allow-Origin": "*" });
           res.end(data);
@@ -5083,10 +5084,11 @@ async function handleApi(req, res) {
         });
       });
       proxyReq.on("error", (e) => {
-        json(res, 502, { error: "Brain engine unreachable: " + e.message });
+        if (!res.headersSent) json(res, 502, { error: "Brain engine unreachable: " + e.message });
         resolve(true);
       });
-      proxyReq.setTimeout(10000, () => { proxyReq.destroy(); json(res, 504, { error: "Brain engine timeout" }); resolve(true); });
+      const brainTimeout = (brainPath.startsWith("/backtest-train") || brainPath.startsWith("/live-train") || brainPath.startsWith("/auto-test")) ? 120000 : 30000;
+      proxyReq.setTimeout(brainTimeout, () => { proxyReq.destroy(); if (!res.headersSent) json(res, 504, { error: "Brain engine timeout" }); resolve(true); });
       if (bodyBuf) proxyReq.write(bodyBuf);
       proxyReq.end();
     });
