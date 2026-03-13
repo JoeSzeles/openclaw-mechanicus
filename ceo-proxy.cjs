@@ -5271,41 +5271,47 @@ const CUSTOM_PAGES = {
   "/login.html": "login.html",
 };
 
-function serveCustomPage(req, res) {
-  const url = new URL(req.url, "http://localhost");
-  const file = CUSTOM_PAGES[url.pathname];
-  if (!file) return false;
+const _customPageCache = {};
+(function preloadCustomPages() {
   const dirs = [
     path.join(__dirname, "ui", "public"),
     path.join(__dirname, "dist", "control-ui"),
   ];
-  for (const dir of dirs) {
-    const fp = path.join(dir, file);
-    if (fs.existsSync(fp)) {
+  for (const [route, file] of Object.entries(CUSTOM_PAGES)) {
+    for (const dir of dirs) {
+      const fp = path.join(dir, file);
       try {
-        const ext = path.extname(file);
-        const ct = MIME_TYPES[ext] || "application/octet-stream";
-        let content = fs.readFileSync(fp, "utf8");
-        if (ext === ".html" && !content.includes("nav-inject.js")) {
-          const idx = content.indexOf("</body>");
-          if (idx !== -1) content = content.slice(0, idx) + NAV_INJECT_TAG + content.slice(idx);
-          else content += NAV_INJECT_TAG;
+        if (fs.existsSync(fp)) {
+          const ext = path.extname(file);
+          let content = fs.readFileSync(fp, "utf8");
+          if (ext === ".html" && !content.includes("nav-inject.js")) {
+            const idx = content.indexOf("</body>");
+            if (idx !== -1) content = content.slice(0, idx) + NAV_INJECT_TAG + content.slice(idx);
+            else content += NAV_INJECT_TAG;
+          }
+          _customPageCache[route] = { content, ct: MIME_TYPES[ext] || "application/octet-stream" };
+          break;
         }
-        res.writeHead(200, {
-          "Content-Type": ct,
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          "Pragma": "no-cache",
-          "Expires": "0",
-        });
-        res.end(content);
-        return true;
-      } catch (readErr) {
-        console.error("[ceo-proxy] readFile error for " + fp + ":", readErr.code || readErr.message);
-        continue;
+      } catch (e) {
+        console.error("[ceo-proxy] preload failed for " + fp + ":", e.code || e.message);
       }
     }
   }
-  return false;
+  console.log("[ceo-proxy] Pre-cached " + Object.keys(_customPageCache).length + "/" + Object.keys(CUSTOM_PAGES).length + " custom pages into memory");
+})();
+
+function serveCustomPage(req, res) {
+  const url = new URL(req.url, "http://localhost");
+  const cached = _customPageCache[url.pathname];
+  if (!cached) return false;
+  res.writeHead(200, {
+    "Content-Type": cached.ct,
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+  });
+  res.end(cached.content);
+  return true;
 }
 
 function proxyReq(req, res, retries = 3) {
@@ -5545,6 +5551,33 @@ async function handleCanvasApiRoutes(req, res) {
   return true;
 }
 
+const _canvasFileCache = {};
+function canvasCacheLoad() {
+  if (!fs.existsSync(CANVAS_DIR)) return;
+  const files = fs.readdirSync(CANVAS_DIR).filter(f => !fs.statSync(path.join(CANVAS_DIR, f)).isDirectory());
+  for (const file of files) {
+    const fp = path.join(CANVAS_DIR, file);
+    try {
+      const ext = path.extname(file).toLowerCase();
+      const isHtml = ext === ".html" || ext === ".htm";
+      const raw = fs.readFileSync(fp);
+      const data = isHtml ? injectNavIntoHtml(raw, fp) : raw;
+      _canvasFileCache[file] = { data, ct: MIME_TYPES[ext] || "application/octet-stream", isHtml };
+    } catch (e) {
+      console.error("[ceo-proxy] canvas preload failed for " + file + ":", e.code || e.message);
+    }
+  }
+  const idxPath = path.join(CANVAS_DIR, "index.html");
+  if (fs.existsSync(idxPath) && !_canvasFileCache["index.html"]) {
+    try {
+      const raw = fs.readFileSync(idxPath);
+      _canvasFileCache["index.html"] = { data: injectNavIntoHtml(raw, idxPath), ct: "text/html; charset=utf-8", isHtml: true };
+    } catch (e) {}
+  }
+  console.log("[ceo-proxy] Pre-cached " + Object.keys(_canvasFileCache).length + " canvas files into memory");
+}
+canvasCacheLoad();
+
 function serveCanvas(req, res) {
   const url = new URL(req.url, "http://localhost");
   const prefix = "/__openclaw__/canvas/";
@@ -5557,6 +5590,22 @@ function serveCanvas(req, res) {
     const data = Buffer.from(JSON.stringify(manifest));
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Content-Length": data.length, "Access-Control-Allow-Origin": "*" });
     res.end(data);
+    return true;
+  }
+  const cached = _canvasFileCache[relPath];
+  if (cached) {
+    const headers = {
+      "Content-Type": cached.ct,
+      "Content-Length": cached.data.length,
+      "Access-Control-Allow-Origin": "*",
+    };
+    if (cached.isHtml) {
+      headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+      headers["Pragma"] = "no-cache";
+      headers["Expires"] = "0";
+    }
+    res.writeHead(200, headers);
+    res.end(cached.data);
     return true;
   }
   const filePath = path.resolve(CANVAS_DIR, path.normalize(relPath));
@@ -5588,6 +5637,7 @@ function serveCanvas(req, res) {
     const ext = path.extname(filePath).toLowerCase();
     const isHtml = ext === ".html" || ext === ".htm";
     const data = isHtml ? injectNavIntoHtml(raw, filePath) : raw;
+    _canvasFileCache[relPath] = { data, ct: MIME_TYPES[ext] || "application/octet-stream", isHtml };
     const headers = {
       "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
       "Content-Length": data.length,
