@@ -5143,6 +5143,7 @@ loadStrategySchemas().then(function(s) { strategySchemas = s || {}; });
 loadClawScriptStrategyTypes();
 initBatchBacktestUI();
 if (typeof loadEngineInfo === 'function') loadEngineInfo();
+if (typeof initNeuralTradingTab === 'function') initNeuralTradingTab();
 (function() {
   var _origPopulate = populateStrategyFields;
   populateStrategyFields = function(s) {
