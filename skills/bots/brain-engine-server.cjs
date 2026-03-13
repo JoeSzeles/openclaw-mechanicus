@@ -380,8 +380,21 @@ function encodeAntennaPressure(inputs, ant, pressure, volumeFallback) {
   }
 }
 
+function computeFeedbackModifier(type) {
+  const REF_SYNAPSES = 4290;
+  const BASE_SUGAR = 0.15;
+  const BASE_PAIN = 0.15;
+  const totalSyn = synapses ? synapses.length : REF_SYNAPSES;
+  const scale = Math.sqrt(REF_SYNAPSES / Math.max(1, totalSyn));
+  const delta = type === 'sugar'
+    ? BASE_SUGAR * scale
+    : BASE_PAIN * scale;
+  return type === 'sugar' ? (1 + delta) : (1 - delta);
+}
+
 function applyFeedback(type, options) {
-  const modifier = type === 'sugar' ? 1.15 : 0.85;
+  const modifier = computeFeedbackModifier(type);
+  const wClamp = Math.max(2, currentParams.w_syn * 0.25);
   const motorStart = N_SENSORY + N_INTER;
   const mbStart = N_SENSORY + mushroomBody.start;
   const mbEnd = mbStart + mushroomBody.count;
@@ -397,14 +410,14 @@ function applyFeedback(type, options) {
 
     if (apply) {
       syn.w = syn.w * modifier;
-      syn.w = Math.max(-2, Math.min(2, syn.w));
+      syn.w = Math.max(-wClamp, Math.min(wClamp, syn.w));
       affected++;
     }
   }
 
-  trainingFeedbackLog.push({ ts: Date.now(), type, modifier, step: stepCount, target, affected });
+  trainingFeedbackLog.push({ ts: Date.now(), type, modifier: +modifier.toFixed(6), step: stepCount, target, affected, synapse_count: synapses ? synapses.length : 0, w_clamp: wClamp });
   if (trainingFeedbackLog.length > 1000) trainingFeedbackLog.shift();
-  return { applied: type, modifier, target, synapses_affected: affected };
+  return { applied: type, modifier: +modifier.toFixed(6), target, synapses_affected: affected, synapse_total: synapses ? synapses.length : 0, w_clamp: wClamp };
 }
 
 function recordPattern(epic, price, rates) {
@@ -484,6 +497,13 @@ function runBenchmark(options) {
     neurons: N_TOTAL,
     synapses: synapses ? synapses.length : 0,
     max_tick_rate_hz: perStep > 0 ? parseFloat((1000 / perStep).toFixed(0)) : 999999,
+    feedback_formula: {
+      sugar_modifier: +computeFeedbackModifier('sugar').toFixed(6),
+      pain_modifier: +computeFeedbackModifier('pain').toFixed(6),
+      w_clamp: Math.max(2, currentParams.w_syn * 0.25),
+      ref_synapses: 4290,
+      actual_synapses: synapses ? synapses.length : 0,
+    },
     fits_timeframes: {}
   };
 }
@@ -802,6 +822,13 @@ async function handleRequest(req, res) {
       sensory_assignments: sensoryAssignments,
       antenna_sub_groups: antennaSubGroups,
       mushroom_body: mushroomBody,
+      feedback_formula: {
+        sugar_modifier: +computeFeedbackModifier('sugar').toFixed(6),
+        pain_modifier: +computeFeedbackModifier('pain').toFixed(6),
+        w_clamp: Math.max(2, currentParams.w_syn * 0.25),
+        ref_synapses: 4290,
+        actual_synapses: synapses ? synapses.length : 0,
+      },
     });
   }
 

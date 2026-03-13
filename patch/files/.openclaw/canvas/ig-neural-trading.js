@@ -1183,7 +1183,7 @@ async function sendTrainingFeedback(type) {
   devLog('INFO', 'Feedback: ' + type);
   var result = await brainFeedback(type);
   if (result) {
-    addBrainLog('INFO', type + ' applied: ' + result.synapses_affected + ' synapses modified');
+    addBrainLog('INFO', type + ' applied: ' + result.synapses_affected + '/' + (result.synapse_total || '?') + ' synapses (modifier=' + (result.modifier || '?') + ', clamp=\u00B1' + (result.w_clamp || '?') + ')');
     showToast(type + ' feedback applied', true);
   } else {
     addBrainLog('ERROR', 'Feedback failed - brain not connected');
@@ -1571,6 +1571,7 @@ async function runArchBenchmark() {
       '<div><span style="color:#8b949e">Neurons:</span> <span style="color:#c9d1d9">' + result.neurons + '</span></div>' +
       '<div><span style="color:#8b949e">Synapses:</span> <span style="color:#c9d1d9">' + result.synapses + '</span></div>' +
       '<div><span style="color:#8b949e">Avg spikes/step:</span> <span style="color:#bc8cff">' + result.avg_spikes_per_step + '</span></div>' +
+      (result.feedback_formula ? '<div style="margin-top:6px;border-top:1px solid #30363d;padding-top:4px"><span style="color:#8b949e">Feedback:</span> <span style="color:#2dc653">sugar=' + result.feedback_formula.sugar_modifier.toFixed(4) + '</span> <span style="color:#f85149">pain=' + result.feedback_formula.pain_modifier.toFixed(4) + '</span> <span style="color:#8b949e">clamp=\u00B1' + result.feedback_formula.w_clamp.toFixed(1) + '</span></div>' : '') +
       '</div>';
   }
   addBrainLog('INFO', 'Benchmark: ' + result.per_step_ms.toFixed(4) + 'ms/step, ' + result.max_tick_rate_hz + ' Hz max');
