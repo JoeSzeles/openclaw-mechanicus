@@ -5282,22 +5282,27 @@ function serveCustomPage(req, res) {
   for (const dir of dirs) {
     const fp = path.join(dir, file);
     if (fs.existsSync(fp)) {
-      const ext = path.extname(file);
-      const ct = MIME_TYPES[ext] || "application/octet-stream";
-      let content = fs.readFileSync(fp, "utf8");
-      if (ext === ".html" && !content.includes("nav-inject.js")) {
-        const idx = content.indexOf("</body>");
-        if (idx !== -1) content = content.slice(0, idx) + NAV_INJECT_TAG + content.slice(idx);
-        else content += NAV_INJECT_TAG;
+      try {
+        const ext = path.extname(file);
+        const ct = MIME_TYPES[ext] || "application/octet-stream";
+        let content = fs.readFileSync(fp, "utf8");
+        if (ext === ".html" && !content.includes("nav-inject.js")) {
+          const idx = content.indexOf("</body>");
+          if (idx !== -1) content = content.slice(0, idx) + NAV_INJECT_TAG + content.slice(idx);
+          else content += NAV_INJECT_TAG;
+        }
+        res.writeHead(200, {
+          "Content-Type": ct,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        });
+        res.end(content);
+        return true;
+      } catch (readErr) {
+        console.error("[ceo-proxy] readFile error for " + fp + ":", readErr.code || readErr.message);
+        continue;
       }
-      res.writeHead(200, {
-        "Content-Type": ct,
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
-      });
-      res.end(content);
-      return true;
     }
   }
   return false;

@@ -54,6 +54,6 @@ localPort = 19876
 externalPort = 3000
 
 [deployment]
-deploymentTarget = "vm"
+deploymentTarget = "autoscale"
 run = ["bash", "start.sh"]
 build = ["npm", "install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund"]
