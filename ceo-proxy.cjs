@@ -3314,11 +3314,12 @@ async function handleIgApi(req, res, p) {
 
     if (req.method === "GET" && p === "/api/ig/scalper/candles") {
       const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
-      const epic = url.searchParams.get("epic");
-      const resolution = url.searchParams.get("resolution") || "MINUTE";
-      const max = parseInt(url.searchParams.get("max")) || 500;
-      const fromTs = url.searchParams.get("from") ? parseInt(url.searchParams.get("from")) : 0;
-      const toTs = url.searchParams.get("to") ? parseInt(url.searchParams.get("to")) : Date.now();
+      const qUrl = new URL("http://localhost" + req.url);
+      const epic = qUrl.searchParams.get("epic");
+      const resolution = qUrl.searchParams.get("resolution") || "MINUTE";
+      const max = parseInt(qUrl.searchParams.get("max")) || 500;
+      const fromTs = qUrl.searchParams.get("from") ? parseInt(qUrl.searchParams.get("from")) : 0;
+      const toTs = qUrl.searchParams.get("to") ? parseInt(qUrl.searchParams.get("to")) : Date.now();
       if (!epic) return json(res, 400, { error: "Missing epic parameter" });
       const candles = await scalperDb.getStoredCandlesRange(epic, resolution, fromTs, toTs);
       const limited = candles.slice(-max);
@@ -3328,8 +3329,9 @@ async function handleIgApi(req, res, p) {
 
     if (req.method === "GET" && p === "/api/ig/scalper/candle-count") {
       const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
-      const epic = url.searchParams.get("epic");
-      const resolution = url.searchParams.get("resolution") || "MINUTE";
+      const qUrl = new URL("http://localhost" + req.url);
+      const epic = qUrl.searchParams.get("epic");
+      const resolution = qUrl.searchParams.get("resolution") || "MINUTE";
       if (!epic) return json(res, 400, { error: "Missing epic parameter" });
       const count = await scalperDb.getCandleCount(epic, resolution);
       return json(res, 200, { epic, resolution, count });

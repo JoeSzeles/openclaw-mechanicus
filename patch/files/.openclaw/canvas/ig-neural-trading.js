@@ -1733,6 +1733,14 @@ async function startBacktestTraining() {
       return;
     }
 
+    if (btTrainAbort) {
+      addBrainLog('INFO', 'Backtest aborted before training');
+      if (startBtn) startBtn.style.display = 'inline-block';
+      if (stopBtn) stopBtn.style.display = 'none';
+      if (progDiv) progDiv.style.display = 'none';
+      return;
+    }
+
     addBrainLog('INFO', 'Got ' + candles.length + ' candles, feeding to brain...');
     if (pctEl) pctEl.textContent = 'Training on ' + candles.length + ' candles...';
     if (barEl) { barEl.style.width = '10%'; }
@@ -3432,8 +3440,10 @@ function channelRefreshLongTerm() {
 function channelSetLongTerm(candles, tf) {
   var high = -Infinity, low = Infinity;
   for (var i = 0; i < candles.length; i++) {
-    if (candles[i].high > high) high = candles[i].high;
-    if (candles[i].low < low) low = candles[i].low;
+    var h = candles[i].high != null ? candles[i].high : candles[i].highPrice;
+    var l = candles[i].low != null ? candles[i].low : candles[i].lowPrice;
+    if (h != null && h > high) high = h;
+    if (l != null && l < low) low = l;
   }
   channelLongTerm = { high: high, low: low, mid: (high + low) / 2, tf: tf };
   channelUpdateUI();
