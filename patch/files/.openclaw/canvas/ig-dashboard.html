@@ -4062,7 +4062,7 @@ async function refresh() {
   await loadStrategy();
   var settingsOpen = document.getElementById('scalperSettingsEdit') && document.getElementById('scalperSettingsEdit').style.display !== 'none';
   var skipScalper = editingScalperStrategy !== null || settingsOpen;
-  var tasks = [loadAccount(), loadPositions(), updateLivePrices(), loadWatchlist(), loadProofread(), loadAlerts(), loadRejectionsLog(), loadVerifyLog(), loadBotLog(), loadSessionStatus(), loadStreamingStatus(), loadProcessesPanel(), loadBacktestLog()];
+  var tasks = [loadAccount(), loadPositions(), updateLivePrices(), loadWatchlist(), typeof loadProofread === 'function' ? loadProofread() : Promise.resolve(), loadAlerts(), loadRejectionsLog(), loadVerifyLog(), loadBotLog(), loadSessionStatus(), loadStreamingStatus(), loadProcessesPanel(), loadBacktestLog()];
   if (!skipScalper) tasks.push(loadScalperStatus());
   await Promise.all(tasks);
 }
