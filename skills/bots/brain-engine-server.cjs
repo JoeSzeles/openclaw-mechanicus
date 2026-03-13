@@ -226,7 +226,7 @@ function step(externalInput) {
 }
 
 function getMotorRates() {
-  const window = Math.min(spikeHistory.length, 10);
+  const window = Math.min(spikeHistory.length, 20);
   if (window === 0) return { buy_signal: 0, sell_signal: 0, hold_signal: 0, avg_rate: 0, raw: {} };
   const motorStart = N_SENSORY + N_INTER;
   const buyEnd = Math.floor(N_MOTOR / 3);
@@ -251,11 +251,11 @@ function getMotorRates() {
   }
   const scale = 1000 / (window * DT);
   return {
-    buy_signal: buyCount * scale / buyNeurons.length,
-    sell_signal: sellCount * scale / sellNeurons.length,
-    hold_signal: holdCount * scale / holdNeurons.length,
-    avg_rate: totalCount * scale / N_MOTOR,
-    motor_rates: totalCount * scale / N_MOTOR,
+    buy_signal: parseFloat((buyCount * scale / buyNeurons.length).toFixed(2)),
+    sell_signal: parseFloat((sellCount * scale / sellNeurons.length).toFixed(2)),
+    hold_signal: parseFloat((holdCount * scale / holdNeurons.length).toFixed(2)),
+    avg_rate: parseFloat((totalCount * scale / N_MOTOR).toFixed(2)),
+    motor_rates: parseFloat((totalCount * scale / N_MOTOR).toFixed(2)),
     raw: { buy: buyCount, sell: sellCount, hold: holdCount, total: totalCount }
   };
 }
@@ -414,6 +414,10 @@ function applyFeedback(type, options) {
     if (apply) {
       syn.w = syn.w * modifier;
       syn.w = Math.max(-wClamp, Math.min(wClamp, syn.w));
+      const minFloor = Math.abs(syn.base_w) * 0.25;
+      if (minFloor > 0 && Math.abs(syn.w) < minFloor) {
+        syn.w = syn.w >= 0 ? minFloor : -minFloor;
+      }
       affected++;
     }
   }
@@ -799,12 +803,36 @@ function boot(config) {
     initSynapses();
     console.log('[brain-engine] Generated fresh random synapses (no saved weights found or architecture changed)');
   }
+  if (weightsRestored) {
+    const motorStart = N_SENSORY + N_INTER;
+    const i2m = synapses.filter(s => s.pre >= N_SENSORY && s.pre < motorStart && s.post >= motorStart && s.w > 0);
+    if (i2m.length > 0) {
+      const avgW = i2m.reduce((a, s) => a + s.w, 0) / i2m.length;
+      const avgBase = i2m.reduce((a, s) => a + Math.abs(s.base_w), 0) / i2m.length;
+      if (avgBase > 0 && avgW / avgBase < 0.4) {
+        console.log('[brain-engine] Auto-rehab: I->M avg weight ' + avgW.toFixed(4) + ' is < 20% of base ' + avgBase.toFixed(4));
+        let healed = 0;
+        for (const syn of synapses) {
+          if (syn.post >= motorStart || (syn.pre >= N_SENSORY && syn.pre < motorStart)) {
+            const target = syn.base_w * 0.5;
+            if (Math.abs(syn.w) < Math.abs(target)) {
+              syn.w = syn.base_w >= 0 ? Math.abs(target) : -Math.abs(target);
+              healed++;
+            }
+          }
+        }
+        console.log('[brain-engine] Auto-rehab healed ' + healed + ' synapses to 50% of base');
+      }
+    }
+  }
+
   isBooted = true;
   bootTime = Date.now();
   if (!weightsRestored) stepCount = 0;
   spikeHistory = [];
 
   saveState();
+  if (weightsRestored) saveSynapseWeights();
 
   console.log('[brain-engine] Booted: ' + N_TOTAL + ' neurons, ' + synapses.length + ' synapses (S=' + N_SENSORY + ' I=' + N_INTER + ' M=' + N_MOTOR + ')' + (weightsRestored ? ' [WEIGHTS RESTORED]' : ' [FRESH WEIGHTS]'));
   return {
@@ -940,6 +968,16 @@ async function handleRequest(req, res) {
   if (m === 'POST' && p === '/stimulate-price') {
     if (!isBooted) return respond(res, 400, { error: 'Brain not booted' });
     const body = await parseBody(req);
+    const price = body.price || 0;
+    const prevPrice = body.prevPrice || price;
+    const priceLevel = Math.max(price, prevPrice, 1);
+    const autoBoost = Math.max(1, Math.min(50, priceLevel / 100));
+    if (!body.boost) body.boost = autoBoost;
+    if (!body.volume && !body.spread) {
+      body.spread = Math.abs(price - prevPrice) || priceLevel * 0.0001;
+    }
+    if (!body.steps) body.steps = 30;
+    spikeHistory = [];
     const rates = stimulateFromPrice(body);
     return respond(res, 200, { timestamp: Date.now(), step_count: stepCount, ...rates });
   }
@@ -957,6 +995,28 @@ async function handleRequest(req, res) {
     if (body.r_poi !== undefined) currentParams.r_poi = body.r_poi;
     if (body.tau_syn !== undefined) currentParams.tau_syn = body.tau_syn;
     return respond(res, 200, { ok: true, params: currentParams });
+  }
+
+  if (m === 'POST' && p === '/rehab') {
+    if (!isBooted) return respond(res, 400, { error: 'Brain not booted' });
+    const body = await parseBody(req);
+    const ratio = Math.max(0.3, Math.min(1.0, body.ratio || 0.5));
+    const motorStart = N_SENSORY + N_INTER;
+    let healed = 0, total = 0;
+    for (const syn of synapses) {
+      if (syn.post >= motorStart || (syn.pre >= N_SENSORY && syn.pre < motorStart)) {
+        total++;
+        const target = syn.base_w * ratio;
+        if (Math.abs(syn.w) < Math.abs(target)) {
+          syn.w = syn.base_w >= 0 ? Math.abs(target) : -Math.abs(target);
+          healed++;
+        }
+      }
+    }
+    spikeHistory = [];
+    saveSynapseWeights();
+    saveState();
+    return respond(res, 200, { ok: true, healed, total, ratio, message: 'Weights rehabilitated to ' + (ratio*100).toFixed(0) + '% of base' });
   }
 
   if (m === 'POST' && p === '/feedback') {
@@ -1131,6 +1191,7 @@ async function handleRequest(req, res) {
       const candleRange = highPrice - lowPrice;
       const syntheticSpread = c.spread || candleRange || Math.abs(closePrice - (prevPrice || closePrice));
       const syntheticVolume = vol || Math.max(1, Math.round(candleRange * 10));
+      spikeHistory = [];
       const rates = stimulateFromPrice({
         price: closePrice,
         prevPrice: prevPrice || closePrice,
@@ -1271,6 +1332,7 @@ async function handleRequest(req, res) {
     const syntheticSpread = candle.spread || candleRange || Math.abs(closePrice - prevPrice);
     const syntheticVolume = vol || Math.max(1, Math.round(candleRange * 10));
 
+    spikeHistory = [];
     const rates = stimulateFromPrice({
       price: closePrice,
       prevPrice: prevPrice,

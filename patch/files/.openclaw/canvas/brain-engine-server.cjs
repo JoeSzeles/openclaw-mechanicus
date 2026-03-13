@@ -226,7 +226,7 @@ function step(externalInput) {
 }
 
 function getMotorRates() {
-  const window = Math.min(spikeHistory.length, 10);
+  const window = Math.min(spikeHistory.length, 20);
   if (window === 0) return { buy_signal: 0, sell_signal: 0, hold_signal: 0, avg_rate: 0, raw: {} };
   const motorStart = N_SENSORY + N_INTER;
   const buyEnd = Math.floor(N_MOTOR / 3);
@@ -251,11 +251,11 @@ function getMotorRates() {
   }
   const scale = 1000 / (window * DT);
   return {
-    buy_signal: buyCount * scale / buyNeurons.length,
-    sell_signal: sellCount * scale / sellNeurons.length,
-    hold_signal: holdCount * scale / holdNeurons.length,
-    avg_rate: totalCount * scale / N_MOTOR,
-    motor_rates: totalCount * scale / N_MOTOR,
+    buy_signal: parseFloat((buyCount * scale / buyNeurons.length).toFixed(2)),
+    sell_signal: parseFloat((sellCount * scale / sellNeurons.length).toFixed(2)),
+    hold_signal: parseFloat((holdCount * scale / holdNeurons.length).toFixed(2)),
+    avg_rate: parseFloat((totalCount * scale / N_MOTOR).toFixed(2)),
+    motor_rates: parseFloat((totalCount * scale / N_MOTOR).toFixed(2)),
     raw: { buy: buyCount, sell: sellCount, hold: holdCount, total: totalCount }
   };
 }
@@ -264,6 +264,8 @@ function stimulateFromPrice(priceData) {
   const inputs = [];
   const { price, prevPrice, volume, spread, epic } = priceData;
   const pressure = priceData.pressure || {};
+  const boost = priceData.boost || 1;
+  const stepsOverride = priceData.steps || 10;
   const pu = sensoryAssignments.price_up;
   const pd = sensoryAssignments.price_down;
   const vol = sensoryAssignments.volume;
@@ -274,27 +276,29 @@ function stimulateFromPrice(priceData) {
   if (price && prevPrice) {
     const delta = price - prevPrice;
     const pctChange = Math.abs(delta / prevPrice) * 10000;
+    const boostedPct = pctChange * boost;
     for (let i = pu.start; i < pu.start + pu.count; i++) {
-      inputs.push([i, pctChange * (delta > 0 ? 1.5 : 0.5)]);
+      inputs.push([i, boostedPct * (delta > 0 ? 1.5 : 0.5)]);
     }
     for (let i = pd.start; i < pd.start + pd.count; i++) {
-      inputs.push([i, pctChange * (delta < 0 ? 1.5 : 0.5)]);
+      inputs.push([i, boostedPct * (delta < 0 ? 1.5 : 0.5)]);
     }
-    const acceleration = Math.abs(pctChange) > 50 ? pctChange * 2 : pctChange;
+    const acceleration = Math.abs(boostedPct) > 50 ? boostedPct * 2 : boostedPct;
     for (let i = mom.start; i < mom.start + mom.count; i++) {
       inputs.push([i, acceleration]);
     }
   }
 
   if (volume) {
-    const volIntensity = Math.min(volume / 100, 200);
+    const volIntensity = Math.min(volume / 100, 200) * boost;
     for (let i = vol.start; i < vol.start + vol.count; i++) {
       inputs.push([i, volIntensity]);
     }
   }
 
-  if (spread) {
-    const spreadIntensity = spread * 1000;
+  const effectiveSpread = spread || (price && prevPrice ? Math.abs(price - prevPrice) : 0);
+  if (effectiveSpread) {
+    const spreadIntensity = effectiveSpread * 1000 * boost;
     for (let i = spr.start; i < spr.start + spr.count; i++) {
       inputs.push([i, spreadIntensity]);
     }
@@ -302,8 +306,7 @@ function stimulateFromPrice(priceData) {
 
   encodeAntennaPressure(inputs, ant, pressure, volume);
 
-  const stepsToRun = 10;
-  for (let s = 0; s < stepsToRun; s++) {
+  for (let s = 0; s < stepsOverride; s++) {
     step(inputs);
   }
   const rates = getMotorRates();
@@ -380,8 +383,21 @@ function encodeAntennaPressure(inputs, ant, pressure, volumeFallback) {
   }
 }
 
+function computeFeedbackModifier(type) {
+  const REF_SYNAPSES = 4290;
+  const BASE_SUGAR = 0.15;
+  const BASE_PAIN = 0.15;
+  const totalSyn = synapses ? synapses.length : REF_SYNAPSES;
+  const scale = Math.sqrt(REF_SYNAPSES / Math.max(1, totalSyn));
+  const delta = type === 'sugar'
+    ? BASE_SUGAR * scale
+    : BASE_PAIN * scale;
+  return type === 'sugar' ? (1 + delta) : (1 - delta);
+}
+
 function applyFeedback(type, options) {
-  const modifier = type === 'sugar' ? 1.15 : 0.85;
+  const modifier = computeFeedbackModifier(type);
+  const wClamp = Math.max(2, currentParams.w_syn * 0.25);
   const motorStart = N_SENSORY + N_INTER;
   const mbStart = N_SENSORY + mushroomBody.start;
   const mbEnd = mbStart + mushroomBody.count;
@@ -397,14 +413,18 @@ function applyFeedback(type, options) {
 
     if (apply) {
       syn.w = syn.w * modifier;
-      syn.w = Math.max(-2, Math.min(2, syn.w));
+      syn.w = Math.max(-wClamp, Math.min(wClamp, syn.w));
+      const minFloor = Math.abs(syn.base_w) * 0.25;
+      if (minFloor > 0 && Math.abs(syn.w) < minFloor) {
+        syn.w = syn.w >= 0 ? minFloor : -minFloor;
+      }
       affected++;
     }
   }
 
-  trainingFeedbackLog.push({ ts: Date.now(), type, modifier, step: stepCount, target, affected });
+  trainingFeedbackLog.push({ ts: Date.now(), type, modifier: +modifier.toFixed(6), step: stepCount, target, affected, synapse_count: synapses ? synapses.length : 0, w_clamp: wClamp });
   if (trainingFeedbackLog.length > 1000) trainingFeedbackLog.shift();
-  return { applied: type, modifier, target, synapses_affected: affected };
+  return { applied: type, modifier: +modifier.toFixed(6), target, synapses_affected: affected, synapse_total: synapses ? synapses.length : 0, w_clamp: wClamp };
 }
 
 function recordPattern(epic, price, rates) {
@@ -484,6 +504,13 @@ function runBenchmark(options) {
     neurons: N_TOTAL,
     synapses: synapses ? synapses.length : 0,
     max_tick_rate_hz: perStep > 0 ? parseFloat((1000 / perStep).toFixed(0)) : 999999,
+    feedback_formula: {
+      sugar_modifier: +computeFeedbackModifier('sugar').toFixed(6),
+      pain_modifier: +computeFeedbackModifier('pain').toFixed(6),
+      w_clamp: Math.max(2, currentParams.w_syn * 0.25),
+      ref_synapses: 4290,
+      actual_synapses: synapses ? synapses.length : 0,
+    },
     fits_timeframes: {}
   };
 }
@@ -510,6 +537,10 @@ function getArchitecture() {
 
 const MAX_BACKUPS = 5;
 const BACKUP_INTERVAL_MS = 5 * 60 * 1000;
+const MAX_DAILY_BACKUPS = 30;
+const DAILY_BACKUP_DIR = path.join(DATA_DIR, 'daily-backups');
+let lastDailyBackupDate = '';
+try { fs.mkdirSync(DAILY_BACKUP_DIR, { recursive: true }); } catch (_) {}
 let lastBackupTime = 0;
 
 function sanitizeEpic(epic) {
@@ -612,6 +643,39 @@ function rotateStateBackups() {
   } catch (_) {}
 }
 
+function dailyBackup() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today === lastDailyBackupDate) return;
+  lastDailyBackupDate = today;
+  try {
+    const dayDir = path.join(DAILY_BACKUP_DIR, today);
+    fs.mkdirSync(dayDir, { recursive: true });
+    if (fs.existsSync(BRAIN_STATE_FILE)) {
+      fs.copyFileSync(BRAIN_STATE_FILE, path.join(dayDir, 'brain-state.json'));
+    }
+    const wpath = path.join(DATA_DIR, 'brain-weights.json');
+    if (fs.existsSync(wpath)) {
+      fs.copyFileSync(wpath, path.join(dayDir, 'brain-weights.json'));
+    }
+    for (const epic of Object.keys(patternMemory)) {
+      const fname = sanitizeEpic(epic) + '.json';
+      const src = path.join(PATTERNS_DIR, fname);
+      if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dayDir, fname));
+    }
+    const cortexPath = path.join(DATA_DIR, 'cortex-state.json');
+    if (fs.existsSync(cortexPath)) {
+      fs.copyFileSync(cortexPath, path.join(dayDir, 'cortex-state.json'));
+    }
+    const days = fs.readdirSync(DAILY_BACKUP_DIR).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    while (days.length > MAX_DAILY_BACKUPS) {
+      const old = days.shift();
+      const oldDir = path.join(DAILY_BACKUP_DIR, old);
+      try { fs.rmSync(oldDir, { recursive: true, force: true }); } catch (_) {}
+    }
+    console.log('[brain-engine] Daily backup created: ' + today + ' (' + Object.keys(patternMemory).length + ' instruments, weights, state, cortex)');
+  } catch (e) { console.error('[brain-engine] Daily backup error:', e.message); }
+}
+
 function saveSynapseWeights() {
   try {
     if (!synapses || !synapses.length) return;
@@ -675,6 +739,7 @@ function saveState() {
       saveInstrumentPatterns(epic);
     }
     backupInstrumentPatterns();
+    dailyBackup();
   } catch (_) {}
 }
 
@@ -738,12 +803,36 @@ function boot(config) {
     initSynapses();
     console.log('[brain-engine] Generated fresh random synapses (no saved weights found or architecture changed)');
   }
+  if (weightsRestored) {
+    const motorStart = N_SENSORY + N_INTER;
+    const i2m = synapses.filter(s => s.pre >= N_SENSORY && s.pre < motorStart && s.post >= motorStart && s.w > 0);
+    if (i2m.length > 0) {
+      const avgW = i2m.reduce((a, s) => a + s.w, 0) / i2m.length;
+      const avgBase = i2m.reduce((a, s) => a + Math.abs(s.base_w), 0) / i2m.length;
+      if (avgBase > 0 && avgW / avgBase < 0.4) {
+        console.log('[brain-engine] Auto-rehab: I->M avg weight ' + avgW.toFixed(4) + ' is < 20% of base ' + avgBase.toFixed(4));
+        let healed = 0;
+        for (const syn of synapses) {
+          if (syn.post >= motorStart || (syn.pre >= N_SENSORY && syn.pre < motorStart)) {
+            const target = syn.base_w * 0.5;
+            if (Math.abs(syn.w) < Math.abs(target)) {
+              syn.w = syn.base_w >= 0 ? Math.abs(target) : -Math.abs(target);
+              healed++;
+            }
+          }
+        }
+        console.log('[brain-engine] Auto-rehab healed ' + healed + ' synapses to 50% of base');
+      }
+    }
+  }
+
   isBooted = true;
   bootTime = Date.now();
   if (!weightsRestored) stepCount = 0;
   spikeHistory = [];
 
   saveState();
+  if (weightsRestored) saveSynapseWeights();
 
   console.log('[brain-engine] Booted: ' + N_TOTAL + ' neurons, ' + synapses.length + ' synapses (S=' + N_SENSORY + ' I=' + N_INTER + ' M=' + N_MOTOR + ')' + (weightsRestored ? ' [WEIGHTS RESTORED]' : ' [FRESH WEIGHTS]'));
   return {
@@ -802,6 +891,13 @@ async function handleRequest(req, res) {
       sensory_assignments: sensoryAssignments,
       antenna_sub_groups: antennaSubGroups,
       mushroom_body: mushroomBody,
+      feedback_formula: {
+        sugar_modifier: +computeFeedbackModifier('sugar').toFixed(6),
+        pain_modifier: +computeFeedbackModifier('pain').toFixed(6),
+        w_clamp: Math.max(2, currentParams.w_syn * 0.25),
+        ref_synapses: 4290,
+        actual_synapses: synapses ? synapses.length : 0,
+      },
     });
   }
 
@@ -872,6 +968,16 @@ async function handleRequest(req, res) {
   if (m === 'POST' && p === '/stimulate-price') {
     if (!isBooted) return respond(res, 400, { error: 'Brain not booted' });
     const body = await parseBody(req);
+    const price = body.price || 0;
+    const prevPrice = body.prevPrice || price;
+    const priceLevel = Math.max(price, prevPrice, 1);
+    const autoBoost = Math.max(1, Math.min(50, priceLevel / 100));
+    if (!body.boost) body.boost = autoBoost;
+    if (!body.volume && !body.spread) {
+      body.spread = Math.abs(price - prevPrice) || priceLevel * 0.0001;
+    }
+    if (!body.steps) body.steps = 30;
+    spikeHistory = [];
     const rates = stimulateFromPrice(body);
     return respond(res, 200, { timestamp: Date.now(), step_count: stepCount, ...rates });
   }
@@ -889,6 +995,28 @@ async function handleRequest(req, res) {
     if (body.r_poi !== undefined) currentParams.r_poi = body.r_poi;
     if (body.tau_syn !== undefined) currentParams.tau_syn = body.tau_syn;
     return respond(res, 200, { ok: true, params: currentParams });
+  }
+
+  if (m === 'POST' && p === '/rehab') {
+    if (!isBooted) return respond(res, 400, { error: 'Brain not booted' });
+    const body = await parseBody(req);
+    const ratio = Math.max(0.3, Math.min(1.0, body.ratio || 0.5));
+    const motorStart = N_SENSORY + N_INTER;
+    let healed = 0, total = 0;
+    for (const syn of synapses) {
+      if (syn.post >= motorStart || (syn.pre >= N_SENSORY && syn.pre < motorStart)) {
+        total++;
+        const target = syn.base_w * ratio;
+        if (Math.abs(syn.w) < Math.abs(target)) {
+          syn.w = syn.base_w >= 0 ? Math.abs(target) : -Math.abs(target);
+          healed++;
+        }
+      }
+    }
+    spikeHistory = [];
+    saveSynapseWeights();
+    saveState();
+    return respond(res, 200, { ok: true, healed, total, ratio, message: 'Weights rehabilitated to ' + (ratio*100).toFixed(0) + '% of base' });
   }
 
   if (m === 'POST' && p === '/feedback') {
@@ -960,18 +1088,23 @@ async function handleRequest(req, res) {
     if (!isBooted) return respond(res, 400, { error: 'Brain not booted' });
     const body = await parseBody(req);
     const candles = (body.candles || []).slice(0, 10000);
-    const stopLossPct = body.stopLossPct || 1.0;
-    const takeProfitPct = body.takeProfitPct || 2.0;
+    const stopLossPips = body.stopLossPips || 0;
+    const takeProfitPips = body.takeProfitPips || 0;
+    const stopLossPct = stopLossPips ? 0 : (body.stopLossPct || 1.0);
+    const takeProfitPct = takeProfitPips ? 0 : (body.takeProfitPct || 2.0);
+    const usePips = stopLossPips > 0 || takeProfitPips > 0;
     const plMultiplier = body.plMultiplier || 1;
     const size = body.size || 1;
     const epic = body.epic || 'BACKTEST';
     const minHoldCandles = Math.max(0, parseInt(body.minHoldCandles) || 0);
     const signalThreshold = Math.max(0, parseFloat(body.signalThreshold) || 5);
     const confirmCandles = Math.max(1, parseInt(body.confirmCandles) || 1);
+    const timeframe = body.timeframe || '';
 
     if (!candles.length) return respond(res, 400, { error: 'No candles provided' });
 
     const antennaEnabled = body.antennaEnabled || false;
+    const dryRun = !!body.dryRun;
 
     const results = {
       total_candles: candles.length,
@@ -1055,15 +1188,21 @@ async function handleRequest(req, res) {
       }
       prevVol = vol;
 
+      const candleRange = highPrice - lowPrice;
+      const syntheticSpread = c.spread || candleRange || Math.abs(closePrice - (prevPrice || closePrice));
+      const syntheticVolume = vol || Math.max(1, Math.round(candleRange * 10));
+      spikeHistory = [];
       const rates = stimulateFromPrice({
         price: closePrice,
         prevPrice: prevPrice || closePrice,
-        volume: vol,
-        spread: c.spread || 0,
+        volume: syntheticVolume,
+        spread: syntheticSpread,
         epic: epic,
         pressure: pressure,
+        boost: 25,
+        steps: 50,
       });
-      results.steps_run += 10;
+      results.steps_run += 50;
 
       const signal = rates.buy_signal > rates.sell_signal && rates.buy_signal > rates.hold_signal
         ? 'BUY' : rates.sell_signal > rates.buy_signal && rates.sell_signal > rates.hold_signal
@@ -1083,8 +1222,8 @@ async function handleRequest(req, res) {
       if (openTrade) {
         openTrade.candlesHeld = (openTrade.candlesHeld || 0) + 1;
         const dir = openTrade.direction === 'BUY' ? 1 : -1;
-        const slPrice = openTrade.entry - dir * openTrade.entry * stopLossPct / 100;
-        const tpPrice = openTrade.entry + dir * openTrade.entry * takeProfitPct / 100;
+        const slPrice = usePips ? (openTrade.entry - dir * stopLossPips) : (openTrade.entry - dir * openTrade.entry * stopLossPct / 100);
+        const tpPrice = usePips ? (openTrade.entry + dir * takeProfitPips) : (openTrade.entry + dir * openTrade.entry * takeProfitPct / 100);
 
         let exitPrice = null;
         let exitReason = null;
@@ -1117,11 +1256,10 @@ async function handleRequest(req, res) {
           });
 
           if (pnl > 0) {
-            applyFeedback('sugar', { target: 'motor' });
-            applyFeedback('sugar', { target: 'mushroom' });
+            if (!dryRun) { applyFeedback('sugar', { target: 'motor' }); applyFeedback('sugar', { target: 'mushroom' }); }
             results.sugar_count++;
           } else {
-            applyFeedback('pain', { target: 'motor' });
+            if (!dryRun) applyFeedback('pain', { target: 'motor' });
             results.pain_count++;
           }
           openTrade = null;
@@ -1158,8 +1296,9 @@ async function handleRequest(req, res) {
       : 0;
     results.architecture = { sensory: N_SENSORY, inter: N_INTER, motor: N_MOTOR, total: N_TOTAL, synapses: synapses.length };
     results.signals = results.signals.slice(-100);
+    results.dry_run = dryRun;
 
-    saveState();
+    if (!dryRun) saveState();
     return respond(res, 200, results);
   }
 
@@ -1168,13 +1307,17 @@ async function handleRequest(req, res) {
     const body = await parseBody(req);
     const candle = body.candle;
     const epic = body.epic || 'LIVE';
-    const stopLossPct = body.stopLossPct || 1.0;
-    const takeProfitPct = body.takeProfitPct || 2.0;
+    const stopLossPips = body.stopLossPips || 0;
+    const takeProfitPips = body.takeProfitPips || 0;
+    const stopLossPct = stopLossPips ? 0 : (body.stopLossPct || 1.0);
+    const takeProfitPct = takeProfitPips ? 0 : (body.takeProfitPct || 2.0);
+    const usePips = stopLossPips > 0 || takeProfitPips > 0;
     const plMultiplier = body.plMultiplier || 1;
     const size = body.size || 1;
     const minHoldCandles = Math.max(0, parseInt(body.minHoldCandles) || 0);
     const signalThreshold = Math.max(0, parseFloat(body.signalThreshold) || 5);
     const confirmCandles = Math.max(1, parseInt(body.confirmCandles) || 1);
+    const timeframe = body.timeframe || '';
 
     if (!candle || !candle.close) return respond(res, 400, { error: 'Candle with close price required' });
 
@@ -1185,14 +1328,20 @@ async function handleRequest(req, res) {
     const prevPrice = candle.prevClose || closePrice;
 
     const pressure = body.pressure || {};
+    const candleRange = highPrice - lowPrice;
+    const syntheticSpread = candle.spread || candleRange || Math.abs(closePrice - prevPrice);
+    const syntheticVolume = vol || Math.max(1, Math.round(candleRange * 10));
 
+    spikeHistory = [];
     const rates = stimulateFromPrice({
       price: closePrice,
       prevPrice: prevPrice,
-      volume: vol,
-      spread: candle.spread || 0,
+      volume: syntheticVolume,
+      spread: syntheticSpread,
       epic: epic,
       pressure: pressure,
+      boost: 25,
+      steps: 50,
     });
 
     const signal = rates.buy_signal > rates.sell_signal && rates.buy_signal > rates.hold_signal
@@ -1214,8 +1363,8 @@ async function handleRequest(req, res) {
       const ot = body.openTrade;
       const candlesHeld = (ot.candlesHeld || 0) + 1;
       const dir = ot.direction === 'BUY' ? 1 : -1;
-      const slPrice = ot.entry - dir * ot.entry * stopLossPct / 100;
-      const tpPrice = ot.entry + dir * ot.entry * takeProfitPct / 100;
+      const slPrice = usePips ? (ot.entry - dir * stopLossPips) : (ot.entry - dir * ot.entry * stopLossPct / 100);
+      const tpPrice = usePips ? (ot.entry + dir * takeProfitPips) : (ot.entry + dir * ot.entry * takeProfitPct / 100);
       let exitPrice = null;
       let exitReason = null;
 
@@ -1449,6 +1598,47 @@ async function handleRequest(req, res) {
       fs.writeFileSync(tmp, JSON.stringify(state));
       fs.renameSync(tmp, CORTEX_STATE_FILE);
       return respond(res, 200, { ok: true, savedAt: state.savedAt });
+    } catch (e) {
+      return respond(res, 500, { error: e.message });
+    }
+  }
+
+  if (m === 'GET' && p === '/cortex-params') {
+    try {
+      if (fs.existsSync(CORTEX_STATE_FILE)) {
+        const raw = JSON.parse(fs.readFileSync(CORTEX_STATE_FILE, 'utf-8'));
+        return respond(res, 200, {
+          params: raw.params || {},
+          autoTradeState: raw.autoTradeState || {},
+          calibAutoPass: raw.calibAutoPass || false,
+          calibAutoPassInterval: raw.calibAutoPassInterval || 30,
+          savedAt: raw.savedAt || null,
+          hasOpenPosition: !!(raw.openPosition && raw.openPosition.dealId),
+        });
+      }
+      return respond(res, 200, { params: {}, autoTradeState: {}, calibAutoPass: false, calibAutoPassInterval: 30 });
+    } catch (e) {
+      return respond(res, 500, { error: e.message });
+    }
+  }
+
+  if (m === 'POST' && p === '/cortex-params') {
+    const newParams = await parseBody(req);
+    try {
+      let state = {};
+      if (fs.existsSync(CORTEX_STATE_FILE)) {
+        state = JSON.parse(fs.readFileSync(CORTEX_STATE_FILE, 'utf-8'));
+      }
+      if (!state.params) state.params = {};
+      Object.assign(state.params, newParams.params || {});
+      if (newParams.calibAutoPass !== undefined) state.calibAutoPass = newParams.calibAutoPass;
+      if (newParams.calibAutoPassInterval !== undefined) state.calibAutoPassInterval = newParams.calibAutoPassInterval;
+      state.savedAt = new Date().toISOString();
+      state.lastModifiedBy = newParams._source || 'agent';
+      const tmp = CORTEX_STATE_FILE + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(state));
+      fs.renameSync(tmp, CORTEX_STATE_FILE);
+      return respond(res, 200, { ok: true, savedAt: state.savedAt, paramsUpdated: Object.keys(newParams.params || {}) });
     } catch (e) {
       return respond(res, 500, { error: e.message });
     }
