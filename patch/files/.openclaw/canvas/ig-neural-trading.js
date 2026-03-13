@@ -1027,124 +1027,212 @@ function stopObserverMode() {
   addBrainLog('INFO', 'Observer stopped');
 }
 
+var calibLastResults = null;
+
 async function startCalibration() {
   if (calibrationRunning) return;
-  var mode = (document.getElementById('neural-calibration-mode') || {}).value || 'live';
   calibrationRunning = true;
-  calibrationData.trades_executed = 0;
-  addBrainLog('INFO', 'Calibration starting in ' + mode + ' mode');
+  calibLastResults = null;
+  var epic = neuralCurrentEpic;
+  if (!epic) {
+    addBrainLog('ERROR', 'Select an instrument before calibrating');
+    calibrationRunning = false;
+    return;
+  }
+  var maxCandles = parseInt((document.getElementById('neural-calib-candles') || {}).value) || 500;
+  var tf = (document.getElementById('neural-calib-tf') || {}).value || 'MINUTE';
+  var rangeMode = (document.getElementById('neural-calib-range') || {}).value || 'normal';
   var statusEl = document.getElementById('neural-calibration-status');
-  if (statusEl) statusEl.textContent = 'Phase 1: Observing baseline...';
+  var progDiv = document.getElementById('neural-calib-progress');
+  var barEl = document.getElementById('neural-calib-bar');
+  var pctEl = document.getElementById('neural-calib-pct');
+  var resultsDiv = document.getElementById('neural-calib-results');
   var startBtn = document.getElementById('neural-calibration-start');
   var stopBtn = document.getElementById('neural-calibration-stop');
   if (startBtn) startBtn.style.display = 'none';
   if (stopBtn) stopBtn.style.display = 'inline-block';
-  var baselineRates = [];
-  var observeCount = 0;
-  var maxObserve = mode === 'backdata' ? 20 : 10;
-  var calInterval = setInterval(async function() {
-    if (!calibrationRunning) { clearInterval(calInterval); return; }
-    var res = await brainObserve();
-    if (res) {
-      var rate = res.avg_rate || 0;
-      baselineRates.push(rate);
-      updateBrainSignals(res);
-    }
-    observeCount++;
-    if (statusEl) statusEl.textContent = 'Observing [' + observeCount + '/' + maxObserve + ']';
-    if (observeCount >= maxObserve) {
-      clearInterval(calInterval);
-      var mean = baselineRates.length > 0 ? baselineRates.reduce(function(a, b) { return a + b; }, 0) / baselineRates.length : 0;
-      var variance = baselineRates.reduce(function(a, b) { return a + Math.pow(b - mean, 2); }, 0) / Math.max(baselineRates.length, 1);
-      var sd = Math.sqrt(variance);
-      calibrationData.baseline_motor_rate = mean;
-      calibrationData.threshold = mean + 2 * sd;
-      var blEl = document.getElementById('neural-calib-baseline');
-      var thEl = document.getElementById('neural-calib-threshold');
-      if (blEl) blEl.textContent = mean.toFixed(2) + 'Hz';
-      if (thEl) thEl.textContent = calibrationData.threshold.toFixed(2) + 'Hz';
-      if (statusEl) statusEl.textContent = 'Phase 2: Trading...';
-      addBrainLog('INFO', 'Baseline: ' + mean.toFixed(2) + 'Hz, Threshold: ' + calibrationData.threshold.toFixed(2) + 'Hz');
-      startCalibrationTrading();
-    }
-  }, 1000);
-}
+  if (progDiv) progDiv.style.display = 'block';
+  if (resultsDiv) resultsDiv.style.display = 'none';
+  if (barEl) barEl.style.width = '0%';
+  if (pctEl) pctEl.textContent = 'Fetching candles...';
+  if (statusEl) statusEl.textContent = 'Fetching...';
+  cortexReadParams();
+  addBrainLog('INFO', 'Auto-calibration: ' + epic + ' tf=' + tf + ' candles=' + maxCandles + ' range=' + rangeMode);
 
-async function startCalibrationTrading() {
-  var maxTrades = 20;
-  var calibSimOpenTrade = null;
-  var calibSimPnl = 0;
-  var calibSimConsecutiveSignal = null;
-  var calibSimConsecutiveCount = 0;
-  var tradeInterval = setInterval(async function() {
-    if (!calibrationRunning || calibrationData.trades_executed >= maxTrades) {
-      clearInterval(tradeInterval);
+  var thresholds;
+  if (rangeMode === 'narrow') thresholds = [3, 5, 7, 9, 12, 15];
+  else if (rangeMode === 'wide') thresholds = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40];
+  else thresholds = [2, 3, 5, 7, 10, 13, 16, 20, 25];
+
+  try {
+    var url = '/api/ig/scalper/candles?epic=' + encodeURIComponent(epic) + '&resolution=' + tf + '&max=' + maxCandles;
+    var data = await apiFetch(url);
+    var candles = (data && data.prices) || [];
+    if (candles.length < 20) {
+      var igUrl = '/api/ig/prices/' + encodeURIComponent(epic) + '?resolution=' + tf + '&max=' + maxCandles;
+      var igData = await apiFetch(igUrl);
+      candles = (igData && igData.prices) || [];
+    }
+    if (candles.length < 20) {
+      addBrainLog('ERROR', 'Not enough candles for calibration (got ' + candles.length + ', need 20+)');
+      showToast('Not enough candle data', false);
       calibrationRunning = false;
-      var statusEl = document.getElementById('neural-calibration-status');
-      if (statusEl) statusEl.textContent = 'Calibration complete! ' + calibrationData.trades_executed + ' simulated trades, P&L=' + calibSimPnl.toFixed(2);
-      addBrainLog('INFO', 'Calibration complete: ' + calibrationData.trades_executed + ' simulated trades, total P&L=' + calibSimPnl.toFixed(2));
-      var startBtn = document.getElementById('neural-calibration-start');
-      var stopBtn = document.getElementById('neural-calibration-stop');
       if (startBtn) startBtn.style.display = 'inline-block';
       if (stopBtn) stopBtn.style.display = 'none';
+      if (progDiv) progDiv.style.display = 'none';
+      if (statusEl) statusEl.textContent = 'Failed: insufficient data';
       return;
     }
-    var res = await brainObserve();
-    if (!res) return;
-    updateBrainSignals(res);
-    var motorRate = res.avg_rate || 0;
-    if (motorRate > calibrationData.threshold) {
-      var price = neuralLastPrice || 0;
-      if (!price) return;
-      var candle = { close: price, high: price, low: price, open: price, prevClose: price, spread: 0, volume: 0 };
-      var pressure = antennaComputePressure();
-      cortexReadParams();
-      var result = await brainFetch('/live-train', {
+    addBrainLog('INFO', 'Got ' + candles.length + ' candles, testing ' + thresholds.length + ' threshold levels...');
+    if (statusEl) statusEl.textContent = 'Testing thresholds...';
+
+    var results = [];
+    for (var ti = 0; ti < thresholds.length; ti++) {
+      if (!calibrationRunning) break;
+      var thresh = thresholds[ti];
+      var pct = Math.round(((ti + 1) / thresholds.length) * 100);
+      if (barEl) barEl.style.width = pct + '%';
+      if (pctEl) pctEl.textContent = 'Threshold ' + thresh + ' (' + (ti + 1) + '/' + thresholds.length + ')';
+
+      var btResult = await brainFetch('/backtest-train', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          candle: candle,
-          epic: neuralCurrentEpic || 'CALIBRATION',
+          candles: candles,
+          epic: epic,
           stopLossPips: cortexStopLossPips,
           takeProfitPips: cortexTakeProfitPips,
           size: cortexMinPositionSize,
           plMultiplier: 1,
-          openTrade: calibSimOpenTrade,
           minHoldCandles: cortexMinHoldCandles,
-          signalThreshold: cortexBuyThreshold,
+          signalThreshold: thresh,
           confirmCandles: cortexConfirmCandles,
-          consecutiveSignal: calibSimConsecutiveSignal,
-          consecutiveCount: calibSimConsecutiveCount,
-          pressure: pressure,
+          antennaEnabled: true,
+          timeframe: tf,
+          dryRun: true,
         })
       });
-      if (result) {
-        if (result.consecutiveSignal !== undefined) calibSimConsecutiveSignal = result.consecutiveSignal;
-        if (result.consecutiveCount !== undefined) calibSimConsecutiveCount = result.consecutiveCount;
-        if (result.trade_closed) {
-          calibrationData.trades_executed++;
-          calibSimPnl += result.trade_closed.pnl;
-          calibSimOpenTrade = null;
-          addBrainLog('INFO', 'Calibration SIM close: ' + result.trade_closed.direction + ' P&L=' + result.trade_closed.pnl.toFixed(2) + ' (' + result.trade_closed.reason + ') [' + result.feedback + ']');
-        }
-        if (result.held_trade) calibSimOpenTrade = result.held_trade;
-        if (result.open_trade) {
-          calibSimOpenTrade = result.open_trade;
-          addBrainLog('INFO', 'Calibration SIM open: ' + result.open_trade.direction + ' @ ' + result.open_trade.entry.toFixed(2));
-        }
-        var tEl = document.getElementById('neural-calib-trades');
-        if (tEl) tEl.textContent = calibrationData.trades_executed + ' (sim P&L=' + calibSimPnl.toFixed(2) + ')';
-        var statusEl = document.getElementById('neural-calibration-status');
-        if (statusEl) statusEl.textContent = 'Trading... ' + calibrationData.trades_executed + '/' + maxTrades + ' sim P&L=' + calibSimPnl.toFixed(2);
+      if (btResult) {
+        results.push({
+          threshold: thresh,
+          trades: btResult.trades ? btResult.trades.length : 0,
+          pnl: btResult.total_pnl || 0,
+          winRate: btResult.win_rate || 0,
+          sugar: btResult.sugar_count || 0,
+          pain: btResult.pain_count || 0,
+        });
+        addBrainLog('INFO', 'Thresh=' + thresh + ': ' + (btResult.trades ? btResult.trades.length : 0) + ' trades, P&L=' + (btResult.total_pnl || 0).toFixed(2) + ', Win=' + (btResult.win_rate || 0) + '%');
       }
     }
-  }, 5000);
+
+    calibLastResults = results;
+    calibShowResults(results, candles.length, tf, epic);
+  } catch (e) {
+    addBrainLog('ERROR', 'Calibration error: ' + e.message);
+    showToast('Calibration error: ' + e.message, false);
+    if (statusEl) statusEl.textContent = 'Error';
+  }
+
+  calibrationRunning = false;
+  if (startBtn) startBtn.style.display = 'inline-block';
+  if (stopBtn) stopBtn.style.display = 'none';
+  if (progDiv) progDiv.style.display = 'none';
+}
+
+function calibShowResults(results, candleCount, tf, epic) {
+  var resultsDiv = document.getElementById('neural-calib-results');
+  var bodyEl = document.getElementById('neural-calib-results-body');
+  var statusEl = document.getElementById('neural-calibration-status');
+  if (!bodyEl || !resultsDiv) return;
+
+  var withTrades = results.filter(function(r) { return r.trades > 0; });
+
+  if (withTrades.length === 0) {
+    bodyEl.innerHTML = '<div style="color:#f85149">No threshold level produced any trades. The brain may need more training first, or try a wider range / more candles.</div>';
+    resultsDiv.style.display = 'block';
+    if (statusEl) statusEl.textContent = 'No trades found';
+    addBrainLog('WARN', 'Calibration: no threshold produced trades');
+    return;
+  }
+
+  var bestWinRate = withTrades.reduce(function(a, b) { return (b.winRate > a.winRate || (b.winRate === a.winRate && b.pnl > a.pnl)) ? b : a; }, withTrades[0]);
+  var bestPnl = withTrades.reduce(function(a, b) { return b.pnl > a.pnl ? b : a; }, withTrades[0]);
+
+  var recommended = bestWinRate;
+  if (bestPnl.pnl > 0 && bestPnl.pnl > recommended.pnl * 1.5 && bestPnl.winRate >= 40) {
+    recommended = bestPnl;
+  }
+
+  calibLastResults._recommended = recommended;
+  calibLastResults._bestPnl = bestPnl;
+  calibLastResults._bestWinRate = bestWinRate;
+
+  var html = '<div style="margin-bottom:8px"><span style="color:#8b949e">Tested on:</span> ' + candleCount + ' ' + tf + ' candles (' + epic.replace(/^CS\.D\./,'').replace(/\.CFA\.IP$/,'') + ')</div>';
+  html += '<div style="margin-bottom:8px"><span style="color:#8b949e">Current thresholds:</span> Buy=' + cortexBuyThreshold + ' Sell=' + cortexSellThreshold + '</div>';
+
+  html += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px">';
+  html += '<tr style="border-bottom:1px solid #30363d"><th style="text-align:left;padding:4px;color:#8b949e">Threshold</th><th style="text-align:right;padding:4px;color:#8b949e">Trades</th><th style="text-align:right;padding:4px;color:#8b949e">Win %</th><th style="text-align:right;padding:4px;color:#8b949e">P&L</th><th style="padding:4px"></th></tr>';
+  for (var i = 0; i < results.length; i++) {
+    var r = results[i];
+    var isRec = r.threshold === recommended.threshold;
+    var isBest = r.threshold === bestPnl.threshold;
+    var rowBg = isRec ? 'background:#0d2137;' : '';
+    var pnlColor = r.pnl > 0 ? '#2dc653' : (r.pnl < 0 ? '#f85149' : '#8b949e');
+    var wrColor = r.winRate >= 60 ? '#2dc653' : (r.winRate >= 40 ? '#d29922' : '#f85149');
+    var badge = '';
+    if (isRec && isBest) badge = '<span style="font-size:9px;padding:1px 5px;background:#1b4332;color:#2dc653;border-radius:6px;margin-left:4px">RECOMMENDED</span>';
+    else if (isRec) badge = '<span style="font-size:9px;padding:1px 5px;background:#1b4332;color:#2dc653;border-radius:6px;margin-left:4px">BEST WIN</span>';
+    else if (isBest) badge = '<span style="font-size:9px;padding:1px 5px;background:#1a1028;color:#bc8cff;border-radius:6px;margin-left:4px">BEST P&L</span>';
+    html += '<tr style="border-bottom:1px solid #21262d;' + rowBg + '"><td style="padding:4px;color:#c9d1d9">' + r.threshold + badge + '</td><td style="text-align:right;padding:4px;color:#c9d1d9">' + r.trades + '</td><td style="text-align:right;padding:4px;color:' + wrColor + '">' + r.winRate + '%</td><td style="text-align:right;padding:4px;color:' + pnlColor + '">' + r.pnl.toFixed(2) + '</td></tr>';
+  }
+  html += '</table>';
+
+  html += '<div style="padding:8px;background:#161b22;border-radius:4px;border:1px solid #30363d">';
+  html += '<div style="font-weight:600;color:#2dc653;margin-bottom:4px">Recommended: Threshold = ' + recommended.threshold + '</div>';
+  html += '<div style="color:#8b949e;font-size:11px">' + recommended.trades + ' trades | Win rate: ' + recommended.winRate + '% | P&L: ' + recommended.pnl.toFixed(2) + '</div>';
+  if (bestPnl.threshold !== recommended.threshold) {
+    html += '<div style="color:#bc8cff;font-size:11px;margin-top:4px">Alt (best P&L): Threshold = ' + bestPnl.threshold + ' (' + bestPnl.trades + ' trades, Win=' + bestPnl.winRate + '%, P&L=' + bestPnl.pnl.toFixed(2) + ')</div>';
+  }
+  html += '</div>';
+
+  bodyEl.innerHTML = html;
+  resultsDiv.style.display = 'block';
+  if (statusEl) statusEl.textContent = 'Done: recommended=' + recommended.threshold;
+  addBrainLog('INFO', 'Calibration complete: recommended threshold=' + recommended.threshold + ' (Win=' + recommended.winRate + '%, P&L=' + recommended.pnl.toFixed(2) + ', ' + recommended.trades + ' trades)');
+}
+
+function calibApplyRecommended() {
+  if (!calibLastResults || !calibLastResults._recommended) { showToast('Run calibration first', false); return; }
+  var t = calibLastResults._recommended.threshold;
+  var buyEl = document.getElementById('cortex-buy-thresh');
+  var sellEl = document.getElementById('cortex-sell-thresh');
+  if (buyEl) buyEl.value = t;
+  if (sellEl) sellEl.value = t;
+  cortexBuyThreshold = t;
+  cortexSellThreshold = t;
+  cortexSaveState();
+  addBrainLog('CORTEX', 'Applied recommended thresholds: Buy=' + t + ' Sell=' + t);
+  showToast('Thresholds set to ' + t, true);
+}
+
+function calibApplyBestPnl() {
+  if (!calibLastResults || !calibLastResults._bestPnl) { showToast('Run calibration first', false); return; }
+  var t = calibLastResults._bestPnl.threshold;
+  var buyEl = document.getElementById('cortex-buy-thresh');
+  var sellEl = document.getElementById('cortex-sell-thresh');
+  if (buyEl) buyEl.value = t;
+  if (sellEl) sellEl.value = t;
+  cortexBuyThreshold = t;
+  cortexSellThreshold = t;
+  cortexSaveState();
+  addBrainLog('CORTEX', 'Applied best P&L thresholds: Buy=' + t + ' Sell=' + t);
+  showToast('Thresholds set to ' + t, true);
 }
 
 function stopCalibration() {
   calibrationRunning = false;
   var statusEl = document.getElementById('neural-calibration-status');
-  if (statusEl) statusEl.textContent = 'Calibration stopped';
+  if (statusEl) statusEl.textContent = 'Stopped';
   var startBtn = document.getElementById('neural-calibration-start');
   var stopBtn = document.getElementById('neural-calibration-stop');
   if (startBtn) startBtn.style.display = 'inline-block';

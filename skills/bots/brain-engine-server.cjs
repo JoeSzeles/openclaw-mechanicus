@@ -1003,6 +1003,7 @@ async function handleRequest(req, res) {
     if (!candles.length) return respond(res, 400, { error: 'No candles provided' });
 
     const antennaEnabled = body.antennaEnabled || false;
+    const dryRun = !!body.dryRun;
 
     const results = {
       total_candles: candles.length,
@@ -1148,11 +1149,10 @@ async function handleRequest(req, res) {
           });
 
           if (pnl > 0) {
-            applyFeedback('sugar', { target: 'motor' });
-            applyFeedback('sugar', { target: 'mushroom' });
+            if (!dryRun) { applyFeedback('sugar', { target: 'motor' }); applyFeedback('sugar', { target: 'mushroom' }); }
             results.sugar_count++;
           } else {
-            applyFeedback('pain', { target: 'motor' });
+            if (!dryRun) applyFeedback('pain', { target: 'motor' });
             results.pain_count++;
           }
           openTrade = null;
@@ -1189,8 +1189,9 @@ async function handleRequest(req, res) {
       : 0;
     results.architecture = { sensory: N_SENSORY, inter: N_INTER, motor: N_MOTOR, total: N_TOTAL, synapses: synapses.length };
     results.signals = results.signals.slice(-100);
+    results.dry_run = dryRun;
 
-    saveState();
+    if (!dryRun) saveState();
     return respond(res, 200, results);
   }
 

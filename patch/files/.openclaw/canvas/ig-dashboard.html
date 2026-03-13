@@ -1029,33 +1029,50 @@ tr:hover { background: rgba(88,166,255,0.04); }
       </div>
 
       <div class="card full" style="margin-bottom:16px">
-        <h2 style="display:flex;align-items:center;gap:8px">Auto-Calibration <span style="font-size:10px;padding:2px 8px;background:#1a1028;color:#bc8cff;border-radius:8px">Automated Signal Tuning</span></h2>
-        <div style="font-size:11px;color:#8b949e;margin-bottom:10px">Automatically observes baseline motor rates, calculates signal thresholds, then executes test trades to calibrate the brain. Phase 1: Observe baseline (10-20 observations). Phase 2: Execute calibration trades when motor rate exceeds threshold.</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+        <h2 style="display:flex;align-items:center;gap:8px">Auto-Calibration <span style="font-size:10px;padding:2px 8px;background:#1a1028;color:#bc8cff;border-radius:8px">Auto-Threshold Tuning</span></h2>
+        <div style="font-size:11px;color:#8b949e;margin-bottom:10px">Runs backtest at multiple threshold levels on local DB candles to find optimal buy/sell thresholds for the current brain state. Recommends thresholds with best win rate and P&L.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px">
           <div>
-            <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Mode</div>
-            <select id="neural-calibration-mode" style="width:100%;padding:4px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:12px">
-              <option value="live" selected>Live (10 observations)</option>
-              <option value="backdata">Back Data (20 observations)</option>
+            <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Candles</div>
+            <select id="neural-calib-candles" style="width:100%;padding:4px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:12px">
+              <option value="200">200</option>
+              <option value="500" selected>500</option>
+              <option value="1000">1000</option>
+              <option value="2000">2000</option>
             </select>
           </div>
           <div>
-            <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Baseline Rate</div>
-            <div style="padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:13px;font-weight:600;color:#58a6ff;text-align:center" id="neural-calib-baseline">--</div>
+            <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Timeframe</div>
+            <select id="neural-calib-tf" style="width:100%;padding:4px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:12px">
+              <option value="SECOND_30">30s</option>
+              <option value="MINUTE" selected>1min</option>
+              <option value="MINUTE_5">5min</option>
+              <option value="MINUTE_15">15min</option>
+            </select>
           </div>
           <div>
-            <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Threshold</div>
-            <div style="padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:13px;font-weight:600;color:#d29922;text-align:center" id="neural-calib-threshold">--</div>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-          <div>
-            <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Calibration Trades</div>
-            <div style="padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:13px;font-weight:600;color:#2dc653;text-align:center" id="neural-calib-trades">0</div>
+            <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Test Range</div>
+            <select id="neural-calib-range" style="width:100%;padding:4px;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:12px">
+              <option value="narrow">Narrow (3-15)</option>
+              <option value="normal" selected>Normal (2-25)</option>
+              <option value="wide">Wide (1-40)</option>
+            </select>
           </div>
           <div>
             <div style="font-size:10px;color:#8b949e;margin-bottom:2px">Status</div>
-            <div style="padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:11px;color:#8b949e;text-align:center" id="neural-calibration-status">Not started</div>
+            <div style="padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:11px;color:#8b949e;text-align:center" id="neural-calibration-status">Ready</div>
+          </div>
+        </div>
+        <div id="neural-calib-progress" style="display:none;margin-bottom:12px">
+          <div style="height:6px;background:#21262d;border-radius:3px;overflow:hidden"><div id="neural-calib-bar" style="width:0%;height:100%;background:#bc8cff;transition:width 0.3s"></div></div>
+          <div style="font-size:10px;color:#8b949e;margin-top:4px;text-align:center" id="neural-calib-pct">0%</div>
+        </div>
+        <div id="neural-calib-results" style="display:none;margin-bottom:12px;border:1px solid #30363d;border-radius:6px;padding:10px;background:#0d1117">
+          <div style="font-size:11px;font-weight:600;color:#bc8cff;margin-bottom:8px">Calibration Results</div>
+          <div id="neural-calib-results-body" style="font-size:12px;color:#c9d1d9"></div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn-sm" onclick="calibApplyRecommended()" style="background:#1b4332;color:#2dc653;border-color:#2dc653;padding:4px 12px;font-weight:600">Apply Recommended</button>
+            <button class="btn-sm" onclick="calibApplyBestPnl()" style="background:#1a1028;color:#bc8cff;border-color:#bc8cff;padding:4px 12px;font-weight:600">Apply Best P&L</button>
           </div>
         </div>
         <div style="display:flex;gap:8px">
