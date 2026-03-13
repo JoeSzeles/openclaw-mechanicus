@@ -914,8 +914,10 @@ tr:hover { background: rgba(88,166,255,0.04); }
       <div class="grid">
         <div class="card">
           <h2 style="display:flex;align-items:center;gap:8px">Auto-Trade <span style="font-size:10px;padding:2px 8px;background:#d2992222;color:#d29922;border-radius:8px">Cortex Execution</span></h2>
-          <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+          <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
             <button class="btn-sm" id="cortex-auto-trade-btn" onclick="toggleCortexAutoTrade()" style="background:#3d1a1a;color:#f85149;border-color:#f85149;padding:8px 16px;font-weight:700;font-size:13px">AUTO-TRADE OFF</button>
+            <button class="btn-sm" id="cortex-reset-btn" onclick="cortexFullReset()" style="background:#21262d;color:#f0883e;border-color:#f0883e;padding:6px 12px;font-size:11px;font-weight:600" title="Close positions and clear all cortex state">FULL RESET</button>
+            <span id="cortex-position-badge" style="font-size:11px;color:#8b949e;display:none;padding:3px 8px;background:#161b22;border-radius:6px;border:1px solid #30363d"></span>
             <select id="cortex-timeframe" class="deal-input" style="width:140px;font-size:11px;padding:4px">
               <option value="TICK">Tick (live)</option>
               <option value="SECOND">1 Second</option>

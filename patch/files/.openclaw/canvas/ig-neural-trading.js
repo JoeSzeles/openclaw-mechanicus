@@ -2995,8 +2995,8 @@ function toggleCortexAutoTrade() {
     cortexLastVerifyTs = 0;
     if (!cortexOpenPosition) cortexDecisionLog = [];
     var monEl = document.getElementById('cortex-decision-monitor');
-    if (monEl) monEl.innerHTML = '';
-    cortexAddDecision({ time: new Date().toLocaleTimeString(), action: 'START', detail: 'hold=' + cortexHoldZone + ' minHold=' + cortexMinHoldCandles + ' confirm=' + cortexConfirmCandles + ' exitConfirm=' + cortexExitConfirmCandles + ' | PriceTP/SL=' + cortexPriceExitsEnabled + ' AutoLearn=' + cortexAutoLearn + ' | ANTENNA flash=' + antenna.flashThreshold + ' emrg=' + antenna.emergencyExitEnabled + ' breakout=' + antenna.breakoutRiderEnabled + ' knife=' + antenna.fallingKnifeBlock });
+    if (monEl && !cortexOpenPosition) monEl.innerHTML = '';
+    cortexAddDecision({ time: new Date().toLocaleTimeString(), action: cortexOpenPosition ? 'RESUME' : 'START', detail: 'hold=' + cortexHoldZone + ' minHold=' + cortexMinHoldCandles + ' confirm=' + cortexConfirmCandles + ' exitConfirm=' + cortexExitConfirmCandles + ' | PriceTP/SL=' + cortexPriceExitsEnabled + ' AutoLearn=' + cortexAutoLearn + ' | ANTENNA flash=' + antenna.flashThreshold + ' emrg=' + antenna.emergencyExitEnabled + ' breakout=' + antenna.breakoutRiderEnabled + ' knife=' + antenna.fallingKnifeBlock + (cortexOpenPosition ? ' | RESUMING with ' + cortexOpenPosition.direction + ' @ ' + (cortexOpenPosition.entry || 0).toFixed(2) : '') });
     if (btn) { btn.textContent = 'AUTO-TRADE ON'; btn.style.background = '#1b4332'; btn.style.color = '#2dc653'; btn.style.borderColor = '#2dc653'; }
     if (statusEl) { statusEl.textContent = 'Active - monitoring ' + neuralCurrentEpic; statusEl.style.color = '#2dc653'; }
     cortexTimeframe = (document.getElementById('cortex-timeframe') || {}).value || 'MINUTE_5';
@@ -3018,20 +3018,88 @@ function toggleCortexAutoTrade() {
     if (cortexAutoTradeInterval) clearInterval(cortexAutoTradeInterval);
     cortexAutoTradeInterval = setInterval(cortexAutoTradeCheck, pollInterval);
     cortexAutoTradeCheck();
+    cortexSaveState();
   } else {
     if (cortexAutoTradeInterval) { clearInterval(cortexAutoTradeInterval); cortexAutoTradeInterval = null; }
     if (cortexOpenPosition) {
-      addBrainLog('CORTEX', 'Auto-trade OFF — clearing tracked position dealId=' + cortexOpenPosition.dealId + ' (position may still be open on IG, manage manually)');
-      cortexOpenPosition = null;
-      cortexExitConsecutiveCount = 0;
+      addBrainLog('CORTEX', 'Auto-trade PAUSED — keeping tracked position: ' + cortexOpenPosition.direction + ' @ ' + (cortexOpenPosition.entry || 0).toFixed(2) + ' dealId=' + cortexOpenPosition.dealId);
+      if (btn) { btn.textContent = 'PAUSED (position open)'; btn.style.background = '#3d2e00'; btn.style.color = '#d29922'; btn.style.borderColor = '#d29922'; }
+      if (statusEl) { statusEl.textContent = 'Paused — ' + cortexOpenPosition.direction + ' position tracked'; statusEl.style.color = '#d29922'; }
+    } else {
+      if (btn) { btn.textContent = 'AUTO-TRADE OFF'; btn.style.background = '#3d1a1a'; btn.style.color = '#f85149'; btn.style.borderColor = '#f85149'; }
+      if (statusEl) { statusEl.textContent = 'Disabled'; statusEl.style.color = '#f85149'; }
     }
+    cortexExitConsecutiveCount = 0;
     cortexVerifyTickCount = 0;
     cortexLastVerifyTs = 0;
-    if (btn) { btn.textContent = 'AUTO-TRADE OFF'; btn.style.background = '#3d1a1a'; btn.style.color = '#f85149'; btn.style.borderColor = '#f85149'; }
-    if (statusEl) { statusEl.textContent = 'Disabled'; statusEl.style.color = '#f85149'; }
-    addBrainLog('CORTEX', 'Auto-trade DISABLED');
+    addBrainLog('CORTEX', cortexOpenPosition ? 'Auto-trade PAUSED (position preserved — click again to resume, or Full Reset to close)' : 'Auto-trade DISABLED');
     cortexSaveState();
   }
+  cortexUpdatePositionBadge();
+}
+
+function cortexUpdatePositionBadge() {
+  var badge = document.getElementById('cortex-position-badge');
+  if (!badge) return;
+  if (cortexOpenPosition) {
+    badge.style.display = 'inline-block';
+    badge.textContent = cortexOpenPosition.direction + ' @ ' + (cortexOpenPosition.entry || 0).toFixed(2) + ' (dealId=' + (cortexOpenPosition.dealId || '?').substring(0, 12) + ')';
+    badge.style.color = cortexOpenPosition.direction === 'BUY' ? '#2dc653' : '#f85149';
+    badge.style.borderColor = cortexOpenPosition.direction === 'BUY' ? '#2dc653' : '#f85149';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+async function cortexFullReset() {
+  var hasPosition = !!cortexOpenPosition;
+  var msg = hasPosition
+    ? 'FULL RESET will:\n1. Stop auto-trade\n2. Close the open ' + cortexOpenPosition.direction + ' position on IG (dealId=' + cortexOpenPosition.dealId + ')\n3. Clear all trade history and decision log\n\nContinue?'
+    : 'FULL RESET will:\n1. Stop auto-trade\n2. Clear all trade history and decision log\n\nContinue?';
+
+  if (!confirm(msg)) return;
+
+  if (cortexAutoTradeInterval) { clearInterval(cortexAutoTradeInterval); cortexAutoTradeInterval = null; }
+  cortexAutoTradeEnabled = false;
+
+  if (hasPosition && cortexOpenPosition.dealId) {
+    addBrainLog('CORTEX', 'FULL RESET — closing position dealId=' + cortexOpenPosition.dealId + '...');
+    try {
+      var closeResult = await apiFetch('/api/ig/positions/' + cortexOpenPosition.dealId, { method: 'DELETE' });
+      if (closeResult && (closeResult.dealStatus === 'ACCEPTED' || closeResult.status === 'ACCEPTED' || closeResult.ok)) {
+        addBrainLog('CORTEX', 'Position closed successfully on IG');
+      } else {
+        var closeMsg = (closeResult && (closeResult.reason || closeResult.error || closeResult.dealStatus)) || 'unknown';
+        addBrainLog('WARN', 'Position close response: ' + closeMsg + ' — check IG manually');
+      }
+    } catch (e) {
+      addBrainLog('ERROR', 'Failed to close position on IG: ' + e.message + ' — you may need to close it manually');
+    }
+  }
+
+  cortexOpenPosition = null;
+  cortexTradeLog = [];
+  cortexDecisionLog = [];
+  cortexConsecutiveSignal = null;
+  cortexConsecutiveCount = 0;
+  cortexExitConsecutiveCount = 0;
+  cortexVerifyTickCount = 0;
+  cortexLastVerifyTs = 0;
+  cortexLastCandleTs = 0;
+
+  var btn = document.getElementById('cortex-auto-trade-btn');
+  var statusEl = document.getElementById('cortex-auto-status');
+  if (btn) { btn.textContent = 'AUTO-TRADE OFF'; btn.style.background = '#3d1a1a'; btn.style.color = '#f85149'; btn.style.borderColor = '#f85149'; }
+  if (statusEl) { statusEl.textContent = 'Reset — all clear'; statusEl.style.color = '#8b949e'; }
+
+  var monEl = document.getElementById('cortex-decision-monitor');
+  if (monEl) monEl.innerHTML = '';
+  renderCortexTradeLog(true);
+  cortexUpdatePositionBadge();
+
+  cortexSaveState();
+  addBrainLog('CORTEX', 'FULL RESET complete — auto-trade off, positions cleared, history wiped');
+  showToast('Cortex fully reset', true);
 }
 
 async function cortexAutoTradeCheck() {
