@@ -4411,15 +4411,15 @@ function dispatchToTarget(target, body, senderName) {
     return true;
   }
   if (target.type === "agent") {
-    const agentSession = "agent:" + target.agent.id.toLowerCase() + ":main";
+    const activeSession = getActiveSessionKey();
     if (!gatewayWs || gatewayWs.readyState !== WebSocket.OPEN) return false;
     const id = "gw-inject-" + (++gwReqCounter) + "-" + Date.now();
     const frame = {
       type: "req", id, method: "chat.inject",
-      params: { sessionKey: agentSession, message: body, label: senderName },
+      params: { sessionKey: activeSession, message: body, label: senderName },
     };
     gatewayWs.send(JSON.stringify(frame));
-    console.log(`[ceo-proxy] Injected message to agent ${target.agent.id} session from ${senderName}`);
+    console.log(`[ceo-proxy] Injected message to agent ${target.agent.id} session from ${senderName} (session: ${activeSession})`);
     return true;
   }
   return false;
