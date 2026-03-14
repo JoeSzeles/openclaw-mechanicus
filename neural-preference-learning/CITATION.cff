@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "Neural Preference Learning: Real-Time Spiking Network Augmentation for Persistent LLM Agent Adaptation"
+authors:
+  - family-names: Szeles
+    given-names: Joe
+type: software
+date-released: "2025-03-14"
+url: "https://github.com/JoeSzeles/neural-preference-learning"
+repository-code: "https://github.com/JoeSzeles/neural-preference-learning"
+license: MIT
+keywords:
+  - spiking-neural-network
+  - llm-agent
+  - preference-learning
+  - reinforcement-learning
+  - rlhf
+  - lif-neuron
+  - hebbian-learning
+  - brainjar
+  - openclaw
