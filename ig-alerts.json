@@ -6,54 +6,6 @@
       "message": "Pipeline test alert",
       "level": "info",
       "channel": "default",
-      "timestamp": "2026-03-08T09:01:41.316Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test-target",
-      "message": "Pipeline stub test",
-      "level": "debug",
-      "channel": "default",
-      "timestamp": "2026-03-08T09:01:41.945Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test",
-      "message": "Pipeline test alert",
-      "level": "info",
-      "channel": "default",
-      "timestamp": "2026-03-08T09:02:17.834Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test-target",
-      "message": "Pipeline stub test",
-      "level": "debug",
-      "channel": "default",
-      "timestamp": "2026-03-08T09:02:18.104Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test",
-      "message": "Pipeline test alert",
-      "level": "info",
-      "channel": "default",
-      "timestamp": "2026-03-08T09:02:19.232Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test-target",
-      "message": "Pipeline stub test",
-      "level": "debug",
-      "channel": "default",
-      "timestamp": "2026-03-08T09:02:19.821Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test",
-      "message": "Pipeline test alert",
-      "level": "info",
-      "channel": "default",
       "timestamp": "2026-03-08T09:18:40.441Z"
     },
     {
@@ -3999,6 +3951,54 @@
       "level": "debug",
       "channel": "default",
       "timestamp": "2026-03-14T11:38:24.634Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-14T11:46:22.619Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-14T11:46:22.846Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-14T11:47:53.603Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-14T11:47:53.679Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-14T11:51:20.188Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-14T11:51:20.259Z"
     }
   ]
 }

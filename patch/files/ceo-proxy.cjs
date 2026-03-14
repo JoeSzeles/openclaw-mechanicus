@@ -6364,15 +6364,20 @@ server.on("upgrade", (req, socket, head) => {
       }
     });
     browserWs.on("message", (data, isBinary) => {
-      if (gwOpen && gwWs.readyState === 1) {
-        try { gwWs.send(data, { binary: isBinary }); } catch (_) {}
-      } else {
-        gwQueue.push([data, { binary: isBinary }]);
-      }
-      if (!isBinary) {
+      let finalData = data;
+      let finalOpts = { binary: isBinary };
+      if (!isBinary && GATEWAY_TOKEN) {
         try {
           const txt = data.toString();
           const frame = JSON.parse(txt);
+          if (frame.type === "req" && frame.method === "connect" && frame.params) {
+            if (!frame.params.auth) frame.params.auth = {};
+            frame.params.auth.token = GATEWAY_TOKEN;
+            delete frame.params.device;
+            finalData = JSON.stringify(frame);
+            finalOpts = { binary: false };
+            console.log("[ws-proxy] Normalized browser connect frame (token set, device stripped)");
+          }
           if (frame.type === "req" && frame.method === "chat.send" && frame.params) {
             const userMsg = typeof frame.params.message === "string" ? frame.params.message : "";
             if (userMsg) {
@@ -6385,6 +6390,11 @@ server.on("upgrade", (req, socket, head) => {
             }
           }
         } catch (_) {}
+      }
+      if (gwOpen && gwWs.readyState === 1) {
+        try { gwWs.send(finalData, finalOpts); } catch (_) {}
+      } else {
+        gwQueue.push([finalData, finalOpts]);
       }
     });
     gwWs.on("close", (code, reason) => {
