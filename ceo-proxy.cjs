@@ -28,6 +28,237 @@ const LOGIN_PASS = process.env.OPENCLAW_LOGIN_PASSWORD || "";
 const LOGIN_SESSION_FILE = path.join(DATA_DIR, "login-sessions.json");
 const LOGIN_SESSION_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 
+const NEURAL_FEEDBACK_FILE = path.join(DATA_DIR, "neural-feedback.json");
+const NEURAL_FEEDBACK_BACKUP_DIR = path.join(DATA_DIR, "backups");
+try { fs.mkdirSync(NEURAL_FEEDBACK_BACKUP_DIR, { recursive: true }); } catch (_) {}
+
+let _nfPool = null;
+function getNfPool() {
+  if (_nfPool) return _nfPool;
+  if (!process.env.DATABASE_URL) return null;
+  try {
+    const { Pool } = require("pg");
+    _nfPool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
+    _nfPool.on("error", () => {});
+    return _nfPool;
+  } catch (_) { return null; }
+}
+
+const _nfMemory = { interactions: [], lastFeedback: null, stats: { total: 0, positive: 0, negative: 0, neutral: 0 } };
+let _nfLastBackup = 0;
+
+const POSITIVE_KEYWORDS = ["good", "great", "perfect", "yes", "nice", "excellent", "love", "awesome", "correct", "exactly", "thanks", "thank you", "well done", "brilliant", "solid", "works", "beautiful", "amazing"];
+const NEGATIVE_KEYWORDS = ["no", "wrong", "bad", "redo", "fix", "broken", "terrible", "useless", "stop", "fail", "error", "crash", "crap", "rubbish", "awful", "horrible", "doesn't work", "not right", "not what"];
+
+function classifySentiment(text) {
+  if (!text || typeof text !== "string") return { sentiment: "neutral", score: 0 };
+  const lower = text.toLowerCase().trim();
+  if (lower.length < 2) return { sentiment: "neutral", score: 0 };
+  let posCount = 0, negCount = 0;
+  for (const kw of POSITIVE_KEYWORDS) { if (lower.includes(kw)) posCount++; }
+  for (const kw of NEGATIVE_KEYWORDS) { if (lower.includes(kw)) negCount++; }
+  if (posCount === 0 && negCount === 0) return { sentiment: "neutral", score: 0 };
+  if (posCount > negCount) return { sentiment: "positive", score: Math.min(1, posCount * 0.3) };
+  if (negCount > posCount) return { sentiment: "negative", score: -Math.min(1, negCount * 0.3) };
+  return { sentiment: "neutral", score: 0 };
+}
+
+let _lastAgentResponse = null;
+
+function buildFeatureVector(responseText, agentId) {
+  const text = responseText || "";
+  const codeBlocks = (text.match(/```/g) || []).length / 2;
+  const hasData = /\d+\.\d+|\btable\b|\brows?\b|\bcolumns?\b/i.test(text);
+  const toolPatterns = /\b(created|edited|read|searched|executed|installed|deployed|built|wrote|deleted|updated)\b/gi;
+  const toolCount = (text.match(toolPatterns) || []).length;
+  const words = text.split(/\s+/).length;
+  const maxWords = 2000;
+  const agentHash = (agentId || "ceo").split("").reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+  return {
+    response_length: Math.min(1, words / maxWords),
+    tool_count: Math.min(1, toolCount / 10),
+    had_code: codeBlocks > 0 ? 1 : 0,
+    had_data: hasData ? 1 : 0,
+    topic_hash: Math.abs(agentHash % 100) / 100,
+    was_proactive: /\b(also|additionally|i noticed|while i was|i went ahead)\b/i.test(text) ? 1 : 0,
+    agent_id_hash: Math.abs(agentHash % 1000) / 1000,
+    response_time: 0,
+    had_error: /\b(error|failed|exception|crash)\b/i.test(text) ? 1 : 0,
+    complexity: Math.min(1, (codeBlocks + toolCount + (hasData ? 2 : 0)) / 15),
+  };
+}
+
+async function recordNeuralFeedback(agentId, featureVector, sentiment, sentimentScore, brainResponse, rawText) {
+  const record = {
+    timestamp: new Date().toISOString(),
+    agentId: agentId || "ceo",
+    featureVector,
+    sentiment,
+    sentimentScore,
+    brainResponse: brainResponse || {},
+    rawText: (rawText || "").slice(0, 500),
+    sessionId: process.pid + "",
+    architecture: {},
+  };
+
+  _nfMemory.interactions.push(record);
+  if (_nfMemory.interactions.length > 1000) _nfMemory.interactions = _nfMemory.interactions.slice(-1000);
+  _nfMemory.lastFeedback = record;
+  _nfMemory.stats.total++;
+  if (sentiment === "positive") _nfMemory.stats.positive++;
+  else if (sentiment === "negative") _nfMemory.stats.negative++;
+  else _nfMemory.stats.neutral++;
+
+  const pool = getNfPool();
+  if (pool) {
+    try {
+      await pool.query(
+        `INSERT INTO neural_feedback (agent_id, feature_vector, sentiment, sentiment_score, brain_response, raw_text, session_id, architecture)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [record.agentId, JSON.stringify(featureVector), sentiment, sentimentScore, JSON.stringify(brainResponse || {}), record.rawText, record.sessionId, JSON.stringify(record.architecture)]
+      );
+    } catch (e) { console.error("[neural-feedback] DB write failed:", e.message); }
+  }
+
+  try {
+    const fileData = loadJson(NEURAL_FEEDBACK_FILE, { interactions: [] });
+    fileData.interactions.push(record);
+    if (fileData.interactions.length > 1000) fileData.interactions = fileData.interactions.slice(-1000);
+    saveJson(NEURAL_FEEDBACK_FILE, fileData);
+  } catch (_) {}
+
+  const now = Date.now();
+  if (now - _nfLastBackup > 86400000) {
+    _nfLastBackup = now;
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const backupPath = path.join(NEURAL_FEEDBACK_BACKUP_DIR, "neural-feedback-" + dateStr + ".json");
+      fs.copyFileSync(NEURAL_FEEDBACK_FILE, backupPath);
+      const backups = fs.readdirSync(NEURAL_FEEDBACK_BACKUP_DIR).filter(f => f.startsWith("neural-feedback-")).sort();
+      while (backups.length > 30) { try { fs.unlinkSync(path.join(NEURAL_FEEDBACK_BACKUP_DIR, backups.shift())); } catch (_) {} }
+    } catch (_) {}
+  }
+
+  return record;
+}
+
+async function stimulateBrainPreference(featureVector, feedback) {
+  try {
+    const brainPortFile = path.join(DATA_DIR, "brain-engine-port");
+    let brainPort = 0;
+    try { brainPort = parseInt(fs.readFileSync(brainPortFile, "utf8").trim()); } catch (_) {}
+    if (!brainPort) return null;
+
+    const postData = JSON.stringify({ features: featureVector, feedback, steps: 5 });
+    return new Promise((resolve) => {
+      const req = http.request({
+        hostname: "127.0.0.1", port: brainPort, path: "/stimulate-preference",
+        method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(postData) },
+        timeout: 5000,
+      }, (res) => {
+        let body = "";
+        res.on("data", (d) => body += d);
+        res.on("end", () => { try { resolve(JSON.parse(body)); } catch (_) { resolve(null); } });
+      });
+      req.on("error", () => resolve(null));
+      req.on("timeout", () => { req.destroy(); resolve(null); });
+      req.end(postData);
+    });
+  } catch (_) { return null; }
+}
+
+async function processNeuralFeedback(userText, agentId) {
+  const { sentiment, score } = classifySentiment(userText);
+  if (sentiment === "neutral") return null;
+
+  const prev = _lastAgentResponse;
+  if (!prev) return null;
+
+  const featureVector = prev.features || buildFeatureVector(prev.text, prev.agentId);
+  const feedback = sentiment === "positive" ? "sugar" : "pain";
+  const brainResponse = await stimulateBrainPreference(featureVector, feedback);
+
+  const record = await recordNeuralFeedback(
+    prev.agentId || agentId || "ceo",
+    featureVector, sentiment, score, brainResponse, userText
+  );
+
+  console.log("[neural-feedback] " + sentiment + " (" + score.toFixed(2) + ") from " + (agentId || "user") + " → brain " + feedback + (brainResponse ? " (buy=" + (brainResponse.buy_signal || 0).toFixed(2) + " sell=" + (brainResponse.sell_signal || 0).toFixed(2) + ")" : " (brain offline)"));
+  return record;
+}
+
+async function loadNeuralFeedbackFromDb() {
+  const pool = getNfPool();
+  if (!pool) return;
+  try {
+    const result = await pool.query("SELECT * FROM neural_feedback ORDER BY timestamp DESC LIMIT 1000");
+    const toKey = (r) => (r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp || "")) + "|" + (r.agentId || r.agent_id || "") + "|" + (r.sessionId || r.session_id || "") + "|" + (r.sentiment || "");
+    const dbRecords = result.rows.map(r => ({
+      timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
+      agentId: r.agent_id, featureVector: r.feature_vector,
+      sentiment: r.sentiment, sentimentScore: r.sentiment_score, brainResponse: r.brain_response,
+      rawText: r.raw_text, sessionId: r.session_id, architecture: r.architecture,
+    }));
+    const fileData = loadJson(NEURAL_FEEDBACK_FILE, { interactions: [] });
+    const fileRecords = fileData.interactions || [];
+    fileRecords.forEach(r => { if (r.timestamp instanceof Date) r.timestamp = r.timestamp.toISOString(); else if (typeof r.timestamp !== "string") r.timestamp = String(r.timestamp); });
+
+    const dbKeys = new Set(dbRecords.map(toKey));
+    const fileKeys = new Set(fileRecords.map(toKey));
+    let fileNew = 0, dbNew = 0;
+
+    for (const fr of fileRecords) {
+      if (!dbKeys.has(toKey(fr))) {
+        try {
+          await pool.query(
+            `INSERT INTO neural_feedback (timestamp, agent_id, feature_vector, sentiment, sentiment_score, brain_response, raw_text, session_id, architecture)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (timestamp, agent_id, session_id, sentiment) DO NOTHING`,
+            [fr.timestamp, fr.agentId, JSON.stringify(fr.featureVector), fr.sentiment, fr.sentimentScore || 0, JSON.stringify(fr.brainResponse || {}), fr.rawText || "", fr.sessionId || "", JSON.stringify(fr.architecture || {})]
+          );
+          fileNew++;
+        } catch (_) {}
+      }
+    }
+
+    for (const dr of dbRecords) {
+      if (!fileKeys.has(toKey(dr))) {
+        fileRecords.push(dr);
+        dbNew++;
+      }
+    }
+
+    if (dbNew > 0) {
+      fileRecords.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      if (fileRecords.length > 1000) fileRecords.splice(0, fileRecords.length - 1000);
+      saveJson(NEURAL_FEEDBACK_FILE, { interactions: fileRecords });
+    }
+
+    _nfMemory.interactions = fileRecords.slice(-1000);
+    _nfMemory.stats.total = fileRecords.length;
+    _nfMemory.stats.positive = fileRecords.filter(r => r.sentiment === "positive").length;
+    _nfMemory.stats.negative = fileRecords.filter(r => r.sentiment === "negative").length;
+    _nfMemory.stats.neutral = fileRecords.filter(r => r.sentiment === "neutral").length;
+
+    if (fileNew > 0 || dbNew > 0) console.log("[neural-feedback] Synced: " + fileNew + " file→DB, " + dbNew + " DB→file, total=" + _nfMemory.stats.total);
+    else console.log("[neural-feedback] Loaded " + _nfMemory.stats.total + " records (DB + file in sync)");
+  } catch (e) { console.error("[neural-feedback] DB sync failed:", e.message); }
+}
+
+async function replayPreferenceFeedback(count) {
+  const interactions = _nfMemory.interactions.slice(-(count || 200));
+  if (interactions.length === 0) return { replayed: 0 };
+  let replayed = 0, errors = 0;
+  for (const record of interactions) {
+    if (record.sentiment === "neutral") continue;
+    const feedback = record.sentiment === "positive" ? "sugar" : "pain";
+    const result = await stimulateBrainPreference(record.featureVector, feedback);
+    if (result && !result.error) replayed++;
+    else errors++;
+  }
+  console.log("[neural-feedback] Replayed " + replayed + " preference interactions (" + errors + " errors)");
+  return { replayed, errors, total: interactions.length };
+}
+
 function loadLoginSessions() {
   try { if (fs.existsSync(LOGIN_SESSION_FILE)) return JSON.parse(fs.readFileSync(LOGIN_SESSION_FILE, "utf8")); } catch (_) {}
   return {};
@@ -3902,6 +4133,10 @@ function connectGateway() {
             for (const part of pm.content) {
               if (part.type === "text" && part.text) fullText += part.text;
             }
+
+            const agentId = (evtSessionKey || "").split(":")[1] || "ceo";
+            _lastAgentResponse = { text: fullText, agentId, features: buildFeatureVector(fullText, agentId), ts: Date.now() };
+
             for (const [reqId, pending] of pendingAgentChats) {
               if (!pending.sendAcked || pending.resolved) continue;
               if (pending.runId && pending.runId !== runId) continue;
@@ -3913,6 +4148,13 @@ function connectGateway() {
           }
 
           if (pm && pm.role === "user" && msg.payload.state === "final" && pm.content) {
+            let userTextForFeedback = "";
+            for (const part of pm.content) {
+              if (part.type === "text" && part.text) userTextForFeedback += part.text;
+            }
+            if (userTextForFeedback && _lastAgentResponse) {
+              processNeuralFeedback(userTextForFeedback, "user").catch(() => {});
+            }
             const msgId = runId || (pm.id || "");
             if (msgId && !processedRunIds["user-" + msgId]) {
               if (msgId) processedRunIds["user-" + msgId] = true;
@@ -5117,6 +5359,67 @@ async function handleApi(req, res) {
     return true;
   }
 
+  if (p === "/api/neural-feedback/status") {
+    return json(res, 200, {
+      total: _nfMemory.stats.total,
+      positive: _nfMemory.stats.positive,
+      negative: _nfMemory.stats.negative,
+      neutral: _nfMemory.stats.neutral,
+      lastFeedback: _nfMemory.lastFeedback,
+      memorySize: _nfMemory.interactions.length,
+      dbConfigured: !!process.env.DATABASE_URL,
+    }), true;
+  }
+
+  if (p === "/api/neural-feedback/history") {
+    const limit = parseInt(url.searchParams.get("limit") || "50");
+    const agentFilter = url.searchParams.get("agent") || "";
+    let records = _nfMemory.interactions.slice(-Math.min(limit, 500));
+    if (agentFilter) records = records.filter(r => r.agentId === agentFilter);
+    return json(res, 200, { records: records.reverse(), total: _nfMemory.stats.total }), true;
+  }
+
+  if (p === "/api/neural-feedback/patterns") {
+    const byAgent = {};
+    const bySentiment = { positive: 0, negative: 0, neutral: 0 };
+    const featureAvgs = {};
+    let count = 0;
+    for (const r of _nfMemory.interactions) {
+      if (!byAgent[r.agentId]) byAgent[r.agentId] = { positive: 0, negative: 0, neutral: 0, total: 0 };
+      byAgent[r.agentId][r.sentiment]++;
+      byAgent[r.agentId].total++;
+      bySentiment[r.sentiment]++;
+      if (r.featureVector && r.sentiment !== "neutral") {
+        for (const [k, v] of Object.entries(r.featureVector)) {
+          if (!featureAvgs[k]) featureAvgs[k] = { positive: { sum: 0, count: 0 }, negative: { sum: 0, count: 0 } };
+          featureAvgs[k][r.sentiment].sum += parseFloat(v) || 0;
+          featureAvgs[k][r.sentiment].count++;
+        }
+        count++;
+      }
+    }
+    const featurePatterns = {};
+    for (const [k, v] of Object.entries(featureAvgs)) {
+      featurePatterns[k] = {
+        positive_avg: v.positive.count > 0 ? +(v.positive.sum / v.positive.count).toFixed(4) : null,
+        negative_avg: v.negative.count > 0 ? +(v.negative.sum / v.negative.count).toFixed(4) : null,
+      };
+    }
+    return json(res, 200, { byAgent, bySentiment, featurePatterns, totalAnalyzed: count }), true;
+  }
+
+  if (req.method === "POST" && p === "/api/neural-feedback/replay") {
+    const body = JSON.parse((await readBody(req)).toString() || "{}");
+    const count = parseInt(body.count) || 200;
+    const result = await replayPreferenceFeedback(count);
+    return json(res, 200, result), true;
+  }
+
+  if (req.method === "POST" && p === "/api/neural-feedback/sync") {
+    await loadNeuralFeedbackFromDb();
+    return json(res, 200, { ok: true, stats: _nfMemory.stats }), true;
+  }
+
   if (p.startsWith("/api/brain/") || p === "/api/brain") {
     const brainApiKey = process.env.BRAIN_API_KEY;
     if (brainApiKey) {
@@ -5849,6 +6152,7 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
   startRegisteredBots();
   setTimeout(async () => {
     try { const sdb = require("./skills/bots/ig-scalper-db.cjs"); await sdb.ensurePriceCandlesTable(); console.log("[startup] price_candles table ready"); } catch (e) { console.log("[startup] price_candles init failed:", e.message); }
+    try { await loadNeuralFeedbackFromDb(); console.log("[startup] Neural feedback: " + _nfMemory.stats.total + " records loaded (pos=" + _nfMemory.stats.positive + " neg=" + _nfMemory.stats.negative + ")"); } catch (e) { console.log("[startup] Neural feedback init:", e.message); }
     await igSessionStartup();
     if (shouldAutoConnectLiveStreaming()) {
       console.log("[startup] Auto-connecting to live streaming (was active before restart)");

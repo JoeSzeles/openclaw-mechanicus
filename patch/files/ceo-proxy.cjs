@@ -28,6 +28,237 @@ const LOGIN_PASS = process.env.OPENCLAW_LOGIN_PASSWORD || "";
 const LOGIN_SESSION_FILE = path.join(DATA_DIR, "login-sessions.json");
 const LOGIN_SESSION_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 
+const NEURAL_FEEDBACK_FILE = path.join(DATA_DIR, "neural-feedback.json");
+const NEURAL_FEEDBACK_BACKUP_DIR = path.join(DATA_DIR, "backups");
+try { fs.mkdirSync(NEURAL_FEEDBACK_BACKUP_DIR, { recursive: true }); } catch (_) {}
+
+let _nfPool = null;
+function getNfPool() {
+  if (_nfPool) return _nfPool;
+  if (!process.env.DATABASE_URL) return null;
+  try {
+    const { Pool } = require("pg");
+    _nfPool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
+    _nfPool.on("error", () => {});
+    return _nfPool;
+  } catch (_) { return null; }
+}
+
+const _nfMemory = { interactions: [], lastFeedback: null, stats: { total: 0, positive: 0, negative: 0, neutral: 0 } };
+let _nfLastBackup = 0;
+
+const POSITIVE_KEYWORDS = ["good", "great", "perfect", "yes", "nice", "excellent", "love", "awesome", "correct", "exactly", "thanks", "thank you", "well done", "brilliant", "solid", "works", "beautiful", "amazing"];
+const NEGATIVE_KEYWORDS = ["no", "wrong", "bad", "redo", "fix", "broken", "terrible", "useless", "stop", "fail", "error", "crash", "crap", "rubbish", "awful", "horrible", "doesn't work", "not right", "not what"];
+
+function classifySentiment(text) {
+  if (!text || typeof text !== "string") return { sentiment: "neutral", score: 0 };
+  const lower = text.toLowerCase().trim();
+  if (lower.length < 2) return { sentiment: "neutral", score: 0 };
+  let posCount = 0, negCount = 0;
+  for (const kw of POSITIVE_KEYWORDS) { if (lower.includes(kw)) posCount++; }
+  for (const kw of NEGATIVE_KEYWORDS) { if (lower.includes(kw)) negCount++; }
+  if (posCount === 0 && negCount === 0) return { sentiment: "neutral", score: 0 };
+  if (posCount > negCount) return { sentiment: "positive", score: Math.min(1, posCount * 0.3) };
+  if (negCount > posCount) return { sentiment: "negative", score: -Math.min(1, negCount * 0.3) };
+  return { sentiment: "neutral", score: 0 };
+}
+
+let _lastAgentResponse = null;
+
+function buildFeatureVector(responseText, agentId) {
+  const text = responseText || "";
+  const codeBlocks = (text.match(/```/g) || []).length / 2;
+  const hasData = /\d+\.\d+|\btable\b|\brows?\b|\bcolumns?\b/i.test(text);
+  const toolPatterns = /\b(created|edited|read|searched|executed|installed|deployed|built|wrote|deleted|updated)\b/gi;
+  const toolCount = (text.match(toolPatterns) || []).length;
+  const words = text.split(/\s+/).length;
+  const maxWords = 2000;
+  const agentHash = (agentId || "ceo").split("").reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+  return {
+    response_length: Math.min(1, words / maxWords),
+    tool_count: Math.min(1, toolCount / 10),
+    had_code: codeBlocks > 0 ? 1 : 0,
+    had_data: hasData ? 1 : 0,
+    topic_hash: Math.abs(agentHash % 100) / 100,
+    was_proactive: /\b(also|additionally|i noticed|while i was|i went ahead)\b/i.test(text) ? 1 : 0,
+    agent_id_hash: Math.abs(agentHash % 1000) / 1000,
+    response_time: 0,
+    had_error: /\b(error|failed|exception|crash)\b/i.test(text) ? 1 : 0,
+    complexity: Math.min(1, (codeBlocks + toolCount + (hasData ? 2 : 0)) / 15),
+  };
+}
+
+async function recordNeuralFeedback(agentId, featureVector, sentiment, sentimentScore, brainResponse, rawText) {
+  const record = {
+    timestamp: new Date().toISOString(),
+    agentId: agentId || "ceo",
+    featureVector,
+    sentiment,
+    sentimentScore,
+    brainResponse: brainResponse || {},
+    rawText: (rawText || "").slice(0, 500),
+    sessionId: process.pid + "",
+    architecture: {},
+  };
+
+  _nfMemory.interactions.push(record);
+  if (_nfMemory.interactions.length > 1000) _nfMemory.interactions = _nfMemory.interactions.slice(-1000);
+  _nfMemory.lastFeedback = record;
+  _nfMemory.stats.total++;
+  if (sentiment === "positive") _nfMemory.stats.positive++;
+  else if (sentiment === "negative") _nfMemory.stats.negative++;
+  else _nfMemory.stats.neutral++;
+
+  const pool = getNfPool();
+  if (pool) {
+    try {
+      await pool.query(
+        `INSERT INTO neural_feedback (agent_id, feature_vector, sentiment, sentiment_score, brain_response, raw_text, session_id, architecture)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [record.agentId, JSON.stringify(featureVector), sentiment, sentimentScore, JSON.stringify(brainResponse || {}), record.rawText, record.sessionId, JSON.stringify(record.architecture)]
+      );
+    } catch (e) { console.error("[neural-feedback] DB write failed:", e.message); }
+  }
+
+  try {
+    const fileData = loadJson(NEURAL_FEEDBACK_FILE, { interactions: [] });
+    fileData.interactions.push(record);
+    if (fileData.interactions.length > 1000) fileData.interactions = fileData.interactions.slice(-1000);
+    saveJson(NEURAL_FEEDBACK_FILE, fileData);
+  } catch (_) {}
+
+  const now = Date.now();
+  if (now - _nfLastBackup > 86400000) {
+    _nfLastBackup = now;
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const backupPath = path.join(NEURAL_FEEDBACK_BACKUP_DIR, "neural-feedback-" + dateStr + ".json");
+      fs.copyFileSync(NEURAL_FEEDBACK_FILE, backupPath);
+      const backups = fs.readdirSync(NEURAL_FEEDBACK_BACKUP_DIR).filter(f => f.startsWith("neural-feedback-")).sort();
+      while (backups.length > 30) { try { fs.unlinkSync(path.join(NEURAL_FEEDBACK_BACKUP_DIR, backups.shift())); } catch (_) {} }
+    } catch (_) {}
+  }
+
+  return record;
+}
+
+async function stimulateBrainPreference(featureVector, feedback) {
+  try {
+    const brainPortFile = path.join(DATA_DIR, "brain-engine-port");
+    let brainPort = 0;
+    try { brainPort = parseInt(fs.readFileSync(brainPortFile, "utf8").trim()); } catch (_) {}
+    if (!brainPort) return null;
+
+    const postData = JSON.stringify({ features: featureVector, feedback, steps: 5 });
+    return new Promise((resolve) => {
+      const req = http.request({
+        hostname: "127.0.0.1", port: brainPort, path: "/stimulate-preference",
+        method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(postData) },
+        timeout: 5000,
+      }, (res) => {
+        let body = "";
+        res.on("data", (d) => body += d);
+        res.on("end", () => { try { resolve(JSON.parse(body)); } catch (_) { resolve(null); } });
+      });
+      req.on("error", () => resolve(null));
+      req.on("timeout", () => { req.destroy(); resolve(null); });
+      req.end(postData);
+    });
+  } catch (_) { return null; }
+}
+
+async function processNeuralFeedback(userText, agentId) {
+  const { sentiment, score } = classifySentiment(userText);
+  if (sentiment === "neutral") return null;
+
+  const prev = _lastAgentResponse;
+  if (!prev) return null;
+
+  const featureVector = prev.features || buildFeatureVector(prev.text, prev.agentId);
+  const feedback = sentiment === "positive" ? "sugar" : "pain";
+  const brainResponse = await stimulateBrainPreference(featureVector, feedback);
+
+  const record = await recordNeuralFeedback(
+    prev.agentId || agentId || "ceo",
+    featureVector, sentiment, score, brainResponse, userText
+  );
+
+  console.log("[neural-feedback] " + sentiment + " (" + score.toFixed(2) + ") from " + (agentId || "user") + " → brain " + feedback + (brainResponse ? " (buy=" + (brainResponse.buy_signal || 0).toFixed(2) + " sell=" + (brainResponse.sell_signal || 0).toFixed(2) + ")" : " (brain offline)"));
+  return record;
+}
+
+async function loadNeuralFeedbackFromDb() {
+  const pool = getNfPool();
+  if (!pool) return;
+  try {
+    const result = await pool.query("SELECT * FROM neural_feedback ORDER BY timestamp DESC LIMIT 1000");
+    const toKey = (r) => (r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp || "")) + "|" + (r.agentId || r.agent_id || "") + "|" + (r.sessionId || r.session_id || "") + "|" + (r.sentiment || "");
+    const dbRecords = result.rows.map(r => ({
+      timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
+      agentId: r.agent_id, featureVector: r.feature_vector,
+      sentiment: r.sentiment, sentimentScore: r.sentiment_score, brainResponse: r.brain_response,
+      rawText: r.raw_text, sessionId: r.session_id, architecture: r.architecture,
+    }));
+    const fileData = loadJson(NEURAL_FEEDBACK_FILE, { interactions: [] });
+    const fileRecords = fileData.interactions || [];
+    fileRecords.forEach(r => { if (r.timestamp instanceof Date) r.timestamp = r.timestamp.toISOString(); else if (typeof r.timestamp !== "string") r.timestamp = String(r.timestamp); });
+
+    const dbKeys = new Set(dbRecords.map(toKey));
+    const fileKeys = new Set(fileRecords.map(toKey));
+    let fileNew = 0, dbNew = 0;
+
+    for (const fr of fileRecords) {
+      if (!dbKeys.has(toKey(fr))) {
+        try {
+          await pool.query(
+            `INSERT INTO neural_feedback (timestamp, agent_id, feature_vector, sentiment, sentiment_score, brain_response, raw_text, session_id, architecture)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (timestamp, agent_id, session_id, sentiment) DO NOTHING`,
+            [fr.timestamp, fr.agentId, JSON.stringify(fr.featureVector), fr.sentiment, fr.sentimentScore || 0, JSON.stringify(fr.brainResponse || {}), fr.rawText || "", fr.sessionId || "", JSON.stringify(fr.architecture || {})]
+          );
+          fileNew++;
+        } catch (_) {}
+      }
+    }
+
+    for (const dr of dbRecords) {
+      if (!fileKeys.has(toKey(dr))) {
+        fileRecords.push(dr);
+        dbNew++;
+      }
+    }
+
+    if (dbNew > 0) {
+      fileRecords.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      if (fileRecords.length > 1000) fileRecords.splice(0, fileRecords.length - 1000);
+      saveJson(NEURAL_FEEDBACK_FILE, { interactions: fileRecords });
+    }
+
+    _nfMemory.interactions = fileRecords.slice(-1000);
+    _nfMemory.stats.total = fileRecords.length;
+    _nfMemory.stats.positive = fileRecords.filter(r => r.sentiment === "positive").length;
+    _nfMemory.stats.negative = fileRecords.filter(r => r.sentiment === "negative").length;
+    _nfMemory.stats.neutral = fileRecords.filter(r => r.sentiment === "neutral").length;
+
+    if (fileNew > 0 || dbNew > 0) console.log("[neural-feedback] Synced: " + fileNew + " file→DB, " + dbNew + " DB→file, total=" + _nfMemory.stats.total);
+    else console.log("[neural-feedback] Loaded " + _nfMemory.stats.total + " records (DB + file in sync)");
+  } catch (e) { console.error("[neural-feedback] DB sync failed:", e.message); }
+}
+
+async function replayPreferenceFeedback(count) {
+  const interactions = _nfMemory.interactions.slice(-(count || 200));
+  if (interactions.length === 0) return { replayed: 0 };
+  let replayed = 0, errors = 0;
+  for (const record of interactions) {
+    if (record.sentiment === "neutral") continue;
+    const feedback = record.sentiment === "positive" ? "sugar" : "pain";
+    const result = await stimulateBrainPreference(record.featureVector, feedback);
+    if (result && !result.error) replayed++;
+    else errors++;
+  }
+  console.log("[neural-feedback] Replayed " + replayed + " preference interactions (" + errors + " errors)");
+  return { replayed, errors, total: interactions.length };
+}
+
 function loadLoginSessions() {
   try { if (fs.existsSync(LOGIN_SESSION_FILE)) return JSON.parse(fs.readFileSync(LOGIN_SESSION_FILE, "utf8")); } catch (_) {}
   return {};
@@ -94,7 +325,13 @@ function isLoginExempt(req) {
       p.startsWith("/api/bots") || p.startsWith("/api/processes")) {
     if (hasValidBearerToken(req)) return true;
   }
+  if (p.startsWith("/api/brain")) {
+    const brainKey = req.headers["x-brain-api-key"];
+    if (brainKey && process.env.BRAIN_API_KEY && brainKey === process.env.BRAIN_API_KEY) return true;
+    return false;
+  }
   if (p.startsWith("/__openclaw__/canvas/")) return true;
+  if (p === "/nav-inject.js") return true;
   return false;
 }
 function serveLoginPage(req, res) {
@@ -3310,6 +3547,31 @@ async function handleIgApi(req, res, p) {
       return json(res, 200, result);
     }
 
+    if (req.method === "GET" && p === "/api/ig/scalper/candles") {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const qUrl = new URL("http://localhost" + req.url);
+      const epic = qUrl.searchParams.get("epic");
+      const resolution = qUrl.searchParams.get("resolution") || "MINUTE";
+      const max = parseInt(qUrl.searchParams.get("max")) || 500;
+      const fromTs = qUrl.searchParams.get("from") ? parseInt(qUrl.searchParams.get("from")) : 0;
+      const toTs = qUrl.searchParams.get("to") ? parseInt(qUrl.searchParams.get("to")) : Date.now();
+      if (!epic) return json(res, 400, { error: "Missing epic parameter" });
+      const candles = await scalperDb.getStoredCandlesRange(epic, resolution, fromTs, toTs);
+      const limited = candles.slice(-max);
+      const mapped = limited.map(c => ({ close: c.close, high: c.high, low: c.low, open: c.open, prevClose: c.open, spread: 0, volume: c.volume || 0 }));
+      return json(res, 200, { prices: mapped, source: "local_db", count: mapped.length, total_available: candles.length });
+    }
+
+    if (req.method === "GET" && p === "/api/ig/scalper/candle-count") {
+      const scalperDb = require("./skills/bots/ig-scalper-db.cjs");
+      const qUrl = new URL("http://localhost" + req.url);
+      const epic = qUrl.searchParams.get("epic");
+      const resolution = qUrl.searchParams.get("resolution") || "MINUTE";
+      if (!epic) return json(res, 400, { error: "Missing epic parameter" });
+      const count = await scalperDb.getCandleCount(epic, resolution);
+      return json(res, 200, { epic, resolution, count });
+    }
+
     return json(res, 404, { error: "Unknown IG endpoint" });
   } catch (e) {
     if (e.code === "NO_DATABASE") return json(res, 503, { error: "Database not configured", detail: "Set DATABASE_URL in your .env file to enable this feature" });
@@ -3537,6 +3799,24 @@ function saveBotRegistry(registry) {
   fs.writeFileSync(BOT_REGISTRY_FILE, JSON.stringify(registry, null, 2));
 }
 
+const _botStderrBuffers = {};
+const _botCrashHistory = {};
+const BOT_CRASH_LOG_PATH = path.join(DATA_DIR, "bot-crash-log.json");
+
+function loadCrashHistory() {
+  try {
+    if (fs.existsSync(BOT_CRASH_LOG_PATH)) {
+      const data = JSON.parse(fs.readFileSync(BOT_CRASH_LOG_PATH, "utf8"));
+      Object.assign(_botCrashHistory, data);
+    }
+  } catch (_) {}
+}
+loadCrashHistory();
+
+function saveCrashHistory() {
+  try { fs.writeFileSync(BOT_CRASH_LOG_PATH, JSON.stringify(_botCrashHistory, null, 2)); } catch (_) {}
+}
+
 function spawnBot(bot) {
   if (botProcesses.has(bot.id) && botProcesses.get(bot.id).proc && !botProcesses.get(bot.id).proc.killed) {
     return;
@@ -3553,10 +3833,30 @@ function spawnBot(bot) {
   });
   const entry = { proc, bot, restarts: 0, lastStart: Date.now(), backoff: 5000 };
   botProcesses.set(bot.id, entry);
+  if (!_botStderrBuffers[bot.id]) _botStderrBuffers[bot.id] = [];
   proc.stdout.on("data", (d) => process.stdout.write(`[${bot.id}] ${d}`));
-  proc.stderr.on("data", (d) => process.stderr.write(`[${bot.id}] ${d}`));
-  proc.on("exit", (code) => {
-    console.log(`[bot-mgr] Bot ${bot.id} exited with code ${code}`);
+  proc.stderr.on("data", (d) => {
+    process.stderr.write(`[${bot.id}] ${d}`);
+    const lines = d.toString().split("\n").filter(l => l.trim());
+    const buf = _botStderrBuffers[bot.id];
+    for (const line of lines) buf.push(line);
+    while (buf.length > 30) buf.shift();
+  });
+  proc.on("exit", (code, signal) => {
+    const uptimeMs = Date.now() - (entry.lastStart || Date.now());
+    console.log(`[bot-mgr] Bot ${bot.id} exited with code ${code}${signal ? ' signal=' + signal : ''} (uptime ${Math.round(uptimeMs / 1000)}s)`);
+    if (!_botCrashHistory[bot.id]) _botCrashHistory[bot.id] = [];
+    const crashRecord = {
+      timestamp: new Date().toISOString(),
+      exitCode: code,
+      signal: signal || null,
+      uptimeMs,
+      stderr: (_botStderrBuffers[bot.id] || []).slice(-20),
+    };
+    _botCrashHistory[bot.id].push(crashRecord);
+    while (_botCrashHistory[bot.id].length > 50) _botCrashHistory[bot.id].shift();
+    saveCrashHistory();
+    _botStderrBuffers[bot.id] = [];
     const registry = loadBotRegistry();
     const current = registry.find(b => b.id === bot.id);
     if (!current || !current.enabled) {
@@ -3633,6 +3933,8 @@ async function handleBotsApi(req, res, p) {
     const bots = registry.map(b => {
       const entry = botProcesses.get(b.id);
       const running = !!(entry && entry.proc && !entry.proc.killed);
+      const crashes = _botCrashHistory[b.id] || [];
+      const lastCrash = crashes.length > 0 ? crashes[crashes.length - 1] : null;
       return {
         id: b.id,
         cmd: b.cmd,
@@ -3640,11 +3942,27 @@ async function handleBotsApi(req, res, p) {
         running,
         pid: running ? entry.proc.pid : null,
         restarts: entry ? entry.restarts : 0,
+        totalCrashes: crashes.length,
+        lastCrash: lastCrash ? { timestamp: lastCrash.timestamp, exitCode: lastCrash.exitCode, signal: lastCrash.signal, uptimeMs: lastCrash.uptimeMs, stderr: (lastCrash.stderr || []).slice(-5) } : null,
         addedBy: b.addedBy || "unknown",
         addedAt: b.addedAt || null,
       };
     });
     return json(res, 200, { bots });
+  }
+
+  if (req.method === "GET" && (p === "/api/bots/crashes" || p.match(/^\/api\/bots\/([^/]+)\/crashes$/))) {
+    const idMatch2 = p.match(/^\/api\/bots\/([^/]+)\/crashes$/);
+    if (idMatch2) {
+      const botId = decodeURIComponent(idMatch2[1]);
+      return json(res, 200, { botId, crashes: _botCrashHistory[botId] || [] });
+    }
+    const url2 = new URL(req.url, "http://localhost");
+    const filterBot = url2.searchParams.get("botId");
+    if (filterBot) {
+      return json(res, 200, { botId: filterBot, crashes: _botCrashHistory[filterBot] || [] });
+    }
+    return json(res, 200, { crashes: _botCrashHistory });
   }
 
   if (req.method === "POST" && p === "/api/bots/register") {
@@ -3815,6 +4133,10 @@ function connectGateway() {
             for (const part of pm.content) {
               if (part.type === "text" && part.text) fullText += part.text;
             }
+
+            const agentId = (evtSessionKey || "").split(":")[1] || "ceo";
+            _lastAgentResponse = { text: fullText, agentId, features: buildFeatureVector(fullText, agentId), ts: Date.now() };
+
             for (const [reqId, pending] of pendingAgentChats) {
               if (!pending.sendAcked || pending.resolved) continue;
               if (pending.runId && pending.runId !== runId) continue;
@@ -3826,6 +4148,13 @@ function connectGateway() {
           }
 
           if (pm && pm.role === "user" && msg.payload.state === "final" && pm.content) {
+            let userTextForFeedback = "";
+            for (const part of pm.content) {
+              if (part.type === "text" && part.text) userTextForFeedback += part.text;
+            }
+            if (userTextForFeedback && _lastAgentResponse) {
+              processNeuralFeedback(userTextForFeedback, "user").catch(() => {});
+            }
             const msgId = runId || (pm.id || "");
             if (msgId && !processedRunIds["user-" + msgId]) {
               if (msgId) processedRunIds["user-" + msgId] = true;
@@ -5030,6 +5359,124 @@ async function handleApi(req, res) {
     return true;
   }
 
+  if (p === "/api/neural-feedback/status") {
+    return json(res, 200, {
+      total: _nfMemory.stats.total,
+      positive: _nfMemory.stats.positive,
+      negative: _nfMemory.stats.negative,
+      neutral: _nfMemory.stats.neutral,
+      lastFeedback: _nfMemory.lastFeedback,
+      memorySize: _nfMemory.interactions.length,
+      dbConfigured: !!process.env.DATABASE_URL,
+    }), true;
+  }
+
+  if (p === "/api/neural-feedback/history") {
+    const limit = parseInt(url.searchParams.get("limit") || "50");
+    const agentFilter = url.searchParams.get("agent") || "";
+    let records = _nfMemory.interactions.slice(-Math.min(limit, 500));
+    if (agentFilter) records = records.filter(r => r.agentId === agentFilter);
+    return json(res, 200, { records: records.reverse(), total: _nfMemory.stats.total }), true;
+  }
+
+  if (p === "/api/neural-feedback/patterns") {
+    const byAgent = {};
+    const bySentiment = { positive: 0, negative: 0, neutral: 0 };
+    const featureAvgs = {};
+    let count = 0;
+    for (const r of _nfMemory.interactions) {
+      if (!byAgent[r.agentId]) byAgent[r.agentId] = { positive: 0, negative: 0, neutral: 0, total: 0 };
+      byAgent[r.agentId][r.sentiment]++;
+      byAgent[r.agentId].total++;
+      bySentiment[r.sentiment]++;
+      if (r.featureVector && r.sentiment !== "neutral") {
+        for (const [k, v] of Object.entries(r.featureVector)) {
+          if (!featureAvgs[k]) featureAvgs[k] = { positive: { sum: 0, count: 0 }, negative: { sum: 0, count: 0 } };
+          featureAvgs[k][r.sentiment].sum += parseFloat(v) || 0;
+          featureAvgs[k][r.sentiment].count++;
+        }
+        count++;
+      }
+    }
+    const featurePatterns = {};
+    for (const [k, v] of Object.entries(featureAvgs)) {
+      featurePatterns[k] = {
+        positive_avg: v.positive.count > 0 ? +(v.positive.sum / v.positive.count).toFixed(4) : null,
+        negative_avg: v.negative.count > 0 ? +(v.negative.sum / v.negative.count).toFixed(4) : null,
+      };
+    }
+    return json(res, 200, { byAgent, bySentiment, featurePatterns, totalAnalyzed: count }), true;
+  }
+
+  if (req.method === "POST" && p === "/api/neural-feedback/replay") {
+    const body = JSON.parse((await readBody(req)).toString() || "{}");
+    const count = parseInt(body.count) || 200;
+    const result = await replayPreferenceFeedback(count);
+    return json(res, 200, result), true;
+  }
+
+  if (req.method === "POST" && p === "/api/neural-feedback/sync") {
+    await loadNeuralFeedbackFromDb();
+    return json(res, 200, { ok: true, stats: _nfMemory.stats }), true;
+  }
+
+  if (p.startsWith("/api/brain/") || p === "/api/brain") {
+    const brainApiKey = process.env.BRAIN_API_KEY;
+    if (brainApiKey) {
+      const remote = req.socket.remoteAddress;
+      const forwarded = req.headers["x-forwarded-for"];
+      const isLocal = (remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1") && !forwarded;
+      const hasKey = req.headers["x-brain-api-key"] === brainApiKey;
+      let hasSession = false;
+      if (LOGIN_USER && LOGIN_PASS) {
+        const cookies = (req.headers.cookie || "").split(";").map(c => c.trim());
+        for (const c of cookies) {
+          if (c.startsWith("openclaw_session=")) {
+            const tok = c.slice("openclaw_session=".length);
+            const sessions = loadLoginSessions();
+            const s = sessions[tok];
+            if (s && Date.now() - s.created < LOGIN_SESSION_MAX_AGE) hasSession = true;
+          }
+        }
+      }
+      if (!isLocal && !hasKey && !hasSession) return json(res, 403, { error: "Brain API requires session auth or x-brain-api-key header" }), true;
+    }
+    const brainPortFile = path.join(DATA_DIR, "brain-engine-port");
+    let brainPort = 0;
+    try { brainPort = parseInt(fs.readFileSync(brainPortFile, "utf8").trim()); } catch (_) {}
+    if (!brainPort || brainPort < 1 || brainPort > 65535) return json(res, 503, { error: "Brain engine not running (no port file)" }), true;
+    const brainPath = (p.replace("/api/brain", "") || "/status") + url.search;
+    const bodyBuf = (req.method === "POST" || req.method === "PUT") ? await readBody(req) : null;
+    const opts = {
+      hostname: "127.0.0.1",
+      port: brainPort,
+      path: brainPath,
+      method: req.method,
+      headers: { "Content-Type": req.headers["content-type"] || "application/json" },
+    };
+    return new Promise((resolve) => {
+      const proxyReq = http.request(opts, (proxyRes) => {
+        let data = "";
+        proxyRes.on("data", (chunk) => (data += chunk));
+        proxyRes.on("end", () => {
+          if (res.headersSent) return resolve(true);
+          const ct = proxyRes.headers["content-type"] || "application/json";
+          res.writeHead(proxyRes.statusCode || 200, { "Content-Type": ct, "Access-Control-Allow-Origin": "*" });
+          res.end(data);
+          resolve(true);
+        });
+      });
+      proxyReq.on("error", (e) => {
+        if (!res.headersSent) json(res, 502, { error: "Brain engine unreachable: " + e.message });
+        resolve(true);
+      });
+      const brainTimeout = (brainPath.startsWith("/backtest-train") || brainPath.startsWith("/live-train") || brainPath.startsWith("/auto-test")) ? 120000 : 30000;
+      proxyReq.setTimeout(brainTimeout, () => { proxyReq.destroy(); if (!res.headersSent) json(res, 504, { error: "Brain engine timeout" }); resolve(true); });
+      if (bodyBuf) proxyReq.write(bodyBuf);
+      proxyReq.end();
+    });
+  }
+
   if (p === "/api/dispatch" && req.method === "POST") {
     if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" }), true;
     const body = JSON.parse((await readBody(req)).toString() || "{}");
@@ -5207,36 +5654,47 @@ const CUSTOM_PAGES = {
   "/login.html": "login.html",
 };
 
-function serveCustomPage(req, res) {
-  const url = new URL(req.url, "http://localhost");
-  const file = CUSTOM_PAGES[url.pathname];
-  if (!file) return false;
+const _customPageCache = {};
+(function preloadCustomPages() {
   const dirs = [
     path.join(__dirname, "ui", "public"),
     path.join(__dirname, "dist", "control-ui"),
   ];
-  for (const dir of dirs) {
-    const fp = path.join(dir, file);
-    if (fs.existsSync(fp)) {
-      const ext = path.extname(file);
-      const ct = MIME_TYPES[ext] || "application/octet-stream";
-      let content = fs.readFileSync(fp, "utf8");
-      if (ext === ".html" && !content.includes("nav-inject.js")) {
-        const idx = content.indexOf("</body>");
-        if (idx !== -1) content = content.slice(0, idx) + NAV_INJECT_TAG + content.slice(idx);
-        else content += NAV_INJECT_TAG;
+  for (const [route, file] of Object.entries(CUSTOM_PAGES)) {
+    for (const dir of dirs) {
+      const fp = path.join(dir, file);
+      try {
+        if (fs.existsSync(fp)) {
+          const ext = path.extname(file);
+          let content = fs.readFileSync(fp, "utf8");
+          if (ext === ".html" && !content.includes("nav-inject.js")) {
+            const idx = content.indexOf("</body>");
+            if (idx !== -1) content = content.slice(0, idx) + NAV_INJECT_TAG + content.slice(idx);
+            else content += NAV_INJECT_TAG;
+          }
+          _customPageCache[route] = { content, ct: MIME_TYPES[ext] || "application/octet-stream" };
+          break;
+        }
+      } catch (e) {
+        console.error("[ceo-proxy] preload failed for " + fp + ":", e.code || e.message);
       }
-      res.writeHead(200, {
-        "Content-Type": ct,
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
-      });
-      res.end(content);
-      return true;
     }
   }
-  return false;
+  console.log("[ceo-proxy] Pre-cached " + Object.keys(_customPageCache).length + "/" + Object.keys(CUSTOM_PAGES).length + " custom pages into memory");
+})();
+
+function serveCustomPage(req, res) {
+  const url = new URL(req.url, "http://localhost");
+  const cached = _customPageCache[url.pathname];
+  if (!cached) return false;
+  res.writeHead(200, {
+    "Content-Type": cached.ct,
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+  });
+  res.end(cached.content);
+  return true;
 }
 
 function proxyReq(req, res, retries = 3) {
@@ -5472,9 +5930,71 @@ async function handleCanvasApiRoutes(req, res) {
     return true;
   }
 
-  json(res, 404, { error: "Unknown canvas API route", available: ["config/scalper-config", "config/strategy", "config/monitor-config", "config/proofread-config", "scalper/status", "scalper/start", "scalper/stop", "scalper/reset", "clawscript/templates"] });
+  if (route === "pages" && req.method === "POST") {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const fileName = (body.file || "").replace(/[^a-zA-Z0-9_.-]/g, "");
+      if (!fileName || !fileName.endsWith(".html")) { json(res, 400, { error: "file required (must end in .html, alphanumeric/dash/underscore only)" }); return true; }
+      const content = body.content || "";
+      if (!content || content.length < 10) { json(res, 400, { error: "content required (min 10 chars)" }); return true; }
+      if (content.includes("&lt;") && !content.includes("<html")) { json(res, 400, { error: "HTML appears entity-escaped (&lt; found instead of <). Write raw HTML tags." }); return true; }
+      const filePath = path.join(CANVAS_DIR, fileName);
+      fs.writeFileSync(filePath, content);
+      const ext = ".html";
+      const raw = fs.readFileSync(filePath);
+      const data = injectNavIntoHtml(raw, filePath);
+      _canvasFileCache[fileName] = { data, ct: "text/html; charset=utf-8", isHtml: true };
+      const manifestEntry = body.manifest || {};
+      if (manifestEntry.name || manifestEntry.category) {
+        const manifestPath = path.join(CANVAS_DIR, "manifest.json");
+        let manifest = [];
+        try { manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8")); } catch (_) {}
+        if (!Array.isArray(manifest)) manifest = [];
+        const existing = manifest.findIndex(e => e.file === fileName);
+        const entry = {
+          name: manifestEntry.name || fileName.replace(/\.html$/, "").replace(/[-_]/g, " "),
+          file: fileName,
+          description: manifestEntry.description || "",
+          category: manifestEntry.category || "Other",
+        };
+        if (existing >= 0) manifest[existing] = entry; else manifest.push(entry);
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+      }
+      json(res, 200, { ok: true, file: fileName, url: "/__openclaw__/canvas/" + fileName, bytes: content.length });
+    } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  json(res, 404, { error: "Unknown canvas API route", available: ["config/scalper-config", "config/strategy", "config/monitor-config", "config/proofread-config", "scalper/status", "scalper/start", "scalper/stop", "scalper/reset", "clawscript/templates", "pages (POST)"] });
   return true;
 }
+
+const _canvasFileCache = {};
+function canvasCacheLoad() {
+  if (!fs.existsSync(CANVAS_DIR)) return;
+  const files = fs.readdirSync(CANVAS_DIR).filter(f => !fs.statSync(path.join(CANVAS_DIR, f)).isDirectory());
+  for (const file of files) {
+    const fp = path.join(CANVAS_DIR, file);
+    try {
+      const ext = path.extname(file).toLowerCase();
+      const isHtml = ext === ".html" || ext === ".htm";
+      const raw = fs.readFileSync(fp);
+      const data = isHtml ? injectNavIntoHtml(raw, fp) : raw;
+      _canvasFileCache[file] = { data, ct: MIME_TYPES[ext] || "application/octet-stream", isHtml };
+    } catch (e) {
+      console.error("[ceo-proxy] canvas preload failed for " + file + ":", e.code || e.message);
+    }
+  }
+  const idxPath = path.join(CANVAS_DIR, "index.html");
+  if (fs.existsSync(idxPath) && !_canvasFileCache["index.html"]) {
+    try {
+      const raw = fs.readFileSync(idxPath);
+      _canvasFileCache["index.html"] = { data: injectNavIntoHtml(raw, idxPath), ct: "text/html; charset=utf-8", isHtml: true };
+    } catch (e) {}
+  }
+  console.log("[ceo-proxy] Pre-cached " + Object.keys(_canvasFileCache).length + " canvas files into memory");
+}
+canvasCacheLoad();
 
 function serveCanvas(req, res) {
   const url = new URL(req.url, "http://localhost");
@@ -5488,6 +6008,22 @@ function serveCanvas(req, res) {
     const data = Buffer.from(JSON.stringify(manifest));
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Content-Length": data.length, "Access-Control-Allow-Origin": "*" });
     res.end(data);
+    return true;
+  }
+  const cached = _canvasFileCache[relPath];
+  if (cached) {
+    const headers = {
+      "Content-Type": cached.ct,
+      "Content-Length": cached.data.length,
+      "Access-Control-Allow-Origin": "*",
+    };
+    if (cached.isHtml) {
+      headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+      headers["Pragma"] = "no-cache";
+      headers["Expires"] = "0";
+    }
+    res.writeHead(200, headers);
+    res.end(cached.data);
     return true;
   }
   const filePath = path.resolve(CANVAS_DIR, path.normalize(relPath));
@@ -5519,6 +6055,7 @@ function serveCanvas(req, res) {
     const ext = path.extname(filePath).toLowerCase();
     const isHtml = ext === ".html" || ext === ".htm";
     const data = isHtml ? injectNavIntoHtml(raw, filePath) : raw;
+    _canvasFileCache[relPath] = { data, ct: MIME_TYPES[ext] || "application/octet-stream", isHtml };
     const headers = {
       "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
       "Content-Length": data.length,
@@ -5615,6 +6152,7 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
   startRegisteredBots();
   setTimeout(async () => {
     try { const sdb = require("./skills/bots/ig-scalper-db.cjs"); await sdb.ensurePriceCandlesTable(); console.log("[startup] price_candles table ready"); } catch (e) { console.log("[startup] price_candles init failed:", e.message); }
+    try { await loadNeuralFeedbackFromDb(); console.log("[startup] Neural feedback: " + _nfMemory.stats.total + " records loaded (pos=" + _nfMemory.stats.positive + " neg=" + _nfMemory.stats.negative + ")"); } catch (e) { console.log("[startup] Neural feedback init:", e.message); }
     await igSessionStartup();
     if (shouldAutoConnectLiveStreaming()) {
       console.log("[startup] Auto-connecting to live streaming (was active before restart)");

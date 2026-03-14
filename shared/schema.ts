@@ -199,3 +199,20 @@ export const scalperTrades = pgTable("scalper_trades", {
   closedAt: timestamp("closed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const neuralFeedback = pgTable("neural_feedback", {
+  id: serial("id").primaryKey(),
+  timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow(),
+  agentId: varchar("agent_id", { length: 100 }).notNull(),
+  featureVector: jsonb("feature_vector").notNull().default("{}"),
+  sentiment: varchar("sentiment", { length: 20 }).notNull(),
+  sentimentScore: doublePrecision("sentiment_score").default(0),
+  brainResponse: jsonb("brain_response").default("{}"),
+  rawText: text("raw_text").default(""),
+  sessionId: varchar("session_id", { length: 200 }).default(""),
+  architecture: jsonb("architecture").default("{}"),
+}, (table) => [
+  index("idx_neural_feedback_agent").on(table.agentId),
+  index("idx_neural_feedback_sentiment").on(table.sentiment),
+  index("idx_neural_feedback_timestamp").on(desc(table.timestamp)),
+]);
