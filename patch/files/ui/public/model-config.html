@@ -87,6 +87,7 @@ tr:hover{background:#1c2128}
 <div class="tabs">
   <div class="tab active" data-tab="ai-models">AI Models</div>
   <div class="tab" data-tab="ig-trading">IG Trading</div>
+  <div class="tab" data-tab="neural-learning">Neural Learning</div>
 </div>
 
 <div id="tab-ai-models" class="tab-content active">
@@ -185,6 +186,35 @@ tr:hover{background:#1c2128}
     <div class="section-title"><span class="section-icon">&#9889;</span> Streaming Status</div>
     <div class="card" id="streamingCard">
       <p class="empty">Loading streaming status...</p>
+    </div>
+  </div>
+</div>
+
+<div id="tab-neural-learning" class="tab-content">
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#129504;</span> Neural Feedback Status</div>
+    <div class="card" id="nfStatusCard"><p class="empty">Loading...</p></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#128200;</span> Sentiment Breakdown</div>
+    <div id="nfSentimentCard" style="display:flex;gap:12px;flex-wrap:wrap"></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#128101;</span> Per-Agent Patterns</div>
+    <div id="nfAgentPatterns"><p class="empty">Loading...</p></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#128203;</span> Recent Interactions</div>
+    <div id="nfHistory"><p class="empty">Loading...</p></div>
+  </div>
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#9881;&#65039;</span> Actions</div>
+    <div class="card">
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btnNfSync">Sync DB &amp; File</button>
+        <button class="btn btn-secondary" id="btnNfReplay">Replay Preferences to Brain</button>
+        <button class="btn btn-secondary" id="btnNfRefresh">Refresh</button>
+      </div>
     </div>
   </div>
 </div>

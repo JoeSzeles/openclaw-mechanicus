@@ -6,22 +6,6 @@
       "message": "Pipeline test alert",
       "level": "info",
       "channel": "default",
-      "timestamp": "2026-03-08T07:00:34.725Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test-target",
-      "message": "Pipeline stub test",
-      "level": "debug",
-      "channel": "default",
-      "timestamp": "2026-03-08T07:00:34.931Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test",
-      "message": "Pipeline test alert",
-      "level": "info",
-      "channel": "default",
       "timestamp": "2026-03-08T07:00:46.999Z"
     },
     {
@@ -3999,6 +3983,22 @@
       "level": "debug",
       "channel": "default",
       "timestamp": "2026-03-14T09:21:52.024Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-14T09:25:35.119Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-14T09:25:35.196Z"
     }
   ]
 }

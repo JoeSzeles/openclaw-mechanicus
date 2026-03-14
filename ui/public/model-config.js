@@ -48,6 +48,7 @@ for (var i = 0; i < tabs.length; i++) {
     this.classList.add('active');
     document.getElementById('tab-' + target).classList.add('active');
     if (target === 'ig-trading') loadIgConfig();
+    if (target === 'neural-learning') loadNeuralFeedback();
   });
 }
 
@@ -474,6 +475,192 @@ document.getElementById('btnSaveDemo').addEventListener('click', function() { sa
 document.getElementById('btnTestDemo').addEventListener('click', function() { testConnection('demo'); });
 document.getElementById('btnSaveLive').addEventListener('click', function() { saveProfile('live'); });
 document.getElementById('btnTestLive').addEventListener('click', function() { testConnection('live'); });
+
+var _nfRefreshTimer = null;
+
+function loadNeuralFeedback() {
+  if (_nfRefreshTimer) clearInterval(_nfRefreshTimer);
+  Promise.all([
+    apiFetch('/api/neural-feedback/status').then(function(r) { return r.json(); }).catch(function() { return null; }),
+    apiFetch('/api/neural-feedback/history?limit=20').then(function(r) { return r.json(); }).catch(function() { return null; }),
+    apiFetch('/api/neural-feedback/patterns').then(function(r) { return r.json(); }).catch(function() { return null; })
+  ]).then(function(results) {
+    renderNfStatus(results[0]);
+    renderNfSentiment(results[0]);
+    renderNfAgentPatterns(results[2]);
+    renderNfHistory(results[1]);
+  }).catch(function(e) {
+    document.getElementById('nfStatusCard').innerHTML = '<p class="empty">Neural feedback not available: ' + escHtml(e.message) + '</p>';
+  });
+  _nfRefreshTimer = setInterval(function() {
+    var tab = document.querySelector('.tab[data-tab="neural-learning"]');
+    if (tab && tab.classList.contains('active')) loadNeuralFeedback();
+    else { clearInterval(_nfRefreshTimer); _nfRefreshTimer = null; }
+  }, 30000);
+}
+
+function renderNfStatus(status) {
+  var el = document.getElementById('nfStatusCard');
+  if (!status) { el.innerHTML = '<p class="empty">Neural feedback system not available</p>'; return; }
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px">';
+  html += '<div><div style="font-size:24px;font-weight:700;color:#e6edf3">' + (status.total || 0) + '</div><div style="font-size:12px;color:#8b949e">Total Interactions</div></div>';
+  html += '<div><div style="font-size:24px;font-weight:700;color:#3fb950">' + (status.positive || 0) + '</div><div style="font-size:12px;color:#8b949e">Positive (Sugar)</div></div>';
+  html += '<div><div style="font-size:24px;font-weight:700;color:#f85149">' + (status.negative || 0) + '</div><div style="font-size:12px;color:#8b949e">Negative (Pain)</div></div>';
+  html += '<div><div style="font-size:24px;font-weight:700;color:#8b949e">' + (status.neutral || 0) + '</div><div style="font-size:12px;color:#8b949e">Neutral</div></div>';
+  html += '<div><div style="font-size:24px;font-weight:700;color:#58a6ff">' + (status.memorySize || 0) + '</div><div style="font-size:12px;color:#8b949e">In Memory</div></div>';
+  html += '</div>';
+  if (status.lastFeedback) {
+    var ts = status.lastFeedback.timestamp ? new Date(status.lastFeedback.timestamp).toLocaleString() : 'unknown';
+    html += '<div style="margin-top:12px;font-size:12px;color:#8b949e">Last feedback: ' + escHtml(ts) + ' (' + escHtml(status.lastFeedback.sentiment || '?') + ')</div>';
+  }
+  html += '<div style="margin-top:8px"><span class="badge ' + (status.dbConfigured ? 'badge-primary' : 'badge-warn') + '">' + (status.dbConfigured ? 'DB Connected' : 'File-only mode') + '</span></div>';
+  el.innerHTML = html;
+}
+
+function renderNfSentiment(status) {
+  var el = document.getElementById('nfSentimentCard');
+  if (!status || !status.total) { el.innerHTML = '<div class="card" style="flex:1"><p class="empty">No data yet — interact with agents to start training</p></div>'; return; }
+  var total = status.total || 1;
+  var pPct = Math.round((status.positive || 0) / total * 100);
+  var nPct = Math.round((status.negative || 0) / total * 100);
+  var uPct = 100 - pPct - nPct;
+
+  var html = '<div class="card" style="flex:1;min-width:200px">';
+  html += '<div class="card-title">Sentiment Distribution</div>';
+  html += '<div style="display:flex;height:24px;border-radius:4px;overflow:hidden;margin:8px 0">';
+  if (pPct > 0) html += '<div style="width:' + pPct + '%;background:#238636" title="Positive ' + pPct + '%"></div>';
+  if (nPct > 0) html += '<div style="width:' + nPct + '%;background:#da3633" title="Negative ' + nPct + '%"></div>';
+  if (uPct > 0) html += '<div style="width:' + uPct + '%;background:#30363d" title="Neutral ' + uPct + '%"></div>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:16px;font-size:12px;color:#8b949e">';
+  html += '<span style="color:#3fb950">Positive ' + pPct + '%</span>';
+  html += '<span style="color:#f85149">Negative ' + nPct + '%</span>';
+  html += '<span>Neutral ' + uPct + '%</span>';
+  html += '</div></div>';
+
+  html += '<div class="card" style="flex:1;min-width:200px">';
+  html += '<div class="card-title">Learning Quality</div>';
+  var ratio = status.positive && status.negative ? (status.positive / status.negative).toFixed(1) : (status.positive ? 'all positive' : (status.negative ? 'all negative' : 'n/a'));
+  html += '<div class="card-row"><span class="card-label">Pos/Neg ratio:</span><span class="card-value">' + ratio + '</span></div>';
+  html += '<div class="card-row"><span class="card-label">Data richness:</span><span class="card-value">' + (total >= 50 ? 'Good' : total >= 10 ? 'Building up' : 'Low — keep interacting') + '</span></div>';
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+function renderNfAgentPatterns(patterns) {
+  var el = document.getElementById('nfAgentPatterns');
+  if (!patterns || !patterns.totalAnalyzed) { el.innerHTML = '<p class="empty">No agent patterns yet</p>'; return; }
+  var agents = patterns.byAgent || {};
+  var keys = Object.keys(agents);
+  if (!keys.length) { el.innerHTML = '<p class="empty">No per-agent data</p>'; return; }
+
+  var html = '<table><tr><th>Agent</th><th>Interactions</th><th>Positive</th><th>Negative</th><th>Trend</th></tr>';
+  keys.sort(function(a, b) { return (agents[b].total || 0) - (agents[a].total || 0); });
+  for (var i = 0; i < keys.length; i++) {
+    var a = agents[keys[i]];
+    var t = a.total || 0;
+    var p = a.positive || 0;
+    var n = a.negative || 0;
+    var trend = p > n ? 'Liked' : p < n ? 'Disliked' : 'Neutral';
+    var trendColor = p > n ? '#3fb950' : p < n ? '#f85149' : '#8b949e';
+    html += '<tr><td style="font-weight:500;color:#e6edf3">' + escHtml(keys[i]) + '</td>';
+    html += '<td>' + t + '</td>';
+    html += '<td style="color:#3fb950">' + p + '</td>';
+    html += '<td style="color:#f85149">' + n + '</td>';
+    html += '<td style="color:' + trendColor + ';font-weight:500">' + trend + '</td></tr>';
+  }
+  html += '</table>';
+
+  var fp = patterns.featurePatterns || {};
+  var fKeys = Object.keys(fp);
+  if (fKeys.length) {
+    html += '<div style="margin-top:16px"><div class="card-title" style="margin-bottom:8px">Feature Patterns (liked responses tend to have...)</div>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    for (var fi = 0; fi < fKeys.length; fi++) {
+      var fv = fp[fKeys[fi]];
+      if (typeof fv === 'object' && fv.avgPositive != null) {
+        var diff = (fv.avgPositive || 0) - (fv.avgNegative || 0);
+        if (Math.abs(diff) > 0.1) {
+          var dir = diff > 0 ? 'Higher' : 'Lower';
+          var col = diff > 0 ? '#3fb950' : '#f85149';
+          html += '<span class="badge" style="background:rgba(255,255,255,.05);color:' + col + ';border:1px solid ' + col + '30">' + escHtml(fKeys[fi]) + ': ' + dir + '</span>';
+        }
+      }
+    }
+    html += '</div></div>';
+  }
+
+  el.innerHTML = html;
+}
+
+function renderNfHistory(history) {
+  var el = document.getElementById('nfHistory');
+  if (!history || !history.records || !history.records.length) { el.innerHTML = '<p class="empty">No interactions recorded yet</p>'; return; }
+  var records = history.records;
+
+  var html = '<table><tr><th>Time</th><th>Agent</th><th>Sentiment</th><th>Brain Signal</th><th>Text</th></tr>';
+  for (var i = 0; i < records.length && i < 20; i++) {
+    var r = records[i];
+    var ts = r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '?';
+    var sentColor = r.sentiment === 'positive' ? '#3fb950' : r.sentiment === 'negative' ? '#f85149' : '#8b949e';
+    var sentLabel = r.sentiment === 'positive' ? 'Sugar' : r.sentiment === 'negative' ? 'Pain' : 'Neutral';
+
+    var brainSig = '';
+    if (r.brainResponse) {
+      var br = r.brainResponse;
+      if (br.buy_signal || br.sell_signal || br.hold_signal) {
+        var signals = [];
+        if (br.buy_signal) signals.push('B:' + br.buy_signal);
+        if (br.sell_signal) signals.push('S:' + br.sell_signal);
+        if (br.hold_signal) signals.push('H:' + br.hold_signal);
+        brainSig = signals.join(' ');
+      } else { brainSig = '-'; }
+    } else { brainSig = '-'; }
+
+    var text = (r.rawText || '').slice(0, 60);
+    if ((r.rawText || '').length > 60) text += '...';
+
+    html += '<tr>';
+    html += '<td style="white-space:nowrap">' + escHtml(ts) + '</td>';
+    html += '<td>' + escHtml(r.agentId || '?') + '</td>';
+    html += '<td style="color:' + sentColor + ';font-weight:500">' + sentLabel + '</td>';
+    html += '<td style="font-family:monospace;font-size:11px">' + escHtml(brainSig) + '</td>';
+    html += '<td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(r.rawText || '') + '">' + escHtml(text) + '</td>';
+    html += '</tr>';
+  }
+  html += '</table>';
+  if (history.total > 20) html += '<div style="margin-top:8px;font-size:12px;color:#8b949e">Showing 20 of ' + history.total + ' interactions</div>';
+  el.innerHTML = html;
+}
+
+document.getElementById('btnNfSync').addEventListener('click', function() {
+  this.disabled = true; this.textContent = 'Syncing...';
+  var btn = this;
+  apiFetch('/api/neural-feedback/sync', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false; btn.textContent = 'Sync DB & File';
+      if (data.ok) { showToast('Neural feedback synced (total: ' + (data.stats ? data.stats.total : '?') + ')', 'success'); loadNeuralFeedback(); }
+      else showToast('Sync failed', 'error');
+    }).catch(function(e) { btn.disabled = false; btn.textContent = 'Sync DB & File'; showToast('Error: ' + e.message, 'error'); });
+});
+
+document.getElementById('btnNfReplay').addEventListener('click', function() {
+  this.disabled = true; this.textContent = 'Replaying...';
+  var btn = this;
+  apiFetch('/api/neural-feedback/replay', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false; btn.textContent = 'Replay Preferences to Brain';
+      showToast('Replayed ' + (data.replayed || 0) + ' preference interactions to brain', 'success');
+    }).catch(function(e) { btn.disabled = false; btn.textContent = 'Replay Preferences to Brain'; showToast('Error: ' + e.message, 'error'); });
+});
+
+document.getElementById('btnNfRefresh').addEventListener('click', function() {
+  loadNeuralFeedback();
+  showToast('Neural feedback refreshed', 'success');
+});
 
 loadConfig();
 loadIgConfig();
