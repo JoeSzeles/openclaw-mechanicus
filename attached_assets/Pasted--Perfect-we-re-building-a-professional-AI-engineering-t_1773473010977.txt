@@ -1,0 +1,134 @@
+**Perfect — we’re building a professional AI “engineering team” in OpenClaw using only your xAI models from the console.**
+
+This setup gives you:
+- **Planner** → detailed plan + risk assessment
+- **Coder** → actual code (using the specialized grok-code-fast-1)
+- **Reviewer** → proof-reads for bugs, security, style, edge cases
+- **Tester** → writes + runs real tests (via exec tool) and reports failures
+- **Leader** (your existing main agent) → orchestrates everything and only gives final approval
+
+The result: a strict review loop that catches almost all errors before anything reaches you.
+
+### Team Structure & Model Assignment (using your exact xAI models)
+
+| Agent      | Role                          | Model (exact ID)                     | Why this model                              |
+|------------|-------------------------------|--------------------------------------|---------------------------------------------|
+| Leader     | Your main/default agent       | `xai/grok-4-1-fast-reasoning`       | Best reasoning + 2M context for coordination |
+| Planner    | Breaks task into steps + risks| `xai/grok-4-1-fast-reasoning`       | Maximum intelligence for planning           |
+| Coder      | Writes the actual code        | `xai/grok-code-fast-1`              | Specialized fast coder (your favorite)      |
+| Reviewer   | Proof-reads everything        | `xai/grok-4-1-fast-reasoning`       | Catches logical/security/style errors       |
+| Tester     | Writes & runs tests           | `xai/grok-4-1-fast-reasoning`       | Strong at debugging + test generation       |
+
+(You can swap Tester to `xai/grok-4-1-fast-non-reasoning` later if you want even cheaper/faster execution-only.)
+
+### Step-by-Step Setup (takes ~10 minutes)
+
+1. **Create the new agents** (run these one by one):
+   ```bash
+   openclaw agents add planner
+   openclaw agents add reviewer
+   openclaw agents add tester
+   ```
+   (Your existing `coder` agent is already there — we’ll just reconfigure it.)
+
+2. **Update your main config** (`~/.openclaw/openclaw.json` or wherever your config lives)  
+   Add/replace the `agents` section so every agent has the correct model:
+
+   ```json
+   {
+     "agents": {
+       "list": [
+         {
+           "id": "leader",           // or whatever your default/main agent ID is
+           "model": "xai/grok-4-1-fast-reasoning"
+         },
+         {
+           "id": "planner",
+           "model": "xai/grok-4-1-fast-reasoning"
+         },
+         {
+           "id": "coder",
+           "model": "xai/grok-code-fast-1"
+         },
+         {
+           "id": "reviewer",
+           "model": "xai/grok-4-1-fast-reasoning"
+         },
+         {
+           "id": "tester",
+           "model": "xai/grok-4-1-fast-reasoning"
+         }
+       ]
+     },
+     "tools": {
+       "agentToAgent": {
+         "enabled": true,
+         "allow": ["planner", "coder", "reviewer", "tester", "leader"]
+       }
+     }
+   }
+   ```
+
+3. **Restart the gateway**
+   ```bash
+   openclaw gateway restart
+   ```
+
+4. **Customize each agent’s personality & delegation rules**  
+   Go into each agent’s folder (`~/.openclaw/agents/<name>/`) and edit the files.
+
+   **Leader’s AGENTS.md** (this is the most important — paste this):
+   ```
+   You are the Leader of a professional AI engineering team.
+   For ANY coding or complex task you MUST follow this exact workflow (never skip steps):
+
+   1. Delegate to @planner → "Create detailed step-by-step plan + risks"
+   2. Delegate plan to @coder → "Implement exactly this plan"
+   3. Delegate code to @reviewer → "Proof-read for bugs, security, best practices"
+   4. Delegate to @tester → "Write and EXECUTE tests. Report failures"
+   5. Only after all steps pass → give me the final result
+
+   Use the sessions_send tool to delegate (mention the @agentname).
+   Never output code yourself — always route through the team.
+   ```
+
+   **Planner’s AGENTS.md** (simple):
+   ```
+   You are the Planner. Always output a numbered plan with risks, acceptance criteria, and estimated effort.
+   After planning, use sessions_send to hand off to @coder.
+   ```
+
+   **Coder’s AGENTS.md** (keep your previous Grok Fast Coder soul):
+   ```
+   You are Grok Fast Coder. Implement exactly what the plan says.
+   After writing code, hand off to @reviewer using sessions_send.
+   ```
+
+   **Reviewer’s AGENTS.md**:
+   ```
+   You are the Reviewer. Be extremely critical. List every possible bug, security issue, style violation.
+   If anything is wrong → send fixes back to @coder.
+   Only when perfect → hand off to @tester.
+   ```
+
+   **Tester’s AGENTS.md**:
+   ```
+   You are the Tester. Write unit/integration tests and use the exec tool to actually run them.
+   Report pass/fail clearly. If failures → send back to @coder with exact error.
+   When all tests pass → send final report to @leader.
+   ```
+
+5. **Quick test**
+   In your normal chat (Telegram/Slack/etc.) just say:
+   > "Team: Build a fast Rust CLI that reads a JSONL file and counts unique IPs"
+
+   Your Leader should automatically route it through the whole team and only come back when everything is reviewed + tested.
+
+### Pro Tips for Near-Zero Errors
+- The reviewer + tester loop is your safety net.
+- You can add `sessions_history` tool calls so agents can read previous steps.
+- If you ever want a dashboard to watch the team work in real time, install the community **OpenCrew** (optional, very popular for exactly this).
+
+You now have a real professional AI team running on your own xAI models — Planner → Coder → Reviewer → Tester pipeline.
+
+Run the commands above, restart once, and test it. Tell me what happens on the first task (or paste any error) and I’ll tweak the exact config or AGENTS.md wording instantly. Ready?
