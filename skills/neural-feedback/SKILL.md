@@ -83,6 +83,29 @@ Replays stored trading patterns through the brain to restore trading knowledge a
 - **Backups**: `~/.openclaw/backups/neural-feedback-YYYY-MM-DD.json` (daily, 30-day retention)
 - **Startup sync**: DB and file are compared and merged on every boot
 
+### GET /api/neural-feedback/preference-summary
+Returns the brain's learned preference summary and the preference context string that gets injected into agent messages.
+
+## Brain→Agent Communication Loop
+
+The brain learns from user feedback (sugar/pain), but it must also communicate those learned preferences back to agents. This is implemented through three mechanisms:
+
+### 1. WS Proxy Context Injection (Real-time)
+When a user sends a chat message, the WS proxy intercepts the `chat.send` frame and appends the brain's learned preference context directly to the user message before forwarding to the gateway. The agent sees the preference memory alongside each user message.
+
+### 2. PREFERENCES.md Workspace File (Persistent)
+After each non-neutral feedback interaction, the system writes/updates `.openclaw/workspace/PREFERENCES.md` with the current preference summary and brain motor signals. The gateway reads this as a bootstrap file, so the agent sees preferences even in new sessions.
+
+### 3. Brain Motor Rate Query (Live Neural Signal)
+The `queryBrainMotorRates()` function queries the brain engine's `/observe` endpoint to get current motor neuron firing rates. These rates represent the spiking network's actual learned output — shaped by all accumulated sugar/pain feedback — and are included in the PREFERENCES.md file.
+
+### Key Functions
+- `getPreferenceSummary()` — analyzes feedback history to extract preference insights (code preference, response length, proactivity, etc.)
+- `buildPreferenceContext()` — generates human-readable preference context string from the summary
+- `queryBrainMotorRates()` — queries brain engine `/observe` for live motor rates
+- `buildFullPreferenceContext()` — combines preference context + brain motor signals
+- `writePreferencesFile()` — writes the full context to `.openclaw/workspace/PREFERENCES.md`
+
 ## Agent Integration
 
 All agents share the same preference neurons. Each interaction is tagged with the agent's ID, allowing per-agent analysis while training a unified preference model. The brain's motor outputs (buy/sell/hold signals) during preference stimulation provide a secondary signal about how preferences relate to trading decisions.
