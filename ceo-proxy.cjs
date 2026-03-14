@@ -6341,55 +6341,31 @@ server.on("upgrade", (req, socket, head) => {
       gwQueue.length = 0;
     });
     gwWs.on("message", (data, isBinary) => {
-      if (browserWs.readyState === 1) {
-        try {
-          browserWs.send(data, { binary: isBinary });
-        } catch (e) {
-          console.error("[ws-proxy] Failed to send to browser:", e.message);
-        }
-      } else {
-        console.error("[ws-proxy] Browser WS not open (state=" + browserWs.readyState + "), dropping gateway frame");
-      }
-      if (!isBinary) {
-        try {
-          const txt = data.toString();
-          const f = JSON.parse(txt);
-          if (f.type === "res" && f.id && (f.ok !== undefined)) {
-            console.log("[ws-proxy:gw→browser] res id=" + f.id + " ok=" + f.ok + " payloadKeys=" + (f.payload ? Object.keys(f.payload).join(",") : "none") + " runId=" + (f.payload?.runId || "none"));
-          }
-          if (f.type === "event" && f.event === "chat" && f.payload) {
-            const pm = f.payload.message;
-            if (pm && pm.role === "assistant") {
-              console.log("[ws-proxy:gw→browser] assistant " + (f.payload.state || "?") + " forwarded (" + txt.length + " bytes, browserState=" + browserWs.readyState + ") runId=" + (f.payload.runId || "none") + " sessionKey=" + (f.payload.sessionKey || "none"));
-            }
-          }
-        } catch (_) {}
-      }
+      try { if (browserWs.readyState === 1) browserWs.send(data, { binary: isBinary }); } catch (_) {}
     });
     browserWs.on("message", (data, isBinary) => {
       let finalData = data;
       let finalOpts = { binary: isBinary };
-      if (!isBinary && GATEWAY_TOKEN) {
+      if (!isBinary) {
         try {
           const txt = data.toString();
           const frame = JSON.parse(txt);
-          if (frame.type === "req" && frame.method === "connect" && frame.params) {
-            if (!frame.params.auth) frame.params.auth = {};
-            frame.params.auth.token = GATEWAY_TOKEN;
-            delete frame.params.device;
-            finalData = JSON.stringify(frame);
-            finalOpts = { binary: false };
-            console.log("[ws-proxy] Normalized browser connect frame (token set, device stripped)");
-          }
           if (frame.type === "req" && frame.method === "chat.send" && frame.params) {
             const userMsg = typeof frame.params.message === "string" ? frame.params.message : "";
-            console.log(`[ws-proxy:debug] chat.send id=${frame.id} idempotencyKey=${frame.params.idempotencyKey || "none"} sessionKey=${frame.params.sessionKey || "none"}`);
             if (userMsg) {
-              console.log(`[neural-feedback:intercept] user chat.send: "${userMsg.slice(0, 80)}"`);
+              const originalUserMsg = userMsg;
+              console.log(`[neural-feedback:intercept] user chat.send: "${originalUserMsg.slice(0, 80)}"`);
               if (_lastAgentResponse) {
-                processNeuralFeedback(userMsg, "user").catch((e) => { console.error("[neural-feedback] intercept error:", e.message); });
+                processNeuralFeedback(originalUserMsg, "user").catch((e) => { console.error("[neural-feedback] intercept error:", e.message); });
               } else {
                 console.log("[neural-feedback:intercept] no _lastAgentResponse yet — skipping");
+              }
+              const prefCtx = buildPreferenceContext();
+              if (prefCtx) {
+                frame.params.message = originalUserMsg + "\n\n---\n" + prefCtx;
+                finalData = JSON.stringify(frame);
+                finalOpts = { binary: false };
+                console.log("[neural-feedback:inject] Injected preference context (" + prefCtx.length + " chars) into chat.send");
               }
             }
           }
