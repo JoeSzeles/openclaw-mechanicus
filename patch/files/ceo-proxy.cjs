@@ -6101,12 +6101,22 @@ server.on("upgrade", (req, socket, head) => {
     socket.destroy();
     return;
   }
+  let wsPath = req.url;
+  if (GATEWAY_TOKEN && !wsPath.includes("_token=")) {
+    wsPath += (wsPath.includes("?") ? "&" : "?") + "_token=" + encodeURIComponent(GATEWAY_TOKEN);
+  }
+  const fwdHeaders = { ...req.headers, host: "127.0.0.1:" + GATEWAY_PORT };
+  delete fwdHeaders["x-forwarded-for"];
+  delete fwdHeaders["x-forwarded-proto"];
+  delete fwdHeaders["x-forwarded-host"];
+  delete fwdHeaders["x-real-ip"];
+  delete fwdHeaders["forwarded"];
   const opts = {
     hostname: "127.0.0.1",
     port: GATEWAY_PORT,
-    path: req.url,
+    path: wsPath,
     method: req.method,
-    headers: { ...req.headers, host: "127.0.0.1:" + GATEWAY_PORT },
+    headers: fwdHeaders,
   };
   const p = http.request(opts);
   p.on("upgrade", (pr, ps, ph) => {
@@ -6122,6 +6132,12 @@ server.on("upgrade", (req, socket, head) => {
     socket.on("error", () => ps.destroy());
     ps.on("close", () => socket.destroy());
     socket.on("close", () => ps.destroy());
+  });
+  p.on("response", (pr) => {
+    const statusLine = `HTTP/1.1 ${pr.statusCode} ${pr.statusMessage || ""}\r\n`;
+    const hdrs = Object.entries(pr.headers).map(([k, v]) => `${k}: ${v}`).join("\r\n");
+    socket.write(statusLine + hdrs + "\r\n\r\n");
+    pr.pipe(socket);
   });
   p.on("error", () => socket.destroy());
   p.end();
