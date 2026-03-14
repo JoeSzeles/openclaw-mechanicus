@@ -6354,10 +6354,13 @@ server.on("upgrade", (req, socket, head) => {
         try {
           const txt = data.toString();
           const f = JSON.parse(txt);
+          if (f.type === "res" && f.id && (f.ok !== undefined)) {
+            console.log("[ws-proxy:gw→browser] res id=" + f.id + " ok=" + f.ok + " payloadKeys=" + (f.payload ? Object.keys(f.payload).join(",") : "none") + " runId=" + (f.payload?.runId || "none"));
+          }
           if (f.type === "event" && f.event === "chat" && f.payload) {
             const pm = f.payload.message;
             if (pm && pm.role === "assistant") {
-              console.log("[ws-proxy:gw→browser] assistant " + (f.payload.state || "?") + " forwarded (" + txt.length + " bytes, browserState=" + browserWs.readyState + ")");
+              console.log("[ws-proxy:gw→browser] assistant " + (f.payload.state || "?") + " forwarded (" + txt.length + " bytes, browserState=" + browserWs.readyState + ") runId=" + (f.payload.runId || "none") + " sessionKey=" + (f.payload.sessionKey || "none"));
             }
           }
         } catch (_) {}
@@ -6380,6 +6383,7 @@ server.on("upgrade", (req, socket, head) => {
           }
           if (frame.type === "req" && frame.method === "chat.send" && frame.params) {
             const userMsg = typeof frame.params.message === "string" ? frame.params.message : "";
+            console.log(`[ws-proxy:debug] chat.send id=${frame.id} idempotencyKey=${frame.params.idempotencyKey || "none"} sessionKey=${frame.params.sessionKey || "none"}`);
             if (userMsg) {
               console.log(`[neural-feedback:intercept] user chat.send: "${userMsg.slice(0, 80)}"`);
               if (_lastAgentResponse) {
