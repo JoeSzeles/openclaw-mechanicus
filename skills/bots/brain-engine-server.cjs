@@ -1681,6 +1681,49 @@ function startServer(callback) {
 function getPort() { return actualPort; }
 function getServer() { return server; }
 
+const BRAIN_CRASH_FILE = path.join(DATA_DIR, 'brain-crash-last.json');
+
+function writeCrashReport(type, err) {
+  try {
+    const report = {
+      type,
+      message: err ? (err.message || String(err)) : 'unknown',
+      stack: err ? (err.stack || '') : '',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      heapMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      neurons: N_TOTAL,
+      synapses: synapses ? synapses.length : 0,
+      steps: stepCount,
+      pid: process.pid,
+    };
+    fs.writeFileSync(BRAIN_CRASH_FILE, JSON.stringify(report, null, 2));
+    console.error('[brain-engine] CRASH REPORT written to ' + BRAIN_CRASH_FILE);
+    console.error('[brain-engine] ' + type + ': ' + report.message);
+  } catch (e2) {
+    console.error('[brain-engine] Failed to write crash report:', e2.message);
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  writeCrashReport('uncaughtException', err);
+  try { saveState(); } catch (_) {}
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  writeCrashReport('unhandledRejection', reason);
+  try { saveState(); } catch (_) {}
+  process.exit(1);
+});
+
+process.on('SIGTERM', () => {
+  console.log('[brain-engine] SIGTERM received, saving state...');
+  try { saveState(); } catch (_) {}
+  process.exit(0);
+});
+
 if (require.main === module) {
   startServer();
 }

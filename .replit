@@ -12,6 +12,7 @@ channel = "stable-25_05"
 OPENCLAW_GATEWAY_PORT = "5001"
 OPENCLAW_SKIP_CHANNELS = "1"
 IG_BASE_URL = "https://demo-api.ig.com/gateway/deal"
+BRAIN_API_KEY = "8aa34fc8a42e88a66896c1b5b78ee1558f789e7bb268889034435d0e15323fe6"
 
 [workflows]
 runButton = "Project"

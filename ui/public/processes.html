@@ -50,6 +50,21 @@ tr:hover{background:#1c2128}
 .toast.show{display:block}
 .toast.success{background:#238636;color:#fff}
 .toast.error{background:#da3633;color:#fff}
+.crash-info{font-size:11px;color:#8b949e;margin-top:2px}
+.crash-recent{color:#f85149}
+.crash-old{color:#d29922}
+.crash-none{color:#3fb950}
+.crash-detail-btn{background:#21262d;border:1px solid #30363d;color:#58a6ff;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px}
+.crash-detail-btn:hover{background:#30363d}
+.crash-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center}
+.crash-modal.show{display:flex}
+.crash-modal-inner{background:#161b22;border:1px solid #30363d;border-radius:8px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;padding:20px}
+.crash-modal h3{color:#e6edf3;margin-bottom:12px;font-size:16px}
+.crash-entry{background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px;margin-bottom:8px;font-size:12px}
+.crash-entry .crash-ts{color:#58a6ff;font-weight:600}
+.crash-entry .crash-code{color:#f85149}
+.crash-entry .crash-stderr{font-family:monospace;color:#d29922;white-space:pre-wrap;margin-top:4px;max-height:120px;overflow-y:auto;font-size:11px}
+.crash-close-btn{background:#da3633;border:none;color:#fff;padding:6px 16px;border-radius:4px;cursor:pointer;float:right;font-size:13px}
 </style>
 </head>
 <body>
@@ -71,6 +86,13 @@ tr:hover{background:#1c2128}
 <div id="processList"><p class="empty">Loading...</p></div>
 </div>
 
+<div id="crashModal" class="crash-modal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="crash-modal-inner">
+<button class="crash-close-btn" onclick="document.getElementById('crashModal').classList.remove('show')">Close</button>
+<h3 id="crashModalTitle">Crash History</h3>
+<div id="crashModalBody"></div>
+</div>
+</div>
 <div id="toast" class="toast"></div>
 <script src="/processes.js"></script>
 <script src="/nav-inject.js"></script>

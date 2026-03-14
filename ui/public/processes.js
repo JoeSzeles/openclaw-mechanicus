@@ -118,20 +118,40 @@ function loadBots() {
       el.innerHTML = '<p class="empty">No bots registered \u2014 agents can register bots via POST /api/bots/register</p>';
       return;
     }
-    var html = '<table><tr><th>ID</th><th>Status</th><th>Startup</th><th>PID</th><th>Restarts</th><th>Command</th><th>Added By</th><th>Actions</th></tr>';
+    var html = '<table><tr><th>ID</th><th>Status</th><th>Startup</th><th>PID</th><th>Restarts</th><th>Last Crash</th><th>Command</th><th>Actions</th></tr>';
     for (var i = 0; i < bots.length; i++) {
       var b = bots[i];
       var statusBadge = b.running ? '<span class="badge badge-running">RUNNING</span>'
         : (b.enabled ? '<span class="badge badge-stopped">STOPPED</span>' : '<span class="badge badge-disabled">DISABLED</span>');
       var checked = b.enabled ? ' checked' : '';
+      var crashCell = '';
+      if (b.lastCrash) {
+        var crashDate = new Date(b.lastCrash.timestamp);
+        var crashAgo = Date.now() - crashDate.getTime();
+        var isRecent = crashAgo < 3600000;
+        var crashTimeStr = crashDate.toLocaleDateString() + ' ' + crashDate.toLocaleTimeString();
+        var uptimeStr = b.lastCrash.uptimeMs ? formatUptime(b.lastCrash.uptimeMs) : '?';
+        var codeStr = b.lastCrash.exitCode !== null ? 'code ' + b.lastCrash.exitCode : (b.lastCrash.signal || 'killed');
+        crashCell += '<div class="crash-info ' + (isRecent ? 'crash-recent' : 'crash-old') + '">';
+        crashCell += crashTimeStr + '<br>' + codeStr + ' (up ' + uptimeStr + ')';
+        if (b.lastCrash.stderr && b.lastCrash.stderr.length > 0) {
+          crashCell += '<br><span style="color:#6e7681">' + escHtml(b.lastCrash.stderr[b.lastCrash.stderr.length - 1]).substring(0, 80) + '</span>';
+        }
+        crashCell += '</div>';
+        if (b.totalCrashes > 0) {
+          crashCell += '<button class="crash-detail-btn" data-crash-bot="' + escHtml(b.id) + '">' + b.totalCrashes + ' crash' + (b.totalCrashes > 1 ? 'es' : '') + '</button>';
+        }
+      } else {
+        crashCell = '<span class="crash-none" style="font-size:11px">No crashes</span>';
+      }
       html += '<tr>';
       html += '<td style="font-weight:600;color:#e6edf3">' + escHtml(b.id || '') + '</td>';
       html += '<td>' + statusBadge + '</td>';
       html += '<td><label class="startup-toggle"><input type="checkbox"' + checked + ' data-startup-id="' + escHtml(b.id || '') + '"><span class="startup-label">Auto</span></label></td>';
       html += '<td style="font-family:monospace">' + escHtml(String(b.pid || '-')) + '</td>';
       html += '<td>' + escHtml(String(b.restarts || 0)) + '</td>';
+      html += '<td>' + crashCell + '</td>';
       html += '<td><span class="cmd" title="' + escHtml(b.cmd || '') + '">' + escHtml(b.cmd || '') + '</span></td>';
-      html += '<td style="font-size:12px;color:#8b949e">' + escHtml(b.addedBy || '-') + '</td>';
       html += '<td><div class="btn-actions">';
       if (b.running) {
         html += '<button class="btn-stop" data-bot-id="' + escHtml(b.id || '') + '" data-action="stop">Stop</button>';
@@ -213,6 +233,57 @@ document.getElementById('botList').addEventListener('change', function(e) {
   if (!cb) return;
   var id = cb.getAttribute('data-startup-id');
   toggleStartup(id, cb.checked);
+});
+
+function formatUptime(ms) {
+  if (ms < 60000) return Math.round(ms / 1000) + 's';
+  if (ms < 3600000) return Math.round(ms / 60000) + 'm';
+  var h = Math.floor(ms / 3600000);
+  var m = Math.round((ms % 3600000) / 60000);
+  return h + 'h ' + m + 'm';
+}
+
+function showCrashHistory(botId) {
+  var modal = document.getElementById('crashModal');
+  var title = document.getElementById('crashModalTitle');
+  var body = document.getElementById('crashModalBody');
+  title.textContent = 'Crash History — ' + botId;
+  body.innerHTML = '<p class="empty">Loading...</p>';
+  modal.classList.add('show');
+  apiFetch('/api/bots/' + encodeURIComponent(botId) + '/crashes').then(function(res) {
+    return res.json();
+  }).then(function(data) {
+    var crashes = data.crashes || [];
+    if (crashes.length === 0) {
+      body.innerHTML = '<p class="empty">No crash records</p>';
+      return;
+    }
+    var html = '';
+    for (var i = crashes.length - 1; i >= 0; i--) {
+      var c = crashes[i];
+      var d = new Date(c.timestamp);
+      var codeStr = c.exitCode !== null ? 'Exit code: ' + c.exitCode : (c.signal ? 'Signal: ' + c.signal : 'Killed (no code)');
+      var uptimeStr = c.uptimeMs ? formatUptime(c.uptimeMs) : 'unknown';
+      html += '<div class="crash-entry">';
+      html += '<span class="crash-ts">' + d.toLocaleDateString() + ' ' + d.toLocaleTimeString() + '</span>';
+      html += ' &mdash; <span class="crash-code">' + escHtml(codeStr) + '</span>';
+      html += ' &mdash; Uptime: ' + uptimeStr;
+      if (c.stderr && c.stderr.length > 0) {
+        html += '<div class="crash-stderr">' + c.stderr.map(function(l) { return escHtml(l); }).join('\n') + '</div>';
+      }
+      html += '</div>';
+    }
+    body.innerHTML = html;
+  }).catch(function(e) {
+    body.innerHTML = '<p class="empty" style="color:#f85149">Failed to load: ' + escHtml(e.message) + '</p>';
+  });
+}
+
+document.getElementById('botList').addEventListener('click', function(e) {
+  var crashBtn = e.target.closest('[data-crash-bot]');
+  if (crashBtn) {
+    showCrashHistory(crashBtn.getAttribute('data-crash-bot'));
+  }
 });
 
 refresh();

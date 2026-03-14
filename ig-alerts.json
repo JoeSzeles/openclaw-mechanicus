@@ -3903,6 +3903,54 @@
       "level": "debug",
       "channel": "default",
       "timestamp": "2026-03-13T08:55:07.302Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-14T06:07:33.224Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-14T06:07:33.835Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-14T06:50:51.646Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-14T06:50:51.792Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-14T06:55:28.978Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-14T06:55:29.058Z"
     }
   ]
 }

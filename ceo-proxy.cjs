@@ -94,7 +94,11 @@ function isLoginExempt(req) {
       p.startsWith("/api/bots") || p.startsWith("/api/processes")) {
     if (hasValidBearerToken(req)) return true;
   }
-  if (p.startsWith("/api/brain")) return true;
+  if (p.startsWith("/api/brain")) {
+    const brainKey = req.headers["x-brain-api-key"];
+    if (brainKey && process.env.BRAIN_API_KEY && brainKey === process.env.BRAIN_API_KEY) return true;
+    return false;
+  }
   if (p.startsWith("/__openclaw__/canvas/")) return true;
   if (p === "/nav-inject.js") return true;
   return false;
@@ -3564,6 +3568,24 @@ function saveBotRegistry(registry) {
   fs.writeFileSync(BOT_REGISTRY_FILE, JSON.stringify(registry, null, 2));
 }
 
+const _botStderrBuffers = {};
+const _botCrashHistory = {};
+const BOT_CRASH_LOG_PATH = path.join(DATA_DIR, "bot-crash-log.json");
+
+function loadCrashHistory() {
+  try {
+    if (fs.existsSync(BOT_CRASH_LOG_PATH)) {
+      const data = JSON.parse(fs.readFileSync(BOT_CRASH_LOG_PATH, "utf8"));
+      Object.assign(_botCrashHistory, data);
+    }
+  } catch (_) {}
+}
+loadCrashHistory();
+
+function saveCrashHistory() {
+  try { fs.writeFileSync(BOT_CRASH_LOG_PATH, JSON.stringify(_botCrashHistory, null, 2)); } catch (_) {}
+}
+
 function spawnBot(bot) {
   if (botProcesses.has(bot.id) && botProcesses.get(bot.id).proc && !botProcesses.get(bot.id).proc.killed) {
     return;
@@ -3580,10 +3602,30 @@ function spawnBot(bot) {
   });
   const entry = { proc, bot, restarts: 0, lastStart: Date.now(), backoff: 5000 };
   botProcesses.set(bot.id, entry);
+  if (!_botStderrBuffers[bot.id]) _botStderrBuffers[bot.id] = [];
   proc.stdout.on("data", (d) => process.stdout.write(`[${bot.id}] ${d}`));
-  proc.stderr.on("data", (d) => process.stderr.write(`[${bot.id}] ${d}`));
-  proc.on("exit", (code) => {
-    console.log(`[bot-mgr] Bot ${bot.id} exited with code ${code}`);
+  proc.stderr.on("data", (d) => {
+    process.stderr.write(`[${bot.id}] ${d}`);
+    const lines = d.toString().split("\n").filter(l => l.trim());
+    const buf = _botStderrBuffers[bot.id];
+    for (const line of lines) buf.push(line);
+    while (buf.length > 30) buf.shift();
+  });
+  proc.on("exit", (code, signal) => {
+    const uptimeMs = Date.now() - (entry.lastStart || Date.now());
+    console.log(`[bot-mgr] Bot ${bot.id} exited with code ${code}${signal ? ' signal=' + signal : ''} (uptime ${Math.round(uptimeMs / 1000)}s)`);
+    if (!_botCrashHistory[bot.id]) _botCrashHistory[bot.id] = [];
+    const crashRecord = {
+      timestamp: new Date().toISOString(),
+      exitCode: code,
+      signal: signal || null,
+      uptimeMs,
+      stderr: (_botStderrBuffers[bot.id] || []).slice(-20),
+    };
+    _botCrashHistory[bot.id].push(crashRecord);
+    while (_botCrashHistory[bot.id].length > 50) _botCrashHistory[bot.id].shift();
+    saveCrashHistory();
+    _botStderrBuffers[bot.id] = [];
     const registry = loadBotRegistry();
     const current = registry.find(b => b.id === bot.id);
     if (!current || !current.enabled) {
@@ -3660,6 +3702,8 @@ async function handleBotsApi(req, res, p) {
     const bots = registry.map(b => {
       const entry = botProcesses.get(b.id);
       const running = !!(entry && entry.proc && !entry.proc.killed);
+      const crashes = _botCrashHistory[b.id] || [];
+      const lastCrash = crashes.length > 0 ? crashes[crashes.length - 1] : null;
       return {
         id: b.id,
         cmd: b.cmd,
@@ -3667,11 +3711,27 @@ async function handleBotsApi(req, res, p) {
         running,
         pid: running ? entry.proc.pid : null,
         restarts: entry ? entry.restarts : 0,
+        totalCrashes: crashes.length,
+        lastCrash: lastCrash ? { timestamp: lastCrash.timestamp, exitCode: lastCrash.exitCode, signal: lastCrash.signal, uptimeMs: lastCrash.uptimeMs, stderr: (lastCrash.stderr || []).slice(-5) } : null,
         addedBy: b.addedBy || "unknown",
         addedAt: b.addedAt || null,
       };
     });
     return json(res, 200, { bots });
+  }
+
+  if (req.method === "GET" && (p === "/api/bots/crashes" || p.match(/^\/api\/bots\/([^/]+)\/crashes$/))) {
+    const idMatch2 = p.match(/^\/api\/bots\/([^/]+)\/crashes$/);
+    if (idMatch2) {
+      const botId = decodeURIComponent(idMatch2[1]);
+      return json(res, 200, { botId, crashes: _botCrashHistory[botId] || [] });
+    }
+    const url2 = new URL(req.url, "http://localhost");
+    const filterBot = url2.searchParams.get("botId");
+    if (filterBot) {
+      return json(res, 200, { botId: filterBot, crashes: _botCrashHistory[filterBot] || [] });
+    }
+    return json(res, 200, { crashes: _botCrashHistory });
   }
 
   if (req.method === "POST" && p === "/api/bots/register") {
@@ -5058,6 +5118,12 @@ async function handleApi(req, res) {
   }
 
   if (p.startsWith("/api/brain/") || p === "/api/brain") {
+    const brainApiKey = process.env.BRAIN_API_KEY;
+    if (brainApiKey) {
+      const hasSession = validateLoginSession(req);
+      const hasKey = req.headers["x-brain-api-key"] === brainApiKey;
+      if (!hasSession && !hasKey) return json(res, 403, { error: "Brain API requires session auth or x-brain-api-key header" }), true;
+    }
     const brainPortFile = path.join(DATA_DIR, "brain-engine-port");
     let brainPort = 0;
     try { brainPort = parseInt(fs.readFileSync(brainPortFile, "utf8").trim()); } catch (_) {}
