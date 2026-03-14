@@ -196,6 +196,50 @@ async function buildFullPreferenceContext() {
   return ctx;
 }
 
+async function ensurePreferencesTable() {
+  const pool = getNfPool();
+  if (!pool) return;
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS preferences_backup (
+      id SERIAL PRIMARY KEY,
+      content TEXT NOT NULL,
+      interaction_count INTEGER DEFAULT 0,
+      positive_count INTEGER DEFAULT 0,
+      negative_count INTEGER DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`);
+  } catch (e) { console.error("[neural-feedback] preferences_backup table create failed:", e.message); }
+}
+let _prefsTableReady = false;
+
+async function backupPreferencesToDb(content) {
+  const pool = getNfPool();
+  if (!pool) return;
+  try {
+    if (!_prefsTableReady) { await ensurePreferencesTable(); _prefsTableReady = true; }
+    await pool.query(
+      `INSERT INTO preferences_backup (content, interaction_count, positive_count, negative_count) VALUES ($1, $2, $3, $4)`,
+      [content, _nfMemory.stats.total, _nfMemory.stats.positive, _nfMemory.stats.negative]
+    );
+    const cutoff = await pool.query(`SELECT id FROM preferences_backup ORDER BY created_at DESC OFFSET 50 LIMIT 1`);
+    if (cutoff.rows.length > 0) {
+      await pool.query(`DELETE FROM preferences_backup WHERE id <= $1`, [cutoff.rows[0].id]);
+    }
+    console.log("[neural-feedback] PREFERENCES.md backed up to DB");
+  } catch (e) { console.error("[neural-feedback] DB backup of PREFERENCES.md failed:", e.message); }
+}
+
+async function restorePreferencesFromDb() {
+  const pool = getNfPool();
+  if (!pool) return null;
+  try {
+    if (!_prefsTableReady) { await ensurePreferencesTable(); _prefsTableReady = true; }
+    const res = await pool.query(`SELECT content, created_at FROM preferences_backup ORDER BY created_at DESC LIMIT 1`);
+    if (res.rows.length > 0) return res.rows[0];
+  } catch (_) {}
+  return null;
+}
+
 async function writePreferencesFile() {
   try {
     const ctx = await buildFullPreferenceContext();
@@ -206,6 +250,7 @@ async function writePreferencesFile() {
     if (existing !== content) {
       fs.writeFileSync(prefFile, content);
       console.log("[neural-feedback] Updated PREFERENCES.md (" + _nfMemory.stats.total + " interactions)");
+      await backupPreferencesToDb(content);
     }
   } catch (e) { console.error("[neural-feedback] Failed to write PREFERENCES.md:", e.message); }
 }
@@ -5507,6 +5552,41 @@ async function handleApi(req, res) {
     return json(res, 200, { summary, context, preferencesFileWritten: !!context }), true;
   }
 
+  if (p === "/api/neural-feedback/preferences-backups") {
+    const pool = getNfPool();
+    if (!pool) return json(res, 200, { backups: [], dbConfigured: false }), true;
+    try {
+      if (!_prefsTableReady) { await ensurePreferencesTable(); _prefsTableReady = true; }
+      const r = await pool.query(`SELECT id, interaction_count, positive_count, negative_count, created_at FROM preferences_backup ORDER BY created_at DESC LIMIT 20`);
+      return json(res, 200, { backups: r.rows, dbConfigured: true }), true;
+    } catch (e) { return json(res, 500, { error: e.message }), true; }
+  }
+
+  if (p === "/api/neural-feedback/preferences-restore") {
+    if (req.method !== "POST") return json(res, 405, { error: "POST required" }), true;
+    const pool = getNfPool();
+    if (!pool) return json(res, 503, { error: "No database configured" }), true;
+    try {
+      if (!_prefsTableReady) { await ensurePreferencesTable(); _prefsTableReady = true; }
+      const body = await readBody(req);
+      const parsed = JSON.parse(body);
+      const backupId = parsed.id;
+      let row;
+      if (backupId) {
+        const r = await pool.query(`SELECT content, created_at FROM preferences_backup WHERE id = $1`, [backupId]);
+        row = r.rows[0];
+      } else {
+        const r = await pool.query(`SELECT content, created_at FROM preferences_backup ORDER BY created_at DESC LIMIT 1`);
+        row = r.rows[0];
+      }
+      if (!row) return json(res, 404, { error: "No backup found" }), true;
+      const prefFile = path.join(DATA_DIR, "workspace", "PREFERENCES.md");
+      fs.writeFileSync(prefFile, row.content);
+      console.log("[neural-feedback] Restored PREFERENCES.md from DB backup (id=" + (backupId || "latest") + ", date=" + row.created_at + ")");
+      return json(res, 200, { restored: true, date: row.created_at }), true;
+    } catch (e) { return json(res, 500, { error: e.message }), true; }
+  }
+
   if (p === "/api/neural-feedback/history") {
     const limit = parseInt(url.searchParams.get("limit") || "50");
     const agentFilter = url.searchParams.get("agent") || "";
@@ -6333,7 +6413,20 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
   startRegisteredBots();
   setTimeout(async () => {
     try { const sdb = require("./skills/bots/ig-scalper-db.cjs"); await sdb.ensurePriceCandlesTable(); console.log("[startup] price_candles table ready"); } catch (e) { console.log("[startup] price_candles init failed:", e.message); }
-    try { await loadNeuralFeedbackFromDb(); console.log("[startup] Neural feedback: " + _nfMemory.stats.total + " records loaded (pos=" + _nfMemory.stats.positive + " neg=" + _nfMemory.stats.negative + ")"); await writePreferencesFile(); } catch (e) { console.log("[startup] Neural feedback init:", e.message); }
+    try {
+      await loadNeuralFeedbackFromDb();
+      console.log("[startup] Neural feedback: " + _nfMemory.stats.total + " records loaded (pos=" + _nfMemory.stats.positive + " neg=" + _nfMemory.stats.negative + ")");
+      const prefFile = path.join(DATA_DIR, "workspace", "PREFERENCES.md");
+      const prefExists = (() => { try { return fs.readFileSync(prefFile, "utf8").length > 0; } catch (_) { return false; } })();
+      if (!prefExists && _nfMemory.stats.total >= 2) {
+        const dbBackup = await restorePreferencesFromDb();
+        if (dbBackup) {
+          fs.writeFileSync(prefFile, dbBackup.content);
+          console.log("[startup] Restored PREFERENCES.md from DB backup (" + dbBackup.created_at + ")");
+        }
+      }
+      await writePreferencesFile();
+    } catch (e) { console.log("[startup] Neural feedback init:", e.message); }
     await igSessionStartup();
     if (shouldAutoConnectLiveStreaming()) {
       console.log("[startup] Auto-connecting to live streaming (was active before restart)");
