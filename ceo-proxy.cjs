@@ -6341,7 +6341,27 @@ server.on("upgrade", (req, socket, head) => {
       gwQueue.length = 0;
     });
     gwWs.on("message", (data, isBinary) => {
-      try { if (browserWs.readyState === 1) browserWs.send(data, { binary: isBinary }); } catch (_) {}
+      if (browserWs.readyState === 1) {
+        try {
+          browserWs.send(data, { binary: isBinary });
+        } catch (e) {
+          console.error("[ws-proxy] Failed to send to browser:", e.message);
+        }
+      } else {
+        console.error("[ws-proxy] Browser WS not open (state=" + browserWs.readyState + "), dropping gateway frame");
+      }
+      if (!isBinary) {
+        try {
+          const txt = data.toString();
+          const f = JSON.parse(txt);
+          if (f.type === "event" && f.event === "chat" && f.payload) {
+            const pm = f.payload.message;
+            if (pm && pm.role === "assistant") {
+              console.log("[ws-proxy:gw→browser] assistant " + (f.payload.state || "?") + " forwarded (" + txt.length + " bytes, browserState=" + browserWs.readyState + ")");
+            }
+          }
+        } catch (_) {}
+      }
     });
     browserWs.on("message", (data, isBinary) => {
       if (gwOpen && gwWs.readyState === 1) {
