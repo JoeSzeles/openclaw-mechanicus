@@ -6344,8 +6344,11 @@ server.on("upgrade", (req, socket, head) => {
       try { if (browserWs.readyState === 1) browserWs.send(data, { binary: isBinary }); } catch (_) {}
     });
     browserWs.on("message", (data, isBinary) => {
-      let finalData = data;
-      let finalOpts = { binary: isBinary };
+      if (gwOpen && gwWs.readyState === 1) {
+        try { gwWs.send(data, { binary: isBinary }); } catch (_) {}
+      } else {
+        gwQueue.push([data, { binary: isBinary }]);
+      }
       if (!isBinary) {
         try {
           const txt = data.toString();
@@ -6353,28 +6356,15 @@ server.on("upgrade", (req, socket, head) => {
           if (frame.type === "req" && frame.method === "chat.send" && frame.params) {
             const userMsg = typeof frame.params.message === "string" ? frame.params.message : "";
             if (userMsg) {
-              const originalUserMsg = userMsg;
-              console.log(`[neural-feedback:intercept] user chat.send: "${originalUserMsg.slice(0, 80)}"`);
+              console.log(`[neural-feedback:intercept] user chat.send: "${userMsg.slice(0, 80)}"`);
               if (_lastAgentResponse) {
-                processNeuralFeedback(originalUserMsg, "user").catch((e) => { console.error("[neural-feedback] intercept error:", e.message); });
+                processNeuralFeedback(userMsg, "user").catch((e) => { console.error("[neural-feedback] intercept error:", e.message); });
               } else {
                 console.log("[neural-feedback:intercept] no _lastAgentResponse yet — skipping");
-              }
-              const prefCtx = buildPreferenceContext();
-              if (prefCtx) {
-                frame.params.message = originalUserMsg + "\n\n---\n" + prefCtx;
-                finalData = JSON.stringify(frame);
-                finalOpts = { binary: false };
-                console.log("[neural-feedback:inject] Injected preference context (" + prefCtx.length + " chars) into chat.send");
               }
             }
           }
         } catch (_) {}
-      }
-      if (gwOpen && gwWs.readyState === 1) {
-        try { gwWs.send(finalData, finalOpts); } catch (_) {}
-      } else {
-        gwQueue.push([finalData, finalOpts]);
       }
     });
     gwWs.on("close", (code, reason) => {
