@@ -169,10 +169,15 @@ async function stimulateBrainPreference(featureVector, feedback) {
 
 async function processNeuralFeedback(userText, agentId) {
   const { sentiment, score } = classifySentiment(userText);
+  const preview = (userText || "").slice(0, 80);
+  console.log(`[neural-feedback:classify] "${preview}" → ${sentiment} (score=${score.toFixed(2)}) lastResponse=${_lastAgentResponse ? "yes" : "no"}`);
   if (sentiment === "neutral") return null;
 
   const prev = _lastAgentResponse;
-  if (!prev) return null;
+  if (!prev) {
+    console.log("[neural-feedback] Skipped: no previous agent response to score against");
+    return null;
+  }
 
   const featureVector = prev.features || buildFeatureVector(prev.text, prev.agentId);
   const feedback = sentiment === "positive" ? "sugar" : "pain";
@@ -4117,6 +4122,12 @@ function connectGateway() {
           const pm = msg.payload.message;
           const runId = msg.payload.runId || "";
           const evtSessionKey = msg.payload.sessionKey || "";
+          if (pm) {
+            const stateTag = msg.payload.state || "?";
+            const roleTag = pm.role || "?";
+            const preview = (pm.content && Array.isArray(pm.content)) ? pm.content.filter(p => p.type === "text").map(p => (p.text || "").slice(0, 60)).join(" ") : "";
+            console.log(`[ceo-proxy:events] chat ${roleTag}/${stateTag} session=${evtSessionKey.slice(0, 40)} preview="${preview.slice(0, 80)}"`);
+          }
           if (evtSessionKey && evtSessionKey.includes(":webchat:")) {
             gwWebchatSessionKey = evtSessionKey;
           }
@@ -4152,8 +4163,12 @@ function connectGateway() {
             for (const part of pm.content) {
               if (part.type === "text" && part.text) userTextForFeedback += part.text;
             }
-            if (userTextForFeedback && _lastAgentResponse) {
-              processNeuralFeedback(userTextForFeedback, "user").catch(() => {});
+            if (userTextForFeedback) {
+              if (_lastAgentResponse) {
+                processNeuralFeedback(userTextForFeedback, "user").catch((e) => { console.error("[neural-feedback] processNeuralFeedback error:", e.message); });
+              } else {
+                console.log("[neural-feedback] User msg received but no _lastAgentResponse yet — skipping");
+              }
             }
             const msgId = runId || (pm.id || "");
             if (msgId && !processedRunIds["user-" + msgId]) {
@@ -6095,6 +6110,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+const _wsProxyWss = new (require("ws").Server)({ noServer: true });
 server.on("upgrade", (req, socket, head) => {
   if (!validateLoginSession(req)) {
     socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
@@ -6111,36 +6127,44 @@ server.on("upgrade", (req, socket, head) => {
   delete fwdHeaders["x-forwarded-host"];
   delete fwdHeaders["x-real-ip"];
   delete fwdHeaders["forwarded"];
-  const opts = {
-    hostname: "127.0.0.1",
-    port: GATEWAY_PORT,
-    path: wsPath,
-    method: req.method,
-    headers: fwdHeaders,
-  };
-  const p = http.request(opts);
-  p.on("upgrade", (pr, ps, ph) => {
-    socket.write(
-      "HTTP/1.1 101 Switching Protocols\r\n" +
-      Object.entries(pr.headers).map(([k, v]) => `${k}: ${v}`).join("\r\n") +
-      "\r\n\r\n"
-    );
-    if (ph.length > 0) socket.write(ph);
-    ps.pipe(socket);
-    socket.pipe(ps);
-    ps.on("error", () => socket.destroy());
-    socket.on("error", () => ps.destroy());
-    ps.on("close", () => socket.destroy());
-    socket.on("close", () => ps.destroy());
+
+  _wsProxyWss.handleUpgrade(req, socket, head, (browserWs) => {
+    const gwWs = new WebSocket("ws://127.0.0.1:" + GATEWAY_PORT + wsPath, {
+      headers: fwdHeaders,
+    });
+    gwWs.on("open", () => {});
+    gwWs.on("message", (data, isBinary) => {
+      try { if (browserWs.readyState === 1) browserWs.send(data, { binary: isBinary }); } catch (_) {}
+    });
+    browserWs.on("message", (data, isBinary) => {
+      try { if (gwWs.readyState === 1) gwWs.send(data, { binary: isBinary }); } catch (_) {}
+      if (!isBinary) {
+        try {
+          const txt = data.toString();
+          const frame = JSON.parse(txt);
+          if (frame.type === "req" && frame.method === "chat.send" && frame.params) {
+            const userMsg = typeof frame.params.message === "string" ? frame.params.message : "";
+            if (userMsg) {
+              console.log(`[neural-feedback:intercept] user chat.send: "${userMsg.slice(0, 80)}"`);
+              if (_lastAgentResponse) {
+                processNeuralFeedback(userMsg, "user").catch((e) => { console.error("[neural-feedback] intercept error:", e.message); });
+              } else {
+                console.log("[neural-feedback:intercept] no _lastAgentResponse yet — skipping");
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    });
+    gwWs.on("close", (code, reason) => {
+      try { browserWs.close(code, reason); } catch (_) {}
+    });
+    browserWs.on("close", (code, reason) => {
+      try { gwWs.close(code, reason); } catch (_) {}
+    });
+    gwWs.on("error", () => { try { browserWs.close(); } catch (_) {} });
+    browserWs.on("error", () => { try { gwWs.close(); } catch (_) {} });
   });
-  p.on("response", (pr) => {
-    const statusLine = `HTTP/1.1 ${pr.statusCode} ${pr.statusMessage || ""}\r\n`;
-    const hdrs = Object.entries(pr.headers).map(([k, v]) => `${k}: ${v}`).join("\r\n");
-    socket.write(statusLine + hdrs + "\r\n\r\n");
-    pr.pipe(socket);
-  });
-  p.on("error", () => socket.destroy());
-  p.end();
 });
 
 server.on("error", (err) => {
