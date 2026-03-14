@@ -1,3 +1,8 @@
+---
+name: brainjar
+description: BrainJar spiking neural network brain engine for trading signal generation. LIF architecture with configurable neuron counts.
+---
+
 # BrainJar - Neural Trading Skill
 
 ## Overview

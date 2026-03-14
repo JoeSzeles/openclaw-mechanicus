@@ -1,3 +1,8 @@
+---
+name: brain-stimulate-pattern
+description: Generic numeric feature vector adapter for brain engine. Maps up to 50 arbitrary features to neurons 210-409.
+---
+
 # Brain Stimulate Pattern — Generic Numeric Pattern Recognition Adapter
 
 ## Overview

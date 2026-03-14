@@ -1,3 +1,8 @@
+---
+name: brain-stimulate-sentiment
+description: Sentiment analysis adapter for brain engine. Maps polarity, subjectivity, emotions to sensory neurons 100-149.
+---
+
 # Brain Stimulate Sentiment — Sentiment Analysis Adapter
 
 ## Overview

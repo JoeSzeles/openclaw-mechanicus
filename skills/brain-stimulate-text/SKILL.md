@@ -1,3 +1,8 @@
+---
+name: brain-stimulate-text
+description: Text/NLP pattern recognition adapter for brain engine. Maps keyword scores, complexity, urgency to neurons 150-209.
+---
+
 # Brain Stimulate Text — Text/NLP Pattern Recognition Adapter
 
 ## Overview

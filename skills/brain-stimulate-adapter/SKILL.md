@@ -1,3 +1,8 @@
+---
+name: brain-stimulate-adapter
+description: Master guide for creating new brain engine stimulate-* routes for non-trading use cases. Covers neuron allocation map, encoding patterns, and motor output interpretation.
+---
+
 # Brain Stimulate Adapter — Creating New stimulate-* Routes
 
 ## Overview
