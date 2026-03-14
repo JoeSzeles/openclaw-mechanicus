@@ -6132,12 +6132,22 @@ server.on("upgrade", (req, socket, head) => {
     const gwWs = new WebSocket("ws://127.0.0.1:" + GATEWAY_PORT + wsPath, {
       headers: fwdHeaders,
     });
-    gwWs.on("open", () => {});
+    let gwOpen = false;
+    const gwQueue = [];
+    gwWs.on("open", () => {
+      gwOpen = true;
+      for (const [d, opts] of gwQueue) { try { gwWs.send(d, opts); } catch (_) {} }
+      gwQueue.length = 0;
+    });
     gwWs.on("message", (data, isBinary) => {
       try { if (browserWs.readyState === 1) browserWs.send(data, { binary: isBinary }); } catch (_) {}
     });
     browserWs.on("message", (data, isBinary) => {
-      try { if (gwWs.readyState === 1) gwWs.send(data, { binary: isBinary }); } catch (_) {}
+      if (gwOpen && gwWs.readyState === 1) {
+        try { gwWs.send(data, { binary: isBinary }); } catch (_) {}
+      } else {
+        gwQueue.push([data, { binary: isBinary }]);
+      }
       if (!isBinary) {
         try {
           const txt = data.toString();
