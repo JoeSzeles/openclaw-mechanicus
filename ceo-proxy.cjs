@@ -5120,9 +5120,23 @@ async function handleApi(req, res) {
   if (p.startsWith("/api/brain/") || p === "/api/brain") {
     const brainApiKey = process.env.BRAIN_API_KEY;
     if (brainApiKey) {
-      const hasSession = validateLoginSession(req);
+      const remote = req.socket.remoteAddress;
+      const forwarded = req.headers["x-forwarded-for"];
+      const isLocal = (remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1") && !forwarded;
       const hasKey = req.headers["x-brain-api-key"] === brainApiKey;
-      if (!hasSession && !hasKey) return json(res, 403, { error: "Brain API requires session auth or x-brain-api-key header" }), true;
+      let hasSession = false;
+      if (LOGIN_USER && LOGIN_PASS) {
+        const cookies = (req.headers.cookie || "").split(";").map(c => c.trim());
+        for (const c of cookies) {
+          if (c.startsWith("openclaw_session=")) {
+            const tok = c.slice("openclaw_session=".length);
+            const sessions = loadLoginSessions();
+            const s = sessions[tok];
+            if (s && Date.now() - s.created < LOGIN_SESSION_MAX_AGE) hasSession = true;
+          }
+        }
+      }
+      if (!isLocal && !hasKey && !hasSession) return json(res, 403, { error: "Brain API requires session auth or x-brain-api-key header" }), true;
     }
     const brainPortFile = path.join(DATA_DIR, "brain-engine-port");
     let brainPort = 0;
@@ -5613,7 +5627,42 @@ async function handleCanvasApiRoutes(req, res) {
     return true;
   }
 
-  json(res, 404, { error: "Unknown canvas API route", available: ["config/scalper-config", "config/strategy", "config/monitor-config", "config/proofread-config", "scalper/status", "scalper/start", "scalper/stop", "scalper/reset", "clawscript/templates"] });
+  if (route === "pages" && req.method === "POST") {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const fileName = (body.file || "").replace(/[^a-zA-Z0-9_.-]/g, "");
+      if (!fileName || !fileName.endsWith(".html")) { json(res, 400, { error: "file required (must end in .html, alphanumeric/dash/underscore only)" }); return true; }
+      const content = body.content || "";
+      if (!content || content.length < 10) { json(res, 400, { error: "content required (min 10 chars)" }); return true; }
+      if (content.includes("&lt;") && !content.includes("<html")) { json(res, 400, { error: "HTML appears entity-escaped (&lt; found instead of <). Write raw HTML tags." }); return true; }
+      const filePath = path.join(CANVAS_DIR, fileName);
+      fs.writeFileSync(filePath, content);
+      const ext = ".html";
+      const raw = fs.readFileSync(filePath);
+      const data = injectNavIntoHtml(raw, filePath);
+      _canvasFileCache[fileName] = { data, ct: "text/html; charset=utf-8", isHtml: true };
+      const manifestEntry = body.manifest || {};
+      if (manifestEntry.name || manifestEntry.category) {
+        const manifestPath = path.join(CANVAS_DIR, "manifest.json");
+        let manifest = [];
+        try { manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8")); } catch (_) {}
+        if (!Array.isArray(manifest)) manifest = [];
+        const existing = manifest.findIndex(e => e.file === fileName);
+        const entry = {
+          name: manifestEntry.name || fileName.replace(/\.html$/, "").replace(/[-_]/g, " "),
+          file: fileName,
+          description: manifestEntry.description || "",
+          category: manifestEntry.category || "Other",
+        };
+        if (existing >= 0) manifest[existing] = entry; else manifest.push(entry);
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+      }
+      json(res, 200, { ok: true, file: fileName, url: "/__openclaw__/canvas/" + fileName, bytes: content.length });
+    } catch (e) { json(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  json(res, 404, { error: "Unknown canvas API route", available: ["config/scalper-config", "config/strategy", "config/monitor-config", "config/proofread-config", "scalper/status", "scalper/start", "scalper/stop", "scalper/reset", "clawscript/templates", "pages (POST)"] });
   return true;
 }
 
