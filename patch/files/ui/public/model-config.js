@@ -850,7 +850,7 @@ function cbRefreshStatus() {
       }
       cbRenderSensory('agent', data.sensory_assignments);
       cbRenderMB('agent', data.mushroom_body);
-      cbRenderMotors('agent', data.regions);
+      cbRenderMotors('agent', data.regions, data.motor_regions);
       cbAddLog('Agent brain: ' + total + ' neurons, ' + (data.synapses_count || 0) + ' synapses, step ' + (data.step_count || 0));
     } else {
       indicator.style.background = '#21262d'; indicator.style.color = '#8b949e';
@@ -882,7 +882,7 @@ function cbRefreshStatus() {
       }
       cbRenderSensory('trading', data.sensory_assignments);
       cbRenderMB('trading', data.mushroom_body);
-      cbRenderMotors('trading', data.regions);
+      cbRenderMotors('trading', data.regions, data.motor_regions);
       cbAddLog('Trading brain: ' + total + ' neurons, ' + (data.synapses_count || 0) + ' synapses, step ' + (data.step_count || 0));
     } else {
       indicator.style.background = '#21262d'; indicator.style.color = '#8b949e';
@@ -896,13 +896,15 @@ window.cbRefreshStatus = cbRefreshStatus;
 function cbRenderSensory(type, assignments) {
   var el = document.getElementById('cb-' + type + '-sensory-table');
   if (!el || !assignments) { if (el) el.innerHTML = '<p class="empty">No data</p>'; return; }
-  var colors = { price_up: '#f85149', price_down: '#2dc653', volume: '#79c0ff', spread: '#d29922', momentum: '#bc8cff', antenna: '#ff7b72', preference: '#e2b714' };
-  var html = '<div style="display:grid;grid-template-columns:90px 50px 50px 1fr;gap:4px;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid #21262d;font-weight:600;color:#8b949e;font-size:10px"><span>Task</span><span>Start</span><span>Count</span><span>Description</span></div>';
+  var tradingColors = { price_up: '#f85149', price_down: '#2dc653', volume: '#79c0ff', spread: '#d29922', momentum: '#bc8cff', antenna: '#ff7b72', preference: '#e2b714' };
+  var agentColors = { content_features: '#79c0ff', behavior_features: '#bc8cff', style_features: '#e2b714', personality_features: '#f97583', identity_features: '#3fb950', meta_features: '#8b949e' };
+  var colors = type === 'agent' ? agentColors : tradingColors;
+  var html = '<div style="display:grid;grid-template-columns:110px 50px 50px 1fr;gap:4px;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid #21262d;font-weight:600;color:#8b949e;font-size:10px"><span>Zone</span><span>Start</span><span>Count</span><span>Description</span></div>';
   for (var key in assignments) {
     var a = assignments[key];
     var c = colors[key] || '#8b949e';
-    var desc = key === 'preference' ? 'User preference features' : key === 'price_up' ? 'Price increase detection' : key === 'price_down' ? 'Price decrease detection' : key === 'volume' ? 'Volume / trade activity' : key === 'spread' ? 'Spread width / liquidity' : key === 'momentum' ? 'Price acceleration' : key === 'antenna' ? 'Pressure sensing' : key;
-    html += '<div style="display:grid;grid-template-columns:90px 50px 50px 1fr;gap:4px;margin-bottom:3px;align-items:center">';
+    var desc = a.desc || key.replace(/_/g, ' ');
+    html += '<div style="display:grid;grid-template-columns:110px 50px 50px 1fr;gap:4px;margin-bottom:3px;align-items:center">';
     html += '<span style="color:' + c + ';font-weight:600;font-size:11px;text-transform:capitalize">' + key.replace(/_/g, ' ') + '</span>';
     html += '<span style="color:#c9d1d9;font-size:11px">' + (a.start != null ? a.start : '--') + '</span>';
     html += '<span style="color:#c9d1d9;font-size:11px">' + (a.count || '--') + '</span>';
@@ -928,19 +930,32 @@ function cbRenderMB(type, mb) {
   el.innerHTML = html;
 }
 
-function cbRenderMotors(type, regions) {
+function cbRenderMotors(type, regions, motorRegions) {
   var el = document.getElementById('cb-' + type + '-motors');
   if (!el || !regions) return;
   var motorTotal = regions.motor || 0;
-  var third = Math.floor(motorTotal / 3);
-  var rem = motorTotal - third * 3;
-  var buyCount = third + (rem > 0 ? 1 : 0);
-  var sellCount = third + (rem > 1 ? 1 : 0);
-  var holdCount = third;
   var html = '';
-  html += '<div style="padding:8px;background:#0d1117;border:1px solid #2dc653;border-radius:4px;text-align:center"><div style="color:#2dc653;font-weight:600;font-size:13px">BUY</div><div style="color:#c9d1d9;font-size:12px;font-weight:600">' + buyCount + ' neurons</div></div>';
-  html += '<div style="padding:8px;background:#0d1117;border:1px solid #f85149;border-radius:4px;text-align:center"><div style="color:#f85149;font-weight:600;font-size:13px">SELL</div><div style="color:#c9d1d9;font-size:12px;font-weight:600">' + sellCount + ' neurons</div></div>';
-  html += '<div style="padding:8px;background:#0d1117;border:1px solid #d29922;border-radius:4px;text-align:center"><div style="color:#d29922;font-weight:600;font-size:13px">HOLD</div><div style="color:#c9d1d9;font-size:12px;font-weight:600">' + holdCount + ' neurons</div></div>';
+  if (motorRegions) {
+    var motorColors = { reinforce: '#3fb950', adjust: '#d29922', explore: '#bc8cff', buy: '#2dc653', sell: '#f85149', hold: '#d29922' };
+    for (var key in motorRegions) {
+      var mr = motorRegions[key];
+      var c = motorColors[key] || '#8b949e';
+      var desc = mr.desc ? '<div style="color:#8b949e;font-size:10px;margin-top:2px">' + mr.desc + '</div>' : '';
+      html += '<div style="padding:8px;background:#0d1117;border:1px solid ' + c + ';border-radius:4px;text-align:center"><div style="color:' + c + ';font-weight:600;font-size:13px">' + key.toUpperCase() + '</div><div style="color:#c9d1d9;font-size:12px;font-weight:600">' + (mr.count || 0) + ' neurons</div>' + desc + '</div>';
+    }
+  } else {
+    var third = Math.floor(motorTotal / 3);
+    var rem = motorTotal - third * 3;
+    if (type === 'agent') {
+      html += '<div style="padding:8px;background:#0d1117;border:1px solid #3fb950;border-radius:4px;text-align:center"><div style="color:#3fb950;font-weight:600;font-size:13px">REINFORCE</div><div style="color:#c9d1d9;font-size:12px;font-weight:600">' + (third + (rem > 0 ? 1 : 0)) + ' neurons</div></div>';
+      html += '<div style="padding:8px;background:#0d1117;border:1px solid #d29922;border-radius:4px;text-align:center"><div style="color:#d29922;font-weight:600;font-size:13px">ADJUST</div><div style="color:#c9d1d9;font-size:12px;font-weight:600">' + (third + (rem > 1 ? 1 : 0)) + ' neurons</div></div>';
+      html += '<div style="padding:8px;background:#0d1117;border:1px solid #bc8cff;border-radius:4px;text-align:center"><div style="color:#bc8cff;font-weight:600;font-size:13px">EXPLORE</div><div style="color:#c9d1d9;font-size:12px;font-weight:600">' + third + ' neurons</div></div>';
+    } else {
+      html += '<div style="padding:8px;background:#0d1117;border:1px solid #2dc653;border-radius:4px;text-align:center"><div style="color:#2dc653;font-weight:600;font-size:13px">BUY</div><div style="color:#c9d1d9;font-size:12px;font-weight:600">' + (third + (rem > 0 ? 1 : 0)) + ' neurons</div></div>';
+      html += '<div style="padding:8px;background:#0d1117;border:1px solid #f85149;border-radius:4px;text-align:center"><div style="color:#f85149;font-weight:600;font-size:13px">SELL</div><div style="color:#c9d1d9;font-size:12px;font-weight:600">' + (third + (rem > 1 ? 1 : 0)) + ' neurons</div></div>';
+      html += '<div style="padding:8px;background:#0d1117;border:1px solid #d29922;border-radius:4px;text-align:center"><div style="color:#d29922;font-weight:600;font-size:13px">HOLD</div><div style="color:#c9d1d9;font-size:12px;font-weight:600">' + third + ' neurons</div></div>';
+    }
+  }
   el.innerHTML = html;
 }
 

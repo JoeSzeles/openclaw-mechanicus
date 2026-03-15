@@ -6,38 +6,6 @@
       "message": "Pipeline test alert",
       "level": "info",
       "channel": "default",
-      "timestamp": "2026-03-08T09:26:25.823Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test-target",
-      "message": "Pipeline stub test",
-      "level": "debug",
-      "channel": "default",
-      "timestamp": "2026-03-08T09:26:26.221Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test",
-      "message": "Pipeline test alert",
-      "level": "info",
-      "channel": "default",
-      "timestamp": "2026-03-08T09:42:02.937Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test-target",
-      "message": "Pipeline stub test",
-      "level": "debug",
-      "channel": "default",
-      "timestamp": "2026-03-08T09:42:03.169Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test",
-      "message": "Pipeline test alert",
-      "level": "info",
-      "channel": "default",
       "timestamp": "2026-03-08T09:42:24.302Z"
     },
     {
@@ -3999,6 +3967,38 @@
       "level": "debug",
       "channel": "default",
       "timestamp": "2026-03-15T21:30:30.849Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-15T21:45:35.300Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-15T21:45:35.438Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-15T21:47:11.868Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-15T21:47:11.977Z"
     }
   ]
 }
