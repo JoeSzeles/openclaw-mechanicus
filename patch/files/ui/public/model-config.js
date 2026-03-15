@@ -609,13 +609,11 @@ function renderNfHistory(history) {
     var brainSig = '';
     if (r.brainResponse) {
       var br = r.brainResponse;
-      if (br.buy_signal || br.sell_signal || br.hold_signal) {
-        var signals = [];
-        if (br.buy_signal) signals.push('B:' + br.buy_signal);
-        if (br.sell_signal) signals.push('S:' + br.sell_signal);
-        if (br.hold_signal) signals.push('H:' + br.hold_signal);
-        brainSig = signals.join(' ');
-      } else { brainSig = '-'; }
+      var signals = [];
+      if (br.reinforce_signal) signals.push('R:' + br.reinforce_signal);
+      if (br.adjust_signal) signals.push('A:' + br.adjust_signal);
+      if (br.explore_signal) signals.push('E:' + br.explore_signal);
+      brainSig = signals.length ? signals.join(' ') : '-';
     } else { brainSig = '-'; }
 
     var text = (r.rawText || '').slice(0, 60);
@@ -695,19 +693,13 @@ document.getElementById('btnReplayCancel').addEventListener('click', function() 
 
 function loadEngramList() {
   var el = document.getElementById('engramList');
-  Promise.all([
-    apiFetch('/api/engram/list?brainType=agent').then(function(r) { return r.json(); }).catch(function() { return { backups: [] }; }),
-    apiFetch('/api/engram/list?brainType=trading').then(function(r) { return r.json(); }).catch(function() { return { backups: [] }; })
-  ]).then(function(results) {
-    var agentBackups = (results[0].backups || []).map(function(b) { b._brainType = 'agent'; return b; });
-    var tradingBackups = (results[1].backups || []).map(function(b) { b._brainType = 'trading'; return b; });
-    var allBackups = agentBackups.concat(tradingBackups).sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
-    if (allBackups.length === 0) { el.innerHTML = '<p class="empty">No engram backups yet</p>'; return; }
-    var html = '<table style="width:100%;font-size:13px;border-collapse:collapse"><tr style="text-align:left;border-bottom:1px solid #333"><th style="padding:4px">Label</th><th>Brain</th><th>Steps</th><th>Synapses</th><th>Date</th><th></th></tr>';
-    allBackups.forEach(function(b) {
+  apiFetch('/api/engram/list?brainType=agent').then(function(r) { return r.json(); }).then(function(data) {
+    var backups = data.backups || [];
+    if (backups.length === 0) { el.innerHTML = '<p class="empty">No agent engram backups yet</p>'; return; }
+    var html = '<table style="width:100%;font-size:13px;border-collapse:collapse"><tr style="text-align:left;border-bottom:1px solid #333"><th style="padding:4px">Label</th><th>Steps</th><th>Synapses</th><th>Date</th><th></th></tr>';
+    backups.forEach(function(b) {
       var date = new Date(b.created_at).toLocaleString();
-      var brainColor = b._brainType === 'agent' ? '#bc8cff' : '#58a6ff';
-      html += '<tr style="border-bottom:1px solid #222"><td style="padding:4px">' + b.label + '</td><td><span style="color:' + brainColor + ';font-weight:600;font-size:11px">' + b._brainType + '</span></td><td>' + (b.step_count || 0) + '</td><td>' + (b.synapse_count || 0) + '</td><td>' + date + '</td>';
+      html += '<tr style="border-bottom:1px solid #222"><td style="padding:4px">' + b.label + '</td><td>' + (b.step_count || 0) + '</td><td>' + (b.synapse_count || 0) + '</td><td>' + date + '</td>';
       html += '<td><button class="btn btn-secondary" style="font-size:11px;padding:2px 8px" onclick="restoreEngram(' + b.id + ',\'' + b.label.replace(/'/g,"\\'") + '\')">Restore</button></td></tr>';
     });
     html += '</table>';
@@ -730,9 +722,7 @@ document.getElementById('btnEngramBackup').addEventListener('click', function() 
   if (!label) return;
   this.disabled = true; this.textContent = 'Creating...';
   var btn = this;
-  var brainType = prompt('Which brain to backup?', 'agent');
-  if (brainType !== 'agent' && brainType !== 'trading') { btn.disabled = false; btn.textContent = 'Create Engram Backup'; return; }
-  apiFetch('/api/engram/backup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({label: label, brainType: brainType}) })
+  apiFetch('/api/engram/backup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({label: label, brainType: 'agent'}) })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       btn.disabled = false; btn.textContent = 'Create Engram Backup';
@@ -840,9 +830,9 @@ function cbRefreshStatus() {
       indicator.style.background = 'rgba(35,134,54,.3)'; indicator.style.color = '#3fb950';
       status.textContent = 'Running (step ' + (data.step_count || 0) + ')';
       status.style.color = '#3fb950';
-      document.getElementById('cb-agent-sensory').textContent = (data.regions && data.regions.sensory) || '--';
-      document.getElementById('cb-agent-inter').textContent = (data.regions && data.regions.inter) || '--';
-      document.getElementById('cb-agent-motor').textContent = (data.regions && data.regions.motor) || '--';
+      document.getElementById('cb-agent-sensory-input').value = (data.regions && data.regions.sensory) || 2000;
+      document.getElementById('cb-agent-inter-input').value = (data.regions && data.regions.inter) || 14000;
+      document.getElementById('cb-agent-motor-input').value = (data.regions && data.regions.motor) || 4000;
       document.getElementById('cb-agent-synapses').textContent = (data.synapses_count || 0).toLocaleString();
       document.getElementById('cb-agent-steps').textContent = (data.step_count || 0).toLocaleString();
       document.getElementById('cb-agent-patterns').textContent = data.patterns || 0;
@@ -863,38 +853,6 @@ function cbRefreshStatus() {
       indicator.style.background = '#21262d'; indicator.style.color = '#8b949e';
       status.textContent = 'Not running'; status.style.color = '#f85149';
       cbAddLog('Agent brain: not running');
-    }
-  });
-  cbFetchBrainStatus('trading').then(function(data) {
-    var indicator = document.getElementById('cb-trading-indicator');
-    var status = document.getElementById('cb-trading-status');
-    if (data && data.running) {
-      indicator.style.background = 'rgba(56,139,253,.2)'; indicator.style.color = '#58a6ff';
-      status.textContent = 'Running (step ' + (data.step_count || 0) + ')';
-      status.style.color = '#3fb950';
-      document.getElementById('cb-trading-sensory').textContent = (data.regions && data.regions.sensory) || '--';
-      document.getElementById('cb-trading-inter').textContent = (data.regions && data.regions.inter) || '--';
-      document.getElementById('cb-trading-motor').textContent = (data.regions && data.regions.motor) || '--';
-      document.getElementById('cb-trading-synapses').textContent = (data.synapses_count || 0).toLocaleString();
-      document.getElementById('cb-trading-steps').textContent = (data.step_count || 0).toLocaleString();
-      document.getElementById('cb-trading-patterns').textContent = data.patterns || 0;
-      document.getElementById('cb-trading-instance').textContent = data.instance_id || 'trading';
-      var total = (data.regions ? data.regions.sensory + data.regions.inter + data.regions.motor : 0);
-      document.getElementById('cb-arch-badge-trading').textContent = total.toLocaleString() + ' neurons';
-      if (data.feedback_formula) {
-        document.getElementById('cb-trading-sugar-mod').textContent = data.feedback_formula.sugar_modifier;
-        document.getElementById('cb-trading-pain-mod').textContent = data.feedback_formula.pain_modifier;
-        document.getElementById('cb-trading-wclamp').textContent = data.feedback_formula.w_clamp;
-        document.getElementById('cb-trading-refsyn').textContent = data.feedback_formula.ref_synapses;
-      }
-      cbRenderSensory('trading', data.sensory_assignments);
-      cbRenderMB('trading', data.mushroom_body);
-      cbRenderMotors('trading', data.regions, data.motor_regions);
-      cbAddLog('Trading brain: ' + total + ' neurons, ' + (data.synapses_count || 0) + ' synapses, step ' + (data.step_count || 0));
-    } else {
-      indicator.style.background = '#21262d'; indicator.style.color = '#8b949e';
-      status.textContent = 'Not running'; status.style.color = '#f85149';
-      cbAddLog('Trading brain: not running');
     }
   });
 }
@@ -968,8 +926,14 @@ function cbRenderMotors(type, regions, motorRegions) {
 
 window.cbBootBrain = function(type) {
   var url = type === 'agent' ? '/api/agent-brain/boot' : '/api/brain/boot';
+  var body = {};
+  if (type === 'agent') {
+    body.sensory = parseInt(document.getElementById('cb-agent-sensory-input').value) || 2000;
+    body.inter = parseInt(document.getElementById('cb-agent-inter-input').value) || 14000;
+    body.motor = parseInt(document.getElementById('cb-agent-motor-input').value) || 4000;
+  }
   cbAddLog('Booting ' + type + ' brain...');
-  apiFetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' })
+  apiFetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       cbAddLog(type + ' brain booted: ' + (data.neurons_count || data.total || '?') + ' neurons');
@@ -984,6 +948,49 @@ window.cbSaveState = function(type) {
     .then(function(r) { return r.json(); })
     .then(function() { cbAddLog(type + ' brain state saved'); showToast(type + ' state saved', 'success'); })
     .catch(function(e) { showToast('Save failed: ' + e.message, 'error'); });
+};
+
+var _agentPresets = {
+  '10k': { sensory: 1000, inter: 7000, motor: 2000 },
+  '20k': { sensory: 2000, inter: 14000, motor: 4000 },
+  '50k': { sensory: 5000, inter: 35000, motor: 10000 }
+};
+
+window.cbApplyPreset = function(preset) {
+  if (preset === 'custom') return;
+  var p = _agentPresets[preset];
+  if (!p) return;
+  document.getElementById('cb-agent-sensory-input').value = p.sensory;
+  document.getElementById('cb-agent-inter-input').value = p.inter;
+  document.getElementById('cb-agent-motor-input').value = p.motor;
+  showToast(preset.toUpperCase() + ' preset loaded (' + (p.sensory + p.inter + p.motor).toLocaleString() + ' neurons)', 'success');
+};
+
+window.cbApplyArchitecture = function() {
+  var sensory = parseInt(document.getElementById('cb-agent-sensory-input').value) || 2000;
+  var inter = parseInt(document.getElementById('cb-agent-inter-input').value) || 14000;
+  var motor = parseInt(document.getElementById('cb-agent-motor-input').value) || 4000;
+  var total = sensory + inter + motor;
+  if (!confirm('Reboot agent brain with ' + total.toLocaleString() + ' neurons?\n\nS=' + sensory + ' I=' + inter + ' M=' + motor + '\n\nThis will reset all current spike history. Synaptic weights will be preserved if they fit the new architecture.')) return;
+  cbAddLog('Applying architecture: S=' + sensory + ' I=' + inter + ' M=' + motor);
+  apiFetch('/api/agent-brain/boot', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ sensory: sensory, inter: inter, motor: motor }) })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      cbAddLog('Agent brain rebooted: ' + (data.neurons_count || total) + ' neurons');
+      showToast('Agent brain rebooted with ' + (data.neurons_count || total).toLocaleString() + ' neurons', 'success');
+      setTimeout(cbRefreshStatus, 500);
+    }).catch(function(e) { cbAddLog('Reboot failed: ' + e.message); showToast('Reboot failed: ' + e.message, 'error'); });
+};
+
+window.cbBenchmark = function() {
+  cbAddLog('Running benchmark...');
+  apiFetch('/api/agent-brain/benchmark', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var msg = 'Benchmark: ' + (data.steps || '?') + ' steps in ' + (data.elapsed_ms || '?') + 'ms (' + (data.rate_hz || '?') + ' Hz)';
+      cbAddLog(msg);
+      showToast(msg, 'success');
+    }).catch(function(e) { cbAddLog('Benchmark failed: ' + e.message); showToast('Benchmark failed: ' + e.message, 'error'); });
 };
 
 loadConfig();

@@ -236,7 +236,7 @@ tr:hover{background:#1c2128}
 
   <div id="nl-brain-config" class="nl-sub-content" style="display:none">
 
-    <div style="font-size:13px;color:#bc8cff;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #bc8cff">Agent Brain &mdash; Preference Learning</div>
+    <div style="font-size:13px;color:#bc8cff;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #bc8cff">Agent Brain &mdash; Neural Preference Learning</div>
 
     <div class="card" style="margin-bottom:16px">
       <div class="section-title" style="margin-bottom:8px"><span class="section-icon">&#129504;</span> Agent Brain Status</div>
@@ -255,29 +255,43 @@ tr:hover{background:#1c2128}
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div class="section-title" style="margin-bottom:8px;display:flex;align-items:center;gap:8px">
-        <span class="section-icon">&#128268;</span> Agent Network Architecture
+      <div class="section-title" style="margin-bottom:4px;display:flex;align-items:center;gap:8px">
+        <span class="section-icon">&#128268;</span> Network Architecture
         <span id="cb-arch-badge-agent" style="font-size:11px;font-weight:400;color:#bc8cff;background:#1a1028;padding:2px 8px;border-radius:10px">-- neurons</span>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-small" style="font-size:10px;padding:2px 8px" onclick="cbApplyPreset('10k')">10K Light</button>
+        <button class="btn btn-secondary btn-small" style="font-size:10px;padding:2px 8px" onclick="cbApplyPreset('20k')">20K Standard</button>
+        <button class="btn btn-secondary btn-small" style="font-size:10px;padding:2px 8px" onclick="cbApplyPreset('50k')">50K Deep</button>
+        <button class="btn btn-secondary btn-small" style="font-size:10px;padding:2px 8px;background:#bc8cff20;color:#bc8cff;border-color:#bc8cff40" onclick="cbApplyPreset('custom')">Custom</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
         <div>
-          <div style="font-size:10px;color:#f85149;text-transform:uppercase;font-weight:600;margin-bottom:2px">Sensory</div>
-          <div id="cb-agent-sensory" style="padding:6px;background:#0d1117;border:1px solid #f85149;border-radius:4px;color:#c9d1d9;font-size:14px;font-weight:600;text-align:center">--</div>
+          <div style="font-size:10px;color:#f85149;text-transform:uppercase;font-weight:600;margin-bottom:2px">Sensory Neurons</div>
+          <input type="number" id="cb-agent-sensory-input" value="2000" min="100" max="20000" step="100" style="width:100%;padding:6px;background:#0d1117;border:1px solid #f85149;border-radius:4px;color:#c9d1d9;font-size:14px;font-weight:600;text-align:center;font-family:monospace">
+          <div style="font-size:9px;color:#8b949e;margin-top:2px">Input layer (content, behavior, style)</div>
         </div>
         <div>
-          <div style="font-size:10px;color:#2dc653;text-transform:uppercase;font-weight:600;margin-bottom:2px">Inter</div>
-          <div id="cb-agent-inter" style="padding:6px;background:#0d1117;border:1px solid #2dc653;border-radius:4px;color:#c9d1d9;font-size:14px;font-weight:600;text-align:center">--</div>
+          <div style="font-size:10px;color:#2dc653;text-transform:uppercase;font-weight:600;margin-bottom:2px">Interneurons</div>
+          <input type="number" id="cb-agent-inter-input" value="14000" min="200" max="100000" step="200" style="width:100%;padding:6px;background:#0d1117;border:1px solid #2dc653;border-radius:4px;color:#c9d1d9;font-size:14px;font-weight:600;text-align:center;font-family:monospace">
+          <div style="font-size:9px;color:#8b949e;margin-top:2px">Processing (inc. mushroom body)</div>
         </div>
         <div>
-          <div style="font-size:10px;color:#58a6ff;text-transform:uppercase;font-weight:600;margin-bottom:2px">Motor</div>
-          <div id="cb-agent-motor" style="padding:6px;background:#0d1117;border:1px solid #58a6ff;border-radius:4px;color:#c9d1d9;font-size:14px;font-weight:600;text-align:center">--</div>
+          <div style="font-size:10px;color:#bc8cff;text-transform:uppercase;font-weight:600;margin-bottom:2px">Motor Neurons</div>
+          <input type="number" id="cb-agent-motor-input" value="4000" min="60" max="20000" step="100" style="width:100%;padding:6px;background:#0d1117;border:1px solid #bc8cff;border-radius:4px;color:#c9d1d9;font-size:14px;font-weight:600;text-align:center;font-family:monospace">
+          <div style="font-size:9px;color:#8b949e;margin-top:2px">Output (reinforce/adjust/explore)</div>
         </div>
       </div>
-      <div style="padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:11px;font-family:monospace">
-        <div style="display:flex;justify-content:space-between"><span style="color:#8b949e">Synapses:</span><span id="cb-agent-synapses" style="color:#d29922">--</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:#8b949e">Steps:</span><span id="cb-agent-steps" style="color:#58a6ff">--</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:#8b949e">Patterns:</span><span id="cb-agent-patterns" style="color:#2dc653">--</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:#8b949e">Instance:</span><span id="cb-agent-instance" style="color:#bc8cff">--</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="btn btn-primary btn-small" onclick="cbApplyArchitecture()">Apply &amp; Reboot Brain</button>
+        <button class="btn btn-secondary btn-small" onclick="cbBenchmark()">Test Fire (Benchmark)</button>
+        <button class="btn btn-secondary btn-small" onclick="cbRefreshStatus()">Refresh from Brain</button>
+      </div>
+      <div style="display:flex;gap:20px;padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:11px;font-family:monospace;flex-wrap:wrap">
+        <div><span style="color:#8b949e">Synapses:</span> <span id="cb-agent-synapses" style="color:#d29922">--</span></div>
+        <div><span style="color:#8b949e">Steps:</span> <span id="cb-agent-steps" style="color:#58a6ff">--</span></div>
+        <div><span style="color:#8b949e">Patterns:</span> <span id="cb-agent-patterns" style="color:#2dc653">--</span></div>
+        <div><span style="color:#8b949e">Instance:</span> <span id="cb-agent-instance" style="color:#bc8cff">--</span></div>
       </div>
     </div>
 
@@ -309,73 +323,6 @@ tr:hover{background:#1c2128}
       <div class="section-title" style="margin-bottom:8px"><span class="section-icon">&#127922;</span> Agent Motor Region Layout</div>
       <div style="font-size:11px;color:#8b949e;margin-bottom:8px">Motor outputs for preference reinforcement, adaptation, and exploration</div>
       <div id="cb-agent-motors" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><p class="empty">--</p></div>
-    </div>
-
-    <div style="font-size:13px;color:#58a6ff;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:24px 0 12px 0;padding-bottom:6px;border-bottom:2px solid #58a6ff">Trading Brain &mdash; Market Signals</div>
-
-    <div class="card" style="margin-bottom:16px">
-      <div class="section-title" style="margin-bottom:8px"><span class="section-icon">&#128200;</span> Trading Brain Status</div>
-      <div style="padding:10px;background:#0d1117;border:1px solid #21262d;border-radius:4px;margin-bottom:12px">
-        <span id="cb-trading-indicator" style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:#21262d;color:#8b949e;margin-right:8px">Trading</span>
-        <span id="cb-trading-status" style="font-size:13px;font-weight:600;color:#8b949e">Checking...</span>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-        <button class="btn btn-secondary btn-small" onclick="cbBootBrain('trading')">Boot Trading Brain</button>
-        <button class="btn btn-secondary btn-small" onclick="cbSaveState('trading')">Save Trading State</button>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:16px">
-      <div class="section-title" style="margin-bottom:8px;display:flex;align-items:center;gap:8px">
-        <span class="section-icon">&#128268;</span> Trading Network Architecture
-        <span id="cb-arch-badge-trading" style="font-size:11px;font-weight:400;color:#58a6ff;background:#0d2137;padding:2px 8px;border-radius:10px">-- neurons</span>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
-        <div>
-          <div style="font-size:10px;color:#f85149;text-transform:uppercase;font-weight:600;margin-bottom:2px">Sensory</div>
-          <div id="cb-trading-sensory" style="padding:6px;background:#0d1117;border:1px solid #f85149;border-radius:4px;color:#c9d1d9;font-size:14px;font-weight:600;text-align:center">--</div>
-        </div>
-        <div>
-          <div style="font-size:10px;color:#2dc653;text-transform:uppercase;font-weight:600;margin-bottom:2px">Inter</div>
-          <div id="cb-trading-inter" style="padding:6px;background:#0d1117;border:1px solid #2dc653;border-radius:4px;color:#c9d1d9;font-size:14px;font-weight:600;text-align:center">--</div>
-        </div>
-        <div>
-          <div style="font-size:10px;color:#58a6ff;text-transform:uppercase;font-weight:600;margin-bottom:2px">Motor</div>
-          <div id="cb-trading-motor" style="padding:6px;background:#0d1117;border:1px solid #58a6ff;border-radius:4px;color:#c9d1d9;font-size:14px;font-weight:600;text-align:center">--</div>
-        </div>
-      </div>
-      <div style="padding:6px;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:11px;font-family:monospace">
-        <div style="display:flex;justify-content:space-between"><span style="color:#8b949e">Synapses:</span><span id="cb-trading-synapses" style="color:#d29922">--</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:#8b949e">Steps:</span><span id="cb-trading-steps" style="color:#58a6ff">--</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:#8b949e">Patterns:</span><span id="cb-trading-patterns" style="color:#2dc653">--</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:#8b949e">Instance:</span><span id="cb-trading-instance" style="color:#58a6ff">--</span></div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:16px">
-      <div class="section-title" style="margin-bottom:8px;font-size:15px"><span class="section-icon">&#128290;</span> Trading Sensory Assignments</div>
-      <div style="font-size:11px;color:#8b949e;margin-bottom:8px">Neuron groups assigned to market data inputs</div>
-      <div id="cb-trading-sensory-table" style="font-size:12px"><p class="empty">Loading...</p></div>
-    </div>
-
-    <div class="card" style="margin-bottom:16px">
-      <div class="section-title" style="margin-bottom:8px"><span class="section-icon">&#9881;&#65039;</span> Trading Feedback Formula</div>
-      <div style="padding:8px;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:11px;font-family:monospace">
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:#2dc653">Sugar modifier:</span><span id="cb-trading-sugar-mod" style="color:#c9d1d9">--</span></div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:#f85149">Pain modifier:</span><span id="cb-trading-pain-mod" style="color:#c9d1d9">--</span></div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:#8b949e">w_clamp:</span><span id="cb-trading-wclamp" style="color:#c9d1d9">--</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:#8b949e">Ref synapses:</span><span id="cb-trading-refsyn" style="color:#c9d1d9">--</span></div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:16px">
-      <div class="section-title" style="margin-bottom:8px;font-size:15px"><span class="section-icon">&#129504;</span> Trading Mushroom Body</div>
-      <div id="cb-trading-mb" style="font-size:12px"><p class="empty">Loading...</p></div>
-    </div>
-
-    <div class="card" style="margin-bottom:16px">
-      <div class="section-title" style="margin-bottom:8px"><span class="section-icon">&#127922;</span> Trading Motor Region Layout</div>
-      <div id="cb-trading-motors" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><p class="empty">--</p></div>
     </div>
 
     <div class="card" style="margin-bottom:16px">
@@ -412,7 +359,7 @@ tr:hover{background:#1c2128}
 </div>
 
 <div id="toast" class="toast"></div>
-<script src="/model-config.js?v=1773611598"></script>
-<script src="/nav-inject.js?v=1773611598"></script>
+<script src="/model-config.js?v=1773612284"></script>
+<script src="/nav-inject.js?v=1773612284"></script>
 </body>
 </html>
