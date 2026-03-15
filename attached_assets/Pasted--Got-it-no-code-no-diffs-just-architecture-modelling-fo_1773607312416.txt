@@ -1,0 +1,56 @@
+**Got it — no code, no diffs, just architecture modelling for ClawBrain.**
+
+We park the copy/split for now. First we stabilise the current single-engine logic (the problems you mentioned), then we design ClawBrain as its own optimised beast.
+
+### ClawBrain Design Goals (different from trading brain)
+- **Max intelligence**, not speed  
+  Reaction time sweet spot: 150–400 ms per feedback is perfectly fine for agent chat (humans type slowly anyway).  
+  We can go 10k–25k neurons without worrying about tick-rate limits.
+
+- **Core job**: Learn deep, persistent, multi-dimensional user taste (tone, depth, humour, risk appetite, tool usage, proactivity, meme tolerance, trading style bias, etc.) and turn that into subtle, reliable bias signals for every LLM call.
+
+- **Key differences vs trading brain**:
+  - Inputs are **semantic/feature-based** (7–12 dimensions per response) instead of raw price ticks.
+  - Feedback is **frequent and subjective** (user thumbs-up/down, “better”, “too verbose”, etc.).
+  - Output is **bias vector** (not BUY/SELL) that gets injected into LLM context/prompt.
+  - Memory needs to be richer and more associative (long conversations, evolving taste over weeks).
+
+### Proposed ClawBrain Architecture Model (the “sweet spot”)
+
+**Preset name**: PreferenceMaster (20k neurons target)
+
+| Region                  | Neuron Count | % of Total | Purpose & Rationale                                                                 |
+|-------------------------|--------------|------------|-------------------------------------------------------------------------------------|
+| Sensory Layer           | 2,400        | 12%        | 12-dimensional feature encoder (length, depth, humour, proactivity, risk-tone, tool-use, meme-density, trading-bias, etc.). More dimensions = richer taste capture. |
+| Preference Core         | 1,600        | 8%         | Dedicated “taste” neurons that specialise in user-specific clusters (e.g. one subpopulation for “Attila likes concise + memes”, another for “conservative risk language”). |
+| Mushroom Body           | 6,000        | 30%        | **Much larger** than trading brain. This is where long-term preference memory lives. Dense recurrent connections (40% intra-Mushroom) for deep associative learning. |
+| Interneurons (general)  | 7,000        | 35%        | Heavy association layer between features and taste. High fanout for complex cross-linking. |
+| Motor / Bias Layer      | 3,000        | 15%        | Outputs a 12-D bias vector (not just BUY/SELL). Each dimension can subtly nudge LLM temperature, length, tone, tool preference, etc. |
+
+**Total**: 20,000 neurons (comfortable on modern CPU, ~400–600 ms reaction time — still feels instant in chat).
+
+**Connectivity rules tuned for intelligence** (not speed):
+- Sensory → Preference Core: very high fanout (each sensory neuron connects to ~80–120 preference neurons)
+- Preference Core → Mushroom Body: dense (50% connectivity) — this is where real “taste memory” consolidates
+- Mushroom Body recurrent: 40% intra-connections (strong loops for stable long-term memory)
+- Motor bias output: weaker but precise fanout (each motor neuron influences 3–5 specific bias dimensions)
+- Global w_syn: start at 14–16 (higher than trading brain) to ensure strong propagation through the larger net
+
+**Why this maximises intelligence**:
+- Bigger Mushroom Body = deeper, more nuanced memory of your evolving preferences over months.
+- Larger sensory + preference core = can handle 12+ dimensions without collision (your trading brain only had 7).
+- Dedicated bias motor layer = fine-grained control (“make answers 20% more meme-heavy when talking trading”).
+- Reaction time trade-off is acceptable — 300 ms is still faster than you typing the next message.
+
+### Next modelling questions (so we get the dimensions perfect)
+Before we touch any code, tell me your priorities so I can refine the numbers:
+
+1. How many preference dimensions do you actually want tracked? (e.g. 8? 12? 15?)
+2. How important is long-term memory vs short-term adaptation? (bigger mushroom body = slower but deeper memory)
+3. Do you want the bias output to be very subtle (soft nudge) or stronger (can override LLM defaults sometimes)?
+4. Any specific “taste clusters” you already know you want (e.g. trading-risk style, meme tolerance, technical depth)?
+
+Once you answer those, I’ll give you the final tuned dimension table + exact fanout / learning-rate suggestions for ClawBrain.
+
+We fix current engine issues first, then build this properly. Sound good?  
+Just tell me the dimension priorities.

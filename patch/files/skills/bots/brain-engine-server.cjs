@@ -3,7 +3,9 @@ const fs = require('fs');
 const path = require('path');
 
 const BRAIN_PORT = parseInt(process.env.BRAIN_PORT) || 0;
-const DATA_DIR = path.join(process.env.HOME || '/home/runner', '.openclaw');
+const BRAIN_INSTANCE_ID = process.env.BRAIN_INSTANCE_ID || 'trading';
+const DATA_DIR = process.env.BRAIN_DATA_DIR || path.join(process.env.HOME || '/home/runner', '.openclaw');
+const PORT_FILENAME = process.env.BRAIN_PORT_FILENAME || 'brain-engine-port';
 const PATTERNS_DIR = path.join(DATA_DIR, 'brain-patterns');
 const BRAIN_STATE_FILE = path.join(DATA_DIR, 'brain-state.json');
 
@@ -385,20 +387,22 @@ function encodeAntennaPressure(inputs, ant, pressure, volumeFallback) {
   }
 }
 
-function computeFeedbackModifier(type) {
+function computeFeedbackModifier(type, strength) {
   const REF_SYNAPSES = 4290;
   const BASE_SUGAR = 0.15;
   const BASE_PAIN = 0.15;
   const totalSyn = synapses ? synapses.length : REF_SYNAPSES;
   const scale = Math.sqrt(REF_SYNAPSES / Math.max(1, totalSyn));
+  const mag = typeof strength === 'number' && strength > 0 ? Math.min(3, 1 + Math.log(1 + strength)) : 1;
   const delta = type === 'sugar'
-    ? BASE_SUGAR * scale
-    : BASE_PAIN * scale;
+    ? BASE_SUGAR * scale * mag
+    : BASE_PAIN * scale * mag;
   return type === 'sugar' ? (1 + delta) : (1 - delta);
 }
 
 function applyFeedback(type, options) {
-  const modifier = computeFeedbackModifier(type);
+  const strength = (options && options.strength) || undefined;
+  const modifier = computeFeedbackModifier(type, strength);
   const wClamp = Math.max(2, currentParams.w_syn * 0.25);
   const motorStart = N_SENSORY + N_INTER;
   const mbStart = N_SENSORY + mushroomBody.start;
@@ -477,7 +481,7 @@ function stimulateFromPreference(data) {
   const stepsToRun = data.steps || 5;
   const inputs = [];
 
-  const featureKeys = PREFERENCE_FEATURES;
+  const featureKeys = Object.keys(features).length > 0 ? Object.keys(features) : PREFERENCE_FEATURES;
   const neuronsPerFeature = Math.max(1, Math.floor(pref.count / featureKeys.length));
 
   for (let fi = 0; fi < featureKeys.length; fi++) {
@@ -498,8 +502,9 @@ function stimulateFromPreference(data) {
   const rates = getMotorRates();
 
   if (feedback === 'sugar' || feedback === 'pain') {
-    applyFeedback(feedback, { target: 'mushroom' });
-    applyFeedback(feedback, { target: 'motor' });
+    const fbOpts = { strength: data.strength };
+    applyFeedback(feedback, { target: 'mushroom', ...fbOpts });
+    applyFeedback(feedback, { target: 'motor', ...fbOpts });
   }
 
   return {
@@ -973,6 +978,7 @@ async function handleRequest(req, res) {
 
   if (m === 'GET' && p === '/status') {
     return respond(res, 200, {
+      instance_id: BRAIN_INSTANCE_ID,
       loaded: isBooted,
       boot_time_ms: bootTime ? Date.now() - bootTime : null,
       step_count: stepCount,
@@ -1138,6 +1144,7 @@ async function handleRequest(req, res) {
     const body = await parseBody(req);
     const type = body.type || 'sugar';
     const options = { target: body.target || 'motor' };
+    if (body.strength !== undefined) options.strength = parseFloat(body.strength) || undefined;
     const result = applyFeedback(type, options);
     return respond(res, 200, result);
   }
@@ -1775,12 +1782,13 @@ function startServer(callback) {
   server.listen(BRAIN_PORT, '127.0.0.1', () => {
     actualPort = server.address().port;
     console.log('[brain-engine] Server listening on 127.0.0.1:' + actualPort);
-    try { fs.writeFileSync(path.join(DATA_DIR, 'brain-engine-port'), String(actualPort)); } catch (_) {}
+    try { fs.writeFileSync(path.join(DATA_DIR, PORT_FILENAME), String(actualPort)); } catch (_) {}
     try {
       const wsDir = path.join(process.env.OPENCLAW_HOME || process.cwd(), '.openclaw');
       fs.mkdirSync(wsDir, { recursive: true });
-      fs.writeFileSync(path.join(wsDir, 'brain-engine-port'), String(actualPort));
+      fs.writeFileSync(path.join(wsDir, PORT_FILENAME), String(actualPort));
     } catch (_) {}
+    console.log('[brain-engine] Instance: ' + BRAIN_INSTANCE_ID + ', data: ' + DATA_DIR + ', port-file: ' + PORT_FILENAME);
     const result = boot();
     console.log('[brain-engine] Auto-booted: ' + result.neurons_count + ' neurons, ' + result.synapses_count + ' synapses');
     setInterval(saveState, 60000);

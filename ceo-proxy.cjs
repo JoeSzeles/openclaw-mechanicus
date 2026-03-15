@@ -88,6 +88,171 @@ function buildFeatureVector(responseText, agentId) {
   };
 }
 
+const DIMENSION_REGISTRY = {
+  response_length: { label: "Response Length", description: "How long the response is (word count normalized)", category: "content", defaultEnabled: true, extract: (text) => Math.min(1, (text || "").split(/\s+/).length / 2000) },
+  tool_count: { label: "Tool Usage", description: "How many tool actions were detected", category: "content", defaultEnabled: true, extract: (text) => { const m = (text || "").match(/\b(created|edited|read|searched|executed|installed|deployed|built|wrote|deleted|updated)\b/gi); return Math.min(1, (m || []).length / 10); } },
+  had_code: { label: "Code Blocks", description: "Whether response contains code examples", category: "content", defaultEnabled: true, extract: (text) => ((text || "").match(/```/g) || []).length / 2 > 0 ? 1 : 0 },
+  had_data: { label: "Data Content", description: "Whether response references data/tables/numbers", category: "content", defaultEnabled: true, extract: (text) => /\d+\.\d+|\btable\b|\brows?\b|\bcolumns?\b/i.test(text || "") ? 1 : 0 },
+  topic_hash: { label: "Topic Hash", description: "Hash of agent identity for topic differentiation", category: "identity", defaultEnabled: true, extract: (text, agentId) => Math.abs((agentId || "ceo").split("").reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0) % 100) / 100 },
+  was_proactive: { label: "Proactivity", description: "Whether agent went beyond the asked task", category: "behavior", defaultEnabled: true, extract: (text) => /\b(also|additionally|i noticed|while i was|i went ahead)\b/i.test(text || "") ? 1 : 0 },
+  agent_id_hash: { label: "Agent Identity", description: "Fine-grained agent identity hash", category: "identity", defaultEnabled: true, extract: (text, agentId) => Math.abs((agentId || "ceo").split("").reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0) % 1000) / 1000 },
+  response_time: { label: "Response Time", description: "How fast the response was generated (not yet measured)", category: "performance", defaultEnabled: false, extract: () => 0 },
+  had_error: { label: "Error Content", description: "Whether response mentions errors or failures", category: "content", defaultEnabled: true, extract: (text) => /\b(error|failed|exception|crash)\b/i.test(text || "") ? 1 : 0 },
+  complexity: { label: "Complexity Score", description: "Composite measure of code, tools, and data", category: "content", defaultEnabled: true, extract: (text) => { const c = ((text || "").match(/```/g) || []).length / 2; const t = ((text || "").match(/\b(created|edited|read|searched|executed|installed|deployed|built|wrote|deleted|updated)\b/gi) || []).length; const d = /\d+\.\d+|\btable\b|\brows?\b|\bcolumns?\b/i.test(text || "") ? 2 : 0; return Math.min(1, (c + t + d) / 15); } },
+  formality: { label: "Formality", description: "Degree of formal vs casual language", category: "style", defaultEnabled: false, extract: (text) => { const formal = ((text || "").match(/\b(therefore|furthermore|consequently|accordingly|regarding|concerning)\b/gi) || []).length; return Math.min(1, formal / 5); } },
+  question_count: { label: "Questions Asked", description: "How many questions the response contains", category: "behavior", defaultEnabled: false, extract: (text) => Math.min(1, ((text || "").match(/\?/g) || []).length / 5) },
+  list_usage: { label: "Lists & Structure", description: "Use of bullet points and numbered lists", category: "style", defaultEnabled: false, extract: (text) => { const bullets = ((text || "").match(/^[\s]*[-*•]\s/gm) || []).length; const numbered = ((text || "").match(/^[\s]*\d+\.\s/gm) || []).length; return Math.min(1, (bullets + numbered) / 10); } },
+  emoji_usage: { label: "Emoji Usage", description: "Whether response uses emojis", category: "style", defaultEnabled: false, extract: (text) => /[\u{1F600}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(text || "") ? 1 : 0 },
+  explanation_depth: { label: "Explanation Depth", description: "How much the response explains (relative to length)", category: "content", defaultEnabled: false, extract: (text) => { const explains = ((text || "").match(/\b(because|since|this means|in other words|for example|specifically)\b/gi) || []).length; return Math.min(1, explains / 8); } },
+};
+
+let _dimensionConfig = null;
+let _dimensionConfigTableReady = false;
+
+async function ensureDimensionConfigTable() {
+  const pool = getNfPool();
+  if (!pool || _dimensionConfigTableReady) return;
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS dimension_config (
+      dimension_key VARCHAR(64) PRIMARY KEY,
+      enabled BOOLEAN NOT NULL DEFAULT true,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`);
+    _dimensionConfigTableReady = true;
+  } catch (e) { console.error("[dimension-config] Table create failed:", e.message); }
+}
+
+async function loadDimensionConfig() {
+  const pool = getNfPool();
+  if (!pool) {
+    const fileConfig = loadDimensionConfigFromFile();
+    if (fileConfig) {
+      _dimensionConfig = {};
+      for (const [key, dim] of Object.entries(DIMENSION_REGISTRY)) {
+        _dimensionConfig[key] = fileConfig[key] !== undefined ? fileConfig[key] : dim.defaultEnabled;
+      }
+    } else {
+      _dimensionConfig = {};
+      for (const [key, dim] of Object.entries(DIMENSION_REGISTRY)) {
+        _dimensionConfig[key] = dim.defaultEnabled;
+      }
+    }
+    return _dimensionConfig;
+  }
+  await ensureDimensionConfigTable();
+  try {
+    const result = await pool.query("SELECT dimension_key, enabled FROM dimension_config");
+    const config = {};
+    for (const [key, dim] of Object.entries(DIMENSION_REGISTRY)) {
+      config[key] = dim.defaultEnabled;
+    }
+    for (const row of result.rows) {
+      if (row.dimension_key in config) config[row.dimension_key] = row.enabled;
+    }
+    _dimensionConfig = config;
+    return config;
+  } catch (e) {
+    console.error("[dimension-config] Load failed:", e.message);
+    _dimensionConfig = {};
+    for (const [key, dim] of Object.entries(DIMENSION_REGISTRY)) {
+      _dimensionConfig[key] = dim.defaultEnabled;
+    }
+    return _dimensionConfig;
+  }
+}
+
+const DIMENSION_CONFIG_FILE = path.join(DATA_DIR, "dimension-config.json");
+
+function loadDimensionConfigFromFile() {
+  try {
+    if (fs.existsSync(DIMENSION_CONFIG_FILE)) return JSON.parse(fs.readFileSync(DIMENSION_CONFIG_FILE, "utf8"));
+  } catch (_) {}
+  return null;
+}
+
+function saveDimensionConfigToFile(config) {
+  try { fs.writeFileSync(DIMENSION_CONFIG_FILE, JSON.stringify(config, null, 2)); } catch (_) {}
+}
+
+async function saveDimensionConfig(key, enabled) {
+  const pool = getNfPool();
+  if (pool) {
+    await ensureDimensionConfigTable();
+    try {
+      await pool.query(
+        `INSERT INTO dimension_config (dimension_key, enabled, updated_at) VALUES ($1, $2, NOW())
+         ON CONFLICT (dimension_key) DO UPDATE SET enabled = $2, updated_at = NOW()`,
+        [key, enabled]
+      );
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+  if (_dimensionConfig) _dimensionConfig[key] = enabled;
+  else {
+    _dimensionConfig = {};
+    for (const [k, dim] of Object.entries(DIMENSION_REGISTRY)) {
+      _dimensionConfig[k] = dim.defaultEnabled;
+    }
+    _dimensionConfig[key] = enabled;
+  }
+  saveDimensionConfigToFile(_dimensionConfig);
+  return { ok: true, key, enabled };
+}
+
+function getEnabledDimensions() {
+  if (!_dimensionConfig) {
+    const config = {};
+    for (const [key, dim] of Object.entries(DIMENSION_REGISTRY)) {
+      config[key] = dim.defaultEnabled;
+    }
+    _dimensionConfig = config;
+  }
+  return Object.entries(_dimensionConfig).filter(([_, v]) => v).map(([k]) => k);
+}
+
+function buildDynamicFeatureVector(responseText, agentId) {
+  const enabled = getEnabledDimensions();
+  const vec = {};
+  for (const key of enabled) {
+    const dim = DIMENSION_REGISTRY[key];
+    if (dim && dim.extract) {
+      vec[key] = dim.extract(responseText, agentId);
+    }
+  }
+  return vec;
+}
+
+function getDynamicInsights() {
+  const mem = _nfMemory;
+  if (!mem || mem.stats.total === 0) return [];
+  const recent = (mem.interactions || []).slice(-20);
+  const posExamples = recent.filter(r => r.sentiment === "positive");
+  const negExamples = recent.filter(r => r.sentiment === "negative");
+  const avg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  const enabled = getEnabledDimensions();
+  const insights = [];
+
+  for (const key of enabled) {
+    const dim = DIMENSION_REGISTRY[key];
+    if (!dim) continue;
+    const posVals = posExamples.map(r => (r.featureVector || {})[key]).filter(v => typeof v === "number");
+    const negVals = negExamples.map(r => (r.featureVector || {})[key]).filter(v => typeof v === "number");
+    const posAvg = avg(posVals);
+    const negAvg = avg(negVals);
+    if (posVals.length >= 2 && negVals.length >= 2) {
+      if (posAvg > negAvg * 1.5 && posAvg > 0.3) {
+        insights.push("User prefers higher " + dim.label.toLowerCase());
+      } else if (negAvg > posAvg * 1.5 && negAvg > 0.3) {
+        insights.push("User dislikes higher " + dim.label.toLowerCase());
+      }
+    } else if (posVals.length >= 2 && posAvg > 0.5) {
+      insights.push("User appreciates " + dim.label.toLowerCase());
+    }
+  }
+  return insights;
+}
+
 function getPreferenceSummary() {
   const mem = _nfMemory;
   if (!mem || mem.stats.total === 0) return null;
@@ -112,20 +277,7 @@ function getPreferenceSummary() {
     }
   }
 
-  const avg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-  const insights = [];
-
-  const posLen = avg(posFeatures.response_length || []);
-  const negLen = avg(negFeatures.response_length || []);
-  if (posLen > 0 && negLen > 0) {
-    if (posLen > negLen * 1.5) insights.push("User prefers detailed, longer responses");
-    else if (negLen > posLen * 1.5) insights.push("User prefers concise, shorter responses");
-  }
-  if (avg(posFeatures.had_code || []) > 0.5) insights.push("User appreciates responses with code examples");
-  if (avg(negFeatures.had_code || []) > 0.5) insights.push("User dislikes responses with too much code");
-  if (avg(posFeatures.was_proactive || []) > 0.5) insights.push("User appreciates proactive suggestions");
-  if (avg(posFeatures.had_data || []) > 0.5) insights.push("User values data-backed responses");
-  if (avg(negFeatures.had_error || []) > 0.5) insights.push("User is frustrated by errors in responses");
+  const insights = getDynamicInsights();
 
   const posTexts = positiveExamples.map(r => r.rawText).filter(Boolean);
   const negTexts = negativeExamples.map(r => r.rawText).filter(Boolean);
@@ -311,14 +463,20 @@ async function recordNeuralFeedback(agentId, featureVector, sentiment, sentiment
   return record;
 }
 
-async function stimulateBrainPreference(featureVector, feedback) {
+async function stimulateBrainPreference(featureVector, feedback, strength) {
   try {
-    const brainPortFile = path.join(DATA_DIR, "brain-engine-port");
+    const agentBrainPortFile = path.join(DATA_DIR, "agent-brain-engine-port");
+    const tradingBrainPortFile = path.join(DATA_DIR, "brain-engine-port");
     let brainPort = 0;
-    try { brainPort = parseInt(fs.readFileSync(brainPortFile, "utf8").trim()); } catch (_) {}
+    try { brainPort = parseInt(fs.readFileSync(agentBrainPortFile, "utf8").trim()); } catch (_) {}
+    if (!brainPort) {
+      try { brainPort = parseInt(fs.readFileSync(tradingBrainPortFile, "utf8").trim()); } catch (_) {}
+    }
     if (!brainPort) return null;
 
-    const postData = JSON.stringify({ features: featureVector, feedback, steps: 5 });
+    const payload = { features: featureVector, feedback, steps: 5 };
+    if (typeof strength === "number" && strength > 0) payload.strength = strength;
+    const postData = JSON.stringify(payload);
     return new Promise((resolve) => {
       const req = http.request({
         hostname: "127.0.0.1", port: brainPort, path: "/stimulate-preference",
@@ -348,9 +506,10 @@ async function processNeuralFeedback(userText, agentId) {
     return null;
   }
 
-  const featureVector = prev.features || buildFeatureVector(prev.text, prev.agentId);
+  const featureVector = prev.features || buildDynamicFeatureVector(prev.text, prev.agentId);
   const feedback = sentiment === "positive" ? "sugar" : "pain";
-  const brainResponse = await stimulateBrainPreference(featureVector, feedback);
+  const magnitude = Math.abs(score);
+  const brainResponse = await stimulateBrainPreference(featureVector, feedback, magnitude);
 
   const record = await recordNeuralFeedback(
     prev.agentId || agentId || "ceo",
@@ -361,12 +520,24 @@ async function processNeuralFeedback(userText, agentId) {
   return record;
 }
 
+function normalizeTimestampMs(ts) {
+  if (!ts) return 0;
+  if (ts instanceof Date) return ts.getTime();
+  const n = typeof ts === "number" ? ts : Date.parse(String(ts));
+  return isNaN(n) ? 0 : n;
+}
+
+function toSyncKey(r) {
+  const ms = normalizeTimestampMs(r.timestamp);
+  const bucket = Math.floor(ms / 1000);
+  return bucket + "|" + (r.agentId || r.agent_id || "") + "|" + (r.sessionId || r.session_id || "") + "|" + (r.sentiment || "");
+}
+
 async function loadNeuralFeedbackFromDb() {
   const pool = getNfPool();
   if (!pool) return;
   try {
     const result = await pool.query("SELECT * FROM neural_feedback ORDER BY timestamp DESC LIMIT 1000");
-    const toKey = (r) => (r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp || "")) + "|" + (r.agentId || r.agent_id || "") + "|" + (r.sessionId || r.session_id || "") + "|" + (r.sentiment || "");
     const dbRecords = result.rows.map(r => ({
       timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
       agentId: r.agent_id, featureVector: r.feature_vector,
@@ -377,12 +548,12 @@ async function loadNeuralFeedbackFromDb() {
     const fileRecords = fileData.interactions || [];
     fileRecords.forEach(r => { if (r.timestamp instanceof Date) r.timestamp = r.timestamp.toISOString(); else if (typeof r.timestamp !== "string") r.timestamp = String(r.timestamp); });
 
-    const dbKeys = new Set(dbRecords.map(toKey));
-    const fileKeys = new Set(fileRecords.map(toKey));
+    const dbKeys = new Set(dbRecords.map(toSyncKey));
+    const fileKeys = new Set(fileRecords.map(toSyncKey));
     let fileNew = 0, dbNew = 0;
 
     for (const fr of fileRecords) {
-      if (!dbKeys.has(toKey(fr))) {
+      if (!dbKeys.has(toSyncKey(fr))) {
         try {
           await pool.query(
             `INSERT INTO neural_feedback (timestamp, agent_id, feature_vector, sentiment, sentiment_score, brain_response, raw_text, session_id, architecture)
@@ -395,7 +566,7 @@ async function loadNeuralFeedbackFromDb() {
     }
 
     for (const dr of dbRecords) {
-      if (!fileKeys.has(toKey(dr))) {
+      if (!fileKeys.has(toSyncKey(dr))) {
         fileRecords.push(dr);
         dbNew++;
       }
@@ -418,19 +589,159 @@ async function loadNeuralFeedbackFromDb() {
   } catch (e) { console.error("[neural-feedback] DB sync failed:", e.message); }
 }
 
-async function replayPreferenceFeedback(count) {
+let _engramTableReady = false;
+async function ensureEngramTable() {
+  const pool = getNfPool();
+  if (!pool) return;
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS engram_backups (
+      id SERIAL PRIMARY KEY,
+      label TEXT NOT NULL,
+      brain_type TEXT DEFAULT 'trading',
+      brain_state JSONB,
+      brain_weights JSONB,
+      step_count INTEGER DEFAULT 0,
+      synapse_count INTEGER DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`);
+    _engramTableReady = true;
+  } catch (e) { console.error("[engram] Table create failed:", e.message); }
+}
+
+async function createEngramBackup(label, brainType) {
+  const pool = getNfPool();
+  if (!pool) return { error: "No database configured" };
+  if (!_engramTableReady) await ensureEngramTable();
+  try {
+    const bt = brainType || "trading";
+    const portFile = bt === "agent" ? path.join(DATA_DIR, "agent-brain-engine-port") : path.join(DATA_DIR, "brain-engine-port");
+    let brainPort = 0;
+    try { brainPort = parseInt(fs.readFileSync(portFile, "utf8").trim()); } catch (_) {}
+    if (!brainPort) return { error: "Brain engine not running (no port file for " + bt + ")" };
+
+    const fetchBrain = (endpoint) => new Promise((resolve) => {
+      const req = http.request({ hostname: "127.0.0.1", port: brainPort, path: endpoint, method: "GET", timeout: 5000 }, (res) => {
+        let data = "";
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => { try { resolve(JSON.parse(data)); } catch (_) { resolve(null); } });
+      });
+      req.on("error", () => resolve(null));
+      req.on("timeout", () => { req.destroy(); resolve(null); });
+      req.end();
+    });
+
+    const status = await fetchBrain("/status");
+    const weights = await fetchBrain("/weights");
+
+    if (!status) return { error: "Could not reach brain engine" };
+
+    const result = await pool.query(
+      `INSERT INTO engram_backups (label, brain_type, brain_state, brain_weights, step_count, synapse_count)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, label, brain_type, step_count, synapse_count, created_at`,
+      [label, bt, JSON.stringify(status), JSON.stringify(weights || {}), status.step_count || 0, status.synapse_count || status.total_synapses || 0]
+    );
+
+    const cutoff = await pool.query(`SELECT id FROM engram_backups WHERE brain_type = $1 ORDER BY created_at DESC OFFSET 20 LIMIT 1`, [bt]);
+    if (cutoff.rows.length > 0) {
+      await pool.query(`DELETE FROM engram_backups WHERE brain_type = $1 AND id <= $2`, [bt, cutoff.rows[0].id]);
+    }
+
+    console.log("[engram] Created backup: " + label + " (type=" + bt + ", steps=" + (status.step_count || 0) + ")");
+    return result.rows[0];
+  } catch (e) {
+    console.error("[engram] Backup failed:", e.message);
+    return { error: e.message };
+  }
+}
+
+async function listEngramBackups(brainType) {
+  const pool = getNfPool();
+  if (!pool) return [];
+  if (!_engramTableReady) await ensureEngramTable();
+  try {
+    const bt = brainType || "trading";
+    const result = await pool.query(
+      `SELECT id, label, brain_type, step_count, synapse_count, created_at FROM engram_backups WHERE brain_type = $1 ORDER BY created_at DESC LIMIT 20`,
+      [bt]
+    );
+    return result.rows;
+  } catch (_) { return []; }
+}
+
+async function restoreEngramBackup(backupId, brainType) {
+  const pool = getNfPool();
+  if (!pool) return { error: "No database configured" };
+  if (!_engramTableReady) await ensureEngramTable();
+  try {
+    const result = await pool.query(`SELECT * FROM engram_backups WHERE id = $1`, [backupId]);
+    if (result.rows.length === 0) return { error: "Backup not found: " + backupId };
+    const backup = result.rows[0];
+    const bt = brainType || backup.brain_type || "trading";
+    const portFile = bt === "agent" ? path.join(DATA_DIR, "agent-brain-engine-port") : path.join(DATA_DIR, "brain-engine-port");
+    let brainPort = 0;
+    try { brainPort = parseInt(fs.readFileSync(portFile, "utf8").trim()); } catch (_) {}
+    if (!brainPort) return { error: "Brain engine not running" };
+
+    if (backup.brain_weights) {
+      const weightsData = typeof backup.brain_weights === "string" ? backup.brain_weights : JSON.stringify(backup.brain_weights);
+      await new Promise((resolve) => {
+        const req = http.request({ hostname: "127.0.0.1", port: brainPort, path: "/weights", method: "POST", headers: { "Content-Type": "application/json" }, timeout: 10000 }, (res) => {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => resolve(data));
+        });
+        req.on("error", () => resolve(null));
+        req.on("timeout", () => { req.destroy(); resolve(null); });
+        req.write(weightsData);
+        req.end();
+      });
+    }
+
+    console.log("[engram] Restored backup id=" + backupId + " (label=" + backup.label + ", type=" + bt + ")");
+    return { restored: true, id: backup.id, label: backup.label, stepCount: backup.step_count, synapseCount: backup.synapse_count, createdAt: backup.created_at };
+  } catch (e) {
+    console.error("[engram] Restore failed:", e.message);
+    return { error: e.message };
+  }
+}
+
+async function replayPreferenceFeedback(count, dryRun) {
   const interactions = _nfMemory.interactions.slice(-(count || 200));
-  if (interactions.length === 0) return { replayed: 0 };
+  if (interactions.length === 0) return { replayed: 0, dryRun: !!dryRun };
+  let sugarCount = 0, painCount = 0, neutralSkipped = 0;
+  const preview = [];
+  for (const record of interactions) {
+    if (record.sentiment === "neutral") { neutralSkipped++; continue; }
+    const feedback = record.sentiment === "positive" ? "sugar" : "pain";
+    if (feedback === "sugar") sugarCount++;
+    else painCount++;
+    preview.push({ timestamp: record.timestamp, sentiment: record.sentiment, feedback, agentId: record.agentId, rawText: (record.rawText || "").slice(0, 80) });
+  }
+
+  if (dryRun) {
+    return { dryRun: true, total: interactions.length, sugar: sugarCount, pain: painCount, neutralSkipped, preview: preview.slice(-20) };
+  }
+
+  const agentBrainPortFile = path.join(DATA_DIR, "agent-brain-engine-port");
+  let replayBrainType = "trading";
+  try { if (parseInt(fs.readFileSync(agentBrainPortFile, "utf8").trim()) > 0) replayBrainType = "agent"; } catch (_) {}
+  const engramResult = await createEngramBackup("pre-replay-" + new Date().toISOString().slice(0, 19), replayBrainType);
+  if (engramResult.error) {
+    console.error("[neural-feedback] Engram backup failed before replay:", engramResult.error);
+  }
+
   let replayed = 0, errors = 0;
   for (const record of interactions) {
     if (record.sentiment === "neutral") continue;
     const feedback = record.sentiment === "positive" ? "sugar" : "pain";
-    const result = await stimulateBrainPreference(record.featureVector, feedback);
+    const rawScore = record.sentimentScore !== undefined ? record.sentimentScore : record.score;
+    const replayStrength = typeof rawScore === "number" ? Math.abs(rawScore) : undefined;
+    const result = await stimulateBrainPreference(record.featureVector, feedback, replayStrength);
     if (result && !result.error) replayed++;
     else errors++;
   }
   console.log("[neural-feedback] Replayed " + replayed + " preference interactions (" + errors + " errors)");
-  return { replayed, errors, total: interactions.length };
+  return { dryRun: false, replayed, errors, total: interactions.length, sugar: sugarCount, pain: painCount, engramBackupId: engramResult.id || null };
 }
 
 function loadLoginSessions() {
@@ -4079,7 +4390,7 @@ function autoRegisterBotScripts() {
   const registry = loadBotRegistry();
   const newBots = [];
   try {
-    const SKIP_BOTS = new Set(["ig-scalper-engine", "ig-scalper-db", "ig-scalper-backtest", "trade-claw-engine", "indicators", "clawscript-runner"]);
+    const SKIP_BOTS = new Set(["ig-scalper-engine", "ig-scalper-db", "ig-scalper-backtest", "trade-claw-engine", "indicators", "clawscript-runner", "agent-brain-engine-bot"]);
     const files = fs.readdirSync(BOTS_DIR).filter(f => f.endsWith(".cjs") && !SKIP_BOTS.has(f.replace(/\.cjs$/, "")));
     for (const file of files) {
       const id = file.replace(/\.cjs$/, "");
@@ -4315,7 +4626,7 @@ function connectGateway() {
             }
 
             const agentId = (evtSessionKey || "").split(":")[1] || "ceo";
-            _lastAgentResponse = { text: fullText, agentId, features: buildFeatureVector(fullText, agentId), ts: Date.now() };
+            _lastAgentResponse = { text: fullText, agentId, features: buildDynamicFeatureVector(fullText, agentId), ts: Date.now() };
 
             for (const [reqId, pending] of pendingAgentChats) {
               if (!pending.sendAcked || pending.resolved) continue;
@@ -5625,15 +5936,100 @@ async function handleApi(req, res) {
   }
 
   if (req.method === "POST" && p === "/api/neural-feedback/replay") {
+    if (!validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" }), true;
     const body = JSON.parse((await readBody(req)).toString() || "{}");
     const count = parseInt(body.count) || 200;
-    const result = await replayPreferenceFeedback(count);
+    const dryRun = body.dryRun === true || body.dry_run === true;
+    const result = await replayPreferenceFeedback(count, dryRun);
     return json(res, 200, result), true;
   }
 
   if (req.method === "POST" && p === "/api/neural-feedback/sync") {
+    if (!validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" }), true;
     await loadNeuralFeedbackFromDb();
     return json(res, 200, { ok: true, stats: _nfMemory.stats }), true;
+  }
+
+  if (req.method === "POST" && p === "/api/engram/backup") {
+    if (!validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" }), true;
+    const body = JSON.parse((await readBody(req)).toString() || "{}");
+    const label = body.label || "manual-" + new Date().toISOString().slice(0, 19);
+    const brainType = body.brainType || "trading";
+    const result = await createEngramBackup(label, brainType);
+    return json(res, 200, result), true;
+  }
+
+  if (p === "/api/engram/list") {
+    const brainType = url.searchParams.get("brainType") || "trading";
+    const backups = await listEngramBackups(brainType);
+    return json(res, 200, { backups }), true;
+  }
+
+  if (req.method === "POST" && p === "/api/engram/restore") {
+    if (!validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" }), true;
+    const body = JSON.parse((await readBody(req)).toString() || "{}");
+    if (!body.id) return json(res, 400, { error: "Missing backup id" }), true;
+    const result = await restoreEngramBackup(body.id, body.brainType);
+    return json(res, 200, result), true;
+  }
+
+  if (p === "/api/dimensions") {
+    const config = await loadDimensionConfig();
+    const dimensions = Object.entries(DIMENSION_REGISTRY).map(([key, dim]) => ({
+      key,
+      label: dim.label,
+      description: dim.description,
+      category: dim.category,
+      enabled: config[key] !== undefined ? config[key] : dim.defaultEnabled,
+      defaultEnabled: dim.defaultEnabled,
+    }));
+    return json(res, 200, { dimensions, enabledCount: dimensions.filter(d => d.enabled).length, totalCount: dimensions.length }), true;
+  }
+
+  if (req.method === "POST" && p === "/api/dimensions/toggle") {
+    if (!validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" }), true;
+    const body = JSON.parse((await readBody(req)).toString() || "{}");
+    if (!body.key || !DIMENSION_REGISTRY[body.key]) return json(res, 400, { error: "Invalid dimension key" }), true;
+    const enabled = body.enabled !== false;
+    const result = await saveDimensionConfig(body.key, enabled);
+    return json(res, 200, result), true;
+  }
+
+  if (p.startsWith("/api/agent-brain/") || p === "/api/agent-brain") {
+    if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" }), true;
+    const agentBrainPortFile = path.join(DATA_DIR, "agent-brain-engine-port");
+    let agentBrainPort = 0;
+    try { agentBrainPort = parseInt(fs.readFileSync(agentBrainPortFile, "utf8").trim()); } catch (_) {}
+    if (!agentBrainPort || agentBrainPort < 1 || agentBrainPort > 65535) return json(res, 503, { error: "Agent brain not running (no port file)" }), true;
+    const agentBrainPath = (p.replace("/api/agent-brain", "") || "/status") + url.search;
+    const bodyBuf = (req.method === "POST" || req.method === "PUT") ? await readBody(req) : null;
+    const opts = {
+      hostname: "127.0.0.1",
+      port: agentBrainPort,
+      path: agentBrainPath,
+      method: req.method,
+      headers: { "Content-Type": req.headers["content-type"] || "application/json" },
+    };
+    return new Promise((resolve) => {
+      const proxyReq = http.request(opts, (proxyRes) => {
+        let data = "";
+        proxyRes.on("data", (chunk) => (data += chunk));
+        proxyRes.on("end", () => {
+          if (res.headersSent) return resolve(true);
+          const ct = proxyRes.headers["content-type"] || "application/json";
+          res.writeHead(proxyRes.statusCode || 200, { "Content-Type": ct, "Access-Control-Allow-Origin": "*" });
+          res.end(data);
+          resolve(true);
+        });
+      });
+      proxyReq.on("error", (e) => {
+        if (!res.headersSent) json(res, 502, { error: "Agent brain unreachable: " + e.message });
+        resolve(true);
+      });
+      proxyReq.setTimeout(30000, () => { proxyReq.destroy(); if (!res.headersSent) json(res, 504, { error: "Agent brain timeout" }); resolve(true); });
+      if (bodyBuf) proxyReq.write(bodyBuf);
+      proxyReq.end();
+    });
   }
 
   if (p.startsWith("/api/brain/") || p === "/api/brain") {
@@ -6411,11 +6807,21 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
   writeConfigSnapshots();
   autoRegisterBotScripts();
   startRegisteredBots();
+  try {
+    const agentBrainBot = require("./skills/bots/agent-brain-engine-bot.cjs");
+    const agentResult = agentBrainBot.start();
+    console.log("[startup] Agent brain:", agentResult.ok ? "started (PID " + agentResult.pid + ")" : "failed: " + (agentResult.error || "unknown"));
+  } catch (e) {
+    console.log("[startup] Agent brain start error:", e.message);
+  }
   setTimeout(async () => {
     try { const sdb = require("./skills/bots/ig-scalper-db.cjs"); await sdb.ensurePriceCandlesTable(); console.log("[startup] price_candles table ready"); } catch (e) { console.log("[startup] price_candles init failed:", e.message); }
     try {
       await loadNeuralFeedbackFromDb();
       console.log("[startup] Neural feedback: " + _nfMemory.stats.total + " records loaded (pos=" + _nfMemory.stats.positive + " neg=" + _nfMemory.stats.negative + ")");
+      await loadDimensionConfig();
+      const enabledDims = getEnabledDimensions();
+      console.log("[startup] Dimension config: " + enabledDims.length + " of " + Object.keys(DIMENSION_REGISTRY).length + " dimensions enabled");
       const prefFile = path.join(DATA_DIR, "workspace", "PREFERENCES.md");
       const prefExists = (() => { try { return fs.readFileSync(prefFile, "utf8").length > 0; } catch (_) { return false; } })();
       if (!prefExists && _nfMemory.stats.total >= 2) {

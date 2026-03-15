@@ -208,12 +208,37 @@ tr:hover{background:#1c2128}
     <div id="nfHistory"><p class="empty">Loading...</p></div>
   </div>
   <div class="section">
+    <div class="section-title"><span class="section-icon">&#128290;</span> Feature Dimensions</div>
+    <div class="card">
+      <p style="font-size:12px;color:#8b949e;margin-bottom:10px">Toggle which feature dimensions the neural preference learning system tracks. Enabled dimensions consume neurons in the agent brain (max ~30 useful).</p>
+      <div id="dimensionConfig"><p class="empty">Loading...</p></div>
+      <div style="margin-top:8px;font-size:12px;color:#8b949e" id="dimensionSummary"></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title"><span class="section-icon">&#129504;</span> Engram Backups</div>
+    <div class="card">
+      <div class="btn-row" style="margin-bottom:8px">
+        <button class="btn btn-secondary" id="btnEngramBackup">Create Engram Backup</button>
+        <button class="btn btn-secondary" id="btnEngramRefresh">Refresh List</button>
+      </div>
+      <div id="engramList"><p class="empty">Loading...</p></div>
+    </div>
+  </div>
+  <div class="section">
     <div class="section-title"><span class="section-icon">&#9881;&#65039;</span> Actions</div>
     <div class="card">
       <div class="btn-row">
         <button class="btn btn-secondary" id="btnNfSync">Sync DB &amp; File</button>
-        <button class="btn btn-secondary" id="btnNfReplay">Replay Preferences to Brain</button>
+        <button class="btn btn-secondary" id="btnNfReplay">Replay Preferences (Dry Run)</button>
         <button class="btn btn-secondary" id="btnNfRefresh">Refresh</button>
+      </div>
+      <div id="replayPreview" style="display:none;margin-top:12px;padding:12px;background:#1a1a2e;border-radius:8px;font-size:13px">
+        <div id="replayPreviewContent"></div>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn" id="btnReplayConfirm" style="background:#e74c3c;color:#fff">Confirm Replay (Modifies Brain)</button>
+          <button class="btn btn-secondary" id="btnReplayCancel">Cancel</button>
+        </div>
       </div>
     </div>
   </div>

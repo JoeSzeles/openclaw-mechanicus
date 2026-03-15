@@ -48,7 +48,7 @@ for (var i = 0; i < tabs.length; i++) {
     this.classList.add('active');
     document.getElementById('tab-' + target).classList.add('active');
     if (target === 'ig-trading') loadIgConfig();
-    if (target === 'neural-learning') loadNeuralFeedback();
+    if (target === 'neural-learning') { loadNeuralFeedback(); loadEngramList(); loadDimensionConfig(); }
   });
 }
 
@@ -635,6 +635,7 @@ function renderNfHistory(history) {
 }
 
 document.getElementById('btnNfSync').addEventListener('click', function() {
+  if (!confirm('Sync DB & File?\n\nThis will merge records between database and local file using timestamp-normalized deduplication. No records will be duplicated.')) return;
   this.disabled = true; this.textContent = 'Syncing...';
   var btn = this;
   apiFetch('/api/neural-feedback/sync', { method: 'POST' })
@@ -647,20 +648,148 @@ document.getElementById('btnNfSync').addEventListener('click', function() {
 });
 
 document.getElementById('btnNfReplay').addEventListener('click', function() {
-  this.disabled = true; this.textContent = 'Replaying...';
+  this.disabled = true; this.textContent = 'Running Dry Run...';
   var btn = this;
-  apiFetch('/api/neural-feedback/replay', { method: 'POST' })
+  apiFetch('/api/neural-feedback/replay', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({dryRun: true}) })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      btn.disabled = false; btn.textContent = 'Replay Preferences to Brain';
-      showToast('Replayed ' + (data.replayed || 0) + ' preference interactions to brain', 'success');
-    }).catch(function(e) { btn.disabled = false; btn.textContent = 'Replay Preferences to Brain'; showToast('Error: ' + e.message, 'error'); });
+      btn.disabled = false; btn.textContent = 'Replay Preferences (Dry Run)';
+      var preview = document.getElementById('replayPreview');
+      var content = document.getElementById('replayPreviewContent');
+      var html = '<strong>Replay Preview (DRY RUN - no changes made)</strong><br>';
+      html += 'Total interactions: ' + (data.total || 0) + '<br>';
+      html += 'Sugar (positive): <span style="color:#2ecc71">' + (data.sugar || 0) + '</span> | ';
+      html += 'Pain (negative): <span style="color:#e74c3c">' + (data.pain || 0) + '</span> | ';
+      html += 'Neutral (skipped): ' + (data.neutralSkipped || 0) + '<br>';
+      if (data.preview && data.preview.length > 0) {
+        html += '<br><strong>Last ' + data.preview.length + ' records:</strong><br>';
+        html += '<div style="max-height:150px;overflow-y:auto;font-size:12px;margin-top:4px">';
+        data.preview.forEach(function(p) {
+          var color = p.feedback === 'sugar' ? '#2ecc71' : '#e74c3c';
+          html += '<div style="padding:2px 0"><span style="color:' + color + '">' + p.feedback + '</span> - ' + (p.rawText || '(no text)').substring(0,60) + '</div>';
+        });
+        html += '</div>';
+      }
+      content.innerHTML = html;
+      preview.style.display = 'block';
+    }).catch(function(e) { btn.disabled = false; btn.textContent = 'Replay Preferences (Dry Run)'; showToast('Error: ' + e.message, 'error'); });
+});
+
+document.getElementById('btnReplayConfirm').addEventListener('click', function() {
+  if (!confirm('WARNING: This will stimulate the brain with all recorded preferences.\n\nAn engram backup will be created automatically before replay.\n\nProceed?')) return;
+  this.disabled = true; this.textContent = 'Replaying...';
+  var btn = this;
+  apiFetch('/api/neural-feedback/replay', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({dryRun: false}) })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false; btn.textContent = 'Confirm Replay (Modifies Brain)';
+      document.getElementById('replayPreview').style.display = 'none';
+      showToast('Replayed ' + (data.replayed || 0) + ' interactions. Engram backup id: ' + (data.engramBackupId || 'N/A'), 'success');
+      loadEngramList();
+    }).catch(function(e) { btn.disabled = false; btn.textContent = 'Confirm Replay (Modifies Brain)'; showToast('Error: ' + e.message, 'error'); });
+});
+
+document.getElementById('btnReplayCancel').addEventListener('click', function() {
+  document.getElementById('replayPreview').style.display = 'none';
+});
+
+function loadEngramList() {
+  apiFetch('/api/engram/list?brainType=trading')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var el = document.getElementById('engramList');
+      if (!data.backups || data.backups.length === 0) { el.innerHTML = '<p class="empty">No engram backups yet</p>'; return; }
+      var html = '<table style="width:100%;font-size:13px;border-collapse:collapse"><tr style="text-align:left;border-bottom:1px solid #333"><th style="padding:4px">Label</th><th>Steps</th><th>Synapses</th><th>Date</th><th></th></tr>';
+      data.backups.forEach(function(b) {
+        var date = new Date(b.created_at).toLocaleString();
+        html += '<tr style="border-bottom:1px solid #222"><td style="padding:4px">' + b.label + '</td><td>' + (b.step_count || 0) + '</td><td>' + (b.synapse_count || 0) + '</td><td>' + date + '</td>';
+        html += '<td><button class="btn btn-secondary" style="font-size:11px;padding:2px 8px" onclick="restoreEngram(' + b.id + ',\'' + b.label.replace(/'/g,"\\'") + '\')">Restore</button></td></tr>';
+      });
+      html += '</table>';
+      el.innerHTML = html;
+    }).catch(function() { document.getElementById('engramList').innerHTML = '<p class="empty">Failed to load</p>'; });
+}
+
+window.restoreEngram = function(id, label) {
+  if (!confirm('Restore engram backup "' + label + '"?\n\nThis will overwrite current brain weights with the saved snapshot. The current state will NOT be backed up automatically.\n\nCreate a backup first if needed.')) return;
+  apiFetch('/api/engram/restore', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id: id}) })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.restored) showToast('Engram restored: ' + label, 'success');
+      else showToast('Restore failed: ' + (data.error || 'unknown'), 'error');
+    }).catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+};
+
+document.getElementById('btnEngramBackup').addEventListener('click', function() {
+  var label = prompt('Engram backup label:', 'manual-' + new Date().toISOString().slice(0,19));
+  if (!label) return;
+  this.disabled = true; this.textContent = 'Creating...';
+  var btn = this;
+  apiFetch('/api/engram/backup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({label: label, brainType: 'trading'}) })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false; btn.textContent = 'Create Engram Backup';
+      if (data.id) { showToast('Engram backup created (id=' + data.id + ')', 'success'); loadEngramList(); }
+      else showToast('Backup failed: ' + (data.error || 'unknown'), 'error');
+    }).catch(function(e) { btn.disabled = false; btn.textContent = 'Create Engram Backup'; showToast('Error: ' + e.message, 'error'); });
+});
+
+document.getElementById('btnEngramRefresh').addEventListener('click', function() {
+  loadEngramList();
+  showToast('Engram list refreshed', 'success');
 });
 
 document.getElementById('btnNfRefresh').addEventListener('click', function() {
   loadNeuralFeedback();
   showToast('Neural feedback refreshed', 'success');
 });
+
+function loadDimensionConfig() {
+  apiFetch('/api/dimensions')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var el = document.getElementById('dimensionConfig');
+      var summary = document.getElementById('dimensionSummary');
+      if (!data.dimensions || data.dimensions.length === 0) { el.innerHTML = '<p class="empty">No dimensions available</p>'; return; }
+      var categories = {};
+      data.dimensions.forEach(function(d) {
+        if (!categories[d.category]) categories[d.category] = [];
+        categories[d.category].push(d);
+      });
+      var html = '';
+      var catOrder = ['content', 'behavior', 'style', 'identity', 'performance'];
+      catOrder.forEach(function(cat) {
+        var dims = categories[cat];
+        if (!dims) return;
+        html += '<div style="margin-bottom:10px"><strong style="text-transform:capitalize;font-size:12px;color:#e2b714">' + cat + '</strong>';
+        dims.forEach(function(d) {
+          var checked = d.enabled ? ' checked' : '';
+          html += '<div style="display:flex;align-items:center;padding:4px 0;gap:8px">';
+          html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex:1;font-size:13px">';
+          html += '<input type="checkbox" data-dim-key="' + d.key + '"' + checked + ' style="cursor:pointer">';
+          html += '<span>' + d.label + '</span>';
+          html += '</label>';
+          html += '<span style="font-size:11px;color:#8b949e;flex:1">' + d.description + '</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+      });
+      el.innerHTML = html;
+      summary.textContent = data.enabledCount + ' of ' + data.totalCount + ' dimensions active (\u2248' + (data.enabledCount <= 30 ? 'OK' : 'WARNING: >30 may thin neuron allocation') + ')';
+      el.querySelectorAll('input[data-dim-key]').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+          var key = this.getAttribute('data-dim-key');
+          var enabled = this.checked;
+          apiFetch('/api/dimensions/toggle', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({key: key, enabled: enabled}) })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+              if (result.ok) { showToast(key + ' ' + (enabled ? 'enabled' : 'disabled'), 'success'); loadDimensionConfig(); }
+              else showToast('Failed: ' + (result.error || 'unknown'), 'error');
+            }).catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+        });
+      });
+    }).catch(function() { document.getElementById('dimensionConfig').innerHTML = '<p class="empty">Failed to load</p>'; });
+}
 
 loadConfig();
 loadIgConfig();

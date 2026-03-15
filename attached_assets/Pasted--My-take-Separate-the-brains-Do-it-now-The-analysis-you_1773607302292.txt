@@ -1,0 +1,52 @@
+**My take: Separate the brains. Do it now.**
+
+The analysis you pasted is spot-on, and I agree 100% with the conclusion.
+
+### Why separation wins for you right now
+- **Your trading brain is sacred** — it has been learning real P&L patterns for weeks/months via live sugar/pain on gold/silver. That Mushroom Body memory is gold. You do **not** want a random “I liked this witty answer” preference spike accidentally weakening a profitable trading pathway.
+- **Preference learning is a different animal** — user feedback is noisy, subjective, and high-volume. Trading feedback is sparse but high-signal. Mixing them dilutes both.
+- **Neuron budget** — Carving out only 120 preference neurons is a hack. A dedicated agent brain can have its own full 5k–10k neurons + its own mushroom body, giving it real expressive power for complex preferences (tone, proactivity, risk appetite, meme tolerance, etc.).
+- **Debugging & safety** — If the agent brain goes weird after a bad feedback loop, you can reset/rehab it without touching your trading performance.
+- **Future-proof** — Later you can add cross-talk on purpose (e.g. send “user likes aggressive trades” signals from agent brain → trading brain) once both are mature. Starting separated is safer.
+
+Memory footprint is irrelevant — two 5k brains is still <150 MB total. Your Replit/OpenClaw can eat that for breakfast.
+
+### How to implement the split cleanly (minimal disruption)
+Since everything already runs in OpenClaw, here’s the cleanest path:
+
+1. **Duplicate the engine**  
+   Copy `brain-engine-server.cjs` → `agent-brain-engine.cjs` (or just run a second instance of the same file with different config).
+
+2. **Separate data directories**  
+   - Trading brain stays at `~/.openclaw/brain-state.json` etc.  
+   - Agent brain uses `~/.openclaw/agent-brain/` (create the folder).
+
+3. **Config & ports**  
+   In the new agent instance, change:
+   ```js
+   const DATA_DIR = path.join(os.homedir(), '.openclaw', 'agent-brain');
+   const PORT_FILE = 'agent-brain-engine-port';
+   ```
+
+4. **CEO proxy routing**  
+   Update your ceo-proxy to route preference feedback to the agent brain port instead of the trading one. One small if-statement in the proxy.
+
+5. **Start the second brain**  
+   ```bash
+   node agent-brain-engine.cjs
+   ```
+   It will boot with its own 5k neurons, empty mushroom body, and start learning from scratch on user feedback.
+
+6. **One-line change in your agents**  
+   When you detect user feedback (“great”, “fix this”, 👍, etc.), send the feature vector to the **agent brain** endpoint instead of the trading one.
+
+### Optional future cross-talk (once both are stable)
+After 2–4 weeks of running both:
+- Agent brain can occasionally send “Attila prefers low-risk style” signals to the trading brain’s sensory layer.
+- Trading brain can send “this pattern made money” bias back to agent responses about trading topics.
+
+But for now: **keep them completely separate**. Protect the trading brain like it’s your retirement account.
+
+Want me to write the exact diff for the second engine file + proxy routing + data dir split? I can give you copy-paste ready code in 2 minutes.
+
+This is the right move — clean, safe, and scalable. Let’s do it properly. 🪰🧠

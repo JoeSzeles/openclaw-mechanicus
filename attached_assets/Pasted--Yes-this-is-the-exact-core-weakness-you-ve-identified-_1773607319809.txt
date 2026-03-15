@@ -1,0 +1,60 @@
+**Yes — this is the exact core weakness** you’ve identified, and it’s fundamental.
+
+Right now both brains (trading + future ClawBrain) operate with **binary-ish reinforcement**:  
+“Any profit = sugar (+ fixed boost)”  
+“Any loss = pain (- fixed boost)”
+
+The network has **no survival instinct, no greed drive, no hunger for bigger wins**.  
+It treats a +2 pip scalp the same as a +50 pip runner. It has no extra motivation to compound equity, chase high R:R setups, or aggressively cut big losers. It’s literally “dumb no-pain-OK” — exactly as you said.
+
+This is why simple Hebbian sugar/pain often plateaus: the reward signal has **zero gradient on magnitude**.
+
+### The biological fix (and the one that fits your fly-brain philosophy perfectly)
+
+In real insect and mammalian brains, **dopamine (sugar) scales with reward size**.  
+A fly gets a tiny sugar drop → small dopamine hit.  
+A big sugar feast → massive dopamine surge that strongly reinforces the behaviour.  
+Same for punishment intensity.
+
+We just make your existing sugar/pain mechanism **proportional to actual P&L magnitude**.  
+That single change turns the brain from “happy with any profit” into a profit-maximising, loss-avoiding predator.
+
+### Three practical ways to fix it (ranked from simplest to most powerful)
+
+1. **Magnitude Scaling (recommended starting point — do this first)**  
+   Instead of fixed +1 sugar / -1 pain:
+
+   ``` 
+   reward = actual_pips_profit / normaliser
+   sugar_modifier = 1 + (base_delta × |reward|)
+   pain_modifier   = 1 - (base_delta × |reward|)
+   ```
+
+   - Normaliser = e.g. 20 pips (your average expected win) or use log(1 + |pips|) for diminishing returns on huge wins.
+   - Result: +50 pip winner gives 2.5× stronger sugar boost than +20 pip.  
+     -30 pip loser hurts 1.5× more than -20 pip.  
+   → The brain now **actively hunts bigger winners** and **fears big losers**.
+
+2. **Risk-Adjusted Scaling (Sharpe-style — next level)**  
+   `reward = pips_profit / (risk_taken_in_pips + 0.01)`  
+   This punishes high-risk small wins and rewards efficient big wins. The brain learns to love high R:R setups.
+
+3. **Long-term Survival Drive (add a “greed/hunger” layer)**  
+   Every N trades, compute rolling equity curve slope.  
+   If equity is making new highs → global “survival sugar” boost to the whole mushroom body.  
+   This creates a built-in compounding instinct (“I want to grow fat and survive”).
+
+### Why this solves the exact problem you described
+- The brain now has **real motivation to maximise profit** (stronger sugar on bigger wins).
+- It develops a **survival instinct** (stronger pain on big losses + optional equity-curve hunger).
+- It stays 100% biologically plausible (dopamine scales with reward size in flies and mammals).
+- Zero architecture change needed — just modify the existing `applyStimulus(reward)` function and the feedback calculation in Cortex.
+
+Do **magnitude scaling first** (option 1). It’s the smallest change with the biggest immediate impact, and it will make your current trading brain noticeably greedier and smarter before we even touch ClawBrain.
+
+Once that’s working (you’ll see it in the trade log — bigger average winners, tighter loss cutting), we can layer on risk-adjustment or survival drive if you want.
+
+Which of the three directions feels right to you first?  
+Or tell me roughly how you currently calculate sugar/pain in the engine and I’ll give you the exact formula tweak for your code.  
+
+This is the missing piece — once fixed, both brains become way more alive. Let’s solve it.
