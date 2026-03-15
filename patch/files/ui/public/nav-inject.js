@@ -4,6 +4,7 @@
   var _graphData = null;
   var _activityPollTimer = null;
   var _lastActivityTs = Date.now();
+  var _seenActivityIds = {};
 
   function inject() {
     if (document.getElementById('openclaw-nav')) return;
@@ -364,6 +365,7 @@
     var logEl = document.getElementById('ocn-bp-log');
     if (logEl) logEl.innerHTML = '';
     _lastActivityTs = Date.now() - 60000;
+    _seenActivityIds = {};
     brainFetch('/api/agent-brain/activity?since=' + _lastActivityTs).then(function(data) {
       if (!data) return;
       if (logEl) {
@@ -375,12 +377,14 @@
       if (data.events) {
         for (var i = 0; i < data.events.length; i++) {
           var evt = data.events[i];
+          var eid = evt.ts + ':' + (evt.type || '') + ':' + (evt.sentiment || '');
+          _seenActivityIds[eid] = true;
           if (evt.ts > _lastActivityTs) _lastActivityTs = evt.ts;
           addBrainLog(evt);
         }
       }
+      _activityPollTimer = setInterval(pollActivity, 2000);
     });
-    _activityPollTimer = setInterval(pollActivity, 2000);
   }
 
   function stopActivityPoll() {
@@ -392,13 +396,18 @@
     brainFetch('/api/agent-brain/activity?since=' + _lastActivityTs).then(function(data) {
       if (!data) return;
       if (data.events && data.events.length > 0) {
+        var anyNew = false;
         for (var i = 0; i < data.events.length; i++) {
           var evt = data.events[i];
+          var eid = evt.ts + ':' + (evt.type || '') + ':' + (evt.sentiment || '');
+          if (_seenActivityIds[eid]) continue;
+          _seenActivityIds[eid] = true;
+          anyNew = true;
           if (evt.ts > _lastActivityTs) _lastActivityTs = evt.ts;
           triggerActivityBurst(evt.type, evt.sentiment);
           addBrainLog(evt);
         }
-        refreshBrainPopup();
+        if (anyNew) refreshBrainPopup();
       }
     });
   }

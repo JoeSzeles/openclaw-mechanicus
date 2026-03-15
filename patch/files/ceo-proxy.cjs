@@ -534,8 +534,7 @@ async function stimulateBrainPreference(featureVector, feedback, strength) {
 
 async function processNeuralFeedback(userText, agentId) {
   const { sentiment, score } = classifySentiment(userText);
-  const preview = (userText || "").slice(0, 80);
-  console.log(`[neural-feedback:classify] "${preview}" → ${sentiment} (score=${score.toFixed(2)}) lastResponse=${_lastAgentResponse ? "yes" : "no"}`);
+  console.log(`[neural-feedback:classify] [${(userText || "").length} chars] → ${sentiment} (score=${score.toFixed(2)}) lastResponse=${_lastAgentResponse ? "yes" : "no"}`);
   if (sentiment === "neutral") return null;
 
   const prev = _lastAgentResponse;
