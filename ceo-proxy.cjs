@@ -6867,6 +6867,7 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
     console.log("[startup] Agent brain start error:", e.message);
   }
   setTimeout(() => { checkAgentBrainSteps().then(s => console.log("[startup] Agent brain steps: " + s + (s < 20 ? " (fresh — preference injection disabled until 20+ steps)" : " (active — preference injection enabled)"))); }, 8000);
+  setInterval(() => { checkAgentBrainSteps().catch(() => {}); }, 30000);
   setTimeout(async () => {
     try { const sdb = require("./skills/bots/ig-scalper-db.cjs"); await sdb.ensurePriceCandlesTable(); console.log("[startup] price_candles table ready"); } catch (e) { console.log("[startup] price_candles init failed:", e.message); }
     try {
