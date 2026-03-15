@@ -104,6 +104,15 @@ const DIMENSION_REGISTRY = {
   list_usage: { label: "Lists & Structure", description: "Use of bullet points and numbered lists", category: "style", defaultEnabled: false, extract: (text) => { const bullets = ((text || "").match(/^[\s]*[-*•]\s/gm) || []).length; const numbered = ((text || "").match(/^[\s]*\d+\.\s/gm) || []).length; return Math.min(1, (bullets + numbered) / 10); } },
   emoji_usage: { label: "Emoji Usage", description: "Whether response uses emojis", category: "style", defaultEnabled: false, extract: (text) => /[\u{1F600}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(text || "") ? 1 : 0 },
   explanation_depth: { label: "Explanation Depth", description: "How much the response explains (relative to length)", category: "content", defaultEnabled: false, extract: (text) => { const explains = ((text || "").match(/\b(because|since|this means|in other words|for example|specifically)\b/gi) || []).length; return Math.min(1, explains / 8); } },
+  risk_appetite: { label: "Risk Appetite", description: "Bold/experimental vs safe/conservative suggestions", category: "personality", defaultEnabled: true, extract: (text) => { const bold = ((text || "").match(/\b(aggressive|risky|bold|leverage|speculative|edge case|experimental|push the limit|high reward)\b/gi) || []).length; const safe = ((text || "").match(/\b(safe|conservative|verified|careful|cautious|proven|stable|low risk)\b/gi) || []).length; return Math.min(1, (bold - safe + 5) / 10); } },
+  humor_density: { label: "Humor / Meme Density", description: "Sarcasm, irony, memes, cheekiness level", category: "personality", defaultEnabled: true, extract: (text) => { const humor = ((text || "").match(/\b(lol|haha|lmao|meme|joke|cheeky|sarcas|irony|rofl|😂|🤣|😏)\b/gi) || []).length; const casual = ((text || "").match(/\b(mate|reckon|bloody|crikey|nah|yeah nah|fair dinkum)\b/gi) || []).length; return Math.min(1, (humor + casual) / 5); } },
+  technical_depth: { label: "Technical Depth", description: "Surface-level explanation vs deep architecture/code breakdown", category: "personality", defaultEnabled: true, extract: (text) => { const deep = ((text || "").match(/\b(implementation|architecture|protocol|algorithm|internals|under the hood|deep dive|stack trace|bytecode|syscall|kernel)\b/gi) || []).length; const code = ((text || "").match(/```/g) || []).length / 2; return Math.min(1, (deep + code * 2) / 10); } },
+  response_confidence: { label: "Confidence Style", description: "Hedging (might/possibly) vs strong claims (definitely/this is the way)", category: "personality", defaultEnabled: true, extract: (text) => { const hedge = ((text || "").match(/\b(might|maybe|possibly|perhaps|could be|not sure|potentially|it seems)\b/gi) || []).length; const strong = ((text || "").match(/\b(definitely|certainly|absolutely|this is the way|guaranteed|without doubt|clearly|obviously)\b/gi) || []).length; return Math.min(1, (strong - hedge + 5) / 10); } },
+  visual_usage: { label: "Visual / Diagram Usage", description: "Use of mermaid charts, ASCII art, tables, structured visuals", category: "style", defaultEnabled: false, extract: (text) => { const mermaid = /```mermaid/i.test(text || "") ? 3 : 0; const ascii = ((text || "").match(/[┌┐└┘│─╔╗╚╝║═├┤┬┴┼+\-|]{3,}/g) || []).length; const tables = ((text || "").match(/\|.*\|.*\|/g) || []).length; return Math.min(1, (mermaid + ascii + tables) / 8); } },
+  speed_completeness: { label: "Speed vs Completeness", description: "Quick & short vs comprehensive & thorough", category: "behavior", defaultEnabled: false, extract: (text) => { const words = (text || "").split(/\s+/).length; const sections = ((text || "").match(/^#{1,3}\s/gm) || []).length; return Math.min(1, (words / 500 + sections) / 5); } },
+  off_topic_tolerance: { label: "Off-Topic / Tangent", description: "How much the response explores tangents and analogies", category: "behavior", defaultEnabled: false, extract: (text) => { const tangent = ((text || "").match(/\b(by the way|tangent|side note|fun fact|speaking of|incidentally|as an aside|while we're at it)\b/gi) || []).length; const analogy = ((text || "").match(/\b(like a|think of it as|analogy|metaphor|imagine|picture this)\b/gi) || []).length; return Math.min(1, (tangent + analogy) / 5); } },
+  first_person_tone: { label: "First-Person Tone", description: "I think/I feel vs The optimal approach is", category: "style", defaultEnabled: false, extract: (text) => { const first = ((text || "").match(/\b(I think|I believe|I feel|I'd say|in my opinion|personally)\b/gi) || []).length; return Math.min(1, first / 5); } },
+  cultural_flavor: { label: "Cultural / Regional Flavor", description: "Aussie slang, local references, regional humor", category: "personality", defaultEnabled: false, extract: (text) => { const aussie = ((text || "").match(/\b(mate|reckon|arvo|brekkie|barbie|fair dinkum|no worries|she'll be right|strewth|crikey|bloody|heaps|sunnies|thongs|ute)\b/gi) || []).length; return Math.min(1, aussie / 3); } },
 };
 
 let _dimensionConfig = null;
@@ -465,7 +474,7 @@ async function recordNeuralFeedback(agentId, featureVector, sentiment, sentiment
 
 async function stimulateBrainPreference(featureVector, feedback, strength) {
   try {
-    const agentBrainPortFile = path.join(DATA_DIR, "agent-brain-engine-port");
+    const agentBrainPortFile = path.join(process.env.HOME || "/home/runner", ".openclaw", "agent-brain", "agent-brain-engine-port");
     const tradingBrainPortFile = path.join(DATA_DIR, "brain-engine-port");
     let brainPort = 0;
     try { brainPort = parseInt(fs.readFileSync(agentBrainPortFile, "utf8").trim()); } catch (_) {}
@@ -722,7 +731,7 @@ async function replayPreferenceFeedback(count, dryRun) {
     return { dryRun: true, total: interactions.length, sugar: sugarCount, pain: painCount, neutralSkipped, preview: preview.slice(-20) };
   }
 
-  const agentBrainPortFile = path.join(DATA_DIR, "agent-brain-engine-port");
+  const agentBrainPortFile = path.join(process.env.HOME || "/home/runner", ".openclaw", "agent-brain", "agent-brain-engine-port");
   let replayBrainType = "trading";
   try { if (parseInt(fs.readFileSync(agentBrainPortFile, "utf8").trim()) > 0) replayBrainType = "agent"; } catch (_) {}
   const engramResult = await createEngramBackup("pre-replay-" + new Date().toISOString().slice(0, 19), replayBrainType);
@@ -5996,8 +6005,8 @@ async function handleApi(req, res) {
   }
 
   if (p.startsWith("/api/agent-brain/") || p === "/api/agent-brain") {
-    if (!authGateway(req)) return json(res, 401, { error: "Unauthorized" }), true;
-    const agentBrainPortFile = path.join(DATA_DIR, "agent-brain-engine-port");
+    if (!authGateway(req) && !validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" }), true;
+    const agentBrainPortFile = path.join(process.env.HOME || "/home/runner", ".openclaw", "agent-brain", "agent-brain-engine-port");
     let agentBrainPort = 0;
     try { agentBrainPort = parseInt(fs.readFileSync(agentBrainPortFile, "utf8").trim()); } catch (_) {}
     if (!agentBrainPort || agentBrainPort < 1 || agentBrainPort > 65535) return json(res, 503, { error: "Agent brain not running (no port file)" }), true;

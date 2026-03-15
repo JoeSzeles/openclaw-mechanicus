@@ -1,0 +1,67 @@
+Here are some strong additional dimensions to consider adding to your 9 active ones (you’re already at a solid foundation with Content, Behavior, Style, Identity, and Performance basics). These suggestions focus on making the agent feel more “alive”, intuitive, and tailored to real user experience — especially for someone like you who builds complex, technical, and sometimes playful systems.
+
+I grouped them by category and ranked them roughly by impact/ease of implementation.
+
+### High-Impact Additions (strongly recommended)
+1. **Risk Appetite / Conservatism**  
+   - Tracks if the user prefers safe/verified answers vs bold/experimental ones  
+   - Very relevant for trading-related chats (e.g. “don’t suggest high-leverage ideas” vs “show me aggressive setups”)  
+   - Easy to measure: look at user corrections like “too risky”, “be more conservative”, “I like that edge case”
+
+2. **Humor / Meme Density**  
+   - How much sarcasm, irony, memes, or Brisbane-style cheekiness the user enjoys  
+   - You already have a playful vibe — this would let the agent learn exactly how much “mean meme machine” energy to dial up/down  
+   - Detect via thumbs-up on funny replies, or corrections like “too serious” / “more memes”
+
+3. **Technical Depth Preference**  
+   - Surface-level explanation vs deep-dive architecture/code/math  
+   - Crucial for a builder like you — sometimes you want quick answers, sometimes full protocol breakdowns  
+   - Measured by user feedback like “too shallow”, “go deeper”, or length of follow-up questions
+
+4. **Response Confidence / Certainty Style**  
+   - Does the user prefer hedging (“might be”, “possibly”) or strong claims (“definitely”, “this is the way”)?  
+   - Affects trust and annoyance level — some users hate wishy-washy answers, others hate overconfidence
+
+### Medium-Impact but Nice Polish
+5. **Visual / Diagram Usage**  
+   - Preference for including mermaid charts, ASCII art, tables, or just pure text  
+   - You use a lot of structured visuals in your repos/docs — the agent could learn when to draw vs when to describe
+
+6. **Speed vs Completeness Tradeoff**  
+   - Quick & short vs comprehensive & long  
+   - Overlaps with length, but more explicit: “I need this fast” vs “take your time and explain everything”
+
+7. **Off-Topic Tolerance / Focus**  
+   - How much the user minds tangents, analogies, or side explorations  
+   - Useful for keeping the agent on-rails when you’re in deep work mode
+
+### Lower-Priority / Nice-to-Have
+8. **First-Person vs Third-Person Tone**  
+   - “I think…” vs “The optimal approach is…”  
+   - Some users prefer the agent sounding more human/relatable
+
+9. **Cultural / Regional Flavor**  
+   - Brisbane/Aussie slang, references, or dry humor tolerance  
+   - Very niche but could make interactions feel more personal
+
+### Suggested Prioritized Additions (my personal top-5 for you)
+Based on your style, trading background, and the fact you’re building complex agent systems:
+
+1. Risk Appetite / Conservatism  
+2. Humor / Meme Density  
+3. Technical Depth Preference  
+4. Response Confidence / Certainty Style  
+5. Visual / Diagram Usage
+
+### Implementation Notes
+- **Neuron budget**: each new dimension ≈ 120–200 sensory neurons (you have room to go to 12–15 total dimensions with 20k neurons)
+- **Feature extraction**: for most of these you can use simple keyword detection + sentiment polarity on user feedback (“too risky”, “love the meme”, “go deeper”, “stop hedging”, “add a diagram”)
+- **Bias injection**: map motor outputs to prompt modifiers like:
+  - high risk-tolerance motor → “Be willing to explore aggressive ideas”
+  - high meme motor → “Inject cheeky Brisbane-style humor”
+  - high depth motor → “Provide detailed technical explanation”
+
+Add 2–3 of the top ones first, run for a week, see how the agent adapts to your corrections — then decide on the rest.
+
+Which 2–3 of these feel most valuable to you right now?  
+I can help refine the exact feature extraction logic or bias injection phrasing if you want.
