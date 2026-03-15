@@ -2,6 +2,8 @@
   var _brainPollTimer = null;
   var _brainPopupOpen = false;
   var _graphData = null;
+  var _activityPollTimer = null;
+  var _lastActivityTs = Date.now();
 
   function inject() {
     if (document.getElementById('openclaw-nav')) return;
@@ -69,14 +71,15 @@
     document.getElementById('ocn-brain-pill').addEventListener('click', function() {
       _brainPopupOpen = !_brainPopupOpen;
       document.getElementById('ocn-brain-popup').style.display = _brainPopupOpen ? 'block' : 'none';
-      if (_brainPopupOpen) { refreshBrainPopup(); startBrainViz(); }
-      else { stopBrainViz(); }
+      if (_brainPopupOpen) { refreshBrainPopup(); startBrainViz(); startActivityPoll(); }
+      else { stopBrainViz(); stopActivityPoll(); }
     });
     document.getElementById('ocn-bp-close').addEventListener('click', function(e) {
       e.stopPropagation();
       _brainPopupOpen = false;
       document.getElementById('ocn-brain-popup').style.display = 'none';
       stopBrainViz();
+      stopActivityPoll();
     });
 
     pollBrainStatus();
@@ -351,6 +354,70 @@
       return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
     }
     return hex;
+  }
+
+  function startActivityPoll() {
+    stopActivityPoll();
+    _lastActivityTs = Date.now() - 30000;
+    pollActivity();
+    _activityPollTimer = setInterval(pollActivity, 2000);
+  }
+
+  function stopActivityPoll() {
+    if (_activityPollTimer) { clearInterval(_activityPollTimer); _activityPollTimer = null; }
+  }
+
+  function pollActivity() {
+    if (!_brainPopupOpen) return;
+    brainFetch('/api/agent-brain/activity?since=' + _lastActivityTs).then(function(data) {
+      if (!data) return;
+      if (data.events && data.events.length > 0) {
+        for (var i = 0; i < data.events.length; i++) {
+          var evt = data.events[i];
+          if (evt.ts > _lastActivityTs) _lastActivityTs = evt.ts;
+          triggerActivityBurst(evt.type, evt.sentiment);
+        }
+        refreshBrainPopup();
+      }
+    });
+  }
+
+  function triggerActivityBurst(type, sentiment) {
+    if (!_vizNodes || _vizNodes.length === 0) return;
+    var sensorNodes = [];
+    var motorNodes = [];
+    var interNodes = [];
+    for (var i = 0; i < _vizNodes.length; i++) {
+      if (_vizNodes[i].group === 'sensory') sensorNodes.push(i);
+      else if (_vizNodes[i].group === 'motor') motorNodes.push(i);
+      else interNodes.push(i);
+    }
+    var burstCount = Math.min(sensorNodes.length, 8);
+    for (var s = 0; s < burstCount; s++) {
+      var idx = sensorNodes[Math.floor(Math.random() * sensorNodes.length)];
+      _vizNodes[idx].glow = 1;
+    }
+    var delay = 150;
+    for (var w = 0; w < 3; w++) {
+      (function(wave) {
+        setTimeout(function() {
+          var waveCount = Math.min(interNodes.length, 12);
+          for (var j = 0; j < waveCount; j++) {
+            var ni = interNodes[Math.floor(Math.random() * interNodes.length)];
+            if (_vizNodes[ni]) _vizNodes[ni].glow = 1;
+          }
+        }, delay * (wave + 1));
+      })(w);
+    }
+    setTimeout(function() {
+      var targetMotor = type === 'sugar' ? 'reinforce' : 'adjust';
+      for (var m = 0; m < motorNodes.length; m++) {
+        var mn = _vizNodes[motorNodes[m]];
+        if (mn && (mn.motor === targetMotor || Math.random() < 0.4)) {
+          mn.glow = 1;
+        }
+      }
+    }, delay * 4);
   }
 
   inject();

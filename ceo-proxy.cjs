@@ -46,6 +46,9 @@ function getNfPool() {
 
 const _nfMemory = { interactions: [], lastFeedback: null, stats: { total: 0, positive: 0, negative: 0, neutral: 0 } };
 let _nfLastBackup = 0;
+let _agentBrainStepCount = 0;
+let _agentBrainStepLastCheck = 0;
+const _recentBrainActivity = [];
 
 const POSITIVE_KEYWORDS = ["good", "great", "perfect", "yes", "nice", "excellent", "love", "awesome", "correct", "exactly", "thanks", "thank you", "well done", "brilliant", "solid", "works", "beautiful", "amazing"];
 const NEGATIVE_KEYWORDS = ["no", "wrong", "bad", "redo", "fix", "broken", "terrible", "useless", "stop", "fail", "error", "crash", "crap", "rubbish", "awful", "horrible", "doesn't work", "not right", "not what"];
@@ -319,11 +322,39 @@ function buildPreferenceContext() {
   return ctx;
 }
 
+async function checkAgentBrainSteps() {
+  const now = Date.now();
+  if (now - _agentBrainStepLastCheck < 30000 && _agentBrainStepCount > 0) return _agentBrainStepCount;
+  try {
+    const agentBrainPortFile = path.join(process.env.HOME || "/home/runner", ".openclaw", "agent-brain", "agent-brain-engine-port");
+    let brainPort = 0;
+    try { brainPort = parseInt(fs.readFileSync(agentBrainPortFile, "utf8").trim()); } catch (_) { return 0; }
+    if (!brainPort) return 0;
+    return new Promise((resolve) => {
+      const req = http.request({ hostname: "127.0.0.1", port: brainPort, path: "/observe", method: "GET", timeout: 2000 }, (res) => {
+        let data = "";
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => {
+          try {
+            const parsed = JSON.parse(data);
+            _agentBrainStepCount = parsed.step_count || 0;
+            _agentBrainStepLastCheck = now;
+            resolve(_agentBrainStepCount);
+          } catch (_) { resolve(0); }
+        });
+      });
+      req.on("error", () => resolve(0));
+      req.on("timeout", () => { req.destroy(); resolve(0); });
+      req.end();
+    });
+  } catch (_) { return 0; }
+}
+
 async function queryBrainMotorRates() {
   try {
-    const brainPortFile = path.join(DATA_DIR, "brain-engine-port");
+    const agentBrainPortFile = path.join(process.env.HOME || "/home/runner", ".openclaw", "agent-brain", "agent-brain-engine-port");
     let brainPort = 0;
-    try { brainPort = parseInt(fs.readFileSync(brainPortFile, "utf8").trim()); } catch (_) { return null; }
+    try { brainPort = parseInt(fs.readFileSync(agentBrainPortFile, "utf8").trim()); } catch (_) {}
     if (!brainPort) return null;
     return new Promise((resolve) => {
       const req = http.request({ hostname: "127.0.0.1", port: brainPort, path: "/observe", method: "GET", timeout: 2000 }, (res) => {
@@ -341,6 +372,8 @@ async function queryBrainMotorRates() {
 }
 
 async function buildFullPreferenceContext() {
+  const brainSteps = await checkAgentBrainSteps();
+  if (brainSteps < 20) return "";
   let ctx = buildPreferenceContext();
   const motorRates = await queryBrainMotorRates();
   if (motorRates && motorRates.motor_rates) {
@@ -475,12 +508,8 @@ async function recordNeuralFeedback(agentId, featureVector, sentiment, sentiment
 async function stimulateBrainPreference(featureVector, feedback, strength) {
   try {
     const agentBrainPortFile = path.join(process.env.HOME || "/home/runner", ".openclaw", "agent-brain", "agent-brain-engine-port");
-    const tradingBrainPortFile = path.join(DATA_DIR, "brain-engine-port");
     let brainPort = 0;
     try { brainPort = parseInt(fs.readFileSync(agentBrainPortFile, "utf8").trim()); } catch (_) {}
-    if (!brainPort) {
-      try { brainPort = parseInt(fs.readFileSync(tradingBrainPortFile, "utf8").trim()); } catch (_) {}
-    }
     if (!brainPort) return null;
 
     const payload = { features: featureVector, feedback, steps: 5 };
@@ -525,7 +554,10 @@ async function processNeuralFeedback(userText, agentId) {
     featureVector, sentiment, score, brainResponse, userText
   );
 
-  console.log("[neural-feedback] " + sentiment + " (" + score.toFixed(2) + ") from " + (agentId || "user") + " → brain " + feedback + (brainResponse ? " (buy=" + (brainResponse.buy_signal || 0).toFixed(2) + " sell=" + (brainResponse.sell_signal || 0).toFixed(2) + ")" : " (brain offline)"));
+  const brainSig = brainResponse ? " (R=" + (brainResponse.reinforce_signal || 0).toFixed(2) + " A=" + (brainResponse.adjust_signal || 0).toFixed(2) + " E=" + (brainResponse.explore_signal || 0).toFixed(2) + ")" : " (brain offline)";
+  console.log("[neural-feedback] " + sentiment + " (" + score.toFixed(2) + ") from " + (agentId || "user") + " → brain " + feedback + brainSig);
+  _recentBrainActivity.push({ ts: Date.now(), type: feedback, sentiment, brainResponse: brainResponse || null });
+  if (_recentBrainActivity.length > 50) _recentBrainActivity.splice(0, _recentBrainActivity.length - 50);
   return record;
 }
 
@@ -6004,6 +6036,13 @@ async function handleApi(req, res) {
     return json(res, 200, result), true;
   }
 
+  if (p === "/api/agent-brain/activity") {
+    if (!authGateway(req) && !validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" }), true;
+    const since = parseInt(url.searchParams.get("since") || "0", 10);
+    const events = _recentBrainActivity.filter(e => e.ts > since);
+    return json(res, 200, { events, brainSteps: _agentBrainStepCount }), true;
+  }
+
   if (p.startsWith("/api/agent-brain/") || p === "/api/agent-brain") {
     if (!authGateway(req) && !validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" }), true;
     const agentBrainPortFile = path.join(process.env.HOME || "/home/runner", ".openclaw", "agent-brain", "agent-brain-engine-port");
@@ -6765,12 +6804,16 @@ server.on("upgrade", (req, socket, head) => {
               } else {
                 console.log("[neural-feedback:intercept] no _lastAgentResponse yet — skipping");
               }
-              const prefCtx = buildPreferenceContext();
-              if (prefCtx) {
-                frame.params.message = originalUserMsg + "\n\n---\n" + prefCtx;
-                finalData = JSON.stringify(frame);
-                finalOpts = { binary: false };
-                console.log("[neural-feedback:inject] Injected preference context (" + prefCtx.length + " chars) into chat.send");
+              if (_agentBrainStepCount >= 20) {
+                const prefCtx = buildPreferenceContext();
+                if (prefCtx) {
+                  frame.params.message = originalUserMsg + "\n\n---\n" + prefCtx;
+                  finalData = JSON.stringify(frame);
+                  finalOpts = { binary: false };
+                  console.log("[neural-feedback:inject] Injected preference context (" + prefCtx.length + " chars) into chat.send");
+                }
+              } else {
+                console.log("[neural-feedback:inject] Skipped — agent brain fresh (steps=" + _agentBrainStepCount + ")");
               }
             }
           }
@@ -6823,6 +6866,7 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
   } catch (e) {
     console.log("[startup] Agent brain start error:", e.message);
   }
+  setTimeout(() => { checkAgentBrainSteps().then(s => console.log("[startup] Agent brain steps: " + s + (s < 20 ? " (fresh — preference injection disabled until 20+ steps)" : " (active — preference injection enabled)"))); }, 8000);
   setTimeout(async () => {
     try { const sdb = require("./skills/bots/ig-scalper-db.cjs"); await sdb.ensurePriceCandlesTable(); console.log("[startup] price_candles table ready"); } catch (e) { console.log("[startup] price_candles init failed:", e.message); }
     try {
