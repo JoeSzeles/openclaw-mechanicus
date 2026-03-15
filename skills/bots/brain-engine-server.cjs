@@ -254,37 +254,48 @@ function step(externalInput) {
 
 function getMotorRates() {
   const window = Math.min(spikeHistory.length, 20);
-  if (window === 0) return { buy_signal: 0, sell_signal: 0, hold_signal: 0, avg_rate: 0, raw: {} };
   const motorStart = N_SENSORY + N_INTER;
-  const buyEnd = Math.floor(N_MOTOR / 3);
-  const sellEnd = Math.floor(2 * N_MOTOR / 3);
-  const buyNeurons = [];
-  const sellNeurons = [];
-  const holdNeurons = [];
-  for (let m = 0; m < N_MOTOR; m++) {
-    if (m < buyEnd) buyNeurons.push(motorStart + m);
-    else if (m < sellEnd) sellNeurons.push(motorStart + m);
-    else holdNeurons.push(motorStart + m);
+  const third = Math.floor(N_MOTOR / 3);
+  const regionLabels = IS_AGENT_BRAIN
+    ? ['reinforce', 'adjust', 'explore']
+    : ['buy', 'sell', 'hold'];
+  const regionBounds = [
+    { start: 0, end: third },
+    { start: third, end: 2 * third },
+    { start: 2 * third, end: N_MOTOR },
+  ];
+  if (window === 0) {
+    const result = { avg_rate: 0, raw: {} };
+    regionLabels.forEach(l => { result[l + '_signal'] = 0; result.raw[l] = 0; });
+    result.raw.total = 0;
+    return result;
   }
-  let buyCount = 0, sellCount = 0, holdCount = 0, totalCount = 0;
+  const counts = [0, 0, 0];
+  let totalCount = 0;
   for (let i = spikeHistory.length - window; i < spikeHistory.length; i++) {
     const entry = spikeHistory[i];
     for (const s of entry.spikes) {
-      if (buyNeurons.includes(s)) buyCount++;
-      if (sellNeurons.includes(s)) sellCount++;
-      if (holdNeurons.includes(s)) holdCount++;
-      if (s >= motorStart) totalCount++;
+      if (s >= motorStart && s < motorStart + N_MOTOR) {
+        const m = s - motorStart;
+        for (let r = 0; r < 3; r++) {
+          if (m >= regionBounds[r].start && m < regionBounds[r].end) { counts[r]++; break; }
+        }
+        totalCount++;
+      }
     }
   }
   const scale = 1000 / (window * DT);
-  return {
-    buy_signal: parseFloat((buyCount * scale / buyNeurons.length).toFixed(2)),
-    sell_signal: parseFloat((sellCount * scale / sellNeurons.length).toFixed(2)),
-    hold_signal: parseFloat((holdCount * scale / holdNeurons.length).toFixed(2)),
+  const result = {
     avg_rate: parseFloat((totalCount * scale / N_MOTOR).toFixed(2)),
     motor_rates: parseFloat((totalCount * scale / N_MOTOR).toFixed(2)),
-    raw: { buy: buyCount, sell: sellCount, hold: holdCount, total: totalCount }
+    raw: { total: totalCount },
   };
+  regionLabels.forEach((l, i) => {
+    const regionSize = regionBounds[i].end - regionBounds[i].start;
+    result[l + '_signal'] = parseFloat((counts[i] * scale / regionSize).toFixed(2));
+    result.raw[l] = counts[i];
+  });
+  return result;
 }
 
 function stimulateFromPrice(priceData) {
@@ -1007,6 +1018,7 @@ async function handleRequest(req, res) {
 
   if (m === 'GET' && p === '/status') {
     const arch = getArchitecture();
+    const rates = isBooted ? getMotorRates() : {};
     return respond(res, 200, {
       instance_id: BRAIN_INSTANCE_ID,
       loaded: isBooted,
@@ -1018,6 +1030,7 @@ async function handleRequest(req, res) {
       regions: { sensory: N_SENSORY, inter: N_INTER, motor: N_MOTOR },
       params: currentParams,
       motor_regions: arch.motor_regions,
+      motor_rates: rates,
       patterns: Object.keys(patternMemory).length,
       pattern_instruments: Object.keys(patternMemory),
       weights_file: fs.existsSync(path.join(DATA_DIR, 'brain-weights.json')) ? 'brain-weights.json' : null,
@@ -1097,6 +1110,10 @@ async function handleRequest(req, res) {
     for (let s = 0; s < stepsToRun; s++) step(inputs);
     const rates = getMotorRates();
     return respond(res, 200, { timestamp: Date.now(), step_count: stepCount, ...rates });
+  }
+
+  if (IS_AGENT_BRAIN && (p === '/stimulate-price' || p === '/replay-trading' || p === '/backtest-train' || p === '/live-train' || p === '/proof-test' || p.startsWith('/cortex-'))) {
+    return respond(res, 404, { error: 'Trading-only endpoint not available on agent brain' });
   }
 
   if (m === 'POST' && p === '/stimulate-price') {

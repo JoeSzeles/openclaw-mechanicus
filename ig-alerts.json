@@ -6,38 +6,6 @@
       "message": "Pipeline test alert",
       "level": "info",
       "channel": "default",
-      "timestamp": "2026-03-08T09:42:24.302Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test-target",
-      "message": "Pipeline stub test",
-      "level": "debug",
-      "channel": "default",
-      "timestamp": "2026-03-08T09:42:24.579Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test",
-      "message": "Pipeline test alert",
-      "level": "info",
-      "channel": "default",
-      "timestamp": "2026-03-08T10:00:51.762Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test-target",
-      "message": "Pipeline stub test",
-      "level": "debug",
-      "channel": "default",
-      "timestamp": "2026-03-08T10:00:52.235Z"
-    },
-    {
-      "type": "clawscript_alert",
-      "target": "test",
-      "message": "Pipeline test alert",
-      "level": "info",
-      "channel": "default",
       "timestamp": "2026-03-08T10:02:08.500Z"
     },
     {
@@ -3999,6 +3967,38 @@
       "level": "debug",
       "channel": "default",
       "timestamp": "2026-03-15T21:47:11.977Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-15T21:51:21.174Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-15T21:51:21.327Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test",
+      "message": "Pipeline test alert",
+      "level": "info",
+      "channel": "default",
+      "timestamp": "2026-03-15T21:53:18.766Z"
+    },
+    {
+      "type": "clawscript_alert",
+      "target": "test-target",
+      "message": "Pipeline stub test",
+      "level": "debug",
+      "channel": "default",
+      "timestamp": "2026-03-15T21:53:18.895Z"
     }
   ]
 }

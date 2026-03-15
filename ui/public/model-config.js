@@ -694,20 +694,25 @@ document.getElementById('btnReplayCancel').addEventListener('click', function() 
 });
 
 function loadEngramList() {
-  apiFetch('/api/engram/list?brainType=trading')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      var el = document.getElementById('engramList');
-      if (!data.backups || data.backups.length === 0) { el.innerHTML = '<p class="empty">No engram backups yet</p>'; return; }
-      var html = '<table style="width:100%;font-size:13px;border-collapse:collapse"><tr style="text-align:left;border-bottom:1px solid #333"><th style="padding:4px">Label</th><th>Steps</th><th>Synapses</th><th>Date</th><th></th></tr>';
-      data.backups.forEach(function(b) {
-        var date = new Date(b.created_at).toLocaleString();
-        html += '<tr style="border-bottom:1px solid #222"><td style="padding:4px">' + b.label + '</td><td>' + (b.step_count || 0) + '</td><td>' + (b.synapse_count || 0) + '</td><td>' + date + '</td>';
-        html += '<td><button class="btn btn-secondary" style="font-size:11px;padding:2px 8px" onclick="restoreEngram(' + b.id + ',\'' + b.label.replace(/'/g,"\\'") + '\')">Restore</button></td></tr>';
-      });
-      html += '</table>';
-      el.innerHTML = html;
-    }).catch(function() { document.getElementById('engramList').innerHTML = '<p class="empty">Failed to load</p>'; });
+  var el = document.getElementById('engramList');
+  Promise.all([
+    apiFetch('/api/engram/list?brainType=agent').then(function(r) { return r.json(); }).catch(function() { return { backups: [] }; }),
+    apiFetch('/api/engram/list?brainType=trading').then(function(r) { return r.json(); }).catch(function() { return { backups: [] }; })
+  ]).then(function(results) {
+    var agentBackups = (results[0].backups || []).map(function(b) { b._brainType = 'agent'; return b; });
+    var tradingBackups = (results[1].backups || []).map(function(b) { b._brainType = 'trading'; return b; });
+    var allBackups = agentBackups.concat(tradingBackups).sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+    if (allBackups.length === 0) { el.innerHTML = '<p class="empty">No engram backups yet</p>'; return; }
+    var html = '<table style="width:100%;font-size:13px;border-collapse:collapse"><tr style="text-align:left;border-bottom:1px solid #333"><th style="padding:4px">Label</th><th>Brain</th><th>Steps</th><th>Synapses</th><th>Date</th><th></th></tr>';
+    allBackups.forEach(function(b) {
+      var date = new Date(b.created_at).toLocaleString();
+      var brainColor = b._brainType === 'agent' ? '#bc8cff' : '#58a6ff';
+      html += '<tr style="border-bottom:1px solid #222"><td style="padding:4px">' + b.label + '</td><td><span style="color:' + brainColor + ';font-weight:600;font-size:11px">' + b._brainType + '</span></td><td>' + (b.step_count || 0) + '</td><td>' + (b.synapse_count || 0) + '</td><td>' + date + '</td>';
+      html += '<td><button class="btn btn-secondary" style="font-size:11px;padding:2px 8px" onclick="restoreEngram(' + b.id + ',\'' + b.label.replace(/'/g,"\\'") + '\')">Restore</button></td></tr>';
+    });
+    html += '</table>';
+    el.innerHTML = html;
+  }).catch(function() { el.innerHTML = '<p class="empty">Failed to load</p>'; });
 }
 
 window.restoreEngram = function(id, label) {
@@ -725,7 +730,9 @@ document.getElementById('btnEngramBackup').addEventListener('click', function() 
   if (!label) return;
   this.disabled = true; this.textContent = 'Creating...';
   var btn = this;
-  apiFetch('/api/engram/backup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({label: label, brainType: 'trading'}) })
+  var brainType = prompt('Which brain to backup?', 'agent');
+  if (brainType !== 'agent' && brainType !== 'trading') { btn.disabled = false; btn.textContent = 'Create Engram Backup'; return; }
+  apiFetch('/api/engram/backup', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({label: label, brainType: brainType}) })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       btn.disabled = false; btn.textContent = 'Create Engram Backup';

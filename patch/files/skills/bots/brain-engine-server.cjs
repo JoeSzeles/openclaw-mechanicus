@@ -4,6 +4,7 @@ const path = require('path');
 
 const BRAIN_PORT = parseInt(process.env.BRAIN_PORT) || 0;
 const BRAIN_INSTANCE_ID = process.env.BRAIN_INSTANCE_ID || 'trading';
+const IS_AGENT_BRAIN = BRAIN_INSTANCE_ID === 'agent';
 const DATA_DIR = process.env.BRAIN_DATA_DIR || path.join(process.env.HOME || '/home/runner', '.openclaw');
 const PORT_FILENAME = process.env.BRAIN_PORT_FILENAME || 'brain-engine-port';
 const PATTERNS_DIR = path.join(DATA_DIR, 'brain-patterns');
@@ -11,9 +12,13 @@ const BRAIN_STATE_FILE = path.join(DATA_DIR, 'brain-state.json');
 
 try { fs.mkdirSync(PATTERNS_DIR, { recursive: true }); } catch (_) {}
 
-let N_SENSORY = 600;
-let N_INTER = 3600;
-let N_MOTOR = 800;
+const AGENT_DEFAULTS = { sensory: 2000, inter: 14000, motor: 4000, total: 20000 };
+const TRADING_DEFAULTS = { sensory: 600, inter: 3600, motor: 800, total: 5000 };
+const DEFAULTS = IS_AGENT_BRAIN ? AGENT_DEFAULTS : TRADING_DEFAULTS;
+
+let N_SENSORY = DEFAULTS.sensory;
+let N_INTER = DEFAULTS.inter;
+let N_MOTOR = DEFAULTS.motor;
 let N_TOTAL = N_SENSORY + N_INTER + N_MOTOR;
 const DT = 1.0;
 const V_REST = -52.0;
@@ -75,24 +80,42 @@ const TIMEFRAME_PRESETS = {
 
 function recalcSensoryAssignments() {
   const n = N_SENSORY;
-  const priceUp = Math.max(4, Math.floor(n * 0.18));
-  const priceDown = Math.max(4, Math.floor(n * 0.18));
-  const vol = Math.max(4, Math.floor(n * 0.14));
-  const spr = Math.max(2, Math.floor(n * 0.10));
-  const mom = Math.max(2, Math.floor(n * 0.10));
-  const pref = Math.max(6, Math.floor(n * 0.20));
-  const ant = Math.max(7, n - priceUp - priceDown - vol - spr - mom - pref);
+  if (IS_AGENT_BRAIN) {
+    const content   = Math.max(6, Math.floor(n * 0.22));
+    const behavior  = Math.max(6, Math.floor(n * 0.18));
+    const style     = Math.max(6, Math.floor(n * 0.18));
+    const personality = Math.max(6, Math.floor(n * 0.18));
+    const identity  = Math.max(4, Math.floor(n * 0.10));
+    const meta      = Math.max(4, n - content - behavior - style - personality - identity);
+    let offset = 0;
+    sensoryAssignments = {};
+    sensoryAssignments.content_features     = { start: offset, count: content,     desc: 'Content analysis (length, code, data, errors, complexity)' }; offset += content;
+    sensoryAssignments.behavior_features    = { start: offset, count: behavior,    desc: 'Behavioral signals (proactivity, questions, speed)' };         offset += behavior;
+    sensoryAssignments.style_features       = { start: offset, count: style,       desc: 'Style detection (formality, lists, emojis, visuals)' };        offset += style;
+    sensoryAssignments.personality_features = { start: offset, count: personality,  desc: 'Personality axes (risk, humor, confidence, tone, cultural)' };  offset += personality;
+    sensoryAssignments.identity_features    = { start: offset, count: identity,    desc: 'Agent identity signals (agent ID, topic hash)' };              offset += identity;
+    sensoryAssignments.meta_features        = { start: offset, count: meta,        desc: 'Meta/auxiliary dimension signals' };                           offset += meta;
+    antennaSubGroups = {};
+  } else {
+    const priceUp = Math.max(4, Math.floor(n * 0.18));
+    const priceDown = Math.max(4, Math.floor(n * 0.18));
+    const vol = Math.max(4, Math.floor(n * 0.14));
+    const spr = Math.max(2, Math.floor(n * 0.10));
+    const mom = Math.max(2, Math.floor(n * 0.10));
+    const pref = Math.max(6, Math.floor(n * 0.20));
+    const ant = Math.max(7, n - priceUp - priceDown - vol - spr - mom - pref);
 
-  let offset = 0;
-  sensoryAssignments.price_up   = { ...sensoryAssignments.price_up,   start: offset, count: priceUp };   offset += priceUp;
-  sensoryAssignments.price_down = { ...sensoryAssignments.price_down, start: offset, count: priceDown }; offset += priceDown;
-  sensoryAssignments.volume     = { ...sensoryAssignments.volume,     start: offset, count: vol };        offset += vol;
-  sensoryAssignments.spread     = { ...sensoryAssignments.spread,     start: offset, count: spr };        offset += spr;
-  sensoryAssignments.momentum   = { ...sensoryAssignments.momentum,   start: offset, count: mom };        offset += mom;
-  sensoryAssignments.antenna    = { ...sensoryAssignments.antenna,    start: offset, count: ant };        offset += ant;
-  sensoryAssignments.preference = { start: offset, count: pref, desc: 'User preference learning (neural feedback)' };
+    let offset = 0;
+    sensoryAssignments.price_up   = { ...sensoryAssignments.price_up,   start: offset, count: priceUp };   offset += priceUp;
+    sensoryAssignments.price_down = { ...sensoryAssignments.price_down, start: offset, count: priceDown }; offset += priceDown;
+    sensoryAssignments.volume     = { ...sensoryAssignments.volume,     start: offset, count: vol };        offset += vol;
+    sensoryAssignments.spread     = { ...sensoryAssignments.spread,     start: offset, count: spr };        offset += spr;
+    sensoryAssignments.momentum   = { ...sensoryAssignments.momentum,   start: offset, count: mom };        offset += mom;
+    sensoryAssignments.antenna    = { ...sensoryAssignments.antenna,    start: offset, count: ant };        offset += ant;
+    sensoryAssignments.preference = { start: offset, count: pref, desc: 'User preference learning (neural feedback)' };
 
-  recalcAntennaSubGroups();
+    recalcAntennaSubGroups();
+  }
 }
 
 function recalcAntennaSubGroups() {
@@ -231,37 +254,48 @@ function step(externalInput) {
 
 function getMotorRates() {
   const window = Math.min(spikeHistory.length, 20);
-  if (window === 0) return { buy_signal: 0, sell_signal: 0, hold_signal: 0, avg_rate: 0, raw: {} };
   const motorStart = N_SENSORY + N_INTER;
-  const buyEnd = Math.floor(N_MOTOR / 3);
-  const sellEnd = Math.floor(2 * N_MOTOR / 3);
-  const buyNeurons = [];
-  const sellNeurons = [];
-  const holdNeurons = [];
-  for (let m = 0; m < N_MOTOR; m++) {
-    if (m < buyEnd) buyNeurons.push(motorStart + m);
-    else if (m < sellEnd) sellNeurons.push(motorStart + m);
-    else holdNeurons.push(motorStart + m);
+  const third = Math.floor(N_MOTOR / 3);
+  const regionLabels = IS_AGENT_BRAIN
+    ? ['reinforce', 'adjust', 'explore']
+    : ['buy', 'sell', 'hold'];
+  const regionBounds = [
+    { start: 0, end: third },
+    { start: third, end: 2 * third },
+    { start: 2 * third, end: N_MOTOR },
+  ];
+  if (window === 0) {
+    const result = { avg_rate: 0, raw: {} };
+    regionLabels.forEach(l => { result[l + '_signal'] = 0; result.raw[l] = 0; });
+    result.raw.total = 0;
+    return result;
   }
-  let buyCount = 0, sellCount = 0, holdCount = 0, totalCount = 0;
+  const counts = [0, 0, 0];
+  let totalCount = 0;
   for (let i = spikeHistory.length - window; i < spikeHistory.length; i++) {
     const entry = spikeHistory[i];
     for (const s of entry.spikes) {
-      if (buyNeurons.includes(s)) buyCount++;
-      if (sellNeurons.includes(s)) sellCount++;
-      if (holdNeurons.includes(s)) holdCount++;
-      if (s >= motorStart) totalCount++;
+      if (s >= motorStart && s < motorStart + N_MOTOR) {
+        const m = s - motorStart;
+        for (let r = 0; r < 3; r++) {
+          if (m >= regionBounds[r].start && m < regionBounds[r].end) { counts[r]++; break; }
+        }
+        totalCount++;
+      }
     }
   }
   const scale = 1000 / (window * DT);
-  return {
-    buy_signal: parseFloat((buyCount * scale / buyNeurons.length).toFixed(2)),
-    sell_signal: parseFloat((sellCount * scale / sellNeurons.length).toFixed(2)),
-    hold_signal: parseFloat((holdCount * scale / holdNeurons.length).toFixed(2)),
+  const result = {
     avg_rate: parseFloat((totalCount * scale / N_MOTOR).toFixed(2)),
     motor_rates: parseFloat((totalCount * scale / N_MOTOR).toFixed(2)),
-    raw: { buy: buyCount, sell: sellCount, hold: holdCount, total: totalCount }
+    raw: { total: totalCount },
   };
+  regionLabels.forEach((l, i) => {
+    const regionSize = regionBounds[i].end - regionBounds[i].start;
+    result[l + '_signal'] = parseFloat((counts[i] * scale / regionSize).toFixed(2));
+    result.raw[l] = counts[i];
+  });
+  return result;
 }
 
 function stimulateFromPrice(priceData) {
@@ -474,7 +508,9 @@ const PREFERENCE_FEATURES = [
 ];
 
 function stimulateFromPreference(data) {
-  const pref = sensoryAssignments.preference;
+  const pref = IS_AGENT_BRAIN
+    ? { start: 0, count: N_SENSORY }
+    : sensoryAssignments.preference;
   if (!pref || pref.count < 6) return { error: 'Preference zone too small or not configured' };
   const features = data.features || {};
   const feedback = data.feedback;
@@ -622,7 +658,11 @@ function getArchitecture() {
     sensory_assignments: sensoryAssignments,
     antenna_sub_groups: antennaSubGroups,
     mushroom_body: mushroomBody,
-    motor_regions: {
+    motor_regions: IS_AGENT_BRAIN ? {
+      reinforce: { start: 0, count: Math.floor(N_MOTOR / 3), desc: 'Strengthen current preferences' },
+      adjust:    { start: Math.floor(N_MOTOR / 3), count: Math.floor(N_MOTOR / 3), desc: 'Modify/adapt preferences' },
+      explore:   { start: Math.floor(2 * N_MOTOR / 3), count: N_MOTOR - Math.floor(2 * N_MOTOR / 3), desc: 'Try new response patterns' },
+    } : {
       buy:  { start: 0, count: Math.floor(N_MOTOR / 3) },
       sell: { start: Math.floor(N_MOTOR / 3), count: Math.floor(N_MOTOR / 3) },
       hold: { start: Math.floor(2 * N_MOTOR / 3), count: N_MOTOR - Math.floor(2 * N_MOTOR / 3) },
@@ -977,6 +1017,8 @@ async function handleRequest(req, res) {
   if (m === 'OPTIONS') return respond(res, 200, {});
 
   if (m === 'GET' && p === '/status') {
+    const arch = getArchitecture();
+    const rates = isBooted ? getMotorRates() : {};
     return respond(res, 200, {
       instance_id: BRAIN_INSTANCE_ID,
       loaded: isBooted,
@@ -987,6 +1029,8 @@ async function handleRequest(req, res) {
       running: isBooted,
       regions: { sensory: N_SENSORY, inter: N_INTER, motor: N_MOTOR },
       params: currentParams,
+      motor_regions: arch.motor_regions,
+      motor_rates: rates,
       patterns: Object.keys(patternMemory).length,
       pattern_instruments: Object.keys(patternMemory),
       weights_file: fs.existsSync(path.join(DATA_DIR, 'brain-weights.json')) ? 'brain-weights.json' : null,
@@ -1066,6 +1110,10 @@ async function handleRequest(req, res) {
     for (let s = 0; s < stepsToRun; s++) step(inputs);
     const rates = getMotorRates();
     return respond(res, 200, { timestamp: Date.now(), step_count: stepCount, ...rates });
+  }
+
+  if (IS_AGENT_BRAIN && (p === '/stimulate-price' || p === '/replay-trading' || p === '/backtest-train' || p === '/live-train' || p === '/proof-test' || p.startsWith('/cortex-'))) {
+    return respond(res, 404, { error: 'Trading-only endpoint not available on agent brain' });
   }
 
   if (m === 'POST' && p === '/stimulate-price') {
