@@ -53,10 +53,12 @@
       + '#ocn-brain-popup .bp-close{cursor:pointer;color:#8b949e;font-size:18px;line-height:1;padding:2px 6px;border-radius:4px}#ocn-brain-popup .bp-close:hover{background:#30363d;color:#e6edf3}'
       + '#ocn-brain-popup .bp-stats{display:flex;gap:12px;padding:8px 14px;border-bottom:1px solid #21262d;font-size:11px;color:#8b949e;flex-wrap:wrap}'
       + '#ocn-brain-popup .bp-stat-val{color:#e6edf3;font-weight:600;font-family:monospace}'
-      + '#ocn-brain-popup .bp-canvas-wrap{position:relative;height:calc(100% - 110px);background:#080c14}'
+      + '#ocn-brain-popup .bp-canvas-wrap{position:relative;height:calc(100% - 210px);background:#080c14}'
       + '#ocn-brain-popup canvas{width:100%;height:100%}'
       + '.bp-motor-bar{display:flex;gap:4px;padding:6px 14px;border-top:1px solid #21262d;font-size:10px}'
-      + '.bp-motor-item{flex:1;text-align:center;padding:3px 0;border-radius:4px;font-weight:600}';
+      + '.bp-motor-item{flex:1;text-align:center;padding:3px 0;border-radius:4px;font-weight:600}'
+      + '.bp-log{height:100px;overflow-y:auto;padding:6px 14px;border-top:1px solid #21262d;font-family:monospace;font-size:10px;color:#8b949e;background:#0d1117}'
+      + '.bp-log-entry{padding:1px 0}.bp-log-sugar{color:#3fb950}.bp-log-pain{color:#f85149}.bp-log-info{color:#bc8cff}';
     document.head.appendChild(style);
     document.documentElement.appendChild(nav);
 
@@ -65,7 +67,8 @@
     popup.innerHTML = '<div class="bp-header"><span class="bp-title">Agent Brain — Neural Activity</span><span class="bp-close" id="ocn-bp-close">×</span></div>'
       + '<div class="bp-stats" id="ocn-bp-stats"></div>'
       + '<div class="bp-canvas-wrap"><canvas id="ocn-bp-canvas"></canvas></div>'
-      + '<div class="bp-motor-bar" id="ocn-bp-motors"></div>';
+      + '<div class="bp-motor-bar" id="ocn-bp-motors"></div>'
+      + '<div id="ocn-bp-log" class="bp-log"></div>';
     document.body.appendChild(popup);
 
     document.getElementById('ocn-brain-pill').addEventListener('click', function() {
@@ -358,8 +361,25 @@
 
   function startActivityPoll() {
     stopActivityPoll();
-    _lastActivityTs = Date.now() - 30000;
-    pollActivity();
+    var logEl = document.getElementById('ocn-bp-log');
+    if (logEl) logEl.innerHTML = '';
+    _lastActivityTs = Date.now() - 60000;
+    brainFetch('/api/agent-brain/activity?since=' + _lastActivityTs).then(function(data) {
+      if (!data) return;
+      if (logEl) {
+        var line = document.createElement('div');
+        line.className = 'bp-log-entry bp-log-info';
+        line.textContent = '[' + new Date().toLocaleTimeString() + '] Agent brain live — stimulations: ' + (data.stimulations || 0) + ' | steps: ' + (data.brainSteps || 0);
+        logEl.appendChild(line);
+      }
+      if (data.events) {
+        for (var i = 0; i < data.events.length; i++) {
+          var evt = data.events[i];
+          if (evt.ts > _lastActivityTs) _lastActivityTs = evt.ts;
+          addBrainLog(evt);
+        }
+      }
+    });
     _activityPollTimer = setInterval(pollActivity, 2000);
   }
 
@@ -376,10 +396,26 @@
           var evt = data.events[i];
           if (evt.ts > _lastActivityTs) _lastActivityTs = evt.ts;
           triggerActivityBurst(evt.type, evt.sentiment);
+          addBrainLog(evt);
         }
         refreshBrainPopup();
       }
     });
+  }
+
+  function addBrainLog(evt) {
+    var logEl = document.getElementById('ocn-bp-log');
+    if (!logEl) return;
+    var ts = new Date(evt.ts).toLocaleTimeString();
+    var cls = evt.type === 'sugar' ? 'bp-log-sugar' : 'bp-log-pain';
+    var br = evt.brainResponse || {};
+    var sig = 'R:' + (br.reinforce_signal || 0).toFixed(1) + ' A:' + (br.adjust_signal || 0).toFixed(1) + ' E:' + (br.explore_signal || 0).toFixed(1);
+    var line = document.createElement('div');
+    line.className = 'bp-log-entry ' + cls;
+    line.textContent = '[' + ts + '] ' + evt.sentiment + ' → ' + evt.type + ' | ' + sig;
+    logEl.appendChild(line);
+    if (logEl.children.length > 50) logEl.removeChild(logEl.firstChild);
+    logEl.scrollTop = logEl.scrollHeight;
   }
 
   function triggerActivityBurst(type, sentiment) {

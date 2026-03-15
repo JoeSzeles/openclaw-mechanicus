@@ -49,6 +49,7 @@ let _nfLastBackup = 0;
 let _agentBrainStepCount = 0;
 let _agentBrainStepLastCheck = 0;
 const _recentBrainActivity = [];
+let _agentBrainStimulationCount = 0;
 
 const POSITIVE_KEYWORDS = ["good", "great", "perfect", "yes", "nice", "excellent", "love", "awesome", "correct", "exactly", "thanks", "thank you", "well done", "brilliant", "solid", "works", "beautiful", "amazing"];
 const NEGATIVE_KEYWORDS = ["no", "wrong", "bad", "redo", "fix", "broken", "terrible", "useless", "stop", "fail", "error", "crash", "crap", "rubbish", "awful", "horrible", "doesn't work", "not right", "not what"];
@@ -372,8 +373,7 @@ async function queryBrainMotorRates() {
 }
 
 async function buildFullPreferenceContext() {
-  const brainSteps = await checkAgentBrainSteps();
-  if (brainSteps < 20) return "";
+  if (_agentBrainStimulationCount < 3) return "";
   let ctx = buildPreferenceContext();
   const motorRates = await queryBrainMotorRates();
   if (motorRates && motorRates.motor_rates) {
@@ -555,7 +555,8 @@ async function processNeuralFeedback(userText, agentId) {
   );
 
   const brainSig = brainResponse ? " (R=" + (brainResponse.reinforce_signal || 0).toFixed(2) + " A=" + (brainResponse.adjust_signal || 0).toFixed(2) + " E=" + (brainResponse.explore_signal || 0).toFixed(2) + ")" : " (brain offline)";
-  console.log("[neural-feedback] " + sentiment + " (" + score.toFixed(2) + ") from " + (agentId || "user") + " → brain " + feedback + brainSig);
+  console.log("[neural-feedback] " + sentiment + " (" + score.toFixed(2) + ") from " + (agentId || "user") + " → agent brain " + feedback + brainSig);
+  if (brainResponse) _agentBrainStimulationCount++;
   _recentBrainActivity.push({ ts: Date.now(), type: feedback, sentiment, brainResponse: brainResponse || null });
   if (_recentBrainActivity.length > 50) _recentBrainActivity.splice(0, _recentBrainActivity.length - 50);
   return record;
@@ -6040,7 +6041,7 @@ async function handleApi(req, res) {
     if (!authGateway(req) && !validateLoginSession(req)) return json(res, 401, { error: "Unauthorized" }), true;
     const since = parseInt(url.searchParams.get("since") || "0", 10);
     const events = _recentBrainActivity.filter(e => e.ts > since);
-    return json(res, 200, { events, brainSteps: _agentBrainStepCount }), true;
+    return json(res, 200, { events, brainSteps: _agentBrainStepCount, stimulations: _agentBrainStimulationCount }), true;
   }
 
   if (p.startsWith("/api/agent-brain/") || p === "/api/agent-brain") {
@@ -6804,7 +6805,7 @@ server.on("upgrade", (req, socket, head) => {
               } else {
                 console.log("[neural-feedback:intercept] no _lastAgentResponse yet — skipping");
               }
-              if (_agentBrainStepCount >= 20) {
+              if (_agentBrainStimulationCount >= 3) {
                 const prefCtx = buildPreferenceContext();
                 if (prefCtx) {
                   frame.params.message = originalUserMsg + "\n\n---\n" + prefCtx;
@@ -6813,7 +6814,7 @@ server.on("upgrade", (req, socket, head) => {
                   console.log("[neural-feedback:inject] Injected preference context (" + prefCtx.length + " chars) into chat.send");
                 }
               } else {
-                console.log("[neural-feedback:inject] Skipped — agent brain fresh (steps=" + _agentBrainStepCount + ")");
+                console.log("[neural-feedback:inject] Skipped — agent brain learning (stimulations=" + _agentBrainStimulationCount + "/3)");
               }
             }
           }
@@ -6866,7 +6867,7 @@ server.listen(PROXY_PORT, "0.0.0.0", () => {
   } catch (e) {
     console.log("[startup] Agent brain start error:", e.message);
   }
-  setTimeout(() => { checkAgentBrainSteps().then(s => console.log("[startup] Agent brain steps: " + s + (s < 20 ? " (fresh — preference injection disabled until 20+ steps)" : " (active — preference injection enabled)"))); }, 8000);
+  setTimeout(() => { checkAgentBrainSteps().then(s => console.log("[startup] Agent brain steps: " + s + ", stimulations this session: " + _agentBrainStimulationCount + (_agentBrainStimulationCount < 3 ? " (fresh — preference injection disabled until 3+ real stimulations)" : " (active)"))); }, 8000);
   setInterval(() => { checkAgentBrainSteps().catch(() => {}); }, 30000);
   setTimeout(async () => {
     try { const sdb = require("./skills/bots/ig-scalper-db.cjs"); await sdb.ensurePriceCandlesTable(); console.log("[startup] price_candles table ready"); } catch (e) { console.log("[startup] price_candles init failed:", e.message); }

@@ -610,9 +610,9 @@ function renderNfHistory(history) {
     if (r.brainResponse) {
       var br = r.brainResponse;
       var signals = [];
-      if (br.reinforce_signal) signals.push('R:' + br.reinforce_signal);
-      if (br.adjust_signal) signals.push('A:' + br.adjust_signal);
-      if (br.explore_signal) signals.push('E:' + br.explore_signal);
+      if (br.reinforce_signal !== undefined) signals.push('R:' + Number(br.reinforce_signal).toFixed(1));
+      if (br.adjust_signal !== undefined) signals.push('A:' + Number(br.adjust_signal).toFixed(1));
+      if (br.explore_signal !== undefined) signals.push('E:' + Number(br.explore_signal).toFixed(1));
       brainSig = signals.length ? signals.join(' ') : '-';
     } else { brainSig = '-'; }
 
@@ -849,6 +849,18 @@ function cbRefreshStatus() {
       cbRenderMB('agent', data.mushroom_body);
       cbRenderMotors('agent', data.regions, data.motor_regions);
       cbAddLog('Agent brain: ' + total + ' neurons, ' + (data.synapses_count || 0) + ' synapses, step ' + (data.step_count || 0));
+      apiFetch('/api/agent-brain/activity?since=0').then(function(r) { return r.json(); }).then(function(act) {
+        if (act && act.stimulations !== undefined) {
+          cbAddLog('Session stimulations: ' + act.stimulations + ' | Recent events: ' + (act.events ? act.events.length : 0));
+          if (act.events) {
+            act.events.slice(-5).forEach(function(evt) {
+              var ts = new Date(evt.ts).toLocaleTimeString();
+              var br = evt.brainResponse || {};
+              cbAddLog('  [' + ts + '] ' + evt.sentiment + ' → ' + evt.type + ' | R:' + (br.reinforce_signal || 0).toFixed(1) + ' A:' + (br.adjust_signal || 0).toFixed(1) + ' E:' + (br.explore_signal || 0).toFixed(1));
+            });
+          }
+        }
+      }).catch(function() {});
     } else {
       indicator.style.background = '#21262d'; indicator.style.color = '#8b949e';
       status.textContent = 'Not running'; status.style.color = '#f85149';
